@@ -305,7 +305,11 @@ jobs:
     timeout-minutes: 60
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-49
-      options: --privileged
+      # /var/lib/flatpak as a volume (Docker copies the image's runtimes into
+      # it): when Flathub has a newer GNOME SDK than the image, flatpak renames
+      # the old deployment, which overlayfs refuses for directories of the
+      # image ("Invalid cross-device link", then a crash – PR #295).
+      options: --privileged --volume /var/lib/flatpak
     strategy:
       fail-fast: false
       matrix:
