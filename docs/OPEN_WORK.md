@@ -143,6 +143,11 @@ feature milestone – the features in *What works* are enough; what is missing i
   SmartScreen and Gatekeeper
 - [ ] Desktop app run and tested on Windows x64/ARM64, macOS and Linux for each RC (a short manual test script in
   `docs/src/dev/release-checklist.md`)
+- [x] One download to try TeamCraft on a laptop: desktop installers *with local server* (Windows x64, macOS Apple
+  silicon, Linux x86_64 AppImage) with the server and PostgreSQL, *Try TeamCraft on this computer*, and
+  `teamcraft local` for an installed PostgreSQL ([research](src/research/local-test-server.md),
+  [guide](src/guide/local-server.md)). Left: the manual check in section 3; Windows ARM64 and Linux ARM64 variants if
+  testers ask
 - [x] Accessibility: keyboard use and screen-reader labels on the main web flows checked (WCAG 2.2 AA for contrast
   is already tested) – `every_rendered_page_is_accessible` checks labels, accessible names, `alt`, `tabindex`,
   `lang`, heading levels and `<th scope>` on every rendered page; sign-in, new item, check-in, BOM and new change
@@ -354,6 +359,9 @@ half a state behind. Prefer tests that fail on a real regression over tests that
   [platforms/windows.md](../platforms/windows.md))
 - [ ] Install and start the release Flatpak bundles (x86_64, aarch64) and the portable Windows zips (x64, arm64) once –
   built and checked as files only (#66); GNOME runtime 49 may be end of life on Flathub, move to the current one
+- [ ] Install the three installers *with local server* once on real computers and click *Try TeamCraft on this
+  computer* – CI starts each installer's bundled server (first start, setup page, clean stop) but not the app's
+  button; on macOS check whether Gatekeeper lets the quarantined app start `teamcraft-server` and PostgreSQL
 - [ ] Release v0.1.0 again from the current `main` (re-tag), when asked – the published v0.1.0 is from `6f68f9a` and
   has no Flatpak, Windows ARM64 or portable builds
 

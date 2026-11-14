@@ -139,6 +139,10 @@ pub struct Settings {
     /// After a crash, ask at the next start whether to share the crash report
     /// (src/crash.rs); `None` = ask. Reports are never sent without asking.
     pub crash_prompt: Option<bool>,
+    /// The port of the local test server (*Try TeamCraft on this computer*,
+    /// src/localserver.rs). While `server_url` is `http://127.0.0.1:<this
+    /// port>`, the app starts that server when it starts.
+    pub local_server_port: Option<u16>,
     /// Not stored in settings.json.
     #[serde(skip)]
     pub token: Option<String>,

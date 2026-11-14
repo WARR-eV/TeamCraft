@@ -16,6 +16,7 @@
       It is only offered while the server listens on this computer (localhost).</p>
     {% if error %}<div class="flash flash-error" role="alert">{{ error }}</div>{% endif %}
     <form class="stack" method="post" action="/setup">
+      <input type="hidden" name="next" value="{{ next }}">
       <label>Username <input type="text" name="username" value="{{ username or 'admin' }}" autocomplete="username" required autofocus></label>
       <label>Display name <input type="text" name="display_name" placeholder="Administrator" maxlength="200"></label>
       <label>Password <span class="hint">at least 10 characters</span>

@@ -130,6 +130,14 @@ jobs:
       TEAMCRAFT_REQUIRE_PG_TOOLS: "1"
     steps:
       - uses: actions/checkout@v4
+      # The debug builds of every test binary, the server binary and the
+      # second build of `cargo run` filled the runner's disk (PR #295):
+      # drop preinstalled SDKs this job never uses (about 20 GB).
+      - name: Free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift
+          df -h /
       - name: PostgreSQL ${{ matrix.postgres }} client tools (pg_dump, pg_restore)
         run: |
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y

@@ -405,15 +405,44 @@ whose newer revision takes the place, stay where they are; files you
 changed are moved first. Identical copies are removed, emptied old folders
 too, and every step is written to `.teamcraft/migration.log`.
 
-## Run it
+## Install or run it
+
+The installers of every version are on the
+[Releases page](https://github.com/rudalabs/TeamCraft/releases) (see
+*Download* in the README for the file of each system). From source:
 
 ```sh
 cd desktop
 cargo run            # Linux needs the WebKitGTK development packages
 ```
 
-The platform guides list the system packages. Installers are not published
-yet; the app is built and tested from source.
+The platform guides list the system packages.
+
+## Try TeamCraft on this computer
+
+The downloads **with local server** (Windows x64 `-setup.exe`, macOS `.dmg`,
+Linux `.AppImage`, named `TeamCraft-with-local-server_…`) also contain the
+server, as `teamcraft-server`, and PostgreSQL's programs. Their connect screen
+offers **Try TeamCraft on this computer** below the server address:
+
+1. The app starts `teamcraft-server local` – a private PostgreSQL cluster and
+   the server, both only on `127.0.0.1` – and waits until it is ready (the
+   first start creates the database).
+2. The server's address `http://127.0.0.1:<port>` becomes the app's server,
+   and the browser sign-in opens. On the first start the browser shows
+   *Create the administrator*; afterwards it continues to the confirmation of
+   the app's sign-in.
+3. While the local server is the configured server, the app starts it again
+   at every launch (the splash says *Starting the local TeamCraft server …*).
+   It keeps the port, so the address and the token stay the same; if another
+   program took the port meanwhile, the app picks a free one and follows.
+
+The server stops when the app ends – also when it crashes: the app keeps a
+pipe to the server's standard input open, and the server shuts itself and
+PostgreSQL down when it closes. Its output goes to `local-server.log` in the
+app's settings folder; the data is in the per-user data folder shared with
+`teamcraft local` – see [Try it on your computer](local-server.md). The
+regular installers do not show the button.
 
 ## Update notice
 

@@ -67,7 +67,8 @@
 
 | Path                                 | Contents                                                                                                                                                          |
 |--------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `src/main.rs`                        | CLI: serve, migrate, user (incl. `holdings`, `deactivate`), vault check/signatures, assistant check, rescan-references, healthcheck, mcp (stdio bridge)          |
+| `src/main.rs`                        | CLI: serve, local, migrate, user (incl. `holdings`, `deactivate`), vault check/signatures, assistant check, rescan-references, healthcheck, mcp (stdio bridge)          |
+| `src/localserver.rs`                | `teamcraft local`: a private PostgreSQL cluster (bundled or installed programs, scram password, 127.0.0.1 only) and the server for a test installation; started by the desktop app *with local server* |
 | `src/lib.rs`                         | `AppState`, router, health endpoints, security headers, the OIDC back-channel logout route (outside the web pages' CSRF guard)                                    |
 | `src/domain.rs`                      | roles, lifecycle, revision letters, skins, validation                                                                                                             |
 | `src/services/`                      | items, revisions, files, chunked uploads, BOM, changes, references, impacts, simulations, projects, users, …; offboarding: `offboarding` (holdings report, idle SSO users), `checkouts`, `deactivation`, `ownership`, `manager_gaps`, `season` |

@@ -74,6 +74,20 @@ pub struct SetupForm {
     password: String,
     #[serde(default)]
     password_repeat: String,
+    /// Where the login page was going (e.g. the desktop app's
+    /// `/desktop/authorize?…`), so that the first start continues there.
+    #[serde(default)]
+    next: Option<String>,
+}
+
+/// Where the first-start setup continues: the page the login was opened for,
+/// or the project groups (the first thing to create) instead of the empty
+/// dashboard.
+fn setup_target(next: Option<&str>) -> &str {
+    match next.map(str::trim) {
+        Some(n) if !n.is_empty() && n != "/" => n,
+        _ => "/projects",
+    }
 }
 
 pub async fn setup_submit(
@@ -97,13 +111,18 @@ pub async fn setup_submit(
             let token =
                 users::create_session(&st.db, user.id, st.config.session_ttl, users::SignIn::Setup)
                     .await?;
-            Ok(signed_in_redirect(&st, &user, &token, Some("/projects")))
+            Ok(signed_in_redirect(
+                &st,
+                &user,
+                &token,
+                Some(setup_target(form.next.as_deref())),
+            ))
         }
         Err(e) if super::is_user_error(&e) => {
             let mut page = render_login(
                 &st,
                 LoginPage {
-                    next: None,
+                    next: form.next.as_deref(),
                     error: Some(e.public_message()),
                     flash: None,
                     username: form.username.trim(),
@@ -410,5 +429,23 @@ pub async fn oidc_callback(
             Ok(page)
         }
         Err(e) => Err(e),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::setup_target;
+
+    /// The first start continues where the login page was going (the
+    /// desktop app's authorize page), otherwise at the project groups.
+    #[test]
+    fn setup_continues_at_next() {
+        assert_eq!(
+            setup_target(Some("/desktop/authorize?port=5&state=x")),
+            "/desktop/authorize?port=5&state=x"
+        );
+        assert_eq!(setup_target(None), "/projects");
+        assert_eq!(setup_target(Some("")), "/projects");
+        assert_eq!(setup_target(Some("/")), "/projects");
     }
 }

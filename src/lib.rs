@@ -37,6 +37,7 @@ pub mod invasm;
 pub mod invpart;
 pub mod invplace;
 pub mod llm;
+pub mod localserver;
 pub mod malware;
 pub mod massprops;
 pub mod mattermost;

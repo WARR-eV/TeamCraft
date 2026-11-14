@@ -1167,6 +1167,15 @@ async fn first_start_creates_the_administrator() {
     let origin = Some("http://localhost:8080");
     let html = app.get_page("/login", None).await.text();
     assert!(html.contains("Create the administrator"), "no accounts yet");
+    let html = app
+        .get_page("/login?next=%2Fdesktop%2Fauthorize%3Fport%3D1234", None)
+        .await
+        .text();
+    assert!(
+        // MiniJinja escapes `/` in attribute values
+        html.contains(r#"name="next" value="&#x2f;desktop&#x2f;authorize?port=1234""#),
+        "the setup form keeps where the login was going"
+    );
     let r = app
         .post_form(
             "/setup",
@@ -1191,11 +1200,17 @@ async fn first_start_creates_the_administrator() {
                 ("display_name", "Root"),
                 ("password", "long enough password"),
                 ("password_repeat", "long enough password"),
+                // the login page was opened for the desktop app's sign-in
+                ("next", "/desktop/authorize?port=1234&state=s"),
             ],
         )
         .await;
     assert_eq!(r.status, StatusCode::SEE_OTHER, "{}", r.text());
-    assert_eq!(r.header("location").as_deref(), Some("/projects"));
+    assert_eq!(
+        r.header("location").as_deref(),
+        Some("/desktop/authorize?port=1234&state=s"),
+        "the first start continues where the login was going"
+    );
     let session = r
         .headers
         .get_all("set-cookie")

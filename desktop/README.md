@@ -20,6 +20,7 @@ TeamCraft server – it is a client, not an offline copy.
 | Area | What the desktop app does |
 |---|---|
 | Sign-in | **Sign in with the browser** (single sign-on or password, confirmed on a TeamCraft page) or a personal access token; *cancel* stops the sign-in at once |
+| Local test server | Downloads *with local server* only: *Try TeamCraft on this computer* on the connect screen starts the bundled `teamcraft-server local` (private PostgreSQL + server on 127.0.0.1), signs in through the browser (the first start creates the administrator there) and starts the server again at every launch while it is the configured server; it stops when the app ends (`src/localserver.rs`, log in `local-server.log`) |
 | Navigator | *Home*: a file browser of the **active project group** – *Files*: its folders and the files in them, as in the working folder (folders first, then the files by name – case-blind, digits by value; one folder per request from `GET /projects/{code}/files`, 500 entries at a time with *show … more*; items without files below the files; with an older server the items instead), *All items*: every item in one list, or the *Structure* view. The name comes first (the number/revision dimmed after it); sorted by name, number, type or state (kept per computer); *Projects* (`Ctrl/Cmd+5`): choose the active group (mine first), create a group (*New*, CAD editors), *Get…* groups into the workspace, *Import CAD folder…*. Both are loaded again on *Refresh* (a group created in the web UI shows without a restart); *My Worklist* (check-outs, reviews, my open changes); change orders by status; full-text search |
 | Toolbar | Below the tab strip, acting on the active tab: grouped buttons that keep their place (revision: Lock · Work · Lifecycle · Collaborate; change: Review · Lifecycle · Collaborate; request: Triage · Requester · Collaborate), the **next step highlighted** (*Check out*, *Check in…* with local changes, *Release…* on a clean check-out, *Revise* when released, *Submit for review* / *Approve change* on a change), greyed-out buttons with a tooltip saying why, rare actions (*Pack and Go…*, *Open in browser*, *Refresh*, *Mark obsolete…*) in **More ▾** – keyboard: `Enter`/`Space`/`↓` open, arrows move, `Esc` closes |
 | Tab order | Drag a tab to move it (pointer events, an insertion bar shows the landing place, the strip scrolls at its edges, `Esc` cancels; a plain click still activates, a dragged tab keeps its state and is not activated). Keyboard: arrow keys, `Home`, `End` move the focus between the tabs (WAI-ARIA tabs, roving tabindex, `Enter`/`Space` activates), `Ctrl+Shift+PageUp/PageDown` move the active tab. Right click (or the menu key): *Move to start*, *Move to end*, *Close*, *Close others*, *Close tabs to the right*. The order is kept while the app runs (open tabs are not restored on start). Rules in `ui/js/tab-order.js`, tested by `scripts/desktop-tab-order.test.mjs` (`node`); the dragging itself is checked by hand |
@@ -63,14 +64,29 @@ x86_64; Windows ARM64 runs as a preview that never blocks. A separate job
 parses every script of `ui/`, the web UI and `shared/` (`node --check`; Node.js is only
 used by CI, the app has no build step). Nothing is packaged or published.
 
-## Run from source
+## Download or run from source
 
-There is no release yet. The release workflow already builds the installers
-(Linux AppImage/`.deb`/`.rpm` and a Flatpak bundle for x86_64 and aarch64,
-macOS `.dmg`, Windows x64 and ARM64 `.msi`/`-setup.exe` plus a portable
-`.zip` with `TeamCraft.exe`, which needs the WebView2 runtime of Windows
-10/11) – see *Download* in the [main README](../README.md#download). Until the
-first release, build and run the app locally. Linux needs
+The installers of every tagged version (0.x pre-releases) are on the
+[Releases page](https://github.com/rudalabs/TeamCraft/releases): Linux
+AppImage/`.deb`/`.rpm` and a Flatpak bundle for x86_64 and aarch64, macOS
+`.dmg`, Windows x64 and ARM64 `.msi`/`-setup.exe` plus a portable `.zip` with
+`TeamCraft.exe`, which needs the WebView2 runtime of Windows 10/11 – see
+*Download* in the [main README](../README.md#download).
+
+**With local server.** `TeamCraft-with-local-server_…` (Windows x64
+`-setup.exe`, macOS `.dmg`, Linux x86_64 `.AppImage`) is the same app plus the
+server (`teamcraft-server`, a Tauri `externalBin`) and PostgreSQL's programs
+(resources `postgresql/`). Its connect screen offers *Try TeamCraft on this
+computer* (`src/localserver.rs`): the app starts `teamcraft-server local
+--port <p> --exit-with-stdin`, waits for `/readyz` and signs in through the
+browser; the server stops when the app ends. The release job `local-server`
+builds it with `tauri.local-server.conf.json`; to build it locally, put the
+server binary at `binaries/teamcraft-server-<target triple>[.exe]` and
+PostgreSQL's `bin/`, `lib/`, `share/` under `local-server/postgresql/`, then
+`cargo tauri build --config tauri.local-server.conf.json`. See
+[Try it on your computer](../docs/src/guide/local-server.md).
+
+To build and run the app locally, Linux needs
 the WebKitGTK development files:
 
 ```sh
@@ -124,6 +140,9 @@ Where the app keeps its data:
   *Settings*; the next start with a keychain moves the file into it (also the file of older app
   versions). On macOS an unsigned build may ask once whether TeamCraft may use the keychain item (again after an update);
 * the working folder: `Documents/TeamCraft/<project group>/<folder>/<file>` with `Documents/TeamCraft/.teamcraft/state.json` (configurable in *Settings*).
+* the local test server (downloads *with local server*): its data in the per-user data directory shared
+  with `teamcraft local` (`~/.local/share/teamcraft/local-server`, `~/Library/Application Support/TeamCraft/local-server`,
+  `%LOCALAPPDATA%\TeamCraft\local-server`), its port in the settings, its output in `local-server.log` next to them.
 
 ## Layout
 
@@ -140,6 +159,7 @@ src/commands.rs    the commands the UI calls (every network and file access)
 src/api.rs         REST client (/api/v1, bearer token) – the web view never talks to the server
 src/abortable.rs   Cancel of long operations: streamed check-in body that stops half-way, Pack and Go download dropped on cancel
 src/signin.rs      browser sign-in: PKCE, loopback listener on 127.0.0.1
+src/localserver.rs *Try TeamCraft on this computer*: finds the bundled teamcraft-server and postgresql/bin, starts `teamcraft-server local`, waits for /readyz
 src/compat.rs      version handshake (pure): does the app fit the server version (also tested by tests/desktop_compat.rs)
 src/layout.rs      working-folder rules (pure): folder mapping, state.json, Get planning, migration planning, local changes before Check in all / sign-out
 src/resume.rs      Get resumes a large file half-way: partial file per content, Range/If-Range, SHA-256 check before the rename
