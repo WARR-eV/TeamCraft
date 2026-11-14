@@ -30,6 +30,9 @@ export function revViewer(tab, el) {
   tab.viewerFile = current.id;
   var canvas = h("canvas.viewer-canvas", { tabindex: "0", "aria-label": "3D view of " + current.filename });
   var status = h("p.small.muted", { role: "status", text: "Loading" });
+  // "Loading …" and every error on the canvas itself: the status line below
+  // can be out of view, which left a failed preview a silent black canvas (#290)
+  var overlay = h("div.viewer-overlay.is-busy", null, h("span", { text: "Loading the 3D model …" }));
   var resetBtn = h("button.small", { type: "button", title: "Back to the initial view (double-click)" }, "Reset view");
   var upBtn = h("button.small", { type: "button", title: "Switch between Z-up and Y-up models" }, "Z up");
   // STL export of STEP/3MF/… models (e.g. for 3D printing); saved through a native dialog in Rust.
@@ -54,20 +57,29 @@ export function revViewer(tab, el) {
         on: { click: function () { tab.viewerFile = f.id; tab.viewerVersion = null; renderActive(); } }
       }, f.filename + "  v" + f.version);
     }))),
-    h("div", null, [canvas, h("div.viewer-bar", null, [status, h("div.row", null, [upBtn, resetBtn, stlBtn])]),
+    h("div", null, [h("div.viewer-stage", null, [canvas, overlay]), h("div.viewer-bar", null, [status, h("div.row", null, [upBtn, resetBtn, stlBtn])]),
       h("p.hint", { text: "Drag to rotate, wheel to zoom, arrow keys to turn, double-click to reset." })])
   ]));
   // the server converts the file into a mesh (pure Rust) – the app only draws it
   var versionId = tab.viewerVersion;
-  state.viewer = window.TeamCraftViewer.mount(canvas, {
-    statusEl: status,
-    resetBtn: resetBtn,
-    upBtn: upBtn,
-    onReady: function () { if (stlBtn) stlBtn.disabled = false; },
-    load: function () {
-      return invoke("file_bytes", versionId ? { kind: "version-mesh", id: versionId } : { kind: "mesh", id: current.id });
-    }
-  });
+  try {
+    state.viewer = window.TeamCraftViewer.mount(canvas, {
+      statusEl: status,
+      overlayEl: overlay,
+      resetBtn: resetBtn,
+      upBtn: upBtn,
+      onReady: function () { if (stlBtn) stlBtn.disabled = false; },
+      load: function () {
+        return invoke("file_bytes", versionId ? { kind: "version-mesh", id: versionId } : { kind: "mesh", id: current.id });
+      }
+    });
+  } catch (err) {
+    // the viewer script itself failed: still no silent canvas
+    clear(overlay);
+    overlay.className = "viewer-overlay is-error";
+    overlay.appendChild(h("span", { text: "The 3D view could not start: " + errorText(err) }));
+    status.textContent = errorText(err);
+  }
 }
 
 // ---------------------------------------------------------------- workspace

@@ -31,6 +31,8 @@
     <canvas id="viewer-canvas" class="viewer-canvas" tabindex="0" data-src="/file-versions/{{ shown.id }}/mesh"
             {% if not is_points %}data-notes="/file-versions/{{ shown.id }}/annotations"{% endif %}
             data-name="{{ file.filename }}" aria-label="3D view of {{ file.filename }} version {{ shown.version }}"></canvas>
+    {#- loading and errors on the canvas itself, never only below it (#290) -#}
+    <div id="viewer-overlay" class="viewer-overlay is-busy"><span>Loading the 3D model …</span></div>
     {#- the view controls sit on the canvas, so they are never below the fold -#}
     <div class="viewer-tools actions" role="toolbar" aria-label="View">
       <button id="viewer-up" class="small" type="button" title="Switch between Z-up (most CAD programs, 3D printing) and Y-up models (glTF, games)">Z up</button>

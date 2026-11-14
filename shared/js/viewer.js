@@ -17,11 +17,46 @@
 (function () {
   "use strict";
 
+  var MAGIC = "TCMESH01";
+
+  /**
+   * Why a TCMESH01 buffer (see Mesh::encode: magic, vertex and index counts,
+   * parts, flags, bounds, then the arrays) cannot be shown, or null. An
+   * empty, cut-off or invalid model must end in a message, never in a
+   * silently empty canvas (#290).
+   */
+  function checkMesh(buffer) {
+    var none = "The server sent no 3D model.";
+    if (!buffer || typeof buffer.byteLength !== "number" || buffer.byteLength < 48) return none;
+    var head = new Uint8Array(buffer, 0, 8);
+    for (var i = 0; i < MAGIC.length; i++) {
+      if (head[i] !== MAGIC.charCodeAt(i)) return none;
+    }
+    var dv = new DataView(buffer);
+    var vertices = dv.getUint32(8, true), indices = dv.getUint32(12, true), flags = dv.getUint32(20, true);
+    if (!vertices) return "The model is empty – the file has no geometry the preview can show.";
+    if (indices % 3) return "The model is damaged (an incomplete triangle).";
+    var need = 48 + vertices * 12 + indices * 4 + (flags & 1 ? vertices * 3 : 0);
+    if (buffer.byteLength < need) {
+      return "The model was cut off while loading (" + buffer.byteLength + " of at least " + need + " bytes) – try again.";
+    }
+    for (var b = 0; b < 6; b++) {
+      if (!isFinite(dv.getFloat32(24 + b * 4, true))) {
+        return "The model has invalid coordinates (NaN or infinite) and cannot be shown.";
+      }
+    }
+    return null;
+  }
+
   /**
    * Shows a model on `canvas`.
    *
    * options.load      () => Promise<ArrayBuffer> – the TCMESH01 mesh
    * options.statusEl, options.resetBtn, options.upBtn – optional elements
+   * options.overlayEl optional element over the canvas: shows "Loading …" and
+   *                   every error on the canvas itself, so a failed preview is
+   *                   never just an empty (dark) canvas; hidden once the model
+   *                   is shown
    * options.onReady   called when the model is shown
    *
    * Returns { exportStl() → ArrayBuffer (binary STL), dispose() }.
@@ -34,17 +69,41 @@
     var disposed = false;
     var windowListeners = [];
 
+    var overlayEl = options.overlayEl || null;
+
     function setStatus(text, isError) {
       if (!statusEl || disposed) return;
       statusEl.textContent = text;
       statusEl.className = isError ? "flash flash-error" : "small muted";
     }
 
+    // The state on the canvas: "busy" (loading), "error", or null (hidden).
+    function overlay(text, kind) {
+      if (!overlayEl || disposed) return;
+      overlayEl.textContent = "";
+      overlayEl.hidden = !kind;
+      overlayEl.className = "viewer-overlay" + (kind ? " is-" + kind : "");
+      if (!kind) return;
+      overlayEl.setAttribute("role", kind === "error" ? "alert" : "status");
+      var msg = document.createElement("span");
+      msg.textContent = text;
+      overlayEl.appendChild(msg);
+    }
+
+    // Every way the preview can fail ends here: a message in the status line
+    // and on the canvas, and data-ready="error" for scripts and tests.
+    function fail(text) {
+      if (disposed) return;
+      canvas.setAttribute("data-ready", "error");
+      setStatus(text, true);
+      overlay(text, "error");
+    }
+
     // ---------------------------------------------------------------- mesh
 
     function parseMesh(buffer) {
-      var magic = new TextDecoder().decode(new Uint8Array(buffer, 0, Math.min(8, buffer.byteLength)));
-      if (buffer.byteLength < 48 || magic !== "TCMESH01") throw new Error("The server sent no 3D model.");
+      var problem = checkMesh(buffer);
+      if (problem) throw new Error(problem);
       var dv = new DataView(buffer);
       var vertices = dv.getUint32(8, true), indices = dv.getUint32(12, true);
       var parts = dv.getUint32(16, true), flags = dv.getUint32(20, true);
@@ -217,11 +276,25 @@
 
     // ---------------------------------------------------------------- renderer
 
+    // what mount() returns when the 3D view cannot start at all
+    var inert = {
+      exportStl: function () { throw new Error("The 3D view is not available."); },
+      compare: function () { throw new Error("The 3D view is not available."); },
+      dispose: function () { disposed = true; }
+    };
     var gl = canvas.getContext("webgl2", { antialias: true });
     if (!gl) {
-      setStatus("Your browser does not support WebGL 2 – download the file to view it.", true);
-      return { exportStl: function () { throw new Error("No WebGL 2."); }, dispose: function () {} };
+      fail("Your browser does not support WebGL 2 – download the file to view it.");
+      return inert;
     }
+    // The GPU process may give up on a model (too large for its memory, a
+    // driver reset – seen as a silent black canvas in WebKit): say so.
+    canvas.addEventListener("webglcontextlost", function (e) {
+      e.preventDefault();
+      drawable = null;
+      fail("The graphics driver stopped the 3D view (WebGL context lost) – the model may be too large for this " +
+        "computer. Open the 3D viewer again to retry.");
+    });
 
     // Flat shading from screen-space derivatives: no normals have to be
     // transferred, and every face is lit from the viewer's side.
@@ -247,10 +320,20 @@
       return s;
     }
 
-    var program = gl.createProgram();
-    gl.attachShader(program, shader(gl.VERTEX_SHADER, VERT));
-    gl.attachShader(program, shader(gl.FRAGMENT_SHADER, FRAG));
-    gl.linkProgram(program);
+    var program;
+    try {
+      program = gl.createProgram();
+      gl.attachShader(program, shader(gl.VERTEX_SHADER, VERT));
+      gl.attachShader(program, shader(gl.FRAGMENT_SHADER, FRAG));
+      gl.linkProgram(program);
+      // an unlinked program draws nothing: a black canvas without a word
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS) && !gl.isContextLost()) {
+        throw new Error(gl.getProgramInfoLog(program) || "the shaders did not link");
+      }
+    } catch (e) {
+      fail("The 3D view could not start on this graphics driver: " + ((e && e.message) || e));
+      return inert;
+    }
     var loc = {
       pos: gl.getAttribLocation(program, "aPos"),
       col: gl.getAttribLocation(program, "aCol"),
@@ -756,6 +839,7 @@
     // ---------------------------------------------------------------- load
 
     setStatus("Loading the model …");
+    overlay("Loading the 3D model …", "busy");
     render();
     var loaded = null;
     Promise.resolve()
@@ -766,6 +850,19 @@
         frame(mesh);
         loaded = mesh;
         drawable = upload(mesh);
+        // a model the GPU cannot hold leaves nothing to draw (getError
+        // returns one queued error per call: look at a few)
+        var outOfMemory = false;
+        for (var k = 0; k < 8; k++) {
+          var code = gl.getError();
+          if (code === gl.NO_ERROR) break;
+          if (code === gl.OUT_OF_MEMORY) outOfMemory = true;
+        }
+        if (outOfMemory || gl.isContextLost()) {
+          drawable = null;
+          var count = mesh.indices ? (mesh.indices.length / 3).toLocaleString() + " triangles" : (mesh.positions.length / 3).toLocaleString() + " points";
+          throw new Error("The model (" + count + ") does not fit into the graphics memory of this computer.");
+        }
         if (mesh.fields.length) {
           legendView = legend(mesh, selectField);
           legendView.show(mesh.fields[0]);
@@ -774,13 +871,12 @@
         sectionEl = sectionControls();
         canvas.insertAdjacentElement("afterend", sectionEl);
         canvas.setAttribute("data-ready", "true");
+        overlay(null, null);
         if (options.onReady) options.onReady();
         redraw();
       })
       .catch(function (err) {
-        if (disposed) return;
-        canvas.setAttribute("data-ready", "error");
-        setStatus((err && err.message) || String(err), true);
+        fail((err && err.message) || String(err));
       });
 
     // Binary STL of the shown triangles, in model coordinates as in the file
@@ -838,7 +934,7 @@
     };
   }
 
-  window.TeamCraftViewer = { mount: mount };
+  window.TeamCraftViewer = { mount: mount, checkMesh: checkMesh };
 
   // Web pages: <canvas id="viewer-canvas" data-src [data-name]>.
   var canvas = document.getElementById("viewer-canvas");
@@ -867,6 +963,7 @@
         remove: function (id) { return notesRequest("POST", "/annotations/" + encodeURIComponent(id) + "/delete", {}); }
       } : null,
       statusEl: document.getElementById("viewer-status"),
+      overlayEl: document.getElementById("viewer-overlay"),
       resetBtn: document.getElementById("viewer-reset"),
       upBtn: document.getElementById("viewer-up"),
       onReady: function () { if (stlBtn) stlBtn.disabled = false; },

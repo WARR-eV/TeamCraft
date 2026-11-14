@@ -101,6 +101,14 @@ readers are part of TeamCraft. *Export STL* (in the toolbar on the view) saves t
 for 3D printing. The same conversion computes the shape signature of the
 [similar part search](similar-parts.md).
 
+While the model loads, the canvas says so, and when there is nothing to show
+the reason appears **on the canvas** (and in the line below it) – in the web
+UI and in the desktop app alike: the server's conversion error (for example a
+damaged or unsupported file), an empty, cut-off or invalid model, a graphics
+driver without WebGL 2 or one that could not compile the shaders, a model too
+large for the graphics memory, or a 3D view the graphics driver stopped
+(WebGL context lost). A preview never ends as a silently empty canvas.
+
 When a STEP preview shows only part of the model, the line below the viewer
 says **partial preview: N of M faces** – the missing faces use geometry the
 kernel cannot tessellate. Details: [STEP in the 3D preview](../reference/formats.md#step-in-the-3d-preview).
