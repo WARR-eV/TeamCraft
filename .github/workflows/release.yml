@@ -494,8 +494,10 @@ jobs:
           "$server" --version
           data="$tmp/tc-local"
           log="$tmp/local.log"
-          ( sleep 900 | "$server" local --data-dir "$data" --port 18080 --pg-bin "$pgbin" --exit-with-stdin \
-              > "$log" 2>&1; echo $? > "$tmp/local.status" ) &
+          # set +e: the test ends `sleep` on purpose, which fails the pipeline
+          # under pipefail; the server's own exit status is PIPESTATUS[1]
+          ( set +e; sleep 900 | "$server" local --data-dir "$data" --port 18080 --pg-bin "$pgbin" --exit-with-stdin \
+              > "$log" 2>&1; echo "${PIPESTATUS[1]}" > "$tmp/local.status" ) &
           ready=""
           for _ in $(seq 1 120); do
             if curl -fsS http://127.0.0.1:18080/readyz; then ready=1; break; fi

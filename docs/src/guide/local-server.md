@@ -88,6 +88,7 @@ Inside it:
 ```text
 postgres/         the database cluster
 postgres.log      PostgreSQL's log
+pg_ctl.log        output of the last `pg_ctl start` (why PostgreSQL did not start)
 db-password       the generated database password (readable by you only)
 vault/            the stored files
 ```

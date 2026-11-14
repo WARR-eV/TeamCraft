@@ -423,6 +423,14 @@ impl Cluster {
         cluster.port = free_port()?;
         std::fs::write(cluster.pgdata.join(LOCAL_CONF), local_conf(cluster.port))
             .context("cannot write the cluster settings")?;
+        // pg_ctl's own output goes to a file, never to a pipe: on Windows
+        // pg_ctl starts postgres through cmd.exe with handle inheritance, so
+        // the postmaster – which keeps running – would hold the write end of
+        // a pipe, and reading the pipe to its end would wait forever.
+        let pg_ctl_log = data_dir.join("pg_ctl.log");
+        let out = std::fs::File::create(&pg_ctl_log)
+            .with_context(|| format!("cannot write {}", pg_ctl_log.display()))?;
+        let err = out.try_clone()?;
         let mut start = pg_command(bin, "pg_ctl");
         start
             .arg("start")
@@ -431,13 +439,18 @@ impl Cluster {
             .arg("--log")
             .arg(data_dir.join("postgres.log"))
             .args(["--wait", "--silent"])
-            .arg(format!("--timeout={PG_CTL_TIMEOUT_SECS}"));
-        run(start, "pg_ctl start").await.with_context(|| {
-            format!(
-                "PostgreSQL did not start; see {}",
-                data_dir.join("postgres.log").display()
-            )
-        })?;
+            .arg(format!("--timeout={PG_CTL_TIMEOUT_SECS}"))
+            .stdout(out)
+            .stderr(err);
+        let status = start.status().await.context("cannot run pg_ctl start")?;
+        if !status.success() {
+            let said = std::fs::read_to_string(&pg_ctl_log).unwrap_or_default();
+            bail!(
+                "PostgreSQL did not start ({status}); see {}\n{}",
+                data_dir.join("postgres.log").display(),
+                said.trim()
+            );
+        }
         tracing::info!(port = cluster.port, "PostgreSQL is running on 127.0.0.1");
         if let Err(e) = cluster.ensure_database().await {
             cluster.stop();
