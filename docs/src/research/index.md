@@ -6,6 +6,14 @@ formats), the decision and the sources. Every investigation gets its own page
 here, written and pushed as soon as the findings are in – before the
 implementation starts.
 
+The pages on native CAD formats also record where the format knowledge came
+from: the sample files studied (the openly licensed NIST models, own files),
+public specifications and openly licensed code under a compatible licence.
+They never use the program code of the CAD programs. Decompiling or
+disassembling proprietary software, and code rewritten from it, are not
+accepted in TeamCraft, from people or from AI agents
+([CONTRIBUTING.md](https://github.com/rudalabs/TeamCraft/blob/main/CONTRIBUTING.md#your-own-work-only--no-decompiled-code)).
+
 | Topic                                                                     | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Date       |
 |---------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------|
 | [A hosted live demo](live-demo.md) | one public read-only account (`TEAMCRAFT_DEMO_USER`, password on the login page; every non-`GET` request refused, per-address sign-in throttle only) on an instance seeded with the README demo data (NIST CAD models), reset nightly to a database snapshot; no open sign-up, no editing, no per-visitor instances | 2026-11-14 |

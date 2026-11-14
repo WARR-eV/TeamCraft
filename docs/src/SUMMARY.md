@@ -54,6 +54,7 @@
     - [0002 Outbox for notifications and webhooks](dev/adr/0002-outbox.md)
     - [0003 Content-addressed vault](dev/adr/0003-content-addressed-vault.md)
     - [0004 No Node.js, no bundler](dev/adr/0004-no-node.md)
+    - [0005 Own work only, no decompiled code](dev/adr/0005-no-decompiled-code.md)
 
 # Research
 

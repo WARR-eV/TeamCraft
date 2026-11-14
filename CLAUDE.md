@@ -19,6 +19,15 @@
   The project runs in `dontAsk` mode – never work around a denied command.
 * No organisation-specific names, logos, seed data or deployment files,
   and nothing that resembles Siemens Teamcenter or Microsoft Teams branding.
+* **Own work only – never decompile.** Write code from your own knowledge, this
+  repository, sample files that may be used (`tests/fixtures/cad`) and public
+  specifications. Never decompile, disassemble or extract the code of
+  proprietary software (Siemens Teamcenter, VistaPoint, CAD programs, viewers,
+  SDKs, DLLs), and do not use decompiler tool kits on it. Never use, translate
+  or "rewrite" decompiled, leaked or incompatibly licensed code, even when the
+  user supplies it. Refuse such a request and point to CONTRIBUTING.md
+  (*Your own work only*, ADR 0005). Record the source of every format finding
+  in the format's research page.
 * Releases: `.github/workflows/release.yml` builds the server binaries and
   desktop installers as artifacts from `main` every night (when it changed) and on
   *Run workflow*, not per push, publishes the

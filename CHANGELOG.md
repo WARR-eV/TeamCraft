@@ -15,6 +15,15 @@ see the notices in the README.
 
 ### Added
 
+- Contribution rule **own work only – no decompiled code**: code
+  decompiled, disassembled or rewritten from proprietary software (for
+  example Siemens Teamcenter or VistaPoint), a "clean room" through
+  decompilation, and leaked or incompatibly licensed code are not accepted,
+  from people or from AI agents. Formats are decoded from sample files and
+  public specifications, and each finding's source is recorded in its
+  research page. The rule is in CONTRIBUTING.md (full), README and the book's
+  start page (short), CODE_OF_CONDUCT.md (with enforcement), ADR 0005,
+  CLAUDE.md and a new pull request template with a confirmation checkbox.
 - Everything for a hosted **live demo** (runbook: *Live demo* in the admin
   guide). `TEAMCRAFT_DEMO_USER` and `TEAMCRAFT_DEMO_PASSWORD` make one local
   account public and read-only: the login page shows it, every page carries a

@@ -13,6 +13,7 @@ down anywhere, the record says so instead of guessing.
 | [0002](0002-outbox.md)                  | Notifications and webhooks are an outbox written in the event's transaction                     | accepted            |
 | [0003](0003-content-addressed-vault.md) | Files live in a content-addressed vault on the local file system                                | accepted            |
 | [0004](0004-no-node.md)                 | No Node.js and no bundler in the product                                                        | accepted            |
+| [0005](0005-no-decompiled-code.md)      | Own work only: no decompiled, leaked or rewritten proprietary code, from people or AI agents    | accepted            |
 
 A new record gets the next number, the same headings and a row here. A
 decision that is replaced keeps its record with the status *superseded by
