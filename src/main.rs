@@ -36,6 +36,26 @@ enum Command {
         #[arg(long)]
         no_migrate: bool,
     },
+    /// Try TeamCraft on this computer: a private PostgreSQL cluster and the
+    /// server, both only on 127.0.0.1, all data in one directory. Needs
+    /// PostgreSQL's programs (bundled next to teamcraft in the release
+    /// downloads, --pg-bin, or an installed PostgreSQL). Not for production.
+    Local {
+        /// Directory of the database, the vault and the logs; default: the
+        /// per-user data directory (e.g. ~/.local/share/teamcraft/local-server).
+        #[arg(long)]
+        data_dir: Option<std::path::PathBuf>,
+        /// Port of the web server on 127.0.0.1.
+        #[arg(long, default_value_t = teamcraft::localserver::DEFAULT_PORT)]
+        port: u16,
+        /// Directory with initdb, pg_ctl and postgres; default: searched.
+        #[arg(long)]
+        pg_bin: Option<std::path::PathBuf>,
+        /// Shut down when standard input closes (used by the desktop app,
+        /// which keeps a pipe open while it runs).
+        #[arg(long)]
+        exit_with_stdin: bool,
+    },
     /// Apply pending database migrations and exit.
     Migrate,
     /// Write a backup of the database and the file vault into a directory.
@@ -386,6 +406,12 @@ async fn run(cli: Cli) -> ExitCode {
         Command::Healthcheck { addr } => return healthcheck(addr),
         Command::Mcp { server, token_file } => mcp_bridge(&server, token_file.as_deref()).await,
         Command::Serve { no_migrate } => serve(no_migrate).await,
+        Command::Local {
+            data_dir,
+            port,
+            pg_bin,
+            exit_with_stdin,
+        } => local(data_dir, port, pg_bin, exit_with_stdin).await,
         Command::Migrate => migrate().await,
         Command::Backup { dir, encrypt } => backup_command(dir, encrypt).await,
         Command::Restore { dir, force } => restore_command(dir, force).await,
@@ -439,6 +465,76 @@ fn load_config_logging_to(to: LogTo) -> Result<Config> {
 
 async fn serve(no_migrate: bool) -> Result<ExitCode> {
     let config = load_config_logging_to(LogTo::Stdout)?;
+    serve_with(config, no_migrate, shutdown_signal()).await
+}
+
+/// `teamcraft local`: starts the private PostgreSQL cluster (see
+/// `teamcraft::localserver`), serves on 127.0.0.1 and stops the cluster again
+/// when the server stops.
+async fn local(
+    data_dir: Option<std::path::PathBuf>,
+    port: u16,
+    pg_bin: Option<std::path::PathBuf>,
+    exit_with_stdin: bool,
+) -> Result<ExitCode> {
+    use teamcraft::localserver;
+    init_tracing(LogFormat::Text, LogTo::Stdout);
+    let data_dir = match data_dir {
+        Some(dir) => dir,
+        None => localserver::default_data_dir()
+            .context("no per-user data directory is known here: give --data-dir")?,
+    };
+    if let Some(running) = localserver::running_instance(&data_dir).await {
+        bail!(
+            "TeamCraft already runs on {} at http://127.0.0.1:{running}",
+            data_dir.display()
+        );
+    }
+    // the port must be free before PostgreSQL is started for nothing
+    std::net::TcpListener::bind(("127.0.0.1", port)).with_context(|| {
+        format!("port {port} on 127.0.0.1 is in use: choose another one with --port")
+    })?;
+    let bin = localserver::find_pg_bin(pg_bin.as_deref())?;
+    tracing::info!(
+        data = %data_dir.display(),
+        postgresql = %bin.display(),
+        "starting a local TeamCraft (for trying it out, not for production)"
+    );
+    let cluster = localserver::Cluster::start(&bin, &data_dir).await?;
+    let local = localserver::local_variables(&data_dir, port, cluster.port, &cluster.password);
+    let result = async {
+        localserver::write_port_file(&data_dir, port)?;
+        let config = Config::from_lookup(localserver::overlay_lookup(local, |key| {
+            std::env::var(key).ok()
+        }))
+        .context("invalid configuration")?;
+        teamcraft::config::warn_unknown_variables();
+        tracing::info!("open http://127.0.0.1:{port} in your browser");
+        let shutdown = async move {
+            if exit_with_stdin {
+                tokio::select! {
+                    _ = shutdown_signal() => {}
+                    _ = localserver::stdin_closed() => {
+                        tracing::info!("standard input closed (the desktop app ended)");
+                    }
+                }
+            } else {
+                shutdown_signal().await;
+            }
+        };
+        serve_with(config, false, shutdown).await
+    }
+    .await;
+    cluster.stop();
+    localserver::remove_port_file(&data_dir);
+    result
+}
+
+async fn serve_with(
+    config: Config,
+    no_migrate: bool,
+    shutdown: impl std::future::Future<Output = ()> + Send + 'static,
+) -> Result<ExitCode> {
     notify::init(&config);
     tracing::info!(
         "starting TeamCraft {} ({})",
@@ -601,7 +697,7 @@ async fn serve(no_migrate: bool) -> Result<ExitCode> {
         listener,
         teamcraft::router(state).into_make_service_with_connect_info::<std::net::SocketAddr>(),
     )
-    .with_graceful_shutdown(shutdown_signal())
+    .with_graceful_shutdown(shutdown)
     .await
     .context("HTTP server failed")?;
     tracing::info!("shut down cleanly");

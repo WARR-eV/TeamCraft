@@ -28,6 +28,15 @@
       <button class="primary" type="submit">Connect</button>
     </form>
 
+    <!-- only in the downloads "with local server" (src/localserver.rs) -->
+    <div id="local-server" class="local-server stack hidden">
+      <p class="connect-or"><span>or, without a server</span></p>
+      <button id="local-server-start" class="big" type="button">Try TeamCraft on this computer</button>
+      <p class="hint">Starts a private test server with its own database on this computer – nothing to install or set up. In the browser you then create your administrator account. For trying TeamCraft out, not for a team's real data.</p>
+      <p id="local-server-wait" class="hint hidden" role="status">Starting the local server … the first start takes up to a minute.</p>
+    </div>
+    <p id="local-server-boot" class="hint hidden" role="status">Starting the local TeamCraft server …</p>
+
     <div id="signin-step" class="stack hidden">
       <p class="small muted">Server: <strong id="signin-server"></strong> · <button type="button" class="link" id="change-server">change</button></p>
       <p id="signin-http-warning" class="notice warn small hidden" role="status">Unencrypted connection (<code>http://</code>): the token and all data can be read on the network. Ask your administrator for the <code>https://</code> address.</p>

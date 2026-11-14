@@ -5,6 +5,7 @@
 # User Guide
 
 - [Getting started](guide/getting-started.md)
+- [Try it on your computer](guide/local-server.md)
 - [Concepts](guide/concepts.md)
 - [Vault, check-out and check-in](guide/vault.md)
 - [Files, versions and 3D preview](guide/files.md)

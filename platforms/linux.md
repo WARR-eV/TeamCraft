@@ -1,5 +1,15 @@
 # TeamCraft on Linux
 
+## Just try it: the desktop app with local server
+
+The `TeamCraft-with-local-server_<version>_amd64.AppImage` from the
+[Releases page](https://github.com/rudalabs/TeamCraft/releases) (x86_64)
+holds the desktop app, the server and PostgreSQL: `chmod +x` it, start it and
+click *Try TeamCraft on this computer*. With PostgreSQL installed
+(`postgresql` package: `initdb`, `pg_ctl`), `teamcraft local` from the server
+archive does the same without the app – as your normal user, not root. See
+[Try it on your computer](https://rudalabs.github.io/TeamCraft/guide/local-server.html).
+
 ## Just run it: Docker
 
 To use TeamCraft on a Linux server or desktop without building anything:

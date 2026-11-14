@@ -3,7 +3,10 @@
 # * a tag `v<version>` (e.g. `v0.2.0`) → GitHub Release with the server
 #   binaries (Linux x86_64/aarch64, Windows x64), the desktop installers
 #   (Linux deb/rpm/AppImage and Flatpak bundles, macOS dmg/app, Windows x64
-#   and arm64 msi/setup.exe plus portable zips) and SHA256SUMS.txt; 0.x versions and
+#   and arm64 msi/setup.exe plus portable zips), the desktop installers
+#   *with local server* (Windows x64 setup.exe, macOS dmg, Linux x86_64
+#   AppImage: app + server + PostgreSQL, job local-server) and
+#   SHA256SUMS.txt; 0.x versions and
 #   versions with a suffix (`v1.0.0-rc.1`) are marked as pre-release;
 # * main every night (when it changed since the last good build: code, not
 #   only *.md/docs/platforms), "Run workflow", or a pull request that changes
@@ -46,6 +49,7 @@ on:
       - ".github/workflows/release.yml"
       - "packaging/**"
       - "desktop/tauri.conf.json"
+      - "desktop/tauri.local-server.conf.json"
       - "Dockerfile"
       - ".dockerignore"
       - "deploy/**"
@@ -107,7 +111,7 @@ jobs:
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             changed=$(git diff --name-only HEAD^1 HEAD)
             echo "$changed"
-            grep -qE '^(\.github/workflows/release\.yml|packaging/|desktop/tauri\.conf\.json)' <<<"$changed" || artifacts=false
+            grep -qE '^(\.github/workflows/release\.yml|packaging/|desktop/tauri\.(conf|local-server\.conf)\.json)' <<<"$changed" || artifacts=false
             grep -qE '^(Dockerfile|\.dockerignore|deploy/|\.github/workflows/release\.yml)' <<<"$changed" || image=false
           fi
           if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
@@ -335,12 +339,192 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+  # TeamCraft Desktop *with local server*: the desktop installer plus the
+  # server binary (as `teamcraft-server`, a Tauri externalBin – `teamcraft`
+  # would clash with the app's own `TeamCraft` executable on the
+  # case-insensitive file systems of Windows and macOS) and PostgreSQL's
+  # programs (resources `postgresql/`). One download to try TeamCraft on a
+  # laptop: *Try TeamCraft on this computer* runs `teamcraft-server local`
+  # (src/localserver.rs, desktop/src/localserver.rs). Only for the platforms
+  # most testers have; the regular installers stay small.
+  #
+  # PostgreSQL: the relocatable builds of theseus-rs/postgresql-binaries
+  # (PostgreSQL licence), the newest patch release of PG_MAJOR, checked
+  # against the release's .sha256 file; the licence text comes from the
+  # PostgreSQL sources of the same version.
+  local-server:
+    name: desktop with local server (${{ matrix.os }})
+    needs: version
+    if: needs.version.outputs.artifacts == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, target: x86_64-unknown-linux-gnu, bundles: appimage }
+          - { os: macos-latest, target: aarch64-apple-darwin, bundles: "app,dmg" }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, bundles: nsis }
+    env:
+      PG_MAJOR: "18"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            desktop
+          key: release-local-server-${{ matrix.target }}
+      - name: Tauri CLI
+        shell: bash
+        run: command -v cargo-tauri || cargo install tauri-cli --version "^2" --locked
+      - name: Server (as teamcraft-server)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release --locked
+          ext=""; if [ "$RUNNER_OS" = "Windows" ]; then ext=".exe"; fi
+          mkdir -p desktop/binaries
+          cp "target/release/teamcraft$ext" "desktop/binaries/teamcraft-server-${{ matrix.target }}$ext"
+          ls -l desktop/binaries
+      - name: PostgreSQL ${{ env.PG_MAJOR }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # Relative paths only: Git Bash on Windows mistakes `D:\…` for a host.
+        run: |
+          set -euo pipefail
+          repo=theseus-rs/postgresql-binaries
+          version=$(gh release list --repo "$repo" --limit 100 --json tagName --jq '.[].tagName' \
+            | grep -E "^${PG_MAJOR}\.[0-9]+\.[0-9]+$" | sort -t. -k2,2n -k3,3n | tail -1)
+          if [ -z "$version" ]; then echo "::error::no PostgreSQL ${PG_MAJOR}.x release in $repo"; exit 1; fi
+          echo "PostgreSQL $version"
+          asset="postgresql-$version-${{ matrix.target }}.tar.gz"
+          mkdir -p .pg-download
+          gh release download "$version" --repo "$repo" --dir .pg-download --pattern "$asset" --pattern "$asset.sha256"
+          cd .pg-download
+          expected=$(awk '{print $1}' "$asset.sha256")
+          if command -v sha256sum > /dev/null; then
+            actual=$(sha256sum "$asset" | awk '{print $1}')
+          else
+            actual=$(shasum -a 256 "$asset" | awk '{print $1}')
+          fi
+          echo "sha256 expected $expected, got $actual"
+          test -n "$expected" && test "$expected" = "$actual"
+          tar -xzf "$asset"
+          cd ..
+          initdb=$(find .pg-download -type f \( -name initdb -o -name initdb.exe \) -path '*/bin/*' -print -quit)
+          root=$(dirname "$(dirname "$initdb")")
+          dest=desktop/local-server/postgresql
+          mkdir -p "$dest"
+          for dir in bin lib share; do
+            if [ -d "$root/$dir" ]; then cp -RL "$root/$dir" "$dest/"; fi
+          done
+          # what a running server does not need
+          rm -rf "$dest/share/doc" "$dest/share/man" "$dest/lib/pgxs" "$dest"/pgAdmin* "$dest"/StackBuilder*
+          find "$dest" -type f \( -name '*.a' -o -name '*.pdb' -o -name '*.lib' \) -delete
+          # the licence of the PostgreSQL version shipped
+          IFS=. read -r major minor _ <<< "$version"
+          curl -fsSL "https://raw.githubusercontent.com/postgres/postgres/REL_${major}_${minor}/COPYRIGHT" \
+            -o "$dest/COPYRIGHT.txt"
+          printf 'PostgreSQL %s from https://github.com/%s (%s)\n' "$version" "$repo" "$asset" > "$dest/SOURCE.txt"
+          ls "$dest" "$dest/bin"
+          du -sh "$dest"
+      # Every Mach-O file of the bundle needs a signature on Apple silicon;
+      # the app itself is signed ad hoc by Tauri (signingIdentity "-").
+      - name: Sign PostgreSQL ad hoc (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          find desktop/local-server/postgresql -type f | while read -r f; do
+            if file "$f" | grep -q 'Mach-O'; then codesign --force --sign - "$f"; fi
+          done
+      - name: Build the installer
+        working-directory: desktop
+        shell: bash
+        run: cargo tauri build --bundles ${{ matrix.bundles }} --config tauri.local-server.conf.json
+      - name: Collect
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          b=desktop/target/release/bundle
+          find "$b" -maxdepth 2 -type f \( -name '*.AppImage' -o -name '*.dmg' -o -name '*-setup.exe' \) \
+            | while read -r f; do
+                name=$(basename "$f")
+                cp "$f" "dist/${name/TeamCraft_/TeamCraft-with-local-server_}"
+              done
+          ls -l dist
+          test -n "$(ls dist)"
+      # The bundled server with the bundled PostgreSQL, where the installed
+      # app has them: first start, the first-start page, a clean stop when
+      # standard input closes (as when the app ends).
+      - name: Smoke test of the bundled server
+        shell: bash
+        run: |
+          set -euo pipefail
+          posix() { if [ "$RUNNER_OS" = "Windows" ]; then cygpath -u "$1"; else printf '%s' "$1"; fi; }
+          tmp=$(posix "$RUNNER_TEMP")
+          case "$RUNNER_OS" in
+            Linux)
+              app=$(find dist -name '*.AppImage' -print -quit)
+              chmod +x "$app"
+              (cd "$tmp" && "$GITHUB_WORKSPACE/$app" --appimage-extract > /dev/null)
+              base="$tmp/squashfs-root" ;;
+            macOS)
+              base="desktop/target/release/bundle/macos/TeamCraft.app" ;;
+            Windows)
+              setup=$(find dist -name '*-setup.exe' -print -quit)
+              "./$setup" //S
+              base="$(posix "$LOCALAPPDATA")/TeamCraft" ;;
+          esac
+          server=$(find "$base" -type f \( -name teamcraft-server -o -name teamcraft-server.exe \) -print -quit)
+          initdb=$(find "$base" -type f \( -name initdb -o -name initdb.exe \) -path '*postgresql/bin/*' -print -quit)
+          echo "server: $server"; echo "initdb: $initdb"
+          if [ -z "$server" ] || [ -z "$initdb" ]; then ls -R "$base" | sed -n '1,80p'; exit 1; fi
+          pgbin=$(dirname "$initdb")
+          test -f "$(dirname "$pgbin")/COPYRIGHT.txt"
+          "$server" --version
+          data="$tmp/tc-local"
+          log="$tmp/local.log"
+          ( sleep 900 | "$server" local --data-dir "$data" --port 18080 --pg-bin "$pgbin" --exit-with-stdin \
+              > "$log" 2>&1; echo $? > "$tmp/local.status" ) &
+          ready=""
+          for _ in $(seq 1 120); do
+            if curl -fsS http://127.0.0.1:18080/readyz; then ready=1; break; fi
+            sleep 1
+          done
+          echo
+          if [ -z "$ready" ]; then cat "$log"; exit 1; fi
+          curl -fsS -o "$tmp/login.html" http://127.0.0.1:18080/login
+          grep -q "Create the administrator" "$tmp/login.html"
+          # end the pipe's writer: the server sees the end of its standard input
+          if [ "$RUNNER_OS" = "Windows" ]; then taskkill //F //IM sleep.exe; else pkill -x sleep; fi
+          for _ in $(seq 1 60); do [ -s "$tmp/local.status" ] && break; sleep 1; done
+          cat "$log"
+          test "$(cat "$tmp/local.status")" = 0
+          grep -q "PostgreSQL stopped" "$log"
+          test ! -e "$data/postgres/postmaster.pid"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-local-server-${{ matrix.os }}
+          path: dist/*
+          retention-days: 14
+          if-no-files-found: error
+
   publish:
     name: GitHub Release
     if: startsWith(github.ref, 'refs/tags/v')
     # After the image: install.sh installs the newest release, whose image
     # must already be on ghcr.io.
-    needs: [version, server, desktop, flatpak, image-manifest]
+    needs: [version, server, desktop, flatpak, local-server, image-manifest]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:

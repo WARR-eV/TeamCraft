@@ -80,7 +80,10 @@ committed and pushed right away – before the implementation starts.
 ## Architecture
 
 ```text
-src/main.rs        CLI (clap): serve (default), migrate, user, vault check, assistant check, rescan-references, healthcheck, mcp (stdio bridge), preview-mesh and text-extract (hidden)
+src/main.rs        CLI (clap): serve (default), local (test installation, src/localserver.rs), migrate, user, vault check, assistant check, rescan-references, healthcheck, mcp (stdio bridge), preview-mesh and text-extract (hidden)
+src/localserver.rs `teamcraft local`: private PostgreSQL cluster (bundled postgresql/bin, --pg-bin or installed; initdb with a random
+                   scram password, 127.0.0.1 + free port, no socket) + the server on 127.0.0.1 via a config overlay; stops PostgreSQL
+                   after the server, port file against a second instance, --exit-with-stdin for the desktop app
 src/lib.rs         AppState, router (healthz/readyz, /api/v1, web UI), security headers, tracing
 src/config.rs      env configuration; every variable also as NAME_FILE; all optional for local use
 src/domain.rs      pure rules: Role, ItemType, LifecycleState, ChangeStatus, revision letters, numbering schemes, skins, validation
@@ -176,11 +179,13 @@ Dockerfile         server image (rust builder → distroless/cc, non-root, HEALT
 deploy/            production Docker install: docker-compose.yml (teamcraft + postgres), teamcraft.env.example, install.sh
 .github/workflows/ ci.yml (fmt, clippy, tests on PostgreSQL 16/18, macOS/Windows builds), docs.yml, desktop.yml, scale.yml (manual/weekly scale check, tests/scale.rs),
                    mutants.yml (cargo-mutants: PR diff report-only, weekly sharded full run; .cargo/mutants.toml),
-                   release.yml (binaries, installers, image + Docker install smoke test)
+                   release.yml (binaries, installers, *with local server* installers with PostgreSQL, image + Docker install smoke test)
 desktop/           TeamCraft Desktop (Tauri 2, own Cargo project – never part of the server build); UI in desktop/ui/js
                    (plain ES modules, no build step): graph.js = the *Graph* tab (navigable BOM/reference graph, SVG +
                    HTML card layer, checked by scripts/desktop-graph-check.mjs), files-view.js = Home *Files* view,
-                   crash.js = crash reports; desktop/src/workspace.rs + layout.rs = working folder, park, local changes
+                   crash.js = crash reports; desktop/src/workspace.rs + layout.rs = working folder, park, local changes;
+                   desktop/src/localserver.rs = *Try TeamCraft on this computer* (starts the bundled teamcraft-server local);
+                   tauri.local-server.conf.json = the *with local server* installers (externalBin teamcraft-server + postgresql/)
 ```
 
 ## Conventions

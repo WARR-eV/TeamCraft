@@ -255,6 +255,10 @@ tr.row-conflict td:first-child, tr.row-clash td:first-child { box-shadow: inset 
 .connect-logo { width: 240px; max-width: 100%; margin: 0 0 4px max(0px, calc(50% - 120px)); vertical-align: top; }
 .connect-sub { text-align: center; color: var(--text-muted); margin: 0 0 20px; }
 .connect .notice { margin-top: 16px; }
+/* "Try TeamCraft on this computer" below the server form */
+.local-server { margin-top: 20px; }
+.connect-or { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--text-dim); font-size: 12px; }
+.connect-or::before, .connect-or::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
 .token-login summary { cursor: pointer; color: var(--text-muted); margin-top: 4px; }
 .token-login form { margin-top: 8px; }
 /* native files of other CAD programs (preferred CAD program, GET /me) */

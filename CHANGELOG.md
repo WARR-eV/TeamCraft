@@ -15,6 +15,24 @@ see the notices in the README.
 
 ### Added
 
+- **Try TeamCraft on a laptop with one download.** The release adds desktop
+  installers *with local server* (`TeamCraft-with-local-server_…`: Windows
+  x64 setup, macOS `.dmg`, Linux x86_64 AppImage) – the app plus the server
+  (as `teamcraft-server`) and PostgreSQL's programs. Their connect screen
+  offers *Try TeamCraft on this computer*: the app starts a private
+  PostgreSQL cluster and the server, both only on 127.0.0.1, opens the
+  browser to create the administrator and signs in; the server stops with
+  the app, also after a crash (`desktop/src/localserver.rs`). New command
+  `teamcraft local [--port] [--data-dir] [--pg-bin]` does the same with an
+  installed PostgreSQL: initdb with a random scram password on the first
+  start, a free port and no Unix socket at every start, data in the per-user
+  data directory, a second instance on the same data refused
+  (`src/localserver.rs`, `tests/local_server.rs`). Release job
+  `local-server` bundles the newest PostgreSQL 18 build of
+  theseus-rs/postgresql-binaries (checksum-checked, with PostgreSQL's
+  licence) and smoke-tests every installer's bundled server
+  ([guide](https://rudalabs.github.io/TeamCraft/guide/local-server.html),
+  `docs/src/research/local-test-server.md`).
 - REST: `POST /api/v1/changes/{number}/cancel` cancels a draft or rejected
   change (its revisions are free for another change), and
   `DELETE /api/v1/changes/{number}/reviewers/{username}` removes a reviewer
@@ -224,6 +242,14 @@ see the notices in the README.
 
 ### Changed
 
+- README: the *Download* section moved up, right below the work-in-progress
+  notice, and starts with a link to the Releases page and which download to
+  pick; a *Download TeamCraft* line sits under the badges.
+- The first-start page (*Create the administrator*) continues where the
+  login was going – e.g. the desktop app's sign-in confirmation – instead of
+  always at the project groups (`next` kept through `POST /setup`).
+- The conversion workers (`preview-mesh`, `text-extract`) also run isolated
+  when the server binary is called `teamcraft-server`.
 - Performance: a request with a personal access token (REST API, MCP, the
   desktop app) is authenticated with one query instead of three; the use of
   the token is still recorded once a minute.

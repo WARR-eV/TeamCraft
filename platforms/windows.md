@@ -4,6 +4,14 @@ Local build and test from PowerShell (Windows 10 / 11, x64 or ARM64). ARM64
 was tried in a Parallels VM on an Apple M1 – server and desktop app build and
 run natively; the extra steps are marked **ARM64**.
 
+**Just try it:** `TeamCraft-with-local-server_<version>_x64-setup.exe` from the
+[Releases page](https://github.com/rudalabs/TeamCraft/releases) installs the
+desktop app with the server and PostgreSQL for your user (no administrator
+rights; SmartScreen: *More info → Run anyway*). Start TeamCraft and click
+*Try TeamCraft on this computer*. On ARM64 the x64 installer runs under
+emulation. See
+[Try it on your computer](https://rudalabs.github.io/TeamCraft/guide/local-server.html).
+
 ## 1. Prerequisites
 
 ```powershell
