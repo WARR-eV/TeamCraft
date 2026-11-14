@@ -57,6 +57,7 @@
 # Research
 
 - [Research notes](research/index.md)
+    - [One download to try TeamCraft on a laptop](research/local-test-server.md)
     - [Deprovisioning through the identity provider (SCIM)](research/scim-deprovisioning.md)
     - [3D preview of CATIA V5 parts](research/catia-cgr-preview.md)
     - [3D preview of CATIA V5 products](research/catia-product-structure.md)
