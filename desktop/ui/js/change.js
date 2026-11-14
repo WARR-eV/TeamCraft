@@ -8,6 +8,7 @@ import { openTab, recordLink, reloadActive, renderTabs, table } from "./tabs.js"
 import { agentButton } from "./agent.js";
 import { dd, dt, openRevision } from "./revision.js";
 import { relationText } from "./references.js";
+import { draftBlocker, reviewerProblem } from "./release-rules.js";
 
 // ======================================================================
 // Change tab
@@ -58,6 +59,42 @@ export function suggestedReviewers(number) {
   return box;
 }
 
+/**
+ * "Add reviewer" of a draft: any CAD editor or administrator by user name
+ * (several separated by commas), not only the suggestions – with nobody
+ * suggested a draft would otherwise be a dead end (#291). The own name is
+ * refused here already (four-eyes principle); the server checks the rest.
+ */
+function addReviewerForm(number) {
+  var input = h("input", { type: "text", maxlength: "200", spellcheck: "false", placeholder: "user name",
+    "aria-label": "User name of the reviewer to add" });
+  var add = h("button.small", { type: "submit" }, "Add reviewer");
+  return h("form.row.add-reviewer", { on: { submit: function (e) {
+    e.preventDefault();
+    var p = reviewerProblem([], input.value, state.me.username, false);
+    if (p.error) { toast(p.error, "error"); input.focus(); return; }
+    if (!p.reviewers.length) { input.focus(); return; }
+    add.disabled = true;
+    run("Adding " + p.reviewers.join(", "), function () {
+      return p.reviewers.reduce(function (done, username) {
+        return done.then(function () { return api("POST", "/changes/" + enc(number) + "/reviewers", { username: username }); });
+      }, Promise.resolve());
+    }).then(function () { toast("Added " + p.reviewers.join(", ")); reloadActive(); },
+      function () { add.disabled = false; reloadActive(); });
+  } } }, [input, add]);
+}
+
+/** "Remove" next to a reviewer of a draft. */
+function removeReviewerButton(number, r) {
+  var b = h("button.small", { type: "button", title: "Remove " + r.reviewer_name + " from " + number, on: { click: function () {
+    b.disabled = true;
+    run("Removing " + r.reviewer_name, function () {
+      return api("DELETE", "/changes/" + enc(number) + "/reviewers/" + enc(r.reviewer_username));
+    }).then(function () { toast("Removed reviewer " + r.reviewer_name); reloadActive(); }, function () { b.disabled = false; });
+  } } }, "Remove");
+  return b;
+}
+
 export function renderChange(tab, body, toolbar) {
   var c = tab.data.change, me = state.me;
   var owner = canEdit() && (c.created_by === me.id || me.role === "admin");
@@ -68,7 +105,12 @@ export function renderChange(tab, body, toolbar) {
       .then(function () { toast(text + " – done"); reloadActive(); refreshWorklistCount(); }, function () {});
   }
   var notOwner = owner ? null : "Only " + c.created_by_name + " (who created it) or an administrator can do this";
-  var canSubmit = owner && c.status === "draft", canWithdraw = owner && c.status === "in_review";
+  var isDraft = c.status === "draft";
+  // a draft without revision or reviewer cannot be submitted: say why instead
+  // of letting every click fail on the server (#291)
+  var blocker = isDraft ? draftBlocker(tab.data.items.length, tab.data.reviews.length) : null;
+  var canSubmit = owner && isDraft && !blocker, canWithdraw = owner && c.status === "in_review";
+  var canCancel = owner && (isDraft || c.status === "rejected");
   // The review decision lives in the toolbar – the comment field below goes with it.
   // A visible label and hint as in the web review form (a placeholder would vanish once you type).
   var comment = canReview ? h("textarea.review-comment", { id: "review-comment", maxlength: "4000", "aria-describedby": "review-comment-hint" }) : null;
@@ -93,11 +135,17 @@ export function renderChange(tab, body, toolbar) {
     toolGroup("Lifecycle", [
       tool("Submit for review", "checkin", function () { action("submit", "Submitting " + c.number); }, {
         primary: canSubmit, disabled: !canSubmit,
-        title: canSubmit ? "Send it to the reviewers" : notOwner || "Only a draft is submitted – this one is " + label(c.status)
+        title: canSubmit ? "Send it to the reviewers" : notOwner || blocker || "Only a draft is submitted – this one is " + label(c.status)
       }),
       tool("Withdraw", "cancel", function () { action("withdraw", "Withdrawing " + c.number); }, {
         disabled: !canWithdraw,
         title: canWithdraw ? "Take it back from review – the revisions return to WIP" : notOwner || "Only a change in review can be withdrawn – this one is " + label(c.status)
+      }),
+      // acts at once, like the web UI: cancelling one's own change needs no confirmation
+      tool("Cancel change", "obsolete", function () { action("cancel", "Cancelling " + c.number); }, {
+        danger: true, disabled: !canCancel,
+        title: canCancel ? "Cancel " + c.number + " at once (cannot be undone) – its revisions are free for another change"
+          : notOwner || "Only a draft or a rejected change can be cancelled – this one is " + label(c.status)
       })
     ]),
     toolGroup("Collaborate", [
@@ -105,7 +153,7 @@ export function renderChange(tab, body, toolbar) {
       agentButton(tab)
     ]),
     moreMenu([
-      { label: "Open in browser", icon: "web", run: function () { call("open_web", { path: "/changes/" + c.id }).catch(function (e) { toast(errorText(e), "error"); }); }, title: "Open this change in the web UI (reviewers, items, cancel …)" },
+      { label: "Open in browser", icon: "web", run: function () { call("open_web", { path: "/changes/" + c.id }).catch(function (e) { toast(errorText(e), "error"); }); }, title: "Open this change in the web UI (items, reopen …)" },
       { label: "Refresh", icon: "refresh", run: reloadActive, shortcut: "F5", title: "Load this change again" }
     ])
   ]);
@@ -114,9 +162,9 @@ export function renderChange(tab, body, toolbar) {
     h("div.meta", null, [badge(c.status), priorityBadge(c.priority), h("span", { text: "created " + fmtDate(c.created_at) + " by " + c.created_by_name })])
   ])]));
   var hints = {
-    draft: "Draft: add the revisions to release and at least one reviewer, then submit.",
+    draft: "Draft: add the revisions to release and at least one reviewer – somebody other than you – then submit.",
     in_review: "In Review: all reviewers must approve; a single rejection sends the revisions back to WIP.",
-    rejected: "Rejected: fix the revisions, then reopen and resubmit in the web UI – or cancel the change.",
+    rejected: "Rejected: fix the revisions, then reopen and resubmit in the web UI – or cancel the change here.",
     released: "Released: all revisions of this change are released."
   };
   if (hints[c.status]) body.appendChild(h("p.notice.info", { text: hints[c.status] }));
@@ -135,10 +183,13 @@ export function renderChange(tab, body, toolbar) {
       dt("Last update"), dd(fmtDate(c.updated_at))
     ])]),
     h("section.panel", null, [h("h2", { text: "Reviewers" }),
-      tab.data.reviews.length ? table(["Reviewer", "Decision", "Comment"], tab.data.reviews.map(function (r) {
-        return { cells: [r.reviewer_name, badge(r.decision), h("span.pre", { text: r.comment || "" })] };
+      tab.data.reviews.length ? table(["Reviewer", "Decision", "Comment"].concat(owner && isDraft ? [""] : []), tab.data.reviews.map(function (r) {
+        var cells = [r.reviewer_name, badge(r.decision), h("span.pre", { text: r.comment || "" })];
+        if (owner && isDraft) cells.push(removeReviewerButton(c.number, r));
+        return { cells: cells };
       }), { nowrap: [0, 1] }) : h("p.empty", { text: "No reviewers assigned yet." }),
-      owner && c.status === "draft" ? suggestedReviewers(c.number) : null])
+      owner && isDraft ? addReviewerForm(c.number) : null,
+      owner && isDraft ? suggestedReviewers(c.number) : null])
   ]));
   body.appendChild(h("section.panel", null, [h("h2", { text: "Affected revisions" }),
     tab.data.items.length ? table(["Revision", "Name", "State"], tab.data.items.map(function (i) {

@@ -13,6 +13,11 @@
       "Bash(grep *)",
       "Bash(cat *)",
       "Bash(tree *)",
+      "Bash(cargo *)",
+      "Bash(gh *)",
+      "Bash(curl *)",
+      "Bash(jq *)",
+      "Bash(gh *)",
       "Bash(git branch)",
       "Bash(git pull)",
       "Bash(git add --all)",
@@ -23,7 +28,6 @@
       "Bash(git log *)",
       "Bash(git show *)",
       "Bash(git checkout *)",
-      "Bash(gh *)",
       "Bash(rm -rf ./**)"
     ],
     "deny": [

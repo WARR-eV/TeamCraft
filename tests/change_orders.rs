@@ -169,6 +169,99 @@ async fn a_rejection_wins_and_reopening_resets_the_reviews() {
     app.teardown().await;
 }
 
+/// A draft the author cannot submit is never a dead end over REST (#291):
+/// the author is refused as reviewer and a draft without reviewer is not
+/// submitted, but reviewers are removed again
+/// (`DELETE …/reviewers/{username}`) and the draft is cancelled
+/// (`POST …/cancel`), which frees its revisions for another change.
+#[tokio::test]
+async fn a_stuck_draft_loses_its_reviewers_and_is_cancelled() {
+    let app = app_or_skip!();
+    let (_, author) = app.user_in("erika", Role::Editor, &["ROCKET"]).await;
+    let (_, other) = app.user_in("rolf", Role::Editor, &["ROCKET"]).await;
+    let part = app
+        .create_item(
+            &author,
+            json!({ "item_type": "part", "name": "Fairing", "project": "ROCKET" }),
+        )
+        .await;
+    let post = |path: String, token: String, body: Option<serde_json::Value>| {
+        let app = &app;
+        async move { app.api(Method::POST, &path, &token, body).await }
+    };
+    let delete = |path: String, token: String| {
+        let app = &app;
+        async move { app.api(Method::DELETE, &path, &token, None).await }
+    };
+    let r = post(
+        "/api/v1/changes".into(),
+        author.clone(),
+        Some(json!({ "title": "Fairing" })),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::CREATED, "{}", r.text());
+    let chg = r.json()["number"].as_str().unwrap().to_string();
+    let items = format!("/api/v1/changes/{chg}/items");
+    let r = post(items, author.clone(), Some(json!({ "item": part }))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+
+    // the author as their own reviewer, a submit without reviewer
+    let reviewers = format!("/api/v1/changes/{chg}/reviewers");
+    let r = post(
+        reviewers.clone(),
+        author.clone(),
+        Some(json!({ "username": "erika" })),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST, "{}", r.text());
+    assert!(r.text().contains("four-eyes"), "{}", r.text());
+    let submit = format!("/api/v1/changes/{chg}/submit");
+    let r = post(submit, author.clone(), None).await;
+    assert_eq!(r.status, StatusCode::CONFLICT, "{}", r.text());
+
+    // a reviewer is added and removed again; only the author removes one
+    let r = post(
+        reviewers.clone(),
+        author.clone(),
+        Some(json!({ "username": "rolf" })),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let rolf = format!("{reviewers}/rolf");
+    let r = delete(rolf.clone(), other.clone()).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN, "{}", r.text());
+    let r = delete(rolf.clone(), author.clone()).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert!(r.json()["reviews"].as_array().unwrap().is_empty());
+    let r = delete(rolf, author.clone()).await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND, "not a reviewer any more");
+    let r = delete(format!("{reviewers}/nobody"), author.clone()).await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND, "{}", r.text());
+
+    // only the author cancels the draft, once
+    let cancel = format!("/api/v1/changes/{chg}/cancel");
+    let r = post(cancel.clone(), other.clone(), None).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN, "{}", r.text());
+    let r = post(cancel.clone(), author.clone(), None).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert_eq!(r.json()["change"]["status"], "cancelled");
+    let r = post(cancel, author.clone(), None).await;
+    assert_eq!(r.status, StatusCode::CONFLICT, "{}", r.text());
+
+    // the revision is free for a new change
+    let r = post(
+        "/api/v1/changes".into(),
+        author.clone(),
+        Some(json!({ "title": "Again" })),
+    )
+    .await;
+    let again = r.json()["number"].as_str().unwrap().to_string();
+    let items = format!("/api/v1/changes/{again}/items");
+    let r = post(items, author.clone(), Some(json!({ "item": part }))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    app.teardown().await;
+}
+
 async fn r_change_id(app: &common::TestApp, number: &str, token: &str) -> uuid::Uuid {
     let r = app
         .api(

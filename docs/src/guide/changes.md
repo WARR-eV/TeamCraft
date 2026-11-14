@@ -116,7 +116,22 @@ submitted (409, naming the reviewer to remove) and again when a reviewer
 decides (403), because people can edit a draft after they were added. An
 administrator can still act for the author, but then cannot also review that
 change. The rule is always on; a team needs at least one person who did not
-touch the files. The user who submitted a change is stored in
+touch the files.
+
+**One user alone cannot release.** On a test server or a fresh installation
+with a single account, every change stays a draft: the author is never their
+own reviewer, and there is no administrator override – a release that one
+person approved for themselves would not be a release (#291). Create a second
+account (*Admin → Users*, a CAD editor) to try the review, or keep the change
+as a draft until a colleague can review it. The desktop *Release…* dialog says
+so when nobody else in the project group can review, offers the draft
+instead, and refuses the own user name before anything is created. A draft
+that cannot be submitted is never a dead end: its reviewers can be added and
+removed by user name, and it can be cancelled (web, desktop,
+`DELETE /api/v1/changes/{n}/reviewers/{username}`,
+`POST /api/v1/changes/{n}/cancel`).
+
+The user who submitted a change is stored in
 `changes.submitted_by`. Changes that were already in review when the rule
 was introduced keep working: only the author is refused on those until they
 are withdrawn and submitted again.
