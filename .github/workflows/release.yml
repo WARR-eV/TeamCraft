@@ -433,6 +433,29 @@ jobs:
           # what a running server does not need
           rm -rf "$dest/share/doc" "$dest/share/man" "$dest/lib/pgxs" "$dest"/pgAdmin* "$dest"/StackBuilder*
           find "$dest" -type f \( -name '*.a' -o -name '*.pdb' -o -name '*.lib' \) -delete
+          # Only the programs `teamcraft local` runs (initdb, pg_ctl, postgres)
+          # and the client tools for a manual backup – not the ~35 other tools,
+          # PostgreSQL's test program or the Python interpreter of PL/Python
+          # that the Windows build brings (python.exe, Lib/, DLLs/): an
+          # unsigned installer with an embedded Python was reported as a virus
+          # by a browser. Libraries stay, except Python's.
+          keep=" initdb pg_ctl postgres psql pg_dump pg_restore pg_isready "
+          rm -rf "$dest/bin/DLLs" "$dest/bin/Lib"
+          for f in "$dest"/bin/*; do
+            name=$(basename "$f")
+            case "$name" in
+              python*) rm -rf "$f" ;;
+              *.dll) ;;
+              *) if [[ "$keep" != *" ${name%.exe} "* ]]; then rm -rf "$f"; fi ;;
+            esac
+          done
+          find "$dest" -depth -iname '*plpython*' -exec rm -rf {} +
+          # what must be left: the three programs, pg_trgm (migrations), no Python
+          for p in initdb pg_ctl postgres; do
+            test -f "$dest/bin/$p" || test -f "$dest/bin/$p.exe"
+          done
+          test -f "$dest/share/extension/pg_trgm.control"
+          test -z "$(find "$dest" -iname 'python*')"
           # the licence of the PostgreSQL version shipped
           IFS=. read -r major minor _ <<< "$version"
           curl -fsSL "https://raw.githubusercontent.com/postgres/postgres/REL_${major}_${minor}/COPYRIGHT" \

@@ -40,7 +40,9 @@ app to any other TeamCraft server; the local data stays where it is.
 
 The installer *with local server* is the regular desktop app plus two
 things: the server program (`teamcraft-server`) and PostgreSQL's programs
-(`postgresql/`, with its licence in `COPYRIGHT.txt`). It installs over the
+(`postgresql/`: `initdb`, `pg_ctl`, `postgres`, the client tools `psql`,
+`pg_dump`, `pg_restore`, `pg_isready` and their libraries, with PostgreSQL's
+licence in `COPYRIGHT.txt`). It installs over the
 regular desktop app. The regular installers stay small and do not show the
 button.
 
@@ -125,3 +127,12 @@ the [Docker install](../admin/docker.md) with its backups.
   flag once: `xattr -dr com.apple.quarantine /Applications/TeamCraft.app`.
 - **"TeamCraft already runs on …"** – another `teamcraft local` (or the app in
   another window) serves the same folder; use that one, or stop it first.
+- **The browser or Windows Defender reports a virus** – the installers are
+  not code-signed yet, and an unsigned installer full of programs is what
+  heuristic scanners distrust. Download only from the
+  [Releases page](https://github.com/rudalabs/TeamCraft/releases) and compare
+  the file with `SHA256SUMS.txt` of the same release (PowerShell:
+  `Get-FileHash <file>`). Please
+  [open an issue](https://github.com/rudalabs/TeamCraft/issues) with the name
+  of the detection, so that it can be reported to the scanner's vendor as a
+  false positive. Do not turn off your virus scanner.

@@ -66,7 +66,12 @@ Take the last option, in three parts:
    the server, takes the newest patch release of PostgreSQL 18 from
    [theseus-rs/postgresql-binaries](https://github.com/theseus-rs/postgresql-binaries)
    (relocatable builds for Linux, macOS and Windows, PostgreSQL Licence),
-   checks its `.sha256`, prunes headers, docs and static libraries, adds the
+   checks its `.sha256`, prunes headers, docs and static libraries, keeps
+   only the programs `initdb`, `pg_ctl`, `postgres` and the client tools
+   `psql`, `pg_dump`, `pg_restore`, `pg_isready` (the Windows build also
+   brings PL/Python's Python interpreter, which is dropped – an unsigned
+   installer with an embedded `python.exe` was reported as a virus by a
+   browser; addendum 2026-11-15), adds the
    `COPYRIGHT` of that PostgreSQL version, signs the macOS files ad hoc and
    bundles everything with `desktop/tauri.local-server.conf.json`
    (`externalBin` + `resources`). Every installer is then started where an

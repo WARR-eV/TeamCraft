@@ -266,6 +266,13 @@ see the notices in the README.
 
 ### Fixed
 
+- Desktop installers *with local server*: PostgreSQL is bundled with only
+  the programs TeamCraft uses (`initdb`, `pg_ctl`, `postgres`) and the client
+  tools `psql`, `pg_dump`, `pg_restore`, `pg_isready`. The Windows build no
+  longer ships PL/Python's Python interpreter (`python.exe`, `Lib/`,
+  `DLLs/`), PostgreSQL's test program and about 35 unused tools; a browser
+  had reported the Windows installer as a virus. The release job fails if
+  one of the needed programs or `pg_trgm` is missing.
 - 3D viewer (web and desktop, #290): a preview that could not be shown could
   end as a silently black canvas – in the desktop app the status line with
   the reason sits below a canvas that fills the window, so it was often out of
