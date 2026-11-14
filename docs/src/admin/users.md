@@ -7,6 +7,13 @@ Administrators create accounts under *Users* or on the command line
 Passwords are hashed with Argon2id; sessions and API tokens are stored as
 SHA-256 hashes only.
 
+**A release needs two people.** Nobody reviews their own change order
+(four-eyes principle, with no administrator override), so a server with a
+single account – a test installation, or the first administrator alone – can
+create changes but never release them. Create at least one more CAD editor
+(`teamcraft user create --username reviewer --role editor`) before trying a
+release; see [Separation of duties](../guide/changes.md#separation-of-duties).
+
 ## Roles
 
 | Role       | Stored as | May                                                                                     |

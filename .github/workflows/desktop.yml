@@ -12,6 +12,7 @@ on:
       - "scripts/check-desktop-modules.mjs"
       - "scripts/desktop-tab-order.test.mjs"
       - "scripts/desktop-files-view.test.mjs"
+      - "scripts/desktop-release-rules.test.mjs"
       - "static/**"
       - "shared/**"
       - "media/logos/**"
@@ -25,6 +26,7 @@ on:
       - "scripts/check-desktop-modules.mjs"
       - "scripts/desktop-tab-order.test.mjs"
       - "scripts/desktop-files-view.test.mjs"
+      - "scripts/desktop-release-rules.test.mjs"
       - "static/**"
       - "shared/**"
       - "media/logos/**"
@@ -79,6 +81,9 @@ jobs:
       # the pure rules of the Files view of Home (orders, labels, pages)
       - name: Test the rules of the Files view
         run: node scripts/desktop-files-view.test.mjs
+      # the reviewers of the release dialog and when a draft can be submitted
+      - name: Test the release rules
+        run: node scripts/desktop-release-rules.test.mjs
 
   test:
     name: desktop (${{ matrix.os }})

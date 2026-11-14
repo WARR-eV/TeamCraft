@@ -226,9 +226,27 @@ back, and *Check in…* is highlighted.
   (*Request change…*, *Watch*, *Agent*);
 * change tab: **Review** (*Approve change* highlighted, *Reject* – the comment field
   of *Your review* goes with it, required for a rejection) while your review
-  is pending · **Lifecycle** (*Submit for review*, highlighted on your draft, *Withdraw*) · **Collaborate**;
+  is pending · **Lifecycle** (*Submit for review*, highlighted on your draft –
+  disabled with the reason as tooltip while the draft has no revision or no
+  reviewer –, *Withdraw*, *Cancel change* for a draft or rejected change, at
+  once) · **Collaborate**. On your draft the *Reviewers* panel has *Add
+  reviewer* (user names, any CAD editor or administrator – not you), *Remove*
+  per reviewer and the suggested reviewers;
 * change request tab: **Triage** (*Start triage* or *Create change order*
   highlighted, *Take up again*) · **Requester** (*Attach…*, *Withdraw*) · **Collaborate**.
+
+*Release…* creates a change order for the revision – with its unreleased
+dependencies by default – assigns the reviewers you tick (the other CAD
+editors of the project group) or type under *Other reviewers* (user names of
+any CAD editor or administrator) and submits it. Your own user name is
+refused before anything is created (four-eyes principle). When nobody else in
+the group can review, the dialog says so and creates a draft instead of
+submitting – a release always needs a second person, so a server with a
+single account cannot release (see [Separation of
+duties](changes.md#separation-of-duties)). If a revision or a reviewer is
+refused, the half-made draft is cancelled again and nothing is left behind;
+only a refused submit (for example an unreleased dependency) keeps the
+complete draft and opens it.
 
 Rare actions are in **More ▾** at the end: *Pack and Go…*, *Open in browser*, *Refresh* (`F5`) and *Mark obsolete…*. The
 menu works with the keyboard:

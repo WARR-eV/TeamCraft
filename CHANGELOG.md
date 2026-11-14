@@ -15,6 +15,10 @@ see the notices in the README.
 
 ### Added
 
+- REST: `POST /api/v1/changes/{number}/cancel` cancels a draft or rejected
+  change (its revisions are free for another change), and
+  `DELETE /api/v1/changes/{number}/reviewers/{username}` removes a reviewer
+  from a draft – what the web UI could do already (#291).
 - 3D preview of PTC Creo assemblies (`.asm.N`), put together from the
   previews of their parts and sub-assemblies like NX, SOLIDWORKS, Inventor
   and CATIA assemblies. The direct components – model name, part or
@@ -236,6 +240,16 @@ see the notices in the README.
 
 ### Fixed
 
+- Desktop: releasing with your own user name as reviewer left a draft change
+  behind that could not be finished in the app (#291). The *Release…* dialog
+  now refuses the own name before anything is created, says when nobody else
+  in the project group can review (a single account can never release –
+  four-eyes principle, no administrator override) and creates a draft
+  instead, and cancels the half-made draft again when a revision or reviewer
+  is refused – no orphaned drafts from failed attempts. The change tab
+  disables *Submit for review* with the reason while the draft has no
+  revision or reviewer (no more piles of error toasts) and has *Cancel
+  change*, *Add reviewer* by user name and *Remove* per reviewer.
 - Creo parts stored in inches (9 of the 16 NIST Creo parts, e.g. ftc-09)
   are shown in millimetres: the length unit is read from the section
   `UnitSystemDef` (they were 25.4 times too small). Turned Creo parts without

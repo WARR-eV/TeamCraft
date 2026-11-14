@@ -7,6 +7,7 @@ import { isCancelled, refreshWorklistCount, uploadLine } from "./shell.js";
 import { reloadActive, renderActive, table } from "./tabs.js";
 import { PROGRAM_LABEL, cadPrograms, dd, exportProgram, exportStep, openRevision, previewFormat, revisionAbilities } from "./revision.js";
 import { openChange } from "./change.js";
+import { reviewerProblem } from "./release-rules.js";
 import { requestChangeDialog } from "./requests.js";
 import { refreshStructure } from "./navigator.js";
 
@@ -553,7 +554,13 @@ export function releaseDialog(tab) {
         return m.active && m.user_id !== state.me.id && (m.role === "editor" || m.role === "admin");
       });
       if (!candidates.length) {
-        reviewerBox.appendChild(h("p.hint", { text: "No other CAD editors in " + rev.project_code + " – name reviewers below." }));
+        // A release needs a second person (four-eyes principle): with nobody
+        // else in the group, offer the draft first instead of a submit that
+        // cannot work (a single-user test server never gets past it).
+        submitNow.checked = false;
+        reviewerBox.appendChild(h("p.notice", { text: "Nobody else in " + rev.project_code + " can review this change. " +
+          "Name a CAD editor or administrator of another group below, or create the change as a draft – " +
+          "a release always needs a second person (four-eyes principle)." }));
       }
       candidates.forEach(function (m) {
         var input = h("input", { type: "checkbox" });
@@ -579,10 +586,11 @@ export function releaseDialog(tab) {
     { label: "Cancel", onClick: function (d) { d.close(); } },
     {
       label: "Create change", primary: true, submit: true, onClick: function (d) {
-        var reviewers = boxes.filter(function (b) { return b.input.checked; }).map(function (b) { return b.username; })
-          .concat(others.value.split(",").map(function (s) { return s.trim(); }).filter(Boolean));
-        if (submitNow.checked && !reviewers.length) { d.fail("Choose at least one reviewer to submit the change."); return; }
-        var number = null;
+        var problem = reviewerProblem(boxes.filter(function (b) { return b.input.checked; }).map(function (b) { return b.username; }),
+          others.value, state.me.username, submitNow.checked);
+        if (problem.error) { d.fail(problem.error); return; }
+        var reviewers = problem.reviewers;
+        var number = null, submitting = false;
         setStatus("Creating the change …");
         api("POST", "/changes", { title: title.value, description: desc.value, priority: priority.value }).then(function (c) {
           number = c.number;
@@ -594,6 +602,7 @@ export function releaseDialog(tab) {
             return p.then(function () { return api("POST", "/changes/" + enc(number) + "/reviewers", { username: username }); });
           }, Promise.resolve());
         }).then(function () {
+          submitting = true;
           return submitNow.checked ? api("POST", "/changes/" + enc(number) + "/submit") : null;
         }).then(function () {
           setStatus("");
@@ -603,9 +612,26 @@ export function releaseDialog(tab) {
           refreshWorklistCount();
           openChange(number);
         }, function (err) {
-          setStatus("");
-          d.fail(number ? errorText(err) + " – " + number + " exists as a draft; finish it in its tab." : err);
-          if (number) { tab.data = null; openChange(number); }
+          if (!number) { setStatus(""); d.fail(err); return; }
+          if (submitting) {
+            // complete (revisions and reviewers) – the change tab finishes it
+            setStatus("");
+            d.fail(errorText(err) + " – " + number + " stays a draft; fix this and submit it in its tab.");
+            tab.data = null;
+            openChange(number);
+            return;
+          }
+          // a revision, dependency or reviewer was refused: take the half-made
+          // draft back, so no orphan blocks the revisions (#291)
+          api("POST", "/changes/" + enc(number) + "/cancel").then(function () {
+            setStatus("");
+            d.fail(errorText(err) + " – nothing was released; the draft " + number + " was cancelled.");
+          }, function () {
+            setStatus("");
+            d.fail(errorText(err) + " – " + number + " exists as a draft; finish or cancel it in its tab.");
+            tab.data = null;
+            openChange(number);
+          });
         });
       }
     }

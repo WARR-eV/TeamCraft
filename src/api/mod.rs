@@ -376,6 +376,10 @@ pub fn router(state: &AppState) -> Router<AppState> {
         .route("/changes/{number}/items", post(add_change_item))
         .route("/changes/{number}/reviewers", post(add_change_reviewer))
         .route(
+            "/changes/{number}/reviewers/{username}",
+            delete(remove_change_reviewer),
+        )
+        .route(
             "/changes/{number}/reviewers/{username}/replace",
             post(replace_change_reviewer),
         )
@@ -391,6 +395,7 @@ pub fn router(state: &AppState) -> Router<AppState> {
         .route("/changes/{number}/submit", post(submit_change))
         .route("/changes/{number}/review", post(review_change))
         .route("/changes/{number}/withdraw", post(withdraw_change))
+        .route("/changes/{number}/cancel", post(cancel_change))
         .route(
             "/change-requests",
             get(change_requests::list).post(change_requests::create),
@@ -658,6 +663,7 @@ async fn index() -> Json<Value> {
             "GET    /api/v1/changes/{number}/impact                   impact analysis: items that depend on its revisions",
             "POST   /api/v1/changes/{number}/items                    {item, revision?, action?: release|obsolete|supersede, successor?} (obsolete and supersede lines are applied on release)",
             "POST   /api/v1/changes/{number}/reviewers                {username}",
+            "DELETE /api/v1/changes/{number}/reviewers/{username}     remove a reviewer from a draft",
             "POST   /api/v1/changes/{number}/reviewers/{old}/replace  {username}: replace a pending reviewer while in review",
             "GET    /api/v1/changes/{number}/suggested-reviewers?limit=  ranked reviewer suggestions with reasons (never assigns)",
             "GET    /api/v1/changes/{number}/readiness                release readiness: unreleased (blocking) and obsolete or file-scan (warning) dependencies",
@@ -665,6 +671,7 @@ async fn index() -> Json<Value> {
             "POST   /api/v1/changes/{number}/submit",
             "POST   /api/v1/changes/{number}/review                   {decision: approve|reject, comment?, meaning?} – needs the approve token scope",
             "POST   /api/v1/changes/{number}/withdraw",
+            "POST   /api/v1/changes/{number}/cancel                   cancel a draft or rejected change (its revisions are free again)",
             "GET    /api/v1/change-requests?status=open|all|<status>&scope=mine|assigned&item=&limit=&offset=",
             "POST   /api/v1/change-requests                           {title, description?, reason?, priority?, due_date?, items?: [{item, revision?, note?}]} – any signed-in user",
             "GET    /api/v1/change-requests/{number}                  request, items, comments, attachments, change orders, history, what I may do",
