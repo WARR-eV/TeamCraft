@@ -5,10 +5,11 @@ was tried in a Parallels VM on an Apple M1 – server and desktop app build and
 run natively; the extra steps are marked **ARM64**.
 
 **Just try it:** `TeamCraft-with-local-server_<version>_x64-setup.exe` from the
-[Releases page](https://github.com/rudalabs/TeamCraft/releases) installs the
-desktop app with the server and PostgreSQL for your user (no administrator
-rights; SmartScreen: *More info → Run anyway*). Start TeamCraft and click
-*Try TeamCraft on this computer*. On ARM64 the x64 installer runs under
+[Releases page](https://github.com/rudalabs/TeamCraft/releases) installs
+*TeamCraft Local* for your user – the desktop app with the server and
+PostgreSQL, as an app of its own next to an installed TeamCraft (no
+administrator rights; SmartScreen: *More info → Run anyway*). Start
+*TeamCraft Local*; it starts its local server by itself. On ARM64 the x64 installer runs under
 emulation. See
 [Try it on your computer](https://rudalabs.github.io/TeamCraft/guide/local-server.html).
 

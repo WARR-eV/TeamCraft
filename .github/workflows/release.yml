@@ -486,7 +486,8 @@ jobs:
           find "$b" -maxdepth 2 -type f \( -name '*.AppImage' -o -name '*.dmg' -o -name '*-setup.exe' \) \
             | while read -r f; do
                 name=$(basename "$f")
-                cp "$f" "dist/${name/TeamCraft_/TeamCraft-with-local-server_}"
+                # "TeamCraft Local_0.2.7_x64-setup.exe" → "TeamCraft-with-local-server_0.2.7_x64-setup.exe"
+                cp "$f" "dist/TeamCraft-with-local-server_${name#*_}"
               done
           ls -l dist
           test -n "$(ls dist)"
@@ -506,11 +507,16 @@ jobs:
               (cd "$tmp" && "$GITHUB_WORKSPACE/$app" --appimage-extract > /dev/null)
               base="$tmp/squashfs-root" ;;
             macOS)
-              base="desktop/target/release/bundle/macos/TeamCraft.app" ;;
+              base=$(find desktop/target/release/bundle/macos -maxdepth 1 -name '*.app' -print -quit)
+              # its own app next to the desktop app (settings, keychain entry)
+              test "$(plutil -extract CFBundleIdentifier raw "$base/Contents/Info.plist")" = io.github.rudalabs.teamcraft.local ;;
             Windows)
               setup=$(find dist -name '*-setup.exe' -print -quit)
               "./$setup" //S
-              base="$(posix "$LOCALAPPDATA")/TeamCraft" ;;
+              # TeamCraft Local installs per user into %LOCALAPPDATA%\<product name>
+              server_exe=$(find "$(posix "$LOCALAPPDATA")" -maxdepth 2 -name teamcraft-server.exe -print -quit)
+              test -n "$server_exe"
+              base=$(dirname "$server_exe") ;;
           esac
           server=$(find "$base" -type f \( -name teamcraft-server -o -name teamcraft-server.exe \) -print -quit)
           initdb=$(find "$base" -type f \( -name initdb -o -name initdb.exe \) -path '*postgresql/bin/*' -print -quit)

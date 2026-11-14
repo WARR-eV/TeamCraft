@@ -7,22 +7,13 @@ or run the Docker image.
 
 **Just try it:** `TeamCraft-with-local-server_<version>_aarch64.dmg` from the
 [Releases page](https://github.com/rudalabs/TeamCraft/releases) (Apple
-silicon) holds the desktop app, the server and PostgreSQL: open the app with
-*right-click → Open* the first time and click *Try TeamCraft on this
-computer*. If macOS still blocks the bundled server, run
-`xattr -dr com.apple.quarantine /Applications/TeamCraft.app` once. With
-Homebrew's PostgreSQL (`brew install postgresql@18`), a server built as below
-runs the same test installation with `teamcraft local`. See
-[Try it on your computer](https://rudalabs.github.io/TeamCraft/guide/local-server.html).
-
-**Just try it:** `TeamCraft-with-local-server_<version>_aarch64.dmg` from the
-[Releases page](https://github.com/rudalabs/TeamCraft/releases) (Apple
-silicon) holds the desktop app, the server and PostgreSQL: open the app with
-*right-click → Open* the first time and click *Try TeamCraft on this
-computer*. If macOS still blocks the bundled server, run `xattr -dr
-com.apple.quarantine /Applications/TeamCraft.app` once. With Homebrew
-PostgreSQL (`brew install postgresql@18`) a self-built server runs the same
-test installation with `teamcraft local`. See
+silicon) installs *TeamCraft Local*, an app of its own next to the desktop
+app, with the server and PostgreSQL: open it with *right-click → Open* the
+first time; it starts its local server by itself. If macOS still blocks the
+bundled server, run
+`xattr -dr com.apple.quarantine "/Applications/TeamCraft Local.app"` once.
+With Homebrew's PostgreSQL (`brew install postgresql@18`), a server built as
+below runs the same test installation with `teamcraft local`. See
 [Try it on your computer](https://rudalabs.github.io/TeamCraft/guide/local-server.html).
 
 ## 1. Prerequisites

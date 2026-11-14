@@ -126,21 +126,26 @@ export function startLocalServer() {
 /** "Try TeamCraft on this computer": start the bundled server, use it as the
  * server and open the browser sign-in – on the first start the browser
  * shows the page that creates the administrator, then the confirmation. */
+/** Starts the bundled server, makes it the app's server and opens the
+ * browser sign-in (the button, and the first start of TeamCraft Local). */
+export function tryLocalServer() {
+  showConnect("server");
+  $("local-server-start").disabled = true;
+  $("local-server-wait").classList.remove("hidden");
+  $("connect-error").classList.add("hidden");
+  call("local_server_start").then(function (base) {
+    return call("set_server", { url: base });
+  }).then(function (base) {
+    state.session.server_url = base;
+    state.session.signed_in = false;
+    state.session.local_server_in_use = true;
+    $("server-url").value = base;
+    showConnect("signin");
+    checkServerVersion();
+    $("signin-browser").click();
+  }, function (err) { showConnect("server", errorText(err)); });
+}
+
 export function initLocalServer() {
-  $("local-server-start").addEventListener("click", function () {
-    $("local-server-start").disabled = true;
-    $("local-server-wait").classList.remove("hidden");
-    $("connect-error").classList.add("hidden");
-    call("local_server_start").then(function (base) {
-      return call("set_server", { url: base });
-    }).then(function (base) {
-      state.session.server_url = base;
-      state.session.signed_in = false;
-      state.session.local_server_in_use = true;
-      $("server-url").value = base;
-      showConnect("signin");
-      checkServerVersion();
-      $("signin-browser").click();
-    }, function (err) { showConnect("server", errorText(err)); });
-  });
+  $("local-server-start").addEventListener("click", tryLocalServer);
 }

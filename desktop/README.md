@@ -20,7 +20,7 @@ TeamCraft server – it is a client, not an offline copy.
 | Area | What the desktop app does |
 |---|---|
 | Sign-in | **Sign in with the browser** (single sign-on or password, confirmed on a TeamCraft page) or a personal access token; *cancel* stops the sign-in at once |
-| Local test server | Downloads *with local server* only: *Try TeamCraft on this computer* on the connect screen starts the bundled `teamcraft-server local` (private PostgreSQL + server on 127.0.0.1), signs in through the browser (the first start creates the administrator there) and starts the server again at every launch while it is the configured server; it stops when the app ends (`src/localserver.rs`, log in `local-server.log`) |
+| Local test server | Downloads *with local server* only – an app of its own, *TeamCraft Local* (own identifier, settings and keychain entry): on its first start, with no server configured, and with *Try TeamCraft on this computer* on the connect screen it starts the bundled `teamcraft-server local` (private PostgreSQL + server on 127.0.0.1), signs in through the browser (the first start creates the administrator there) and starts the server again at every launch while it is the configured server; it stops when the app ends (`src/localserver.rs`, log in `local-server.log`) |
 | Navigator | *Home*: a file browser of the **active project group** – *Files*: its folders and the files in them, as in the working folder (folders first, then the files by name – case-blind, digits by value; one folder per request from `GET /projects/{code}/files`, 500 entries at a time with *show … more*; items without files below the files; with an older server the items instead), *All items*: every item in one list, or the *Structure* view. The name comes first (the number/revision dimmed after it); sorted by name, number, type or state (kept per computer); *Projects* (`Ctrl/Cmd+5`): choose the active group (mine first), create a group (*New*, CAD editors), *Get…* groups into the workspace, *Import CAD folder…*. Both are loaded again on *Refresh* (a group created in the web UI shows without a restart); *My Worklist* (check-outs, reviews, my open changes); change orders by status; full-text search |
 | Toolbar | Below the tab strip, acting on the active tab: grouped buttons that keep their place (revision: Lock · Work · Lifecycle · Collaborate; change: Review · Lifecycle · Collaborate; request: Triage · Requester · Collaborate), the **next step highlighted** (*Check out*, *Check in…* with local changes, *Release…* on a clean check-out, *Revise* when released, *Submit for review* / *Approve change* on a change), greyed-out buttons with a tooltip saying why, rare actions (*Pack and Go…*, *Open in browser*, *Refresh*, *Mark obsolete…*) in **More ▾** – keyboard: `Enter`/`Space`/`↓` open, arrows move, `Esc` closes |
 | Tab order | Drag a tab to move it (pointer events, an insertion bar shows the landing place, the strip scrolls at its edges, `Esc` cancels; a plain click still activates, a dragged tab keeps its state and is not activated). Keyboard: arrow keys, `Home`, `End` move the focus between the tabs (WAI-ARIA tabs, roving tabindex, `Enter`/`Space` activates), `Ctrl+Shift+PageUp/PageDown` move the active tab. Right click (or the menu key): *Move to start*, *Move to end*, *Close*, *Close others*, *Close tabs to the right*. The order is kept while the app runs (open tabs are not restored on start). Rules in `ui/js/tab-order.js`, tested by `scripts/desktop-tab-order.test.mjs` (`node`); the dragging itself is checked by hand |
@@ -76,8 +76,11 @@ AppImage/`.deb`/`.rpm` and a Flatpak bundle for x86_64 and aarch64, macOS
 **With local server.** `TeamCraft-with-local-server_…` (Windows x64
 `-setup.exe`, macOS `.dmg`, Linux x86_64 `.AppImage`) is the same app plus the
 server (`teamcraft-server`, a Tauri `externalBin`) and PostgreSQL's programs
-(resources `postgresql/`). Its connect screen offers *Try TeamCraft on this
-computer* (`src/localserver.rs`): the app starts `teamcraft-server local
+(resources `postgresql/`), built as an app of its own: *TeamCraft Local*, identifier
+`io.github.rudalabs.teamcraft.local` (the overlay sets `productName` and `identifier`; the token's keychain
+service follows the identifier, `settings::set_keychain_service`), so it never takes over the desktop app's
+server and token. Without a configured server (its first start) it starts the local server by itself; its
+connect screen offers *Try TeamCraft on this computer* (`src/localserver.rs`): the app starts `teamcraft-server local
 --port <p> --exit-with-stdin`, waits for `/readyz` and signs in through the
 browser; the server stops when the app ends. The release job `local-server`
 builds it with `tauri.local-server.conf.json`; to build it locally, put the
@@ -140,6 +143,9 @@ Where the app keeps its data:
   *Settings*; the next start with a keychain moves the file into it (also the file of older app
   versions). On macOS an unsigned build may ask once whether TeamCraft may use the keychain item (again after an update);
 * the working folder: `Documents/TeamCraft/<project group>/<folder>/<file>` with `Documents/TeamCraft/.teamcraft/state.json` (configurable in *Settings*).
+* TeamCraft Local (downloads *with local server*): its own settings folder and keychain service
+  `io.github.rudalabs.teamcraft.local` (`~/.config/io.github.rudalabs.teamcraft.local`, …), so its server and
+  token are separate from the desktop app's;
 * the local test server (downloads *with local server*): its data in the per-user data directory shared
   with `teamcraft local` (`~/.local/share/teamcraft/local-server`, `~/Library/Application Support/TeamCraft/local-server`,
   `%LOCALAPPDATA%\TeamCraft\local-server`), its port in the settings, its output in `local-server.log` next to them.

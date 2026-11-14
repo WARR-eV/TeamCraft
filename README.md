@@ -80,9 +80,9 @@ versions are pre-releases (see the warning above). Which one you need:
 
 - **Just try TeamCraft on your laptop** – the desktop app **with local
   server** (`TeamCraft-with-local-server_…`): one installer with the app, the
-  server and its PostgreSQL database. Start TeamCraft and click **Try
-  TeamCraft on this computer**; your browser opens to create the
-  administrator account, and you are signed in. No Docker, no database
+  server and its PostgreSQL database. It installs **TeamCraft Local**, an app
+  of its own; start it and it starts its local server, your browser opens to
+  create the administrator account, and you are signed in. No Docker, no database
   set-up, no configuration. The data stays in your user folder – this is for
   trying TeamCraft out, not for a team's real data.
 - **Connect to your team's server** – the desktop app.
@@ -96,9 +96,10 @@ versions are pre-releases (see the warning above). Which one you need:
 | **Server** (`teamcraft`)                     | `.tar.gz`                               | `.tar.gz`                  | –                     | `.zip`                                        | –                                                 |
 
 - **With local server:** the same app plus the server (`teamcraft-server`)
-  and PostgreSQL's programs. It installs over the plain desktop app and can
-  still connect to any other server. The local server listens only on this
-  computer and stops with the app; see
+  and PostgreSQL's programs, installed as *TeamCraft Local* next to the
+  desktop app – with its own settings and sign-in, so an existing desktop app
+  stays connected to your team's server. The local server listens only on
+  this computer and stops with the app; see
   [Try it on your computer](https://rudalabs.github.io/TeamCraft/guide/local-server.html).
 - **Server:** runs on Linux in production, or as the
   [Docker image](docs/src/admin/docker.md) on any platform. On macOS, build it
@@ -142,8 +143,8 @@ onboarding where new members sign in with the accounts they already have.
 ## Quick start
 
 **Try it on your laptop** – install the desktop app *with local server* from
-the [Releases page](https://github.com/rudalabs/TeamCraft/releases), start it
-and click *Try TeamCraft on this computer* ([Download](#download)). With
+the [Releases page](https://github.com/rudalabs/TeamCraft/releases) and start
+*TeamCraft Local* – it starts its own server ([Download](#download)). With
 PostgreSQL already installed, the server alone does the same on the command
 line – a private database and the server on <http://127.0.0.1:8080>:
 

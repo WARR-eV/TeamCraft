@@ -266,6 +266,13 @@ see the notices in the README.
 
 ### Fixed
 
+- Desktop installers *with local server*: they install **TeamCraft Local**, an
+  app of its own next to the desktop app (identifier
+  `io.github.rudalabs.teamcraft.local`, own settings folder and keychain
+  entry). The first test build shared the desktop app's identity, so it
+  opened with the server and sign-in configured in the desktop app instead
+  of the local server. With no server configured TeamCraft Local now starts
+  its local server by itself.
 - Desktop installers *with local server*: PostgreSQL is bundled with only
   the programs TeamCraft uses (`initdb`, `pg_ctl`, `postgres`) and the client
   tools `psql`, `pg_dump`, `pg_restore`, `pg_isready`. The Windows build no

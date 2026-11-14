@@ -13,7 +13,7 @@
 
 import { $, TAURI, call, errorText, h, invoke, setStatus, state, toast } from "./core.js";
 import { applySkin } from "./skins.js";
-import { checkServerVersion, initConnect, showConnect, startLocalServer } from "./connect.js";
+import { checkServerVersion, initConnect, showConnect, startLocalServer, tryLocalServer } from "./connect.js";
 import { enterShell, initShell, onPackageProgress, refreshWorklistCount, uploadLine } from "./shell.js";
 import { selectView } from "./navigator.js";
 import { activeTab, reloadActive } from "./tabs.js";
@@ -139,7 +139,10 @@ export function boot() {
     showZoom();
     applySkin(s.skin);
     var open = function () {
-      if (!s.server_url) showConnect("server");
+      // no server yet: TeamCraft Local (downloads with local server) starts
+      // its own; the regular app asks for the address
+      if (!s.server_url && s.local_server_available) tryLocalServer();
+      else if (!s.server_url) showConnect("server");
       else if (!s.signed_in) { showConnect("signin"); checkServerVersion(); }
       else enterShell();
     };

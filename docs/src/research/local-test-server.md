@@ -62,6 +62,13 @@ Take the last option, in three parts:
    kept through `/setup`). The port is kept in the settings so that the
    address and the token stay valid; while the local server is the
    configured server the app starts it at every launch.
+
+   *Addendum 2026-11-15:* the installers with local server are an app of
+   their own, *TeamCraft Local* (identifier
+   `io.github.rudalabs.teamcraft.local`, own settings folder, the token's
+   keychain service follows the identifier). The first test build shared the
+   desktop app's identity and opened with the server configured there. With
+   no server configured, TeamCraft Local starts its local server by itself.
 3. **Release job `local-server`** (`.github/workflows/release.yml`): builds
    the server, takes the newest patch release of PostgreSQL 18 from
    [theseus-rs/postgresql-binaries](https://github.com/theseus-rs/postgresql-binaries)
