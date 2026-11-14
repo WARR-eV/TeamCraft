@@ -717,6 +717,15 @@ pub(crate) fn render_public(
     if let Value::Object(map) = &mut data {
         map.insert("flash".into(), json!(flash));
         map.insert("local_login".into(), json!(st.config.local_login));
+        // a hosted live demo: the banner on every page, the account on the login page
+        map.insert(
+            "demo".into(),
+            json!(st
+                .config
+                .demo
+                .as_ref()
+                .map(|d| json!({ "username": d.username, "password": d.password }))),
+        );
         let skin = map
             .get("skin")
             .and_then(Value::as_str)

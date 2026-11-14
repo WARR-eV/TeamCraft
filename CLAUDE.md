@@ -173,7 +173,9 @@ tests/fixtures/cad openly licensed NIST CAD files (Inventor, NX, SolidWorks, Cre
 docs/              mdBook documentation (Doxygen-style theme in docs/theme/), published with rustdoc via GitHub Pages
 platforms/         short build-and-test guides: linux.md, macos.md, windows.md
 Dockerfile         server image (rust builder → distroless/cc, non-root, HEALTHCHECK), built by CI only
-deploy/            production Docker install: docker-compose.yml (teamcraft + postgres), teamcraft.env.example, install.sh
+deploy/            production Docker install: docker-compose.yml (teamcraft + postgres), teamcraft.env.example, install.sh;
+                   demo/demo.sh = snapshot and nightly reset of a hosted live demo (TEAMCRAFT_DEMO_USER: read-only
+                   public account, auth::refuse_demo_write; data from scripts/seed-demo.sh over screenshots.sh seed_*)
 .github/workflows/ ci.yml (fmt, clippy, tests on PostgreSQL 16/18, macOS/Windows builds), docs.yml, desktop.yml, scale.yml (manual/weekly scale check, tests/scale.rs),
                    mutants.yml (cargo-mutants: PR diff report-only, weekly sharded full run; .cargo/mutants.toml),
                    release.yml (binaries, installers, image + Docker install smoke test)

@@ -207,6 +207,12 @@ workflow annotation on GitHub) for every image the README shows that the run
 did not make – the run itself does not fail. Without `DESKTOP_APP` the
 `desktop-*.png` images are among them.
 
+The data loading lives in the script's `seed` and `seed_*` functions, apart
+from the captures: `scripts/seed-demo.sh` sources the script (it captures
+nothing when sourced) to load the same data into the hosted live demo
+([Live demo](docs/src/admin/live-demo.md)). Keep new demo data in a `seed_*`
+function, so the screenshots and the demo stay alike.
+
 To run it locally against a throw-away database and vault (Chrome and a
 matching chromedriver installed):
 

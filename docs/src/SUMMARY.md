@@ -28,6 +28,7 @@
 - [Branding: your own logos](admin/branding.md)
 - [Upgrading and rolling back](admin/upgrade.md)
 - [Operations](admin/operations.md)
+- [Live demo](admin/live-demo.md)
 - [Support policy](admin/support-policy.md)
 
 # Reference
@@ -57,6 +58,7 @@
 # Research
 
 - [Research notes](research/index.md)
+    - [A hosted live demo](research/live-demo.md)
     - [Deprovisioning through the identity provider (SCIM)](research/scim-deprovisioning.md)
     - [3D preview of CATIA V5 parts](research/catia-cgr-preview.md)
     - [3D preview of CATIA V5 products](research/catia-product-structure.md)

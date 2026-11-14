@@ -346,6 +346,11 @@ half a state behind. Prefer tests that fail on a real regression over tests that
 
 **Operations and repository**
 
+- [ ] Host the live demo (**maintainer action**). Ready in the code: the read-only demo account
+  (`TEAMCRAFT_DEMO_USER`, `TEAMCRAFT_DEMO_PASSWORD`), `scripts/seed-demo.sh` (the README demo data) and
+  `deploy/demo/demo.sh` (snapshot, nightly reset). Left: server, DNS, TLS, seed, snapshot, cron – the runbook is
+  [docs/src/admin/live-demo.md](src/admin/live-demo.md) – then link the demo from the top of the README and from
+  `docs/src/index.md`.
 - [ ] Test e-mail (SMTP) and Mattermost notifications against real servers (so far only against fakes)
 - [ ] Enable private vulnerability reporting (*Settings → Code security → Private vulnerability reporting*), which
   `SECURITY.md` points to

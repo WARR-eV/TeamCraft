@@ -15,6 +15,17 @@ see the notices in the README.
 
 ### Added
 
+- Everything for a hosted **live demo** (runbook: *Live demo* in the admin
+  guide). `TEAMCRAFT_DEMO_USER` and `TEAMCRAFT_DEMO_PASSWORD` make one local
+  account public and read-only: the login page shows it, every page carries a
+  *Live demo* banner, and every request of that account that is not
+  `GET`/`HEAD` is refused (403, sign-out excepted) in the web UI and the REST
+  API; wrong passwords for it count per client address only, so it cannot be
+  locked. `scripts/seed-demo.sh` loads the demo data of the README
+  screenshots (now reusable: `scripts/screenshots.sh` seeds in its own
+  `seed_*` functions and takes an existing administrator through
+  `ADMIN_PASSWORD_FILE`) and creates the account; `deploy/demo/demo.sh`
+  snapshots the seeded database and resets it to the snapshot every night.
 - REST: `POST /api/v1/changes/{number}/cancel` cancels a draft or rejected
   change (its revisions are free for another change), and
   `DELETE /api/v1/changes/{number}/reviewers/{username}` removes a reviewer
