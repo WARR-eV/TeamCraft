@@ -34,7 +34,7 @@ top of it.
   repository and permitted material.
 * **Not accepted, from people or from AI agents:** code, pseudocode, tables or
   algorithms decompiled, disassembled or otherwise extracted from proprietary
-  software (for example Siemens Teamcenter, VistaPoint, CAD programs, their
+  software (for example commercial PLM/PDM systems, CAD programs, their
   viewers and SDKs), including translated or rewritten versions of it. Also
   not accepted: the two-team "clean room" through decompilation, leaked or
   confidential vendor material, and code ported from projects with an

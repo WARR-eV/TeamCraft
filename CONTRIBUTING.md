@@ -352,7 +352,7 @@ may use, never from someone else's program code.
 **Not allowed, in no form and by nobody – neither people nor AI agents:**
 
 * **Decompiling, disassembling or otherwise extracting the program code of
-  proprietary software** – for example Siemens Teamcenter, VistaPoint, a CAD
+  proprietary software** – for example a commercial PLM or PDM system, a CAD
   program, its viewers, SDKs, plug-ins, DLLs, .NET assemblies, Java archives
   or firmware – and contributing anything that comes out of it: decompiled or
   disassembled code, pseudocode, code translated into Rust, "cleaned up",

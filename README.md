@@ -460,8 +460,7 @@ contributions. Report security problems privately, as described in
 
 **Your own work only.** Contributions must come from your own (or your AI
 agent's own) skills and knowledge. Never contribute code decompiled,
-disassembled or rewritten from proprietary software (for example Siemens
-Teamcenter or VistaPoint), and never leaked code. TeamCraft reads CAD formats
+disassembled or rewritten from proprietary software, and never leaked code. TeamCraft reads CAD formats
 from sample files and public specifications, never from anyone's program code
 ([details](CONTRIBUTING.md#your-own-work-only--no-decompiled-code)).
 

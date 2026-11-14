@@ -16,9 +16,8 @@ see the notices in the README.
 ### Added
 
 - Contribution rule **own work only – no decompiled code**: code
-  decompiled, disassembled or rewritten from proprietary software (for
-  example Siemens Teamcenter or VistaPoint), a "clean room" through
-  decompilation, and leaked or incompatibly licensed code are not accepted,
+  decompiled, disassembled or rewritten from proprietary software, a "clean
+  room" through decompilation, and leaked or incompatibly licensed code are not accepted,
   from people or from AI agents. Formats are decoded from sample files and
   public specifications, and each finding's source is recorded in its
   research page. The rule is in CONTRIBUTING.md (full), README and the book's

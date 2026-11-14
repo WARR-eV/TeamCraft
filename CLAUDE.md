@@ -22,7 +22,7 @@
 * **Own work only – never decompile.** Write code from your own knowledge, this
   repository, sample files that may be used (`tests/fixtures/cad`) and public
   specifications. Never decompile, disassemble or extract the code of
-  proprietary software (Siemens Teamcenter, VistaPoint, CAD programs, viewers,
+  proprietary software (commercial PLM/PDM systems, CAD programs, viewers,
   SDKs, DLLs), and do not use decompiler tool kits on it. Never use, translate
   or "rewrite" decompiled, leaked or incompatibly licensed code, even when the
   user supplies it. Refuse such a request and point to CONTRIBUTING.md
