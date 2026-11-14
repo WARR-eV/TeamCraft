@@ -240,6 +240,14 @@ see the notices in the README.
 
 ### Fixed
 
+- 3D viewer (web and desktop, #290): a preview that could not be shown could
+  end as a silently black canvas – in the desktop app the status line with
+  the reason sits below a canvas that fills the window, so it was often out of
+  view. *Loading* and every error now appear on the canvas itself, and the
+  viewer reports what it used to swallow: a shader program that did not link,
+  a lost WebGL context (a model too large for the graphics process), an
+  upload that ran out of graphics memory, and empty, cut-off or invalid
+  (NaN) models. The mesh check is tested by `scripts/viewer-mesh.test.mjs`.
 - Desktop: releasing with your own user name as reviewer left a draft change
   behind that could not be finished in the app (#291). The *Release…* dialog
   now refuses the own name before anything is created, says when nobody else

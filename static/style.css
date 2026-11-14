@@ -1009,6 +1009,14 @@ details.payload pre {
 .viewer-canvas:active { cursor: grabbing; }
 .viewer-canvas:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .viewer-stage { position: relative; }
+/* "Loading …" and errors on the canvas (viewer.js overlayEl, #290) */
+.viewer-overlay {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  padding: var(--space-4); text-align: center; pointer-events: none; color: var(--text-muted);
+}
+.viewer-overlay[hidden] { display: none; }
+.viewer-overlay > span { max-width: 40rem; padding: 8px 12px; border-radius: var(--radius); background: var(--surface); }
+.viewer-overlay.is-error > span { color: var(--text); box-shadow: inset 3px 0 0 var(--danger); }
 .viewer-tools {
   position: absolute;
   top: 8px;

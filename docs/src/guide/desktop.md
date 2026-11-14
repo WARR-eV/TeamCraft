@@ -178,7 +178,9 @@ account can read and says so at the start and in *Settings*. An address with
 plain `http://` to another computer gets a warning when you connect: the token
 and all data would cross the network unencrypted – use the `https://` address
 of the server. The app uses the same skins
-and 3D viewer as the web interface; the models are converted by the server. *Settings → Appearance*: *TeamCraft* (the
+and 3D viewer as the web interface; the models are converted by the server,
+and *Loading* or the reason a model cannot be shown appears on the canvas of
+the *3D viewer* tab (see [Files](files.md)). *Settings → Appearance*: *TeamCraft* (the
 default) follows the light or dark
 appearance of the operating system and switches with it, *TeamCraft Light*
 and *TeamCraft Dark* stay fixed, the distribution skins are dark. *Settings → Change password…* changes the password of

@@ -754,6 +754,16 @@ table.grid td.actions button { height: var(--ctl-h-sm); padding: 0 8px; font-siz
   border: 1px solid var(--border); border-radius: var(--radius);
   cursor: grab; touch-action: none;
 }
+/* the canvas with its state on top: "Loading …" or the error (viewer.js overlayEl) */
+.viewer-stage { position: relative; }
+.viewer-overlay {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  padding: 24px; text-align: center; pointer-events: none;
+  color: var(--text-muted); font-size: 13px; line-height: 20px;
+}
+.viewer-overlay[hidden] { display: none; }
+.viewer-overlay > span { max-width: 40rem; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--surface); }
+.viewer-overlay.is-error > span { color: var(--text); box-shadow: inset 3px 0 0 var(--st-danger-fg); }
 .viewer-canvas:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .viewer-canvas:active { cursor: grabbing; }
 .viewer-bar { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-top: 8px; color: var(--text-muted); font-size: 12px; }

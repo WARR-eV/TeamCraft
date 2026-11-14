@@ -13,6 +13,7 @@ on:
       - "scripts/desktop-tab-order.test.mjs"
       - "scripts/desktop-files-view.test.mjs"
       - "scripts/desktop-release-rules.test.mjs"
+      - "scripts/viewer-mesh.test.mjs"
       - "static/**"
       - "shared/**"
       - "media/logos/**"
@@ -27,6 +28,7 @@ on:
       - "scripts/desktop-tab-order.test.mjs"
       - "scripts/desktop-files-view.test.mjs"
       - "scripts/desktop-release-rules.test.mjs"
+      - "scripts/viewer-mesh.test.mjs"
       - "static/**"
       - "shared/**"
       - "media/logos/**"
@@ -84,6 +86,10 @@ jobs:
       # the reviewers of the release dialog and when a draft can be submitted
       - name: Test the release rules
         run: node scripts/desktop-release-rules.test.mjs
+      # the mesh check of the shared 3D viewer: empty, cut-off or invalid
+      # models end in a message, not in an empty canvas (#290)
+      - name: Test the 3D viewer's mesh check
+        run: node scripts/viewer-mesh.test.mjs
 
   test:
     name: desktop (${{ matrix.os }})
