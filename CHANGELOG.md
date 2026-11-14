@@ -248,7 +248,17 @@ see the notices in the README.
   work in progress. The desktop import tutorial, the user guide and code
   comments describe features without comparing them to one vendor's PLM
   system. The research page is now *Popular features of commercial PLM
-  systems*.
+  systems* (`research/plm-working-features.md`), and the other research
+  pages compare with "enterprise PLM" in general.
+- File formats: JT (`jt`) now belongs to *Visualisation formats* and PLM XML
+  (`plmxml`, label *PLM XML (product structure)*) to *Neutral exchange
+  formats*. The separate CAD-program entry for them is gone, so the
+  system id `teamcenter` no longer exists in `/formats`, the search filter
+  or the API's format list. A saved web search with that filter shows all
+  items; `GET /api/v1/items?system=teamcenter` answers 400 like any other
+  unknown program. Format ids and stored files are unchanged, and both
+  formats stay neutral (never collapsed). The comments of migrations 0007 and
+  0012 were edited (`db::EDITED_BEFORE_RELEASE`, no schema change).
 - Performance: a request with a personal access token (REST API, MCP, the
   desktop app) is authenticated with one query instead of three; the use of
   the token is still recorded once a minute.

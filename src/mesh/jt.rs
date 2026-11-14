@@ -86,7 +86,7 @@ pub(crate) fn read_nx(data: &[u8]) -> Result<Mesh> {
     read_jt(jt.get(start..).ok_or_else(damaged)?)
 }
 
-/// The preview mesh of a standalone JT file (Teamcenter, NX, CATIA, Creo
+/// The preview mesh of a standalone JT file (PLM visualisation, NX, CATIA, Creo
 /// exports): the same reader as for the JT inside NX parts – JT 9 with
 /// topologically compressed triangle LODs; other versions are reported.
 pub(crate) fn read_file(data: &[u8]) -> Result<Mesh> {

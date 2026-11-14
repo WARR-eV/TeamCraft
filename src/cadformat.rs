@@ -190,7 +190,6 @@ macro_rules! cad_format {
 pub const SYSTEMS: &[CadSystem] = &[
     system!("solidworks", "SolidWorks", "SolidWorks", "Dassault Systèmes", "sw"),
     system!("nx", "Siemens NX", "NX", "Siemens", "unigraphics", "ug", "nx cad"),
-    system!("teamcenter", "Siemens Teamcenter (JT, PLM XML)", "Teamcenter", "Siemens", "tc"),
     system!("solid-edge", "Siemens Solid Edge", "Solid Edge", "Siemens", "solidedge"),
     system!("inventor", "Autodesk Inventor", "Inventor", "Autodesk"),
     system!("fusion", "Autodesk Fusion", "Fusion", "Autodesk", "fusion 360", "fusion360"),
@@ -244,9 +243,6 @@ pub const FORMATS: &[CadFormat] = &[
     // Siemens NX
     cad_format!("nx-part", "NX part", "nx", Model, ["prt"], OCTET),
     cad_format!("nx-simulation", "NX simulation / FE model", "nx", Simulation, ["sim", "fem", "afm"], OCTET),
-    // Siemens Teamcenter
-    cad_format!("jt", "JT visualisation (ISO 14306)", "teamcenter", Visualization, ["jt"], "model/jt"),
-    cad_format!("plmxml", "Teamcenter PLM XML", "teamcenter", Exchange, ["plmxml"], "application/xml"),
     // Siemens Solid Edge
     cad_format!("solidedge-part", "Solid Edge part", "solid-edge", Part, ["par"], OCTET),
     cad_format!("solidedge-sheetmetal", "Solid Edge sheet metal part", "solid-edge", Part, ["psm"], OCTET),
@@ -327,6 +323,7 @@ pub const FORMATS: &[CadFormat] = &[
     cad_format!("acis-binary", "ACIS (binary)", "exchange", Exchange, ["sab"], OCTET),
     cad_format!("brep", "OpenCascade BREP", "exchange", Exchange, ["brep", "brp"], OCTET),
     cad_format!("vda-fs", "VDA-FS", "exchange", Exchange, ["vda"], OCTET),
+    cad_format!("plmxml", "PLM XML (product structure)", "exchange", Exchange, ["plmxml"], "application/xml"),
     // Meshes and 3D printing
     cad_format!("stl", "STL mesh", "mesh", Mesh, ["stl"], "model/stl"),
     cad_format!("obj", "Wavefront OBJ mesh", "mesh", Mesh, ["obj"], "model/obj"),
@@ -335,6 +332,7 @@ pub const FORMATS: &[CadFormat] = &[
     cad_format!("off", "OFF mesh", "mesh", Mesh, ["off"], OCTET),
     cad_format!("amf", "AMF (3D printing)", "mesh", Mesh, ["amf"], OCTET),
     // Visualisation
+    cad_format!("jt", "JT visualisation (ISO 14306)", "visualization", Visualization, ["jt"], "model/jt"),
     cad_format!("gltf", "glTF", "visualization", Visualization, ["gltf"], "model/gltf+json"),
     cad_format!("glb", "glTF binary", "visualization", Visualization, ["glb"], "model/gltf-binary"),
     cad_format!("fbx", "FBX", "visualization", Visualization, ["fbx"], OCTET),
@@ -966,11 +964,9 @@ pub fn ids_named_by(query: &str) -> Vec<String> {
 /// Groups of [`SYSTEMS`] that are not one authoring program: neutral and
 /// exchange formats, meshes, visualisation, point clouds, open BIM, PCB
 /// fabrication data, multi-vendor simulation and CFD, G-code, documents.
-/// Their files belong to no family and are never collapsed. JT and PLM XML
-/// (`teamcenter`) are read by every major CAD program, so they count as
-/// neutral too.
-const NEUTRAL_SYSTEMS: [&str; 13] = [
-    "teamcenter",
+/// Their files belong to no family and are never collapsed (JT is in
+/// `visualization`, PLM XML in `exchange`).
+const NEUTRAL_SYSTEMS: [&str; 12] = [
     "exchange",
     "mesh",
     "visualization",
@@ -1472,7 +1468,6 @@ mod tests {
         for system_id in [
             "solidworks",
             "nx",
-            "teamcenter",
             "inventor",
             "fusion",
             "creo",
@@ -2077,7 +2072,7 @@ mod tests {
             .collect();
         assert_eq!(ids, expected, "in the order of SYSTEMS");
         assert!(is_family("nx") && is_family("solidworks") && is_family("kicad"));
-        assert!(!is_family("exchange") && !is_family("teamcenter") && !is_family(""));
+        assert!(!is_family("exchange") && !is_family("visualization") && !is_family(""));
         assert_eq!(info("nx-part").and_then(|i| i.family), Some("nx"));
         assert_eq!(info("step").and_then(|i| i.family), None);
     }
@@ -2125,7 +2120,7 @@ mod tests {
     #[test]
     fn grouping_without_or_with_an_unknown_preference_shows_all() {
         let files = ["nx-part", "solidworks-part"];
-        for preferred in ["", "exchange", "teamcenter", "nonsense"] {
+        for preferred in ["", "exchange", "visualization", "nonsense"] {
             let g = group_by_family(preferred, &files);
             assert_eq!(g.collapsed, [false, false], "{preferred}");
         }

@@ -100,7 +100,7 @@ async fn the_setting_is_stored_per_user_and_exposed_on_me() {
     );
 
     // neutral groups and unknown ids are refused, the setting is unchanged
-    for bad in ["exchange", "teamcenter", "nonsense"] {
+    for bad in ["exchange", "visualization", "nonsense"] {
         let r = set_preference(&app, &max, bad).await;
         assert_eq!(r.status, StatusCode::SEE_OTHER, "{bad}: back with an error");
         assert_eq!(app.actor("max").await.preferred_cad, "nx", "{bad}");

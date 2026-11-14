@@ -610,7 +610,7 @@ real files and belong to section 3 once such files are at hand.
 
 **Siemens NX**
 
-- [ ] (research first) How other PLMs connect NX (native vs. Teamcenter NX Manager), licences (student/academic) and
+- [ ] (research first) How other PLMs connect NX (native vs. through a PLM integration), licences (student/academic) and
   what is feasible for an open-source project
 - [ ] Folder import for the master model concept: the drawing `*_dwg*.prt` belongs into the item of the model
 - [ ] Test the BOM import with real NX BOM exports
@@ -619,7 +619,7 @@ real files and belong to section 3 once such files are at hand.
 
 ### 5. Feature demand (backlog)
 
-What users ask of PLM/PDM systems (reviews of Teamcenter, Vistapoint, Dokuly, OdooPLM and others, Siemens community
+What users ask of PLM/PDM systems (reviews of commercial and open-source PLM/PDM systems, vendor community
 enhancement requests), reduced to what TeamCraft does not have yet; what is present or done is left out. Entries
 that need the CAD programs themselves (add-ins, generated drawings) are listed too – they need a Windows machine
 with licensed CAD software to build and test. Like section 4, these are candidates, not commitments: a feature
@@ -720,7 +720,7 @@ needs an issue with a reason first (see *Direction*).
 - [ ] CAD clone workflows: clone an assembly with selective reuse, Save As / revise per component over a whole
   structure, shown as an indented tree
 - [ ] Interactive onboarding and contextual help
-- [ ] Migration tooling from Teamcenter, Windchill, Aras and SOLIDWORKS PDM
+- [ ] Migration tooling from commercial PLM/PDM systems
 - [ ] GA proofs: production readiness, migration and concurrency safety, scale validation, external security review,
   support and versioning policy
 

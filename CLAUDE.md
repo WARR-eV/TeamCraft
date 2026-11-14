@@ -18,7 +18,9 @@
 * Do not edit `.claude/settings.local.json`; ask the user for missing permissions.
   The project runs in `dontAsk` mode – never work around a denied command.
 * No organisation-specific names, logos, seed data or deployment files,
-  and nothing that resembles Siemens Teamcenter or Microsoft Teams branding.
+  and nothing that resembles the branding of other PLM or collaboration
+  products. Do not name commercial PLM products to position TeamCraft or
+  as the model for a feature.
 * **Own work only – never decompile.** Write code from your own knowledge, this
   repository, sample files that may be used (`tests/fixtures/cad`) and public
   specifications. Never decompile, disassemble or extract the code of

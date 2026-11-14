@@ -1,4 +1,4 @@
--- Personal working sets, as in Teamcenter (Favorites, Saved Queries).
+-- Personal working sets (favorites, saved searches).
 
 -- Items a user keeps at hand ("★ Favorites" folder of the vault explorer).
 CREATE TABLE favorites (
