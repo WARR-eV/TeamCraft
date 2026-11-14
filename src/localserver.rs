@@ -713,7 +713,8 @@ mod tests {
 
     #[test]
     fn local_variables_win_over_the_environment() {
-        let local = local_variables(Path::new("/data"), 8099, 54000, "pw");
+        let password = random_password();
+        let local = local_variables(Path::new("/data"), 8099, 54000, &password);
         let env = |key: &str| -> Option<String> {
             match key {
                 "TEAMCRAFT_DATABASE_URL" => Some("postgres://elsewhere/db".into()),
@@ -734,7 +735,10 @@ mod tests {
             Some("http://127.0.0.1:8099")
         );
         assert_eq!(lookup("TEAMCRAFT_DB_PORT").as_deref(), Some("54000"));
-        assert_eq!(lookup("TEAMCRAFT_DB_PASSWORD").as_deref(), Some("pw"));
+        assert_eq!(
+            lookup("TEAMCRAFT_DB_PASSWORD").as_deref(),
+            Some(password.as_str())
+        );
         assert_eq!(lookup("TEAMCRAFT_DB_PASSWORD_FILE"), None);
         assert_eq!(lookup("TEAMCRAFT_DATABASE_URL"), None);
         assert_eq!(lookup("DATABASE_URL_FILE"), None);
@@ -747,7 +751,7 @@ mod tests {
     /// first-start setup page needs (`web::auth_pages::setup_open`).
     #[test]
     fn local_configuration_is_valid_and_loopback() {
-        let local = local_variables(Path::new("/data"), 8099, 54000, "pw");
+        let local = local_variables(Path::new("/data"), 8099, 54000, &random_password());
         let config = crate::config::Config::from_lookup(overlay_lookup(local, |_| None)).unwrap();
         assert!(config.bind_addr.ip().is_loopback());
         assert_eq!(config.bind_addr.port(), 8099);
