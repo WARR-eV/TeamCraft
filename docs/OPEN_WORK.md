@@ -873,7 +873,7 @@ The history up to the open-source release is squashed into the first commit
 | –  | Preview images of native Inventor, Solid Edge and SolidWorks files                                                                                                    | `457e03d`            |
 | –  | Desktop: one workspace folder per project group; import of existing CAD folders                                                                                       | `8bf8e65`, `9557ffa` |
 | –  | Skins without distribution logos                                                                                                                                      | `099737e`            |
-| –  | Teamcenter working features: favorites, saved searches, Save As, BOM comparison                                                                                       | `9289aa4`            |
+| –  | Common PLM working features: favorites, saved searches, Save As, BOM comparison                                                                                       | `9289aa4`            |
 | –  | Release readiness of change orders: unreleased BOM children and references block the submit, *Add all* (web, API, desktop)                                            | `5c5b3fd`            |
 | –  | Work-in-progress / no-warranty notices (README, docs, web footer, desktop), `CONTRIBUTING.md`, `SECURITY.md`                                                          | `5c8eff3`            |
 | –  | Similar part search by 3D shape signature                                                                                                                             | `03f94dd`            |

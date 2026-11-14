@@ -1,10 +1,10 @@
-# Popular features of Teamcenter
+# Popular features of commercial PLM systems
 
-TeamCraft is meant as an open-source alternative to Siemens Teamcenter. This
-page lists the features its users rely on most, what TeamCraft already has
-and what is implemented next. Date: 2026-11-04.
+Which working features do users of an established commercial PLM system rely
+on most, which of them does TeamCraft already have, and which come next? The
+study looked at one widely documented system as an example. Date: 2026-11-04.
 
-## Siemens Teamcenter
+## The system studied: Siemens Teamcenter
 
 |               |                                                                        |
 |---------------|------------------------------------------------------------------------|

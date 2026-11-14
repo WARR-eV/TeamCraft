@@ -10,7 +10,7 @@
   Check your CAD data out and in, keep every version, release with reviews,
   follow changes through assemblies and see STEP, NX, mesh and point-cloud models
   in 3D – in the browser, in the desktop app or through the REST API.<br />
-  <em>Work in progress: an open-source alternative to Siemens Teamcenter.</em>
+  <em>Work in progress: there is no stable release yet.</em>
 </p>
 
 <div align="center">

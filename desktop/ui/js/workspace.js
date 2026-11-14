@@ -420,7 +420,7 @@ export function checkinDialog(tab, park) {
     });
     var comment = h("input", { type: "text", maxlength: "2000", placeholder: "What changed, e.g. wall thickness 2 → 2.5 mm" });
     var progressLine = h("p.small.muted.hidden", { role: "status" });
-    // Like the Vault add-in or the Teamcenter integration: viewables at check-in.
+    // Like the CAD add-ins of PDM systems: viewables at check-in.
     var exportable = boxes.filter(function (b) { return exportProgram(b.name, programs); });
     var withStep = h("input", { type: "checkbox", checked: true });
     var stepNote = exportable.length ? h("label.check", null, [withStep,

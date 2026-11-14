@@ -1,6 +1,6 @@
 //! STEP export of native CAD files through the CAD program installed on this
-//! computer – the way the Inventor add-in of Autodesk Vault or the Solid Edge
-//! integration of Teamcenter create viewables at check-in (findings in
+//! computer – the way the CAD add-ins of PDM systems create viewables at
+//! check-in (findings in
 //! `docs/src/research/cad-previews.md`). The server then shows the STEP in 3D.
 //!
 //! Windows only: Autodesk Inventor and Siemens Solid Edge are driven through

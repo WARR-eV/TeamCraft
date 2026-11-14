@@ -243,6 +243,12 @@ see the notices in the README.
 
 ### Changed
 
+- TeamCraft no longer presents itself as an alternative to a particular
+  commercial product: the README tagline now says only that the project is a
+  work in progress. The desktop import tutorial, the user guide and code
+  comments describe features without comparing them to one vendor's PLM
+  system. The research page is now *Popular features of commercial PLM
+  systems*.
 - Performance: a request with a personal access token (REST API, MCP, the
   desktop app) is authenticated with one query instead of three; the use of
   the token is still recorded once a minute.
