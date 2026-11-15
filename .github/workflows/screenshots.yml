@@ -95,7 +95,11 @@ jobs:
           BASE_URL: http://127.0.0.1:8080
           OUT_DIR: ${{ runner.temp }}/screenshots
           DESKTOP_APP: desktop/target/debug/teamcraft-desktop
-        run: scripts/screenshots.sh
+        run: |
+          # the one-time code of the first-start setup link in the server log
+          SETUP_CODE=$(grep -o 'login?setup=[0-9a-f]*' "$RUNNER_TEMP/teamcraft.log" | head -n 1 | cut -d= -f2)
+          export SETUP_CODE
+          scripts/screenshots.sh
 
       - name: Server log
         if: failure()

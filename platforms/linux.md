@@ -52,8 +52,8 @@ docker compose up -d db     # PostgreSQL on 127.0.0.1:5432, no password needed
 cargo run --release         # first build takes a few minutes
 ```
 
-Open <http://localhost:8080>, create the administrator on the login page,
-then a project group (*Projects → New project group*) and your first item.
+Open the setup link the server prints at start (`…/login?setup=…`), create
+the administrator, then a project group (*Projects → New project group*) and your first item.
 
 Without Docker, use a native PostgreSQL and a role with `CREATEDB`:
 

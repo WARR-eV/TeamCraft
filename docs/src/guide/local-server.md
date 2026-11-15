@@ -107,8 +107,9 @@ the [Docker install](../admin/docker.md) with its backups.
   (mode `0600` on Linux and macOS), and checked with `scram-sha-256`, so other
   accounts on the same computer cannot use the database.
 - The page that creates the administrator is only offered while no account
-  exists and the server listens on this computer – the same rule as for every
-  other first start.
+  exists and the server listens on this computer. Unlike a normal server,
+  `teamcraft local` needs no setup link from its log: its port is new and
+  private, and the desktop app opens the page right after the start.
 - A second `teamcraft local` on the same folder refuses to start instead of
   stopping the running database.
 

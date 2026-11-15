@@ -49,8 +49,8 @@ docker compose up -d db     # skip when you use Homebrew's PostgreSQL
 cargo run --release         # first build takes a few minutes
 ```
 
-Open <http://localhost:8080>, create the administrator on the login page,
-then a project group (*Projects → New project group*) and your first item.
+Open the setup link the server prints at start (`…/login?setup=…`), create
+the administrator, then a project group (*Projects → New project group*) and your first item.
 
 ## 3. Test
 

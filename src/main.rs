@@ -504,10 +504,13 @@ async fn local(
     let local = localserver::local_variables(&data_dir, port, cluster.port, &cluster.password);
     let result = async {
         localserver::write_port_file(&data_dir, port)?;
-        let config = Config::from_lookup(localserver::overlay_lookup(local, |key| {
+        let mut config = Config::from_lookup(localserver::overlay_lookup(local, |key| {
             std::env::var(key).ok()
         }))
         .context("invalid configuration")?;
+        // a fresh private port the desktop app opens itself: the first-start
+        // page needs no code from the log
+        config.setup_without_code = true;
         teamcraft::config::warn_unknown_variables();
         tracing::info!("open http://127.0.0.1:{port} in your browser");
         let shutdown = async move {
@@ -570,6 +573,22 @@ async fn serve_with(
     let preview_cache_max_bytes = config.preview_cache_max_bytes;
     let thread_retention_days = config.assistant.as_ref().map(|a| a.retention_days);
     let state = AppState::new(config, pool.clone()).await?;
+    // first start: the setup link with the one-time code (see
+    // web::auth_pages::setup_state); only this log shows it
+    if state.config.local_login
+        && state.config.bind_addr.ip().is_loopback()
+        && services::users::count(&pool).await? == 0
+    {
+        let link = if state.config.setup_without_code {
+            format!("{}/login", state.config.public_url)
+        } else {
+            format!(
+                "{}/login?setup={}",
+                state.config.public_url, state.setup_code
+            )
+        };
+        tracing::info!("no administrator yet: open {link} to create one (the link works until the next restart)");
+    }
     // Outgoing event webhooks (the outbox `webhook_deliveries`).
     teamcraft::webhooks::spawn(pool.clone(), state.webhooks.clone());
 

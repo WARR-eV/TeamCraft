@@ -566,6 +566,12 @@ mod tests {
             json!({ "next": "/", "next_encoded": "%2F", "error": "bad", "oidc_name": "Single Sign-On",
                                            "username": "max", "local_login": true, "flash": null }),
         );
+        // first start without the setup link: where to find it
+        render(
+            &env,
+            "login.html",
+            json!({ "next": "/", "next_encoded": "%2F", "setup_needs_code": true, "local_login": true, "flash": null }),
+        );
         render(
             &env,
             "error.html",
