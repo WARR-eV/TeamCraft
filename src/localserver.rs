@@ -180,10 +180,11 @@ pub fn pg_bin_candidates(explicit: Option<&Path>, exe_dir: Option<&Path>) -> Vec
 
 /// The first candidate that holds `initdb`, `pg_ctl` and `postgres`.
 pub fn find_pg_bin(explicit: Option<&Path>) -> Result<PathBuf> {
+    let explicit = explicit.map(without_verbatim_prefix);
     let exe_dir = std::env::current_exe()
         .ok()
-        .and_then(|p| p.parent().map(Path::to_path_buf));
-    let candidates = pg_bin_candidates(explicit, exe_dir.as_deref());
+        .and_then(|p| p.parent().map(without_verbatim_prefix));
+    let candidates = pg_bin_candidates(explicit.as_deref(), exe_dir.as_deref());
     if let Some(found) = candidates.iter().find(|d| is_pg_bin(d)) {
         return Ok(found.clone());
     }
@@ -197,6 +198,32 @@ pub fn find_pg_bin(explicit: Option<&Path>) -> Result<PathBuf> {
              or in the usual installation directories. Install PostgreSQL (16 or newer), \
              or give its bin directory with --pg-bin"
         ),
+    }
+}
+
+/// `\\?\C:\dir` → `C:\dir` and `\\?\UNC\server\share` → `\\server\share`;
+/// every other path unchanged. Windows hands out such "verbatim" paths (the
+/// desktop app's resource folder from Tauri, canonicalised paths), and
+/// PostgreSQL cannot use them: `initdb` looks for `postgres.exe` under
+/// `//?/C:/…` and fails with "The system cannot find the path specified".
+/// Pure string handling, so it is tested on every platform.
+pub fn without_verbatim_prefix(path: &Path) -> PathBuf {
+    let Some(s) = path.to_str() else {
+        return path.to_path_buf();
+    };
+    if let Some(rest) = s.strip_prefix(r"\\?\UNC\") {
+        return PathBuf::from(format!(r"\\{rest}"));
+    }
+    match s.strip_prefix(r"\\?\") {
+        // only a drive path (`C:\…`); other verbatim forms stay as they are
+        Some(rest)
+            if rest.len() >= 3
+                && rest.as_bytes()[0].is_ascii_alphabetic()
+                && &rest[1..3] == r":\" =>
+        {
+            PathBuf::from(rest)
+        }
+        _ => path.to_path_buf(),
     }
 }
 
@@ -644,6 +671,29 @@ mod tests {
             );
             assert_eq!(data_dir_from(vars(&[("HOME", "")])), None);
         }
+    }
+
+    /// Windows verbatim paths (the desktop app's resource folder) lose their
+    /// `\\?\` prefix, which PostgreSQL cannot handle; others stay.
+    #[test]
+    fn verbatim_prefixes_are_removed() {
+        let s = |p: &str| {
+            without_verbatim_prefix(Path::new(p))
+                .to_string_lossy()
+                .to_string()
+        };
+        assert_eq!(
+            s(r"\\?\C:\Users\a\AppData\Local\TeamCraft Local\postgresql\bin"),
+            r"C:\Users\a\AppData\Local\TeamCraft Local\postgresql\bin"
+        );
+        assert_eq!(s(r"\\?\UNC\server\share\pg"), r"\\server\share\pg");
+        assert_eq!(s(r"C:\pg\bin"), r"C:\pg\bin");
+        assert_eq!(
+            s("/usr/lib/postgresql/16/bin"),
+            "/usr/lib/postgresql/16/bin"
+        );
+        // other verbatim forms (device paths) are left alone
+        assert_eq!(s(r"\\?\Volume{1234}\pg"), r"\\?\Volume{1234}\pg");
     }
 
     #[test]
