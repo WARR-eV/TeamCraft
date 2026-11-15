@@ -237,9 +237,12 @@ jobs:
         with:
           workspaces: desktop
           key: release-bundle
+      # a prebuilt cargo-tauri (cargo-binstall fallback of install-action);
+      # building it from source took 9 minutes on Windows without a cache
       - name: Tauri CLI
-        shell: bash
-        run: command -v cargo-tauri || cargo install tauri-cli --version "^2" --locked
+        uses: taiki-e/install-action@v2
+        with:
+          tool: tauri-cli@2
       - name: Build the installers
         working-directory: desktop
         shell: bash
@@ -358,7 +361,9 @@ jobs:
   # PostgreSQL sources of the same version.
   local-server:
     name: desktop with local server (${{ matrix.os }})
-    needs: version
+    # the server binaries of the server job (Linux x86_64, Windows x64) are
+    # reused instead of built again (20 minutes on Windows)
+    needs: [version, server]
     if: needs.version.outputs.artifacts == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
@@ -366,9 +371,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-24.04, target: x86_64-unknown-linux-gnu, bundles: appimage }
-          - { os: macos-latest, target: aarch64-apple-darwin, bundles: "app,dmg" }
-          - { os: windows-latest, target: x86_64-pc-windows-msvc, bundles: nsis }
+          - { os: ubuntu-24.04, target: x86_64-unknown-linux-gnu, bundles: appimage, server: linux-x86_64 }
+          # no macOS server job: built here
+          - { os: macos-latest, target: aarch64-apple-darwin, bundles: "app,dmg", server: "" }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, bundles: nsis, server: windows-x64 }
     env:
       PG_MAJOR: "18"
     steps:
@@ -385,17 +391,38 @@ jobs:
             .
             desktop
           key: release-local-server-${{ matrix.target }}
+      # a prebuilt cargo-tauri (cargo-binstall fallback of install-action);
+      # building it from source took 9 minutes on Windows without a cache
       - name: Tauri CLI
-        shell: bash
-        run: command -v cargo-tauri || cargo install tauri-cli --version "^2" --locked
+        uses: taiki-e/install-action@v2
+        with:
+          tool: tauri-cli@2
+      - name: Server binary of the server job
+        if: matrix.server != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: server-${{ matrix.server }}
+          path: server-dist
       - name: Server (as teamcraft-server)
         shell: bash
         run: |
           set -euo pipefail
-          cargo build --release --locked
           ext=""; if [ "$RUNNER_OS" = "Windows" ]; then ext=".exe"; fi
+          if [ -n "${{ matrix.server }}" ]; then
+            # the archive of the server job (relative paths: Git Bash on Windows)
+            cd server-dist
+            for a in *.tar.gz; do [ -e "$a" ] && tar -xzf "$a"; done
+            for a in *.zip; do [ -e "$a" ] && 7z x -y "$a" > /dev/null; done
+            cd ..
+            bin=$(find server-dist -type f -name "teamcraft$ext" -print -quit)
+          else
+            cargo build --release --locked
+            bin="target/release/teamcraft$ext"
+          fi
+          test -n "$bin" && test -f "$bin"
           mkdir -p desktop/binaries
-          cp "target/release/teamcraft$ext" "desktop/binaries/teamcraft-server-${{ matrix.target }}$ext"
+          cp "$bin" "desktop/binaries/teamcraft-server-${{ matrix.target }}$ext"
+          chmod 755 "desktop/binaries/teamcraft-server-${{ matrix.target }}$ext"
           ls -l desktop/binaries
       - name: PostgreSQL ${{ env.PG_MAJOR }}
         shell: bash
