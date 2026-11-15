@@ -224,6 +224,6 @@ desktop/           TeamCraft Desktop (Tauri 2, own Cargo project – never part 
   fuzzing, CI gates) and structure (module splits, guard tests) before new features;
   without a request from the user, pick the next task from its sections 1 and 2.
 * **Project status:** no stable release yet – only `0.x` pre-releases
-  (`Cargo.toml` is at `0.2.7`). Keep the work-in-progress / no-warranty notices
+  (`Cargo.toml` is at `0.2.8`). Keep the work-in-progress / no-warranty notices
   in the README, `docs/src/index.md`, the web footer and the desktop *About*
   dialog until the user asks for a stable release.
