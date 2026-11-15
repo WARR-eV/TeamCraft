@@ -107,6 +107,9 @@ pub struct AppState {
     pub sign_in: Arc<auth::SignInThrottle>,
     /// Request counters for `GET /metrics`.
     pub metrics: Arc<metrics::Metrics>,
+    /// One-time code of the first-start setup, new at every start (see
+    /// `auth::setup_code`); logged with the setup link.
+    pub setup_code: Arc<str>,
 }
 
 impl AppState {
@@ -158,6 +161,7 @@ impl AppState {
             db,
             sign_in,
             metrics: Arc::default(),
+            setup_code: auth::setup_code().into(),
             config: Arc::new(config),
             templates: Arc::new(templates),
             vault,

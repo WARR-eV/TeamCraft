@@ -8,7 +8,9 @@ post_install() {
          sudo -u postgres createuser teamcraft
          sudo -u postgres createdb -O teamcraft teamcraft
     3. sudo systemctl enable --now teamcraft
-    4. Open http://localhost:8080 and create the administrator.
+    4. Open the setup link from the log and create the administrator:
+         journalctl -u teamcraft | grep "setup="
+       (or: sudo -u teamcraft teamcraft user create --username admin --role admin)
     Configuration: /etc/teamcraft/teamcraft.env
     Commands: sudo -u teamcraft teamcraft user list
 EOF
