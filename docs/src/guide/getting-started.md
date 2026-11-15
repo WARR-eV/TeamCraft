@@ -4,8 +4,8 @@
 
 Download the desktop app **with local server** from the
 [Releases page](https://github.com/rudalabs/TeamCraft/releases) (Windows x64,
-macOS Apple silicon, Linux x86_64), start it and click **Try TeamCraft on
-this computer**: the app starts a private server with its own database on
+macOS Apple silicon, Linux x86_64) and start *TeamCraft Local*, an app of its
+own next to the regular desktop app: it starts a private server with its own database on
 your computer and opens the browser, where you create the administrator. With
 PostgreSQL installed, `teamcraft local` does the same on the command line.
 Details: [Try it on your computer](local-server.md).

@@ -277,6 +277,20 @@ see the notices in the README.
   every start); without it the login page says where to find the link.
   `teamcraft local` (and the desktop app *TeamCraft Local*) needs no code.
   `scripts/screenshots.sh` takes the code in `SETUP_CODE`.
+- Desktop installers *with local server*: they install **TeamCraft Local**, an
+  app of its own next to the desktop app (identifier
+  `io.github.rudalabs.teamcraft.local`, own settings folder and keychain
+  entry). The first test build shared the desktop app's identity, so it
+  opened with the server and sign-in configured in the desktop app instead
+  of the local server. With no server configured TeamCraft Local now starts
+  its local server by itself.
+- Desktop installers *with local server*: PostgreSQL is bundled with only
+  the programs TeamCraft uses (`initdb`, `pg_ctl`, `postgres`) and the client
+  tools `psql`, `pg_dump`, `pg_restore`, `pg_isready`. The Windows build no
+  longer ships PL/Python's Python (Windows: `python.exe`, `Lib/`, `DLLs/`;
+  Linux: `lib/python3.x`), PostgreSQL's test program and about 35 unused tools; a browser
+  had reported the Windows installer as a virus. The release job fails if
+  one of the needed programs or `pg_trgm` is missing.
 - 3D viewer (web and desktop, #290): a preview that could not be shown could
   end as a silently black canvas – in the desktop app the status line with
   the reason sits below a canvas that fills the window, so it was often out of

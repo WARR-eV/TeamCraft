@@ -369,6 +369,10 @@ half a state behind. Prefer tests that fail on a real regression over tests that
 - [ ] Install the three installers *with local server* once on real computers and click *Try TeamCraft on this
   computer* – CI starts each installer's bundled server (first start, setup page, clean stop) but not the app's
   button; on macOS check whether Gatekeeper lets the quarantined app start `teamcraft-server` and PostgreSQL
+- [ ] Windows: a browser reported `TeamCraft-with-local-server_0.2.7_x64-setup.exe` (a CI artifact) as a virus –
+  detection name unknown. The bundled PostgreSQL is now trimmed (no PL/Python interpreter, no test or extra programs);
+  check the next build with VirusTotal and report remaining detections to the vendor (Microsoft: WDSI file submission)
+  as false positives; code signing would be the lasting fix
 - [ ] Release v0.1.0 again from the current `main` (re-tag), when asked – the published v0.1.0 is from `6f68f9a` and
   has no Flatpak, Windows ARM64 or portable builds
 

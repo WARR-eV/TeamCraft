@@ -433,6 +433,37 @@ jobs:
           # what a running server does not need
           rm -rf "$dest/share/doc" "$dest/share/man" "$dest/lib/pgxs" "$dest"/pgAdmin* "$dest"/StackBuilder*
           find "$dest" -type f \( -name '*.a' -o -name '*.pdb' -o -name '*.lib' \) -delete
+          # Only the programs `teamcraft local` runs (initdb, pg_ctl, postgres)
+          # and the client tools for a manual backup – not the ~35 other tools,
+          # PostgreSQL's test program or the Python interpreter of PL/Python
+          # that the Windows build brings (python.exe, Lib/, DLLs/): an
+          # unsigned installer with an embedded Python was reported as a virus
+          # by a browser. Libraries stay, except Python's.
+          keep=" initdb pg_ctl postgres psql pg_dump pg_restore pg_isready "
+          rm -rf "$dest/bin/DLLs" "$dest/bin/Lib"
+          for f in "$dest"/bin/*; do
+            name=$(basename "$f")
+            case "$name" in
+              python*) rm -rf "$f" ;;
+              *.dll) ;;
+              *) if [[ "$keep" != *" ${name%.exe} "* ]]; then rm -rf "$f"; fi ;;
+            esac
+          done
+          # PL/Python and the Python it brings (Linux: lib/python3.x, libpython)
+          find "$dest" -depth \( -iname '*plpython*' -o -iname 'python*' -o -iname 'libpython*' \) -exec rm -rf {} +
+          # what must be left: the three programs, pg_trgm (migrations), no
+          # Python (searched below share/, whatever the layout).
+          find "$dest" -maxdepth 3 -type d
+          for p in initdb pg_ctl postgres; do
+            if ! { test -f "$dest/bin/$p" || test -f "$dest/bin/$p.exe"; }; then
+              echo "::error::$p is missing in $dest/bin"; exit 1
+            fi
+          done
+          trgm=$(find "$dest/share" -name pg_trgm.control -print -quit)
+          if [ -z "$trgm" ]; then echo "::error::pg_trgm.control is missing"; exit 1; fi
+          echo "pg_trgm: $trgm"
+          left=$(find "$dest" -iname 'python*')
+          if [ -n "$left" ]; then echo "::error::Python is left: $left"; exit 1; fi
           # the licence of the PostgreSQL version shipped
           IFS=. read -r major minor _ <<< "$version"
           curl -fsSL "https://raw.githubusercontent.com/postgres/postgres/REL_${major}_${minor}/COPYRIGHT" \
@@ -463,7 +494,8 @@ jobs:
           find "$b" -maxdepth 2 -type f \( -name '*.AppImage' -o -name '*.dmg' -o -name '*-setup.exe' \) \
             | while read -r f; do
                 name=$(basename "$f")
-                cp "$f" "dist/${name/TeamCraft_/TeamCraft-with-local-server_}"
+                # "TeamCraft Local_0.2.7_x64-setup.exe" → "TeamCraft-with-local-server_0.2.7_x64-setup.exe"
+                cp "$f" "dist/TeamCraft-with-local-server_${name#*_}"
               done
           ls -l dist
           test -n "$(ls dist)"
@@ -483,11 +515,16 @@ jobs:
               (cd "$tmp" && "$GITHUB_WORKSPACE/$app" --appimage-extract > /dev/null)
               base="$tmp/squashfs-root" ;;
             macOS)
-              base="desktop/target/release/bundle/macos/TeamCraft.app" ;;
+              base=$(find desktop/target/release/bundle/macos -maxdepth 1 -name '*.app' -print -quit)
+              # its own app next to the desktop app (settings, keychain entry)
+              test "$(plutil -extract CFBundleIdentifier raw "$base/Contents/Info.plist")" = io.github.rudalabs.teamcraft.local ;;
             Windows)
               setup=$(find dist -name '*-setup.exe' -print -quit)
               "./$setup" //S
-              base="$(posix "$LOCALAPPDATA")/TeamCraft" ;;
+              # TeamCraft Local installs per user into %LOCALAPPDATA%\<product name>
+              server_exe=$(find "$(posix "$LOCALAPPDATA")" -maxdepth 2 -name teamcraft-server.exe -print -quit)
+              test -n "$server_exe"
+              base=$(dirname "$server_exe") ;;
           esac
           server=$(find "$base" -type f \( -name teamcraft-server -o -name teamcraft-server.exe \) -print -quit)
           initdb=$(find "$base" -type f \( -name initdb -o -name initdb.exe \) -path '*postgresql/bin/*' -print -quit)

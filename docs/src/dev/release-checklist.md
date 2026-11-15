@@ -57,9 +57,11 @@ mismatch.
 - [ ] Test the candidate: the install from the container image with
   `deploy/install.sh`, an upgrade from the previous release with data, and
   one desktop installer per platform. With one installer *with local
-  server*, click *Try TeamCraft on this computer* on a computer without
-  PostgreSQL: the browser offers to create the administrator, the app signs
-  in, and quitting the app stops the server.
+  server*, on a computer without PostgreSQL and with the desktop app
+  connected to another server: TeamCraft Local installs next to it, starts
+  its local server by itself, the browser offers to create the administrator,
+  the app signs in, quitting it stops the server, and the desktop app still
+  shows its own server.
 - [ ] Note what was found in the soak in the changelog or in the release
   notes.
 
