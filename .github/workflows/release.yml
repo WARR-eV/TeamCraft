@@ -450,12 +450,20 @@ jobs:
             esac
           done
           find "$dest" -depth -iname '*plpython*' -exec rm -rf {} +
-          # what must be left: the three programs, pg_trgm (migrations), no Python
+          # what must be left: the three programs, pg_trgm (migrations), no
+          # Python. Extensions are in share/extension (Windows) or
+          # share/postgresql/extension (Unix builds, by their prefix).
+          find "$dest" -maxdepth 3 -type d
           for p in initdb pg_ctl postgres; do
-            test -f "$dest/bin/$p" || test -f "$dest/bin/$p.exe"
+            if ! { test -f "$dest/bin/$p" || test -f "$dest/bin/$p.exe"; }; then
+              echo "::error::$p is missing in $dest/bin"; exit 1
+            fi
           done
-          test -f "$dest/share/extension/pg_trgm.control"
-          test -z "$(find "$dest" -iname 'python*')"
+          trgm=$(find "$dest/share" -name pg_trgm.control -print -quit)
+          if [ -z "$trgm" ]; then echo "::error::pg_trgm.control is missing"; exit 1; fi
+          echo "pg_trgm: $trgm"
+          left=$(find "$dest" -iname 'python*')
+          if [ -n "$left" ]; then echo "::error::Python is left: $left"; exit 1; fi
           # the licence of the PostgreSQL version shipped
           IFS=. read -r major minor _ <<< "$version"
           curl -fsSL "https://raw.githubusercontent.com/postgres/postgres/REL_${major}_${minor}/COPYRIGHT" \
