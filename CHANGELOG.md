@@ -242,6 +242,11 @@ see the notices in the README.
 
 ### Changed
 
+- Release workflow: the installers *with local server* reuse the server
+  binaries of the `server` job (Linux x86_64, Windows x64) instead of building
+  them a second time (about 20 minutes on Windows), and the desktop jobs
+  install a prebuilt Tauri CLI instead of compiling it (9 minutes without a
+  cache).
 - README: the *Download* section moved up, right below the work-in-progress
   notice, and starts with a link to the Releases page and which download to
   pick; a *Download TeamCraft* line sits under the badges.
