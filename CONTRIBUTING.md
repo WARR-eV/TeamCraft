@@ -152,7 +152,8 @@ The screenshots in `media/screenshots/` are made by
 [`scripts/screenshots.sh`](scripts/screenshots.sh), never by hand, so that they
 always show the same demo data. The script needs a running TeamCraft with an **empty** database that listens on
 localhost. It creates the administrator
-through the first-start page and two editors, the project group ROVER, parts
+through the first-start page (with the one-time code of the setup link in the
+server log, `SETUP_CODE`) and two editors, the project group ROVER, parts
 and assemblies with the NIST files from `tests/fixtures/cad`, a multi-level
 BOM, a released and a pending change order, check-outs and notifications,
 and after the main pages a change request, two simulations with results, an
@@ -479,13 +480,22 @@ release may contain breaking changes.
 binaries (Linux x86_64/ARM64, Windows x64) and the desktop installers
 (AppImage, `.deb`, `.rpm` and Flatpak bundles for x86_64/aarch64, `.dmg`,
 and for Windows x64 and ARM64 `.msi`, NSIS `-setup.exe` and a portable
-`.zip`) and keeps them as workflow artifacts for 14 days. It builds `main`
+`.zip`), the desktop installers *with local server* (job `local-server`: the
+app plus the server as `teamcraft-server` and PostgreSQL's programs from
+theseus-rs/postgresql-binaries, checksum-checked, for Windows x64, macOS
+Apple silicon and Linux x86_64; each smoke-tested with its bundled server) –
+that job takes the server binaries of the `server` job instead of building them
+again (for macOS the `server` job builds an unreleased `sidecar-macos-aarch64`
+artifact, in parallel with the others), and the Tauri CLI comes
+prebuilt through `taiki-e/install-action`
+and keeps them as workflow artifacts for 14 days. It builds `main`
 every night (01:07 UTC) when `main` has changed outside the documentation
 since its last successful build, not on every push: with several merges a
 day, each push cancelled the build of the one before and left a red ✗ on
 that commit. *Run workflow* on the Actions page builds any branch at once
 the same way. A pull request that changes the workflow, `packaging/` or
-`desktop/tauri.conf.json` builds everything before it is merged.
+`desktop/tauri.conf.json` (or `desktop/tauri.local-server.conf.json`) builds
+everything before it is merged.
 
 **Container image.** The same workflow builds `ghcr.io/rudalabs/teamcraft`
 from the `Dockerfile` on an amd64 and an arm64 runner and publishes it:

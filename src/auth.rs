@@ -228,6 +228,26 @@ fn random_hex() -> String {
     hex::encode(bytes)
 }
 
+/// The one-time code of the first-start setup (128 random bits, hex): the
+/// server logs the setup link with it, and only that link offers *Create the
+/// administrator* – a request through a reverse proxy on the same computer
+/// looks local otherwise (see `web::auth_pages::setup_open`).
+pub fn setup_code() -> String {
+    let mut bytes = [0u8; 16];
+    OsRng.fill_bytes(&mut bytes);
+    hex::encode(bytes)
+}
+
+/// Compares two secrets without stopping at the first difference.
+pub fn secrets_equal(given: &str, expected: &str) -> bool {
+    let (a, b) = (given.as_bytes(), expected.as_bytes());
+    let mut diff = a.len() ^ b.len();
+    for i in 0..a.len().max(b.len()) {
+        diff |= usize::from(a.get(i).copied().unwrap_or(0) ^ b.get(i).copied().unwrap_or(0));
+    }
+    diff == 0
+}
+
 /// Tokens are high-entropy, so a fast hash is sufficient for storage.
 pub fn hash_token(token: &str) -> String {
     hex::encode(Sha256::digest(token.as_bytes()))

@@ -56,7 +56,12 @@ mismatch.
   rated as blocking. A fix during the soak needs a new candidate (`-rc.2`) and the soak starts again.
 - [ ] Test the candidate: the install from the container image with
   `deploy/install.sh`, an upgrade from the previous release with data, and
-  one desktop installer per platform.
+  one desktop installer per platform. With one installer *with local
+  server*, on a computer without PostgreSQL and with the desktop app
+  connected to another server: TeamCraft Local installs next to it, starts
+  its local server by itself, the browser offers to create the administrator,
+  the app signs in, quitting it stops the server, and the desktop app still
+  shows its own server.
 - [ ] Note what was found in the soak in the changelog or in the release
   notes.
 
@@ -73,8 +78,9 @@ mismatch.
 
 - [ ] The GitHub Release lists the server archives (Linux x86_64 and ARM64,
   Windows x64), the desktop installers (AppImage, `.deb`, `.rpm`,
-  Flatpak, `.dmg`, `.msi`, NSIS setup and portable `.zip`) and
-  `SHA256SUMS.txt`.
+  Flatpak, `.dmg`, `.msi`, NSIS setup and portable `.zip`), the three
+  installers *with local server* (`TeamCraft-with-local-server_…`: Windows x64
+  setup, macOS `.dmg`, Linux x86_64 AppImage) and `SHA256SUMS.txt`.
 - [ ] Download `SHA256SUMS.txt` and at least one archive and check the hash
   with `sha256sum -c SHA256SUMS.txt --ignore-missing`. A mismatch means
   the release is withdrawn, not patched.

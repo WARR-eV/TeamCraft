@@ -34,6 +34,82 @@ see the notices in the README.
   `seed_*` functions and takes an existing administrator through
   `ADMIN_PASSWORD_FILE`) and creates the account; `deploy/demo/demo.sh`
   snapshots the seeded database and resets it to the snapshot every night.
+
+### Changed
+
+- TeamCraft no longer presents itself as an alternative to a particular
+  commercial product: the README tagline now says only that the project is a
+  work in progress. The desktop import tutorial, the user guide and code
+  comments describe features without comparing them to one vendor's PLM
+  system. The research page is now *Popular features of commercial PLM
+  systems* (`research/plm-working-features.md`), and the other research
+  pages compare with "enterprise PLM" in general.
+- File formats: JT (`jt`) now belongs to *Visualisation formats* and PLM XML
+  (`plmxml`, label *PLM XML (product structure)*) to *Neutral exchange
+  formats*. The separate CAD-program entry for them is gone, so the
+  system id `teamcenter` no longer exists in `/formats`, the search filter
+  or the API's format list. A saved web search with that filter shows all
+  items; `GET /api/v1/items?system=teamcenter` answers 400 like any other
+  unknown program. Format ids and stored files are unchanged, and both
+  formats stay neutral (never collapsed). The comments of migrations 0007 and
+  0012 were edited (`db::EDITED_BEFORE_RELEASE`, no schema change).
+- Release workflow about 10 minutes shorter (29 → about 18): the macOS
+  installer *with local server* compiled its server itself, but only after
+  the slowest `server` build (Windows, 12 minutes) had finished, because the
+  job waits for the `server` job. The `server` job now builds the macOS server
+  in parallel with the others, as an artifact that is not released (there is
+  still no macOS server download), and the installer job reuses it like on
+  Linux and Windows.
+- CI: test and dev builds with line tables only (`CARGO_PROFILE_*_DEBUG`),
+  the CLI smoke test runs the binary the test run built instead of building
+  it again with `cargo run`, and the disk clean-up of the Linux test job runs
+  in the background while the toolchain and cache are set up.
+- Guide *Try it on your computer*: the Windows `initdb` error of 0.2.8 names
+  0.2.9 as the release that fixes it (confirmed on Windows) instead of "the
+  next release".
+
+## [0.2.9] - 2026-11-15
+
+Changes since the `v0.2.8` tag.
+
+### Fixed
+
+- **TeamCraft Local on Windows (0.2.8): "Try TeamCraft on this computer"
+  failed** with `initdb: error: program "postgres" is needed by initdb but was
+  not found` (*Das System kann den angegebenen Pfad nicht finden*). The app
+  passed its resource folder as Tauri gives it on Windows, a verbatim path
+  (`\\?\C:\…`), and PostgreSQL cannot use those. The app and `teamcraft
+  local` now strip the prefix (`localserver::without_verbatim_prefix`). The
+  installer smoke test passed a plain path and so missed it; on Windows it now
+  passes the folder the way the app does.
+- Logs written to a file or a service log carry no colour codes any more
+  (they showed up as `[2m…[0m` in the app's error message): colours only
+  when the output is a terminal.
+
+## [0.2.8] - 2026-11-15
+
+Changes since the `v0.2.7` tag.
+
+### Added
+
+- **Try TeamCraft on a laptop with one download.** The release adds desktop
+  installers *with local server* (`TeamCraft-with-local-server_…`: Windows
+  x64 setup, macOS `.dmg`, Linux x86_64 AppImage) – the app plus the server
+  (as `teamcraft-server`) and PostgreSQL's programs. Their connect screen
+  offers *Try TeamCraft on this computer*: the app starts a private
+  PostgreSQL cluster and the server, both only on 127.0.0.1, opens the
+  browser to create the administrator and signs in; the server stops with
+  the app, also after a crash (`desktop/src/localserver.rs`). New command
+  `teamcraft local [--port] [--data-dir] [--pg-bin]` does the same with an
+  installed PostgreSQL: initdb with a random scram password on the first
+  start, a free port and no Unix socket at every start, data in the per-user
+  data directory, a second instance on the same data refused
+  (`src/localserver.rs`, `tests/local_server.rs`). Release job
+  `local-server` bundles the newest PostgreSQL 18 build of
+  theseus-rs/postgresql-binaries (checksum-checked, with PostgreSQL's
+  licence) and smoke-tests every installer's bundled server
+  ([guide](https://rudalabs.github.io/TeamCraft/guide/local-server.html),
+  `docs/src/research/local-test-server.md`).
 - REST: `POST /api/v1/changes/{number}/cancel` cancels a draft or rejected
   change (its revisions are free for another change), and
   `DELETE /api/v1/changes/{number}/reviewers/{username}` removes a reviewer
@@ -243,22 +319,19 @@ see the notices in the README.
 
 ### Changed
 
-- TeamCraft no longer presents itself as an alternative to a particular
-  commercial product: the README tagline now says only that the project is a
-  work in progress. The desktop import tutorial, the user guide and code
-  comments describe features without comparing them to one vendor's PLM
-  system. The research page is now *Popular features of commercial PLM
-  systems* (`research/plm-working-features.md`), and the other research
-  pages compare with "enterprise PLM" in general.
-- File formats: JT (`jt`) now belongs to *Visualisation formats* and PLM XML
-  (`plmxml`, label *PLM XML (product structure)*) to *Neutral exchange
-  formats*. The separate CAD-program entry for them is gone, so the
-  system id `teamcenter` no longer exists in `/formats`, the search filter
-  or the API's format list. A saved web search with that filter shows all
-  items; `GET /api/v1/items?system=teamcenter` answers 400 like any other
-  unknown program. Format ids and stored files are unchanged, and both
-  formats stay neutral (never collapsed). The comments of migrations 0007 and
-  0012 were edited (`db::EDITED_BEFORE_RELEASE`, no schema change).
+- Release workflow: the installers *with local server* reuse the server
+  binaries of the `server` job (Linux x86_64, Windows x64) instead of building
+  them a second time (about 20 minutes on Windows), and the desktop jobs
+  install a prebuilt Tauri CLI instead of compiling it (9 minutes without a
+  cache).
+- README: the *Download* section moved up, right below the work-in-progress
+  notice, and starts with a link to the Releases page and which download to
+  pick; a *Download TeamCraft* line sits under the badges.
+- The first-start page (*Create the administrator*) continues where the
+  login was going – e.g. the desktop app's sign-in confirmation – instead of
+  always at the project groups (`next` kept through `POST /setup`).
+- The conversion workers (`preview-mesh`, `text-extract`) also run isolated
+  when the server binary is called `teamcraft-server`.
 - Performance: a request with a personal access token (REST API, MCP, the
   desktop app) is authenticated with one query instead of three; the use of
   the token is still recorded once a minute.
@@ -275,6 +348,31 @@ see the notices in the README.
 
 ### Fixed
 
+- **Security – first-start setup behind a reverse proxy.** *Create the
+  administrator* was offered to every request while no account existed and
+  the server listened on 127.0.0.1 – also to requests through a reverse proxy
+  on the same computer (the Linux packages bind 127.0.0.1:8080; nginx without
+  explicit settings sends `Host: 127.0.0.1` and no `X-Forwarded-*`), so anyone
+  reaching the proxy before the administrator could take the server over. The
+  page now needs the one-time code of the setup link the server logs at start
+  (`no administrator yet: open http://localhost:8080/login?setup=…`, new at
+  every start); without it the login page says where to find the link.
+  `teamcraft local` (and the desktop app *TeamCraft Local*) needs no code.
+  `scripts/screenshots.sh` takes the code in `SETUP_CODE`.
+- Desktop installers *with local server*: they install **TeamCraft Local**, an
+  app of its own next to the desktop app (identifier
+  `io.github.rudalabs.teamcraft.local`, own settings folder and keychain
+  entry). The first test build shared the desktop app's identity, so it
+  opened with the server and sign-in configured in the desktop app instead
+  of the local server. With no server configured TeamCraft Local now starts
+  its local server by itself.
+- Desktop installers *with local server*: PostgreSQL is bundled with only
+  the programs TeamCraft uses (`initdb`, `pg_ctl`, `postgres`) and the client
+  tools `psql`, `pg_dump`, `pg_restore`, `pg_isready`. The Windows build no
+  longer ships PL/Python's Python (Windows: `python.exe`, `Lib/`, `DLLs/`;
+  Linux: `lib/python3.x`), PostgreSQL's test program and about 35 unused tools; a browser
+  had reported the Windows installer as a virus. The release job fails if
+  one of the needed programs or `pg_trgm` is missing.
 - 3D viewer (web and desktop, #290): a preview that could not be shown could
   end as a silently black canvas – in the desktop app the status line with
   the reason sits below a canvas that fills the window, so it was often out of
@@ -767,7 +865,9 @@ Changes since the `v0.2.0` tag.
   app keeps the private file and shows a warning. Server addresses with plain
   `http://` to another computer get a warning.
 
-[Unreleased]: https://github.com/rudalabs/TeamCraft/compare/v0.2.7...HEAD
+[Unreleased]: https://github.com/rudalabs/TeamCraft/compare/v0.2.9...HEAD
+[0.2.9]: https://github.com/rudalabs/TeamCraft/compare/v0.2.8...v0.2.9
+[0.2.8]: https://github.com/rudalabs/TeamCraft/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/rudalabs/TeamCraft/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/rudalabs/TeamCraft/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/rudalabs/TeamCraft/compare/v0.2.0...v0.2.5

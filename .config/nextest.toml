@@ -38,7 +38,9 @@ retries = 2
 # 2 s there (the OS retries before it gives up), and starting a child process
 # is slow – milliseconds on Linux and macOS. The vault tests flush every
 # stored file to disk (sync_data/sync_all), and a flush on the Windows
-# runner can take a second when the disk is busy – 0.1 s on Linux.
+# runner can take a second when the disk is busy – 0.1 s on Linux. The HTML
+# text cap reads 720 kB of markup: 0.5-0.95 s on the Windows runner, so a busy
+# runner pushed it over 1 s on all three attempts (PR #295).
 [[profile.default.overrides]]
 platform = "cfg(windows)"
 filter = """
@@ -46,6 +48,7 @@ test(=llm::http::tests::network_errors_do_not_carry_the_url)
 | test(=malware::tests::an_unreachable_scanner_fails_closed)
 | test(=preview::tests::conversions_are_cached_including_failures)
 | test(/^vault::tests::/)
+| test(=htmltext::tests::the_text_is_capped)
 """
 slow-timeout = { period = "10s", terminate-after = 3 }
 

@@ -1165,8 +1165,56 @@ async fn notifications_in_the_web_ui() {
 async fn first_start_creates_the_administrator() {
     let app = app_or_skip!();
     let origin = Some("http://localhost:8080");
+    let code = app.state.setup_code.to_string();
+    // without the setup link of the server log: no form, but where to find it
+    // (a request through a reverse proxy on the same computer looks local)
     let html = app.get_page("/login", None).await.text();
+    assert!(
+        !html.contains("Create the administrator"),
+        "no form without the code"
+    );
+    assert!(html.contains("No administrator yet") && html.contains("setup link"));
+    let html = app.get_page("/login?setup=wrong", None).await.text();
+    assert!(
+        !html.contains("Create the administrator"),
+        "no form with a wrong code"
+    );
+    let r = app
+        .post_form(
+            "/setup",
+            None,
+            origin,
+            &[
+                ("username", "mallory"),
+                ("password", "long enough password"),
+                ("password_repeat", "long enough password"),
+            ],
+        )
+        .await;
+    assert_eq!(
+        r.status,
+        StatusCode::FORBIDDEN,
+        "no administrator without the code"
+    );
+    assert!(r.text().contains("setup link"));
+    let html = app
+        .get_page(&format!("/login?setup={code}"), None)
+        .await
+        .text();
     assert!(html.contains("Create the administrator"), "no accounts yet");
+    assert!(html.contains(&format!(r#"name="setup_code" value="{code}""#)));
+    let html = app
+        .get_page(
+            &format!("/login?setup={code}&next=%2Fdesktop%2Fauthorize%3Fport%3D1234"),
+            None,
+        )
+        .await
+        .text();
+    assert!(
+        // MiniJinja escapes `/` in attribute values
+        html.contains(r#"name="next" value="&#x2f;desktop&#x2f;authorize?port=1234""#),
+        "the setup form keeps where the login was going"
+    );
     let r = app
         .post_form(
             "/setup",
@@ -1176,6 +1224,7 @@ async fn first_start_creates_the_administrator() {
                 ("username", "root"),
                 ("password", "long enough password"),
                 ("password_repeat", "different"),
+                ("setup_code", &code),
             ],
         )
         .await;
@@ -1189,13 +1238,20 @@ async fn first_start_creates_the_administrator() {
             &[
                 ("username", "root"),
                 ("display_name", "Root"),
+                ("setup_code", &code),
                 ("password", "long enough password"),
                 ("password_repeat", "long enough password"),
+                // the login page was opened for the desktop app's sign-in
+                ("next", "/desktop/authorize?port=1234&state=s"),
             ],
         )
         .await;
     assert_eq!(r.status, StatusCode::SEE_OTHER, "{}", r.text());
-    assert_eq!(r.header("location").as_deref(), Some("/projects"));
+    assert_eq!(
+        r.header("location").as_deref(),
+        Some("/desktop/authorize?port=1234&state=s"),
+        "the first start continues where the login was going"
+    );
     let session = r
         .headers
         .get_all("set-cookie")

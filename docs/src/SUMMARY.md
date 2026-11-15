@@ -5,6 +5,7 @@
 # User Guide
 
 - [Getting started](guide/getting-started.md)
+- [Try it on your computer](guide/local-server.md)
 - [Concepts](guide/concepts.md)
 - [Vault, check-out and check-in](guide/vault.md)
 - [Files, versions and 3D preview](guide/files.md)
@@ -60,6 +61,7 @@
 
 - [Research notes](research/index.md)
     - [A hosted live demo](research/live-demo.md)
+    - [One download to try TeamCraft on a laptop](research/local-test-server.md)
     - [Deprovisioning through the identity provider (SCIM)](research/scim-deprovisioning.md)
     - [3D preview of CATIA V5 parts](research/catia-cgr-preview.md)
     - [3D preview of CATIA V5 products](research/catia-product-structure.md)

@@ -2,7 +2,8 @@
 # Seeds demo data into a fresh TeamCraft and captures the README screenshots.
 #
 # Expects a running TeamCraft at $BASE_URL with an EMPTY database, listening on
-# localhost (the first-start /setup page creates the administrator), plus
+# localhost (the first-start /setup page creates the administrator, with the
+# one-time code of its log in SETUP_CODE), plus
 # curl, jq, base64, Google Chrome and a matching chromedriver. Builds nothing.
 # Used by .github/workflows/screenshots.yml; see CONTRIBUTING.md, "Updating
 # the README screenshots".
@@ -23,6 +24,9 @@
 #   ADMIN_PASSWORD_FILE  sign in as the existing administrator "admin"
 #                     instead of creating it on the first-start page (which
 #                     only localhost gets) – a hosted live demo   (unset)
+#   SETUP_CODE        the one-time code of the setup link the server logs
+#                     at start (login?setup=…) – needed for the first-start page
+#                     (not with ADMIN_PASSWORD_FILE)
 #   README            compared with the result: warns about images it
 #                     expects in media/screenshots/ that were not made (README.md)
 #
@@ -420,9 +424,10 @@ seed() {
         code=$(web admin /setup --data-urlencode username=admin \
             --data-urlencode "display_name=Alex Morgan" \
             --data-urlencode "password@$WORK/pw-admin" \
-            --data-urlencode "password_repeat@$WORK/pw-admin")
+            --data-urlencode "password_repeat@$WORK/pw-admin" \
+            --data-urlencode "setup_code=${SETUP_CODE:-}")
         if [[ $code == 403 ]]; then
-            die "the first-start setup is closed – the database must be empty and the server must listen on localhost (or set ADMIN_PASSWORD_FILE)"
+            die "the first-start setup is closed – the database must be empty, the server must listen on localhost and SETUP_CODE must be the code of the setup link in its log (or set ADMIN_PASSWORD_FILE)"
         fi
         [[ $code == 303 || $code == 302 ]] || die "first-start setup failed (HTTP $code)"
     fi

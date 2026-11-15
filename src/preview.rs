@@ -433,13 +433,20 @@ fn signature_outcome(mesh: &crate::mesh::Mesh) -> shape::Outcome {
 
 /// The `teamcraft` binary that runs isolated jobs (`preview-mesh`,
 /// `text-extract`); `None` in tests and other binaries, which run them
-/// in-process.
+/// in-process. The desktop downloads *with local server* ship the same
+/// binary as `teamcraft-server` ([`crate::localserver::SIDECAR_NAME`]): next
+/// to the app's own `TeamCraft` executable, `teamcraft` would be the same
+/// file name on Windows and macOS.
 pub fn worker_exe() -> Option<PathBuf> {
-    std::env::current_exe().ok().filter(|exe| {
-        exe.file_stem()
-            .and_then(|s| s.to_str())
-            .is_some_and(|s| s == "teamcraft")
-    })
+    std::env::current_exe()
+        .ok()
+        .filter(|exe| is_worker_name(exe))
+}
+
+fn is_worker_name(exe: &Path) -> bool {
+    exe.file_stem()
+        .and_then(|s| s.to_str())
+        .is_some_and(|s| s == "teamcraft" || s == crate::localserver::SIDECAR_NAME)
 }
 
 /// One-at-a-time turns per key ([`Previews::render`]): who asks for a key
@@ -1168,6 +1175,28 @@ pub fn cache_entry(name: &str) -> CacheEntry<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The binary isolates its conversions under both of its names – also
+    /// as `teamcraft-server` in the desktop downloads with local server.
+    #[test]
+    fn worker_names() {
+        for name in [
+            "/usr/bin/teamcraft",
+            "teamcraft.exe",
+            "/Applications/TeamCraft.app/Contents/MacOS/teamcraft-server",
+            "teamcraft-server.exe",
+        ] {
+            assert!(is_worker_name(Path::new(name)), "{name}");
+        }
+        for name in [
+            "teamcraft-desktop",
+            "TeamCraft",
+            "local_server-5e3f",
+            "deps/teamcraft-1a2b",
+        ] {
+            assert!(!is_worker_name(Path::new(name)), "{name}");
+        }
+    }
 
     #[test]
     fn partial_previews_get_no_shape_signature() {

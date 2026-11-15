@@ -20,7 +20,7 @@ use tokio::sync::Notify;
 use crate::{
     acp, addfiles,
     api::{self, Api, ApiError, Transfer},
-    bomimport, cadexport, folderimport, layout,
+    bomimport, cadexport, folderimport, layout, localserver,
     settings::{self, Settings, TokenStorage},
     signin, update, workspace, AppState,
 };
@@ -94,6 +94,12 @@ pub struct Session {
     pub checkout_parts: bool,
     /// After a crash, ask at the next start whether to share the report.
     pub crash_prompt: bool,
+    /// A *with local server* installation: the connect screen offers *Try
+    /// TeamCraft on this computer* (src/localserver.rs).
+    pub local_server_available: bool,
+    /// The configured server is the local test server: the UI starts it
+    /// (`local_server_start`) before it signs in or opens the main window.
+    pub local_server_in_use: bool,
 }
 
 #[tauri::command]
@@ -111,7 +117,71 @@ pub fn session(app: AppHandle, state: State<'_, AppState>) -> Session {
         version: env!("CARGO_PKG_VERSION"),
         device: crate::device_name(),
         zoom: s.zoom.unwrap_or(1.0),
+        local_server_available: localserver::sidecar().is_some(),
+        local_server_in_use: local_server_in_use(&s),
     }
+}
+
+/// Whether the configured server is the app's local test server.
+fn local_server_in_use(s: &Settings) -> bool {
+    s.local_server_port.is_some()
+        && s.server_url.as_deref().and_then(localserver::port_of) == s.local_server_port
+}
+
+/// *Try TeamCraft on this computer*: starts the bundled server
+/// (`teamcraft local`, src/localserver.rs) and returns its address. The
+/// port of the last start is kept, so that the address – and with it the
+/// sign-in token – stays the same; if another program took it meanwhile, a
+/// new one is chosen and the stored address follows (same server, the token
+/// stays valid). A server already answering there (started by another
+/// window or `teamcraft local` on the command line) is used as it is.
+#[tauri::command]
+pub async fn local_server_start(app: AppHandle, state: State<'_, AppState>) -> CmdResult<String> {
+    {
+        let mut running = state.local_server.lock().expect("local server lock");
+        if let Some(r) = running.as_mut() {
+            if matches!(r.child.try_wait(), Ok(None)) {
+                return Ok(localserver::url(r.port));
+            }
+        }
+    }
+    let sidecar = localserver::sidecar().ok_or_else(|| {
+        ApiError::local(
+            "This installation has no local server (download TeamCraft with local server).",
+        )
+    })?;
+    let s = snapshot(&state);
+    let probe = reqwest::Client::builder()
+        .no_proxy()
+        .build()
+        .map_err(|e| ApiError::local(e.to_string()))?;
+    let stored = s.local_server_port;
+    let port = match stored {
+        Some(port) if localserver::ready(&probe, port).await => {
+            return Ok(localserver::url(port));
+        }
+        Some(port) if localserver::port_free(port) => port,
+        _ => localserver::free_port().map_err(|e| ApiError::local(e.to_string()))?,
+    };
+    let pg_bin = app
+        .path()
+        .resource_dir()
+        .ok()
+        .and_then(|dir| localserver::bundled_pg_bin(&dir));
+    let log = state.config_dir.join("local-server.log");
+    std::fs::create_dir_all(&state.config_dir).map_err(|e| ApiError::local(e.to_string()))?;
+    let running = localserver::start(&probe, &sidecar, pg_bin.as_deref(), port, &log)
+        .await
+        .map_err(ApiError::local)?;
+    *state.local_server.lock().expect("local server lock") = Some(running);
+    let was_in_use = local_server_in_use(&s);
+    update_settings(&state, |s| {
+        s.local_server_port = Some(port);
+        if was_in_use {
+            s.server_url = Some(localserver::url(port));
+        }
+    })?;
+    Ok(localserver::url(port))
 }
 
 /// Would this address (as typed) reach another computer over plain
@@ -990,6 +1060,33 @@ mod tests {
         let none = check_backend(Company, &[Local]).unwrap_err();
         assert!(none.contains("no company AI"), "{none}");
         assert!(check_backend(Local, &[]).is_err());
+    }
+
+    /// The app starts its local server only while it is the configured one.
+    #[test]
+    fn the_local_server_is_in_use_only_at_its_own_address() {
+        let with = |url: Option<&str>, port: Option<u16>| Settings {
+            server_url: url.map(String::from),
+            local_server_port: port,
+            ..Settings::default()
+        };
+        assert!(local_server_in_use(&with(
+            Some("http://127.0.0.1:18080"),
+            Some(18080)
+        )));
+        assert!(!local_server_in_use(&with(
+            Some("http://127.0.0.1:18080"),
+            Some(18081)
+        )));
+        assert!(!local_server_in_use(&with(
+            Some("http://127.0.0.1:18080"),
+            None
+        )));
+        assert!(!local_server_in_use(&with(
+            Some("https://plm.example.org"),
+            Some(18080)
+        )));
+        assert!(!local_server_in_use(&with(None, Some(18080))));
     }
 
     #[test]

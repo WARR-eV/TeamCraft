@@ -13,7 +13,8 @@
 #   BASE_URL             TeamCraft address                    (http://127.0.0.1:8080)
 #   ADMIN_PASSWORD_FILE  password of the existing administrator "admin"
 #                        (TEAMCRAFT_BOOTSTRAP_ADMIN_*); unset: the first-start
-#                        page creates it, which only a server on localhost offers
+#                        page creates it, which only a server on localhost offers,
+#                        with the one-time code of its setup link in SETUP_CODE
 #   DEMO_USER            the public account               (demo; = TEAMCRAFT_DEMO_USER)
 #   DEMO_PASSWORD        its password, at least 10 characters (= TEAMCRAFT_DEMO_PASSWORD)
 #   FIXTURES             NIST CAD files                       (tests/fixtures/cad/nist)

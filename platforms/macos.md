@@ -5,6 +5,17 @@ silicon or Intel). Releases contain the desktop app for Apple silicon
 (`.dmg`, `.app.zip`) but no macOS server binary: build the server as below
 or run the Docker image.
 
+**Just try it:** `TeamCraft-with-local-server_<version>_aarch64.dmg` from the
+[Releases page](https://github.com/rudalabs/TeamCraft/releases) (Apple
+silicon) installs *TeamCraft Local*, an app of its own next to the desktop
+app, with the server and PostgreSQL: open it with *right-click → Open* the
+first time; it starts its local server by itself. If macOS still blocks the
+bundled server, run
+`xattr -dr com.apple.quarantine "/Applications/TeamCraft Local.app"` once.
+With Homebrew's PostgreSQL (`brew install postgresql@18`), a server built as
+below runs the same test installation with `teamcraft local`. See
+[Try it on your computer](https://rudalabs.github.io/TeamCraft/guide/local-server.html).
+
 ## 1. Prerequisites
 
 ```sh
@@ -29,8 +40,8 @@ docker compose up -d db     # skip when you use Homebrew's PostgreSQL
 cargo run --release         # first build takes a few minutes
 ```
 
-Open <http://localhost:8080>, create the administrator on the login page,
-then a project group (*Projects → New project group*) and your first item.
+Open the setup link the server prints at start (`…/login?setup=…`), create
+the administrator, then a project group (*Projects → New project group*) and your first item.
 
 ## 3. Test
 

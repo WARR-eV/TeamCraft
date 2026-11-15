@@ -1,5 +1,15 @@
 # Getting started
 
+## Try it on your laptop
+
+Download the desktop app **with local server** from the
+[Releases page](https://github.com/rudalabs/TeamCraft/releases) (Windows x64,
+macOS Apple silicon, Linux x86_64) and start *TeamCraft Local*, an app of its
+own next to the regular desktop app: it starts a private server with its own database on
+your computer and opens the browser, where you create the administrator. With
+PostgreSQL installed, `teamcraft local` does the same on the command line.
+Details: [Try it on your computer](local-server.md).
+
 ## Install on Linux with Docker
 
 ```sh
@@ -30,9 +40,15 @@ installations and the desktop app:
 
 ## First start
 
-1. Open <http://localhost:8080>. A server without accounts that listens on
-   localhost offers **Create the administrator** – pick a username and a
-   password (10+ characters). The form disappears afterwards.
+1. Open the **setup link** the server writes to its log when it starts
+   (`no administrator yet: open http://localhost:8080/login?setup=…`; with
+   systemd: `journalctl -u teamcraft`). A server without accounts that listens
+   on localhost then offers **Create the administrator** – pick a username and
+   a password (10+ characters). The form disappears afterwards. The link's
+   one-time code keeps out anyone who reaches the server through a reverse
+   proxy before you; it changes at every restart. Instead of the link:
+   `teamcraft user create --role admin` on the server. `teamcraft local` and
+   the desktop app *TeamCraft Local* need no link.
 2. **Projects → New project group**: every item belongs to one. The creator
    manages the group and adds the team members.
 3. **Admin → Users** (admins): create accounts for your team, or connect single

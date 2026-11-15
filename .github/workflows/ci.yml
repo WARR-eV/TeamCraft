@@ -40,6 +40,12 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  # Line tables only (file and line in backtraces, no variable info): the
+  # ~107 test binaries each link the whole library, and full debug info made
+  # linking the slowest part of the build and filled the runner's disk. The
+  # same idea as [profile.mutants] in Cargo.toml; local builds keep full info.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_TEST_DEBUG: line-tables-only
 
 jobs:
   # Whether the Rust jobs have anything to check: not for a pull request
@@ -130,6 +136,16 @@ jobs:
       TEAMCRAFT_REQUIRE_PG_TOOLS: "1"
     steps:
       - uses: actions/checkout@v4
+      # The debug builds of every test binary filled the runner's disk (PR
+      # #295): drop preinstalled SDKs this job never uses (about 20 GB). In the
+      # background – deleting takes 1–2 minutes – while the toolchain and the
+      # cache are set up; "Wait for the disk space" waits for it before the build.
+      - name: Free disk space (in the background)
+        run: |
+          df -h /
+          # shellcheck disable=SC2016 # $1 belongs to the inner shell
+          nohup sh -c 'sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift; touch "$1"' \
+            sh "$RUNNER_TEMP/disk-freed" > /dev/null 2>&1 &
       - name: PostgreSQL ${{ matrix.postgres }} client tools (pg_dump, pg_restore)
         run: |
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
@@ -147,6 +163,11 @@ jobs:
         if: ${{ !matrix.coverage }}
         with:
           tool: cargo-nextest
+      - name: Wait for the disk space
+        run: |
+          for _ in $(seq 1 300); do [ -e "$RUNNER_TEMP/disk-freed" ] && break; sleep 1; done
+          test -e "$RUNNER_TEMP/disk-freed"
+          df -h /
       # nextest kills a test that runs over its limit (.config/nextest.toml:
       # 1 s for unit tests), so a hang fails at once instead of stalling the job
       - if: ${{ !matrix.coverage }}
@@ -154,20 +175,22 @@ jobs:
       - name: doc tests (nextest does not run them)
         if: ${{ !matrix.coverage }}
         run: cargo test --locked --doc
+      # the server binary the test run built (tests run it by CARGO_BIN_EXE);
+      # `cargo run` built it a second time with other features (71 s)
       - name: CLI smoke test
         if: ${{ !matrix.coverage }}
         env:
           TEAMCRAFT_DATABASE_URL: postgres://teamcraft@localhost:5432/teamcraft
         run: |
-          cargo run --locked --quiet -- migrate
-          cargo run --locked --quiet -- vault check
-          cargo run --locked --quiet -- preview-mesh --format step --input tests/fixtures/cube.step --output cube.tcm
+          ./target/debug/teamcraft migrate
+          ./target/debug/teamcraft vault check
+          ./target/debug/teamcraft preview-mesh --format step --input tests/fixtures/cube.step --output cube.tcm
           test -s cube.tcm
-          cargo run --locked --quiet -- backup "$RUNNER_TEMP/backup"
+          ./target/debug/teamcraft backup "$RUNNER_TEMP/backup"
           createdb -h localhost -U teamcraft teamcraft_restored
           TEAMCRAFT_DATABASE_URL=postgres://teamcraft@localhost:5432/teamcraft_restored \
           TEAMCRAFT_VAULT_DIR="$RUNNER_TEMP/vault-restored" \
-            cargo run --locked --quiet -- restore "$RUNNER_TEMP/backup"
+            ./target/debug/teamcraft restore "$RUNNER_TEMP/backup"
 
       - if: ${{ matrix.coverage }}
         uses: taiki-e/install-action@v2

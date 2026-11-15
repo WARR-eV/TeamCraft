@@ -78,7 +78,14 @@ feature milestone – the features in *What works* are enough; what is missing i
 
 *Security*
 
-- Open findings of the [threat model](src/dev/threat-model.md) (F1–F19 there):
+- Open findings of the [threat model](src/dev/threat-model.md) (F1–F20 there):
+    - [x] First-start setup behind a reverse proxy on the same computer: `/setup` needs the one-time code of the setup
+      link the server logs (`teamcraft local` excepted)
+    - [ ] Client address from `X-Forwarded-For` is believed from every peer on a private address (`auth::client_address`):
+      with Docker's published port (peer = the bridge gateway) or clients on a campus network without a proxy, any
+      client can claim an address – `allowed_networks` of restricted groups, the per-address sign-in throttle and
+      the read log can be fooled. Fix: an explicit list of trusted proxies (default loopback only), documented for
+      Docker
     - [x] F1: failed password sign-ins throttled per username and client address (`TEAMCRAFT_SIGNIN_MAX_FAILURES`,
       429 with `Retry-After`)
     - [x] F1 (rest): wrong current passwords of the own password change (web form and `POST /api/v1/me/password`)
@@ -143,6 +150,11 @@ feature milestone – the features in *What works* are enough; what is missing i
   SmartScreen and Gatekeeper
 - [ ] Desktop app run and tested on Windows x64/ARM64, macOS and Linux for each RC (a short manual test script in
   `docs/src/dev/release-checklist.md`)
+- [x] One download to try TeamCraft on a laptop: desktop installers *with local server* (Windows x64, macOS Apple
+  silicon, Linux x86_64 AppImage) with the server and PostgreSQL, *Try TeamCraft on this computer*, and
+  `teamcraft local` for an installed PostgreSQL ([research](src/research/local-test-server.md),
+  [guide](src/guide/local-server.md)). Left: the manual check in section 3; Windows ARM64 and Linux ARM64 variants if
+  testers ask
 - [x] Accessibility: keyboard use and screen-reader labels on the main web flows checked (WCAG 2.2 AA for contrast
   is already tested) – `every_rendered_page_is_accessible` checks labels, accessible names, `alt`, `tabindex`,
   `lang`, heading levels and `<th scope>` on every rendered page; sign-in, new item, check-in, BOM and new change
@@ -359,6 +371,13 @@ half a state behind. Prefer tests that fail on a real regression over tests that
   [platforms/windows.md](../platforms/windows.md))
 - [ ] Install and start the release Flatpak bundles (x86_64, aarch64) and the portable Windows zips (x64, arm64) once –
   built and checked as files only (#66); GNOME runtime 49 may be end of life on Flathub, move to the current one
+- [ ] Install the three installers *with local server* once on real computers and click *Try TeamCraft on this
+  computer* – CI starts each installer's bundled server (first start, setup page, clean stop) but not the app's
+  button; on macOS check whether Gatekeeper lets the quarantined app start `teamcraft-server` and PostgreSQL
+- [ ] Windows: a browser reported `TeamCraft-with-local-server_0.2.7_x64-setup.exe` (a CI artifact) as a virus –
+  detection name unknown. The bundled PostgreSQL is now trimmed (no PL/Python interpreter, no test or extra programs);
+  check the next build with VirusTotal and report remaining detections to the vendor (Microsoft: WDSI file submission)
+  as false positives; code signing would be the lasting fix
 - [ ] Release v0.1.0 again from the current `main` (re-tag), when asked – the published v0.1.0 is from `6f68f9a` and
   has no Flatpak, Windows ARM64 or portable builds
 

@@ -312,6 +312,11 @@ pub struct Config {
     pub oidc: Option<OidcConfig>,
     /// Whether username/password login for local accounts is offered.
     pub local_login: bool,
+    /// The first-start setup works without the one-time code of the server
+    /// log. Only `teamcraft local` sets it (not an environment variable): its
+    /// server runs on a fresh private port no reverse proxy points to, and
+    /// the desktop app opens the setup page itself.
+    pub setup_without_code: bool,
     /// Mattermost incoming webhook that receives internal server errors.
     pub mattermost_error_webhook: Option<String>,
     /// E-mail notifications via SMTP. `None` = no e-mails.
@@ -1212,6 +1217,7 @@ impl Config {
             demo,
             oidc,
             local_login,
+            setup_without_code: false,
             mattermost_error_webhook,
             smtp,
             request_digest_hours,
