@@ -13,6 +13,16 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Changed
+
+- Release workflow about 10 minutes shorter (29 → about 18): the macOS
+  installer *with local server* compiled its server itself, but only after
+  the slowest `server` build (Windows, 12 minutes) had finished, because the
+  job waits for the `server` job. The `server` job now builds the macOS server
+  in parallel with the others, as an artifact that is not released (there is
+  still no macOS server download), and the installer job reuses it like on
+  Linux and Windows.
+
 ## [0.2.9] - 2026-11-15
 
 Changes since the `v0.2.8` tag.
