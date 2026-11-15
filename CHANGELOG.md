@@ -22,6 +22,10 @@ see the notices in the README.
   in parallel with the others, as an artifact that is not released (there is
   still no macOS server download), and the installer job reuses it like on
   Linux and Windows.
+- CI: test and dev builds with line tables only (`CARGO_PROFILE_*_DEBUG`),
+  the CLI smoke test runs the binary the test run built instead of building
+  it again with `cargo run`, and the disk clean-up of the Linux test job runs
+  in the background while the toolchain and cache are set up.
 
 ## [0.2.9] - 2026-11-15
 
