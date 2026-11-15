@@ -13,6 +13,10 @@ see the notices in the README.
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-11-15
+
+Changes since the `v0.2.8` tag.
+
 ### Fixed
 
 - **TeamCraft Local on Windows (0.2.8): "Try TeamCraft on this computer"
@@ -806,7 +810,8 @@ Changes since the `v0.2.0` tag.
   app keeps the private file and shows a warning. Server addresses with plain
   `http://` to another computer get a warning.
 
-[Unreleased]: https://github.com/rudalabs/TeamCraft/compare/v0.2.8...HEAD
+[Unreleased]: https://github.com/rudalabs/TeamCraft/compare/v0.2.9...HEAD
+[0.2.9]: https://github.com/rudalabs/TeamCraft/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/rudalabs/TeamCraft/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/rudalabs/TeamCraft/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/rudalabs/TeamCraft/compare/v0.2.5...v0.2.6
