@@ -422,8 +422,13 @@ The platform guides list the system packages.
 
 The downloads **with local server** (Windows x64 `-setup.exe`, macOS `.dmg`,
 Linux `.AppImage`, named `TeamCraft-with-local-server_…`) also contain the
-server, as `teamcraft-server`, and PostgreSQL's programs. Their connect screen
-offers **Try TeamCraft on this computer** below the server address:
+server, as `teamcraft-server`, and PostgreSQL's programs. They install
+**TeamCraft Local**, an app of its own (identifier
+`io.github.rudalabs.teamcraft.local`, own settings folder and keychain entry)
+next to the desktop app, which keeps its own server and sign-in. With no
+server configured – its first start – TeamCraft Local starts the local server
+by itself; later its connect screen offers **Try TeamCraft on this
+computer** below the server address:
 
 1. The app starts `teamcraft-server local` – a private PostgreSQL cluster and
    the server, both only on `127.0.0.1` – and waits until it is ready (the

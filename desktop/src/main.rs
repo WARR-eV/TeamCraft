@@ -172,6 +172,9 @@ fn main() {
             crash::start_session(&crash_dir, move || {
                 let _ = handle.emit("crash-reports", ());
             });
+            // the token's keychain entry belongs to this app's identifier:
+            // TeamCraft Local (downloads with local server) has its own
+            settings::set_keychain_service(&app.config().identifier);
             let settings = settings::Settings::load(&config_dir);
             let zoom = settings.zoom.map(commands::clamp_zoom);
             let theme = window_theme(settings.skin.as_deref());

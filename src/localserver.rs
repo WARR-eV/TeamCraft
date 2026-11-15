@@ -124,7 +124,7 @@ pub fn pg_bin_candidates(explicit: Option<&Path>, exe_dir: Option<&Path>) -> Vec
                 .join("bin"),
         );
         // Linux packages and the AppImage: usr/bin/teamcraft, usr/lib/<app>/postgresql
-        for app in ["teamcraft", "TeamCraft"] {
+        for app in ["teamcraft", "TeamCraft", "TeamCraft Local"] {
             out.push(
                 dir.join("..")
                     .join("lib")

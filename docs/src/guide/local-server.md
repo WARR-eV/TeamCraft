@@ -24,9 +24,9 @@ a team, use the [Docker install](../admin/docker.md).
    *More info → Run anyway*; on macOS, open the app the first time with
    *right-click → Open*; on Linux, make the AppImage executable
    (`chmod +x`).
-2. Start TeamCraft and click **Try TeamCraft on this computer**. The first
-   start creates the database and takes a few seconds, at most about a
-   minute on a slow disk.
+2. Start **TeamCraft Local**. On its first start it starts the local server
+   by itself (no address to type); creating the database takes a few
+   seconds, at most about a minute on a slow disk.
 3. Your browser opens. Create the **administrator** – pick a username and a
    password (10+ characters) – and confirm the sign-in of the app. You are
    now signed in, in the browser and in the app.
@@ -36,13 +36,21 @@ a team, use the [Docker install](../admin/docker.md).
 The app starts the local server again each time you open it while it is the
 configured server, and stops it when you quit the app. *change* next to the
 server name on the sign-in screen (or *File → Sign Out*) connects the same
-app to any other TeamCraft server; the local data stays where it is.
+app to any other TeamCraft server; the local data stays where it is. The
+connect screen then offers **Try TeamCraft on this computer** to come back.
 
 The installer *with local server* is the regular desktop app plus two
 things: the server program (`teamcraft-server`) and PostgreSQL's programs
-(`postgresql/`, with its licence in `COPYRIGHT.txt`). It installs over the
-regular desktop app. The regular installers stay small and do not show the
-button.
+(`postgresql/`: `initdb`, `pg_ctl`, `postgres`, the client tools `psql`,
+`pg_dump`, `pg_restore`, `pg_isready` and their libraries, with PostgreSQL's
+licence in `COPYRIGHT.txt`).
+
+**An app of its own.** It installs as *TeamCraft Local* (app identifier
+`io.github.rudalabs.teamcraft.local`) next to the regular desktop app
+*TeamCraft*, with its own start-menu entry, settings folder and keychain
+entry for the sign-in. A desktop app that is connected to your team's server
+stays connected, and neither app ever sends its token to the other's
+server. The regular installers stay small and do not show the button.
 
 ## On the command line
 
@@ -116,12 +124,26 @@ the [Docker install](../admin/docker.md) with its backups.
 
 - **The button is missing** – this is the regular desktop app; download the
   one *with local server*.
+- **It opens with your other server instead of the local one** – an early
+  test build of the installer *with local server* was still the desktop app
+  itself and took over its settings and sign-in. Install the current one
+  (*TeamCraft Local*); if the desktop app now shows *Try TeamCraft on this
+  computer*, reinstall the regular desktop app over it.
 - **"The local server stopped" / "did not start"** – the message shows the
   end of the server's log. `postgres.log` in the data folder has PostgreSQL's
   side. The app replaces a port that another program took with a free one;
   `teamcraft local` names the port in use – choose another with `--port`.
 - **macOS blocks the server or PostgreSQL** – the app is not notarised yet.
   If *right-click → Open* on the app was not enough, remove the quarantine
-  flag once: `xattr -dr com.apple.quarantine /Applications/TeamCraft.app`.
+  flag once: `xattr -dr com.apple.quarantine "/Applications/TeamCraft Local.app"`.
 - **"TeamCraft already runs on …"** – another `teamcraft local` (or the app in
   another window) serves the same folder; use that one, or stop it first.
+- **The browser or Windows Defender reports a virus** – the installers are
+  not code-signed yet, and an unsigned installer full of programs is what
+  heuristic scanners distrust. Download only from the
+  [Releases page](https://github.com/rudalabs/TeamCraft/releases) and compare
+  the file with `SHA256SUMS.txt` of the same release (PowerShell:
+  `Get-FileHash <file>`). Please
+  [open an issue](https://github.com/rudalabs/TeamCraft/issues) with the name
+  of the detection, so that it can be reported to the scanner's vendor as a
+  false positive. Do not turn off your virus scanner.
