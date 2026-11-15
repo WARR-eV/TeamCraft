@@ -449,10 +449,10 @@ jobs:
               *) if [[ "$keep" != *" ${name%.exe} "* ]]; then rm -rf "$f"; fi ;;
             esac
           done
-          find "$dest" -depth -iname '*plpython*' -exec rm -rf {} +
+          # PL/Python and the Python it brings (Linux: lib/python3.x, libpython)
+          find "$dest" -depth \( -iname '*plpython*' -o -iname 'python*' -o -iname 'libpython*' \) -exec rm -rf {} +
           # what must be left: the three programs, pg_trgm (migrations), no
-          # Python. Extensions are in share/extension (Windows) or
-          # share/postgresql/extension (Unix builds, by their prefix).
+          # Python (searched below share/, whatever the layout).
           find "$dest" -maxdepth 3 -type d
           for p in initdb pg_ctl postgres; do
             if ! { test -f "$dest/bin/$p" || test -f "$dest/bin/$p.exe"; }; then
