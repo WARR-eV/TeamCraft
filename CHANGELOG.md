@@ -20,6 +20,24 @@ see the notices in the README.
   it again with `cargo run`, and the disk clean-up of the Linux test job runs
   in the background while the toolchain and cache are set up.
 
+## [0.2.9] - 2026-11-15
+
+Changes since the `v0.2.8` tag.
+
+### Fixed
+
+- **TeamCraft Local on Windows (0.2.8): "Try TeamCraft on this computer"
+  failed** with `initdb: error: program "postgres" is needed by initdb but was
+  not found` (*Das System kann den angegebenen Pfad nicht finden*). The app
+  passed its resource folder as Tauri gives it on Windows, a verbatim path
+  (`\\?\C:\…`), and PostgreSQL cannot use those. The app and `teamcraft
+  local` now strip the prefix (`localserver::without_verbatim_prefix`). The
+  installer smoke test passed a plain path and so missed it; on Windows it now
+  passes the folder the way the app does.
+- Logs written to a file or a service log carry no colour codes any more
+  (they showed up as `[2m…[0m` in the app's error message): colours only
+  when the output is a terminal.
+
 ## [0.2.8] - 2026-11-15
 
 Changes since the `v0.2.7` tag.
@@ -799,7 +817,8 @@ Changes since the `v0.2.0` tag.
   app keeps the private file and shows a warning. Server addresses with plain
   `http://` to another computer get a warning.
 
-[Unreleased]: https://github.com/rudalabs/TeamCraft/compare/v0.2.8...HEAD
+[Unreleased]: https://github.com/rudalabs/TeamCraft/compare/v0.2.9...HEAD
+[0.2.9]: https://github.com/rudalabs/TeamCraft/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/rudalabs/TeamCraft/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/rudalabs/TeamCraft/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/rudalabs/TeamCraft/compare/v0.2.5...v0.2.6

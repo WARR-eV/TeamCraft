@@ -139,6 +139,10 @@ the [Docker install](../admin/docker.md) with its backups.
   flag once: `xattr -dr com.apple.quarantine "/Applications/TeamCraft Local.app"`.
 - **"TeamCraft already runs on …"** – another `teamcraft local` (or the app in
   another window) serves the same folder; use that one, or stop it first.
+- **Windows, 0.2.8: `initdb: error: program "postgres" is needed by initdb
+  but was not found`** – a bug of the first 0.2.8 installer (the app passed its
+  folder as a `\\?\C:\…` path, which PostgreSQL cannot use). Install the next
+  release; nothing on your computer needs to be cleaned up.
 - **The browser or Windows Defender reports a virus** – the installers are
   not code-signed yet, and an unsigned installer full of programs is what
   heuristic scanners distrust. Download only from the
