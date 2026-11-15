@@ -13,6 +13,13 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Changed
+
+- CI: test and dev builds with line tables only (`CARGO_PROFILE_*_DEBUG`),
+  the CLI smoke test runs the binary the test run built instead of building
+  it again with `cargo run`, and the disk clean-up of the Linux test job runs
+  in the background while the toolchain and cache are set up.
+
 ## [0.2.9] - 2026-11-15
 
 Changes since the `v0.2.8` tag.
