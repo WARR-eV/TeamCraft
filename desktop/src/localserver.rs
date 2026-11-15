@@ -44,8 +44,32 @@ fn sidecar_name() -> &'static str {
 /// The bundled server executable next to the app's own executable, if this
 /// is a *with local server* installation.
 pub fn sidecar() -> Option<PathBuf> {
-    let dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    let dir = without_verbatim_prefix(std::env::current_exe().ok()?.parent()?);
     sidecar_in(&dir)
+}
+
+/// `\\?\C:\dir` → `C:\dir`, `\\?\UNC\server\share` → `\\server\share`; other paths
+/// unchanged. Tauri hands out the resource folder as such a Windows
+/// "verbatim" path, and PostgreSQL cannot use it (`initdb` looks for
+/// `postgres.exe` under `//?/C:/…`: "The system cannot find the path
+/// specified" – the first 0.2.8 release). The server strips it as well.
+pub fn without_verbatim_prefix(path: &Path) -> PathBuf {
+    let Some(s) = path.to_str() else {
+        return path.to_path_buf();
+    };
+    if let Some(rest) = s.strip_prefix(r"\\?\UNC\") {
+        return PathBuf::from(format!(r"\\{rest}"));
+    }
+    match s.strip_prefix(r"\\?\") {
+        Some(rest)
+            if rest.len() >= 3
+                && rest.as_bytes()[0].is_ascii_alphabetic()
+                && &rest[1..3] == r":\" =>
+        {
+            PathBuf::from(rest)
+        }
+        _ => path.to_path_buf(),
+    }
 }
 
 fn sidecar_in(dir: &Path) -> Option<PathBuf> {
@@ -55,7 +79,9 @@ fn sidecar_in(dir: &Path) -> Option<PathBuf> {
 
 /// The bundled PostgreSQL programs in the app's resources.
 pub fn bundled_pg_bin(resource_dir: &Path) -> Option<PathBuf> {
-    let dir = resource_dir.join("postgresql").join("bin");
+    let dir = without_verbatim_prefix(resource_dir)
+        .join("postgresql")
+        .join("bin");
     dir.is_dir().then_some(dir)
 }
 
@@ -185,6 +211,23 @@ pub async fn start(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The resource folder Tauri gives on Windows (`\\?\C:\…`) reaches the server
+    /// without the verbatim prefix PostgreSQL cannot handle.
+    #[test]
+    fn verbatim_prefixes_are_removed() {
+        let s = |p: &str| {
+            without_verbatim_prefix(Path::new(p))
+                .to_string_lossy()
+                .to_string()
+        };
+        assert_eq!(
+            s(r"\\?\C:\Users\a\AppData\Local\TeamCraft Local"),
+            r"C:\Users\a\AppData\Local\TeamCraft Local"
+        );
+        assert_eq!(s(r"\\?\UNC\srv\share"), r"\\srv\share");
+        assert_eq!(s("/opt/tc"), "/opt/tc");
+    }
 
     #[test]
     fn the_local_address_round_trips() {

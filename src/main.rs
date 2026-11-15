@@ -442,7 +442,16 @@ enum LogTo {
 fn init_tracing(format: LogFormat, to: LogTo) {
     let filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new("info,tower_http=info,sqlx=warn"));
-    let builder = tracing_subscriber::fmt().with_env_filter(filter);
+    // colour codes only for a terminal: a log file (the desktop app's
+    // local-server.log, which its error message quotes) or a service log
+    // would otherwise carry the raw escape sequences
+    let ansi = match to {
+        LogTo::Stdout => std::io::stdout().is_terminal(),
+        LogTo::Stderr => std::io::stderr().is_terminal(),
+    };
+    let builder = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_ansi(ansi);
     match (format, to) {
         (LogFormat::Text, LogTo::Stdout) => builder.init(),
         (LogFormat::Json, LogTo::Stdout) => builder.json().init(),
@@ -480,7 +489,7 @@ async fn local(
     use teamcraft::localserver;
     init_tracing(LogFormat::Text, LogTo::Stdout);
     let data_dir = match data_dir {
-        Some(dir) => dir,
+        Some(dir) => localserver::without_verbatim_prefix(&dir),
         None => localserver::default_data_dir()
             .context("no per-user data directory is known here: give --data-dir")?,
     };

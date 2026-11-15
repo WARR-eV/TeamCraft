@@ -562,9 +562,18 @@ jobs:
           "$server" --version
           data="$tmp/tc-local"
           log="$tmp/local.log"
+          # pass the folder the way the app does: on Windows Tauri hands out
+          # the resource folder as a verbatim path (\\?\C:\…), which
+          # PostgreSQL cannot use unless teamcraft strips the prefix (the first
+          # 0.2.8 installer failed exactly there, this test passed a plain path)
+          pgarg="$pgbin"
+          dataarg="$data"
+          if [ "$RUNNER_OS" = "Windows" ]; then pgarg="\\\\?\\$(cygpath -w "$pgbin")"; fi
+          if [ "$RUNNER_OS" = "Windows" ]; then dataarg=$(cygpath -w "$data"); fi
+          echo "--pg-bin $pgarg"
           # set +e: the test ends `sleep` on purpose, which fails the pipeline
           # under pipefail; the server's own exit status is PIPESTATUS[1]
-          ( set +e; sleep 900 | "$server" local --data-dir "$data" --port 18080 --pg-bin "$pgbin" --exit-with-stdin \
+          ( set +e; sleep 900 | MSYS_NO_PATHCONV=1 "$server" local --data-dir "$dataarg" --port 18080 --pg-bin "$pgarg" --exit-with-stdin \
               > "$log" 2>&1; echo "${PIPESTATUS[1]}" > "$tmp/local.status" ) &
           ready=""
           for _ in $(seq 1 120); do
@@ -581,6 +590,8 @@ jobs:
           cat "$log"
           test "$(cat "$tmp/local.status")" = 0
           grep -q "PostgreSQL stopped" "$log"
+          # no colour codes in a log file (the app quotes it in its error messages)
+          if grep -q $'\x1b\[' "$log"; then echo "::error::colour codes in the log"; exit 1; fi
           test ! -e "$data/postgres/postmaster.pid"
       - uses: actions/upload-artifact@v4
         with:
