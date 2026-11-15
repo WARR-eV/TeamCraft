@@ -26,6 +26,9 @@ see the notices in the README.
   the CLI smoke test runs the binary the test run built instead of building
   it again with `cargo run`, and the disk clean-up of the Linux test job runs
   in the background while the toolchain and cache are set up.
+- Guide *Try it on your computer*: the Windows `initdb` error of 0.2.8 names
+  0.2.9 as the release that fixes it (confirmed on Windows) instead of "the
+  next release".
 
 ## [0.2.9] - 2026-11-15
 
