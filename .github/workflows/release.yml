@@ -171,6 +171,12 @@ jobs:
           - { os: ubuntu-24.04, target: x86_64-unknown-linux-gnu, platform: linux-x86_64 }
           - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, platform: linux-aarch64 }
           - { os: windows-latest, target: x86_64-pc-windows-msvc, platform: windows-x64 }
+          # Not released (no macOS server download, #66): only the sidecar of
+          # the macOS installer *with local server*. Built here, in parallel,
+          # instead of inside the local-server job after the slowest server
+          # build – that put 9 minutes of macOS compiling after the 12 of
+          # Windows (29 → about 18 minutes per release).
+          - { os: macos-latest, target: aarch64-apple-darwin, platform: macos-aarch64, artifact: sidecar }
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -205,7 +211,8 @@ jobs:
           ls -l dist
       - uses: actions/upload-artifact@v4
         with:
-          name: server-${{ matrix.platform }}
+          # server-* is what the GitHub Release publishes
+          name: ${{ matrix.artifact || 'server' }}-${{ matrix.platform }}
           path: dist/*
           retention-days: 14
           if-no-files-found: error
@@ -361,8 +368,8 @@ jobs:
   # PostgreSQL sources of the same version.
   local-server:
     name: desktop with local server (${{ matrix.os }})
-    # the server binaries of the server job (Linux x86_64, Windows x64) are
-    # reused instead of built again (20 minutes on Windows)
+    # the server binaries of the server job are reused instead of built again
+    # (20 minutes on Windows); macOS's is the job's unreleased sidecar artifact
     needs: [version, server]
     if: needs.version.outputs.artifacts == 'true'
     runs-on: ${{ matrix.os }}
@@ -371,10 +378,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-24.04, target: x86_64-unknown-linux-gnu, bundles: appimage, server: linux-x86_64 }
-          # no macOS server job: built here
-          - { os: macos-latest, target: aarch64-apple-darwin, bundles: "app,dmg", server: "" }
-          - { os: windows-latest, target: x86_64-pc-windows-msvc, bundles: nsis, server: windows-x64 }
+          - { os: ubuntu-24.04, target: x86_64-unknown-linux-gnu, bundles: appimage, server: server-linux-x86_64 }
+          - { os: macos-latest, target: aarch64-apple-darwin, bundles: "app,dmg", server: sidecar-macos-aarch64 }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, bundles: nsis, server: server-windows-x64 }
     env:
       PG_MAJOR: "18"
     steps:
@@ -385,11 +391,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
       - uses: dtolnay/rust-toolchain@stable
+      # only the desktop app is compiled here (the server comes from the server job)
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: |
-            .
-            desktop
+          workspaces: desktop
           key: release-local-server-${{ matrix.target }}
       # a prebuilt cargo-tauri (cargo-binstall fallback of install-action);
       # building it from source took 9 minutes on Windows without a cache
@@ -398,27 +403,21 @@ jobs:
         with:
           tool: tauri-cli@2
       - name: Server binary of the server job
-        if: matrix.server != ''
         uses: actions/download-artifact@v4
         with:
-          name: server-${{ matrix.server }}
+          name: ${{ matrix.server }}
           path: server-dist
       - name: Server (as teamcraft-server)
         shell: bash
         run: |
           set -euo pipefail
           ext=""; if [ "$RUNNER_OS" = "Windows" ]; then ext=".exe"; fi
-          if [ -n "${{ matrix.server }}" ]; then
-            # the archive of the server job (relative paths: Git Bash on Windows)
-            cd server-dist
-            for a in *.tar.gz; do [ -e "$a" ] && tar -xzf "$a"; done
-            for a in *.zip; do [ -e "$a" ] && 7z x -y "$a" > /dev/null; done
-            cd ..
-            bin=$(find server-dist -type f -name "teamcraft$ext" -print -quit)
-          else
-            cargo build --release --locked
-            bin="target/release/teamcraft$ext"
-          fi
+          # the archive of the server job (relative paths: Git Bash on Windows)
+          cd server-dist
+          for a in *.tar.gz; do [ -e "$a" ] && tar -xzf "$a"; done
+          for a in *.zip; do [ -e "$a" ] && 7z x -y "$a" > /dev/null; done
+          cd ..
+          bin=$(find server-dist -type f -name "teamcraft$ext" -print -quit)
           test -n "$bin" && test -f "$bin"
           mkdir -p desktop/binaries
           cp "$bin" "desktop/binaries/teamcraft-server-${{ matrix.target }}$ext"

@@ -69,8 +69,9 @@ Take the last option, in three parts:
    keychain service follows the identifier). The first test build shared the
    desktop app's identity and opened with the server configured there. With
    no server configured, TeamCraft Local starts its local server by itself.
-3. **Release job `local-server`** (`.github/workflows/release.yml`): builds
-   the server, takes the newest patch release of PostgreSQL 18 from
+3. **Release job `local-server`** (`.github/workflows/release.yml`): uses
+   the server binary of the `server` job (for macOS an unreleased sidecar
+   build), takes the newest patch release of PostgreSQL 18 from
    [theseus-rs/postgresql-binaries](https://github.com/theseus-rs/postgresql-binaries)
    (relocatable builds for Linux, macOS and Windows, PostgreSQL Licence),
    checks its `.sha256`, prunes headers, docs and static libraries, keeps

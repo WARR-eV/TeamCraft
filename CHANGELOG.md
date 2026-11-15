@@ -15,6 +15,13 @@ see the notices in the README.
 
 ### Changed
 
+- Release workflow about 10 minutes shorter (29 → about 18): the macOS
+  installer *with local server* compiled its server itself, but only after
+  the slowest `server` build (Windows, 12 minutes) had finished, because the
+  job waits for the `server` job. The `server` job now builds the macOS server
+  in parallel with the others, as an artifact that is not released (there is
+  still no macOS server download), and the installer job reuses it like on
+  Linux and Windows.
 - CI: test and dev builds with line tables only (`CARGO_PROFILE_*_DEBUG`),
   the CLI smoke test runs the binary the test run built instead of building
   it again with `cargo run`, and the disk clean-up of the Linux test job runs
