@@ -266,6 +266,17 @@ see the notices in the README.
 
 ### Fixed
 
+- **Security – first-start setup behind a reverse proxy.** *Create the
+  administrator* was offered to every request while no account existed and
+  the server listened on 127.0.0.1 – also to requests through a reverse proxy
+  on the same computer (the Linux packages bind 127.0.0.1:8080; nginx without
+  explicit settings sends `Host: 127.0.0.1` and no `X-Forwarded-*`), so anyone
+  reaching the proxy before the administrator could take the server over. The
+  page now needs the one-time code of the setup link the server logs at start
+  (`no administrator yet: open http://localhost:8080/login?setup=…`, new at
+  every start); without it the login page says where to find the link.
+  `teamcraft local` (and the desktop app *TeamCraft Local*) needs no code.
+  `scripts/screenshots.sh` takes the code in `SETUP_CODE`.
 - Desktop installers *with local server*: they install **TeamCraft Local**, an
   app of its own next to the desktop app (identifier
   `io.github.rudalabs.teamcraft.local`, own settings folder and keychain

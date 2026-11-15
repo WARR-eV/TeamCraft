@@ -78,7 +78,14 @@ feature milestone – the features in *What works* are enough; what is missing i
 
 *Security*
 
-- Open findings of the [threat model](src/dev/threat-model.md) (F1–F19 there):
+- Open findings of the [threat model](src/dev/threat-model.md) (F1–F20 there):
+    - [x] First-start setup behind a reverse proxy on the same computer: `/setup` needs the one-time code of the setup
+      link the server logs (`teamcraft local` excepted)
+    - [ ] Client address from `X-Forwarded-For` is believed from every peer on a private address (`auth::client_address`):
+      with Docker's published port (peer = the bridge gateway) or clients on a campus network without a proxy, any
+      client can claim an address – `allowed_networks` of restricted groups, the per-address sign-in throttle and
+      the read log can be fooled. Fix: an explicit list of trusted proxies (default loopback only), documented for
+      Docker
     - [x] F1: failed password sign-ins throttled per username and client address (`TEAMCRAFT_SIGNIN_MAX_FAILURES`,
       429 with `Retry-After`)
     - [x] F1 (rest): wrong current passwords of the own password change (web form and `POST /api/v1/me/password`)

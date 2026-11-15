@@ -173,8 +173,9 @@ docker compose up -d db     # PostgreSQL on 127.0.0.1, no password needed
 cargo run --release         # applies the migrations, serves http://localhost:8080
 ```
 
-Open <http://localhost:8080> and create the administrator on the login page
-(offered once, while the server listens on localhost). Then *Projects → New
+Open the setup link the server prints when it starts
+(`no administrator yet: open http://localhost:8080/login?setup=…`) and create
+the administrator – offered once, while the server listens on localhost. Then *Projects → New
 project group*, *Items → New item* with a STEP file, and open it in 3D.
 
 No configuration is needed for a local test. Step-by-step guides, including

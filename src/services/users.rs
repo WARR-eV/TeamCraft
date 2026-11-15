@@ -1385,8 +1385,7 @@ pub async fn ensure_bootstrap_admin(pool: &PgPool, config: &Config) -> AppResult
             tracing::info!(username = %user.username, "created bootstrap administrator");
         }
         None if config.oidc.is_none() && config.bind_addr.ip().is_loopback() => tracing::info!(
-            "the database has no users yet: open {} and create the administrator",
-            config.public_url
+            "the database has no users yet: the setup link that creates the administrator follows"
         ),
         None if config.oidc.is_none() => tracing::warn!(
             "the database has no users; set TEAMCRAFT_BOOTSTRAP_ADMIN_PASSWORD or run `teamcraft user create --role admin`"

@@ -6,7 +6,7 @@ Use two browsers (or a private window) for the two-person steps.
 
 ## 1. Accounts and project groups
 
-1. Create the administrator on the login page (first start only).
+1. Create the administrator with the setup link from the server log (first start only).
 2. *Users → New user*: `erika` (CAD editor) and `rolf` (CAD editor), `vera` (viewer).
 3. Sign in as **erika**. *Projects → New project group* `ROVER` – erika is its
    manager. Add `rolf` as member. (The tour builds a rover with wheel hubs;

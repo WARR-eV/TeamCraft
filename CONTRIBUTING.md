@@ -152,7 +152,8 @@ The screenshots in `media/screenshots/` are made by
 [`scripts/screenshots.sh`](scripts/screenshots.sh), never by hand, so that they
 always show the same demo data. The script needs a running TeamCraft with an **empty** database that listens on
 localhost. It creates the administrator
-through the first-start page and two editors, the project group ROVER, parts
+through the first-start page (with the one-time code of the setup link in the
+server log, `SETUP_CODE`) and two editors, the project group ROVER, parts
 and assemblies with the NIST files from `tests/fixtures/cad`, a multi-level
 BOM, a released and a pending change order, check-outs and notifications,
 and after the main pages a change request, two simulations with results, an
