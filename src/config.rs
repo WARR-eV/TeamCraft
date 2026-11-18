@@ -954,7 +954,8 @@ impl Config {
             }
         };
         // 0 = no limit; at most 16 TiB
-        let preview_cache_max_mb = env.parse_or("TEAMCRAFT_PREVIEW_CACHE_MAX_MB", DEFAULT_PREVIEW_CACHE_MB)?;
+        let preview_cache_max_mb =
+            env.parse_or("TEAMCRAFT_PREVIEW_CACHE_MAX_MB", DEFAULT_PREVIEW_CACHE_MB)?;
         if preview_cache_max_mb > MAX_PREVIEW_CACHE_MB {
             bail!("TEAMCRAFT_PREVIEW_CACHE_MAX_MB must be between 0 (no limit) and {MAX_PREVIEW_CACHE_MB}");
         }
