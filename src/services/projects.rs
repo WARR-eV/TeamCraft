@@ -44,6 +44,19 @@ pub async fn list(pool: &PgPool, actor: &Actor, only_active: bool) -> AppResult<
     .await?)
 }
 
+/// How many items have no project group (#310): every user may read them and
+/// every CAD editor change them. New items always get a group
+/// (`items::create_tx`) and a move needs one (`items::update_master`), so
+/// these come from older versions. The caller shows the number to
+/// administrators only; the items themselves are at `/vault?folder=none`.
+pub async fn count_ungrouped_items(pool: &PgPool) -> AppResult<i64> {
+    Ok(
+        sqlx::query_scalar("SELECT count(*) FROM items WHERE project_id IS NULL")
+            .fetch_one(pool)
+            .await?,
+    )
+}
+
 /// Every project group, for the project overview of an administrator who
 /// manages groups they may not read (need-to-know policy): names, codes and
 /// member counts are management data, not content.

@@ -4,10 +4,13 @@
 
 use serde::Serialize;
 use serde_json::{json, Value};
+use sqlx::PgPool;
+use uuid::Uuid;
 
 use crate::{
     assistant::{self, Answer, AssistantError, McpTools, Question, ToolUse, Trace},
     auth::Actor,
+    config::AssistantQuota,
     error::{AppError, AppResult},
     pagecontext::PageContext,
     services::{
@@ -177,6 +180,77 @@ pub async fn ask(st: &AppState, me: &Actor, question: Question) -> AppResult<Run
 /// One run; also says whether it ended tainted (see `assistant::McpTools`).
 /// `prior_taint`: an earlier answer of the conversation that the question
 /// quotes came from a tainted run, so this one starts tainted too.
+/// What one user used of the assistant in the last 24 hours, from the
+/// `assistant.run` audit entries (successful, failed and cancelled runs).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, sqlx::FromRow)]
+pub struct DailyUsage {
+    pub runs: i64,
+    /// Input plus output tokens the provider reported.
+    pub tokens: i64,
+    /// Seconds until the oldest counted run leaves the 24-hour window.
+    pub frees_in_secs: i64,
+}
+
+/// The usage of `user` over the last 24 hours (#306).
+pub async fn daily_usage(pool: &PgPool, user: Uuid) -> AppResult<DailyUsage> {
+    Ok(sqlx::query_as::<_, DailyUsage>(
+        "SELECT count(*) AS runs,
+                COALESCE(sum(COALESCE((details->>'input_tokens')::bigint, 0)
+                             + COALESCE((details->>'output_tokens')::bigint, 0)), 0)::bigint
+                    AS tokens,
+                COALESCE(EXTRACT(EPOCH FROM min(at) + interval '24 hours' - now()), 0)::bigint
+                    AS frees_in_secs
+         FROM audit_log
+         WHERE action = 'assistant.run' AND user_id = $1 AND at > now() - interval '24 hours'",
+    )
+    .bind(user)
+    .fetch_one(pool)
+    .await?)
+}
+
+/// The refusal when `usage` reached `quota` (0 = no limit), otherwise `None`.
+pub fn quota_refusal(usage: DailyUsage, quota: AssistantQuota) -> Option<AppError> {
+    let runs_used = quota.runs > 0 && usage.runs >= i64::from(quota.runs);
+    let tokens_used =
+        quota.tokens > 0 && usage.tokens >= i64::try_from(quota.tokens).unwrap_or(i64::MAX);
+    if !runs_used && !tokens_used {
+        return None;
+    }
+    let what = if runs_used {
+        format!("{} questions", quota.runs)
+    } else {
+        format!("{} model tokens", quota.tokens)
+    };
+    let wait = usage.frees_in_secs.clamp(60, 24 * 3600);
+    let (n, unit) = if wait >= 3600 {
+        ((wait + 1800) / 3600, "hour")
+    } else {
+        ((wait + 59) / 60, "minute")
+    };
+    Some(AppError::TooManyRequests {
+        message: format!(
+            "You have reached the assistant's limit of {what} in 24 hours. Try again in about \
+             {n} {unit}{} – or ask an administrator to raise the limit.",
+            if n == 1 { "" } else { "s" }
+        ),
+        retry_after: std::time::Duration::from_secs(wait.unsigned_abs()),
+    })
+}
+
+/// Refuses a run (429) when the actor used up the daily quota (#306): the
+/// server's model key is paid for by the operator, and one account – or a
+/// stolen token – must not run it up without bound. Checked before the run;
+/// runs that start at the same time may go a little over.
+async fn ensure_within_quota(pool: &PgPool, me: &Actor, quota: AssistantQuota) -> AppResult<()> {
+    if quota.runs == 0 && quota.tokens == 0 {
+        return Ok(());
+    }
+    match quota_refusal(daily_usage(pool, me.id).await?, quota) {
+        Some(refusal) => Err(refusal),
+        None => Ok(()),
+    }
+}
+
 async fn run_once(
     st: &AppState,
     me: &Actor,
@@ -186,6 +260,7 @@ async fn run_once(
     let Some(client) = st.assistant.as_deref() else {
         return Err(AssistantError::Disabled.into_app_error());
     };
+    ensure_within_quota(&st.db, me, st.config.assistant_quota).await?;
     let Ok(_permit) = client.permits.try_acquire() else {
         return Err(AssistantError::Busy.into_app_error());
     };
@@ -655,6 +730,41 @@ mod tests {
     use super::*;
     use crate::config::{AssistantConfig, AssistantProvider, LocalAgents};
     use std::time::Duration;
+
+    #[test]
+    fn the_daily_quota_refuses_with_429_and_a_wait() {
+        let quota = AssistantQuota {
+            runs: 200,
+            tokens: 2_000_000,
+        };
+        let usage = |runs, tokens, frees_in_secs| DailyUsage {
+            runs,
+            tokens,
+            frees_in_secs,
+        };
+        assert!(quota_refusal(usage(0, 0, 0), quota).is_none());
+        assert!(quota_refusal(usage(199, 1_999_999, 3600), quota).is_none());
+        // the run limit
+        let e = quota_refusal(usage(200, 10, 5400), quota).expect("refused");
+        assert_eq!(e.status(), axum::http::StatusCode::TOO_MANY_REQUESTS);
+        let text = e.public_message();
+        assert!(text.contains("200 questions"), "{text}");
+        assert!(text.contains("2 hours"), "{text}");
+        // the token limit; a short wait is shown in minutes, at least one
+        let e = quota_refusal(usage(3, 2_000_000, 5), quota).expect("refused");
+        let text = e.public_message();
+        assert!(text.contains("2000000 model tokens"), "{text}");
+        assert!(text.contains("about 1 minute –"), "{text}");
+        match e {
+            AppError::TooManyRequests { retry_after, .. } => {
+                assert_eq!(retry_after, Duration::from_secs(60));
+            }
+            other => panic!("{other:?}"),
+        }
+        // 0 = no limit
+        let off = AssistantQuota { runs: 0, tokens: 0 };
+        assert!(quota_refusal(usage(10_000, i64::MAX, 0), off).is_none());
+    }
 
     fn sample(key: Option<&str>) -> AssistantConfig {
         AssistantConfig {

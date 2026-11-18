@@ -37,7 +37,10 @@ account public.
   are plenty; the 3D conversions are the heaviest part.
 * A DNS name for it (for example `demo.<your domain>`) and a reverse proxy
   with TLS in front (the steps below use Caddy, which fetches the
-  certificate itself).
+  certificate itself). **No own domain, or the server sits behind NAT**
+  (no open port 443)? Use [Tailscale Funnel](#3b-alternative-tailscale-funnel)
+  instead: it gives the server a public `https://<machine>.<tailnet>.ts.net`
+  address with a certificate, without a port forwarding or DNS record.
 * `git`, `curl` and `jq` on the server, to load the demo data.
 
 ## 1. Install TeamCraft
@@ -86,6 +89,49 @@ demo.example.org {
 
 `sudo systemctl reload caddy`, then open `https://demo.example.org/login` –
 the page names the demo account.
+
+## 3b. Alternative: Tailscale Funnel
+
+For a server behind NAT or without an own domain – the hosted TeamCraft demo
+runs this way. Tailscale Funnel publishes one local port of a machine in your
+tailnet on the internet, under the machine's `ts.net` name, with TLS done by
+Tailscale; nothing is opened in the router and no Caddy is needed.
+
+1. Install Tailscale on the server and add it to your tailnet
+   (`sudo tailscale up`). In the admin console, enable **MagicDNS** and
+   **HTTPS certificates**, and allow Funnel for this machine (the
+   `funnel` node attribute in the tailnet policy).
+2. Publish TeamCraft's local port (the compose file binds it to
+   `127.0.0.1:8080`) – `--bg` keeps it after a restart:
+
+   ```sh
+   sudo tailscale funnel --bg 8080
+   sudo tailscale funnel status      # shows the public https://….ts.net address
+   ```
+
+3. Use that address as the public URL in `/opt/teamcraft/teamcraft.env`
+   (step 2), then `cd /opt/teamcraft && sudo docker compose up -d`:
+
+   ```sh
+   TEAMCRAFT_PUBLIC_URL=https://<machine>.<tailnet>.ts.net
+   ```
+
+Then open `https://<machine>.<tailnet>.ts.net/login` – the page names the
+demo account. Everywhere below, read that address for
+`https://demo.example.org`.
+
+Check once that wrong passwords are counted per visitor: on one device, sign
+in as `demo` with a wrong password until the login page answers *too many
+attempts*; then sign in as `demo` with the right password from another
+network (a phone on mobile data). If that works, each visitor has their own
+counter. If it is refused too, the server sees every visitor under one
+address (the proxy passes no `X-Forwarded-For`), and anyone typing wrong
+passwords for `demo` locks it for everybody for 15 minutes (see
+[Sign-in](configuration.md#sign-in)).
+
+Funnel is meant for small traffic (Tailscale limits its bandwidth); for a
+demo announced widely, a server with a public address and Caddy (step 3)
+holds more.
 
 ## 4. Load the demo data
 
@@ -147,7 +193,10 @@ the cached previews stay warm). Every night at 03:15, in
 
 Add the address to the top of `README.md` (next to *Download* in the badge
 row, and *Try the live demo* in the first paragraph) and to the table of
-`docs/src/index.md`; move the entry in `docs/OPEN_WORK.md` to done.
+`docs/src/index.md`; move the entry in `docs/OPEN_WORK.md` to done. The
+hosted TeamCraft demo is linked this way:
+<https://teamcraft-demo.tailc7ef5b.ts.net> (account `demo`, password
+`try-teamcraft`).
 
 ## Upgrades and new demo data
 

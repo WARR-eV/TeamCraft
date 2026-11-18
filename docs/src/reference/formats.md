@@ -59,8 +59,8 @@ Creo):
 
 - **JT 10** (`src/mesh/jt10.rs`) carries parts and assembly in one file. The
   scene graph (an LZMA-compressed segment) gives every shape occurrence with
-  its transform, the units of the model and the nodes NX marks hidden
-  (section and trace-line geometry). Each shape's finest level of detail is
+  its transform, the units of the model and the nodes NX marks hidden (section and trace-line geometry). Each shape's
+  finest level of detail is
   decoded with the JT 9 topology coder plus the newer integer codecs, its
   hash checked, refined along the stored normals within the same budget as
   NX parts and placed per instance.
@@ -103,8 +103,8 @@ The mesh is refined along the stored normals like an NX part. A part saved
 without visualisation data has no 3D preview, nor do drawings. Details are in
 [Research: 3D preview of CATIA V5 parts](../research/catia-cgr-preview.md).
 
-CATIA V5 products (`.CATProduct`) are put together from their parts
-(`src/catprod.rs`, `services/assemblies.rs`). A product names no files.
+CATIA V5 products (`.CATProduct`) are put together from their parts (`src/catprod.rs`, `services/assemblies.rs`). A
+product names no files.
 The object stream of its container `CATProdCont` holds per instance:
 
 * the part number and the instance name (`_InstanceName`);
@@ -136,8 +136,8 @@ bitmap Rhino stored as its thumbnail.
 Fusion designs (`.f3d`) are ZIP archives whose entries are mostly
 compressed with Zstandard (read by `src/fusion.rs` with the pure-Rust
 `ruzstd`, sizes capped and checked against the stored CRC-32). Their 3D
-preview is the display scene Fusion stores for fast opening
-(`OGS.BlobFolder/OGS/DefaultScene/world` and `stream_mesh_NNN`,
+preview is the display scene Fusion stores for fast opening (`OGS.BlobFolder/OGS/DefaultScene/world` and
+`stream_mesh_NNN`,
 `src/mesh/f3d.rs`): the triangles of every body face, welded per body,
 refined along their stored normals like NX parts and converted from
 centimetres to millimetres. Sketches, edges, dimensions and work geometry
@@ -151,6 +151,7 @@ zlib- or Zstandard-compressed segments below `RSeStorage` (`src/invpart.rs`;
 Zstandard in newer files, told apart by the magic bytes). The 3D
 preview of a part is the display tessellation in `PmGraphicsSegment`
 (`src/mesh/inventor.rs`):
+
 - each B-rep face is an indexed triangle list (centimetres) with a unit
   surface normal per vertex;
 - the faces of solid bodies are taken (all faces of a part without a
@@ -180,8 +181,8 @@ planes, cylinders, cones and tori with their contours and the edges sampled
 in both faces' parameter spaces (`brep.rs`), interpolating bicubic splines,
 rolling-ball fillets and ruled surfaces (`freeform.rs`), ear clipping of
 every face region in the parameter plane with every edge evaluated once on
-its most exact face, welding and PN refinement along the analytic normals
-(`tess.rs`). Lengths are converted to millimetres with the unit of the
+its most exact face, welding and PN refinement along the analytic normals (`tess.rs`). Lengths are converted to
+millimetres with the unit of the
 `UnitSystemDef` section (`mm`, `in`, …). Turned parts without a plane in
 the identity frame get their face parametrisations from a seeded face (see
 [Research: 3D preview of Creo parts](../research/creo-brep-preview.md)).

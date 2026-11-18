@@ -1546,8 +1546,11 @@ mod tests {
                       "active_managers": 2, "last_active_at": TS },
                 ],
                 "manager_gap_ids": [ROCKET, OTHER], "stale_days": 90,
+                "ungrouped_items": 3,
             })),
         );
+        assert!(html.contains("3 items have no project group"));
+        assert!(html.contains("href=\"/vault?folder=none\""));
         assert!(html.contains("Groups without an active manager"));
         assert!(html.contains("Sounding &lt;rocket&gt; –") && html.contains("no active manager"));
         assert!(html.contains("2 active managers, none seen for 90 days"));
@@ -1558,9 +1561,11 @@ mod tests {
             with_common(json!({
                 "projects": [project()], "my_projects": [ROCKET], "review_due": [],
                 "manager_gaps": [], "manager_gap_ids": [], "stale_days": 90,
+                "ungrouped_items": 0,
             })),
         );
         assert!(!html.contains("manager-gaps"));
+        assert!(!html.contains("ungrouped-items"));
         let html = render(
             &env,
             "projects/access_review.html",

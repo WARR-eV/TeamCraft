@@ -255,6 +255,7 @@ async fn write_backup(
         .with_context(|| format!("cannot write '{}'", partial.display()))?;
     fs::rename(&partial, &manifest_path)
         .with_context(|| format!("cannot write '{}'", manifest_path.display()))?;
+    restrict_tree(dir)?;
 
     Ok(BackupSummary {
         db_dump_bytes,
@@ -435,6 +436,14 @@ async fn ensure_database_empty(config: &Config, force: bool) -> Result<()> {
 /// Checks that `dir` is an empty directory or does not exist (then it is
 /// created); returns whether it was created.
 fn prepare_target(dir: &Path) -> Result<bool> {
+    let created = create_or_check_empty(dir)?;
+    // Owner only before anything is written into it: the dump holds password
+    // and token hashes (#307, F19), whatever the umask.
+    set_mode(dir, PRIVATE_DIR_MODE)?;
+    Ok(created)
+}
+
+fn create_or_check_empty(dir: &Path) -> Result<bool> {
     if dir.exists() {
         if !dir.is_dir() {
             bail!("backup target '{}' is not a directory", dir.display());
@@ -455,6 +464,44 @@ fn prepare_target(dir: &Path) -> Result<bool> {
             .with_context(|| format!("cannot create backup target '{}'", dir.display()))?;
         Ok(true)
     }
+}
+
+/// Mode of every directory of a backup (Unix).
+const PRIVATE_DIR_MODE: u32 = 0o700;
+/// Mode of every file of a backup (Unix).
+const PRIVATE_FILE_MODE: u32 = 0o600;
+
+#[cfg(unix)]
+fn set_mode(path: &Path, mode: u32) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(path, fs::Permissions::from_mode(mode))
+        .with_context(|| format!("cannot restrict the permissions of '{}'", path.display()))
+}
+
+/// Windows: the target folder's ACL applies (no Unix modes).
+#[cfg(not(unix))]
+fn set_mode(_path: &Path, _mode: u32) -> Result<()> {
+    Ok(())
+}
+
+/// Gives every directory below `dir` mode 0700 and every file 0600,
+/// independent of the umask and of the vault's own modes (`fs::copy` keeps
+/// those). Symbolic links are left alone; a backup writes none.
+fn restrict_tree(dir: &Path) -> Result<()> {
+    set_mode(dir, PRIVATE_DIR_MODE)?;
+    for entry in fs::read_dir(dir).with_context(|| format!("cannot read '{}'", dir.display()))? {
+        let entry = entry.with_context(|| format!("cannot read '{}'", dir.display()))?;
+        let path = entry.path();
+        let kind = fs::symlink_metadata(&path)
+            .with_context(|| format!("cannot inspect '{}'", path.display()))?
+            .file_type();
+        if kind.is_dir() {
+            restrict_tree(&path)?;
+        } else if kind.is_file() {
+            set_mode(&path, PRIVATE_FILE_MODE)?;
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1186,6 +1233,46 @@ mod tests {
         let file = root.join("plain-file");
         fs::write(&file, b"x").unwrap();
         assert!(prepare_target(&file).is_err());
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[cfg(unix)]
+    fn mode_of(path: &Path) -> u32 {
+        use std::os::unix::fs::PermissionsExt;
+        fs::metadata(path).unwrap().permissions().mode() & 0o777
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn backups_are_owner_only_whatever_the_umask() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = temp_dir("modes");
+        let target = root.join("backup");
+        prepare_target(&target).unwrap();
+        assert_eq!(mode_of(&target), 0o700, "new target");
+        // an existing empty folder is narrowed too
+        let existing = root.join("existing");
+        fs::create_dir_all(&existing).unwrap();
+        fs::set_permissions(&existing, fs::Permissions::from_mode(0o755)).unwrap();
+        prepare_target(&existing).unwrap();
+        assert_eq!(mode_of(&existing), 0o700, "existing empty target");
+
+        // files and folders written with a permissive mode (vault copies keep theirs)
+        let objects = target.join(VAULT_DIR).join("objects");
+        let hash = write_object(&objects, b"blob");
+        let object = object_path_under(&objects, &hash).unwrap();
+        fs::set_permissions(&object, fs::Permissions::from_mode(0o644)).unwrap();
+        fs::set_permissions(object.parent().unwrap(), fs::Permissions::from_mode(0o755)).unwrap();
+        let dump = target.join(DUMP_FILE);
+        fs::write(&dump, b"dump").unwrap();
+        fs::set_permissions(&dump, fs::Permissions::from_mode(0o664)).unwrap();
+
+        restrict_tree(&target).unwrap();
+        assert_eq!(mode_of(&dump), 0o600);
+        assert_eq!(mode_of(&object), 0o600);
+        assert_eq!(mode_of(object.parent().unwrap()), 0o700);
+        assert_eq!(mode_of(&target.join(VAULT_DIR)), 0o700);
+        assert_eq!(mode_of(&target), 0o700);
         fs::remove_dir_all(root).ok();
     }
 }
