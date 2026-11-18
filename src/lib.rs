@@ -340,6 +340,16 @@ async fn metrics_endpoint(
             state.db.num_idle() as f64,
         ),
         (
+            "teamcraft_db_pool_max_connections",
+            "Largest number of database connections (TEAMCRAFT_DB_MAX_CONNECTIONS).",
+            f64::from(state.config.db_max_connections),
+        ),
+        (
+            "teamcraft_db_pool_timeouts",
+            "Requests since the start that found no free database connection within 10 s (answered 503).",
+            crate::error::POOL_TIMEOUTS.load(std::sync::atomic::Ordering::Relaxed) as f64,
+        ),
+        (
             "teamcraft_webhook_deliveries_pending",
             "Webhook deliveries waiting to be sent.",
             webhooks,

@@ -56,6 +56,13 @@ see the notices in the README.
 
 ### Changed
 
+- **Database pool** (#317): `TEAMCRAFT_DB_MAX_CONNECTIONS` defaults to 20
+  instead of 10 – requests and background jobs share the pool, and long
+  imports made requests wait. A request that finds no free connection within
+  10 seconds now answers **503** *The server is busy* (it was a 500 reported
+  as a defect), logs a warning and counts in the new gauge
+  `teamcraft_db_pool_timeouts`; `teamcraft_db_pool_max_connections` shows the
+  limit. The operations guide has a section on sizing the pool.
 - CI: the macOS build (`build (macos-latest)`, on `main` only) is advisory
   and no longer part of **CI result**. GitHub's hosted macOS arm64 runners
   often stay unavailable ("The job was not acquired by Runner of type hosted
