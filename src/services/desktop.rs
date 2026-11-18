@@ -103,6 +103,37 @@ impl AuthorizeRequest {
     }
 }
 
+/// Prefix of the computer names a live demo gives desktop sign-ins.
+const DEMO_DEVICE_PREFIX: &str = "demo-computer-";
+
+/// A random, meaningless computer name for a desktop sign-in of the live
+/// demo's public account (#325): visitors share that account, so the real
+/// name of their computer is neither shown to others nor stored – not in the
+/// one-time code, the token name or the audit log.
+pub fn demo_device() -> String {
+    let random = Uuid::new_v4().simple().to_string();
+    format!("{DEMO_DEVICE_PREFIX}{}", &random[..8])
+}
+
+/// Whether `device` is a name made by [`demo_device`] (the confirmation form
+/// posts it back unchanged).
+pub fn is_demo_device(device: &str) -> bool {
+    device
+        .strip_prefix(DEMO_DEVICE_PREFIX)
+        .is_some_and(|r| r.len() == 8 && r.bytes().all(|b| b.is_ascii_hexdigit()))
+}
+
+impl AuthorizeRequest {
+    /// The request as the live demo's public account sees and stores it:
+    /// any computer name that [`demo_device`] did not make is replaced.
+    pub fn anonymized(mut self) -> Self {
+        if !is_demo_device(&self.device) {
+            self.device = demo_device();
+        }
+        self
+    }
+}
+
 /// PKCE S256: `base64url(SHA-256(verifier))`.
 pub fn challenge_of(verifier: &str) -> String {
     URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()))
@@ -233,6 +264,32 @@ mod tests {
         assert_eq!(
             challenge_of("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
             CHALLENGE
+        );
+    }
+
+    #[test]
+    fn demo_sign_ins_get_a_random_computer_name() {
+        let real = AuthorizeRequest::parse("53682", "abcdefghijklmnop", CHALLENGE, "Leos-MacBook")
+            .unwrap();
+        let shown = real.clone().anonymized();
+        assert!(is_demo_device(&shown.device), "{}", shown.device);
+        assert!(!shown.device.contains("Leo"));
+        // the form posts the random name back: it is kept, not replaced again
+        assert_eq!(shown.clone().anonymized().device, shown.device);
+        // two sign-ins get different names
+        assert_ne!(demo_device(), demo_device());
+        // a real name that only looks similar is replaced
+        for fake in [
+            "demo-computer-",
+            "demo-computer-xyz12345",
+            "demo-computer-1234567890",
+        ] {
+            assert!(!is_demo_device(fake), "{fake}");
+        }
+        // the rest of the request is unchanged
+        assert_eq!(
+            (shown.port, shown.state.as_str()),
+            (53682, "abcdefghijklmnop")
         );
     }
 

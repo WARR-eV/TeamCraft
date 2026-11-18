@@ -8,6 +8,11 @@
     <strong>{{ me.display_name }}</strong> ({{ me.role|label }}). It receives a personal access token that
     expires after {{ token_days }} days without use and appears on your <a href="/account">account page</a>, where you can revoke
     it at any time.</p>
+  {% if demo %}
+  <p class="hint">This is the live demo: everybody shares this account, so the name of your computer is not
+    kept – the app appears here as <strong>{{ req.device }}</strong>. The app can look at everything the demo
+    shows but change nothing, and its token disappears with the nightly reset of the demo.</p>
+  {% endif %}
   <p class="hint">Only allow this if you have just started the sign-in in TeamCraft Desktop yourself.</p>
   <form method="post" action="/desktop/authorize" class="actions">
     <input type="hidden" name="port" value="{{ req.port }}">

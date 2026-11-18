@@ -177,7 +177,9 @@ or KWallet on Linux). Where there is none, it uses a file only your user
 account can read and says so at the start and in *Settings*. An address with
 plain `http://` to another computer gets a warning when you connect: the token
 and all data would cross the network unencrypted – use the `https://` address
-of the server. The app uses the same skins
+of the server. On a hosted live demo the app signs in to the public
+account under a random computer name and can look at everything but change
+nothing. of the server. The app uses the same skins
 and 3D viewer as the web interface; the models are converted by the server,
 and *Loading* or the reason a model cannot be shown appears on the canvas of
 the *3D viewer* tab (see [Files](files.md)). *Settings → Appearance*: *TeamCraft* (the
