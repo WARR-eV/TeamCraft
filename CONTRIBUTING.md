@@ -177,8 +177,8 @@ screen with ImageMagick. The app has no deep links, so `xdotool` drives it like
 a user: the Ctrl+2 shortcut (worklist) and clicks on navigator rows at fixed
 screen positions (the ROVER group, the checked-out bracket, the change order
 waiting for review), then Ctrl+PageUp back to the bracket, its *Graph*
-sub-tab and the sensor mast assembly above it in the graph
-(`desktop-graph.png`; `desktop-graph-nav.png` shows the bracket's graph the
+sub-tab and the sensor mast assembly above it in the graph (`desktop-graph.png`; `desktop-graph-nav.png` shows the
+bracket's graph the
 click aims at). When the desktop layout or the demo data changes, check
 that the `desktop-*.png` images still show what their names say and adjust the
 coordinates in `desktop_run`.
@@ -210,8 +210,8 @@ did not make – the run itself does not fail. Without `DESKTOP_APP` the
 
 The data loading lives in the script's `seed` and `seed_*` functions, apart
 from the captures: `scripts/seed-demo.sh` sources the script (it captures
-nothing when sourced) to load the same data into the hosted live demo
-([Live demo](docs/src/admin/live-demo.md)). Keep new demo data in a `seed_*`
+nothing when sourced) to load the same data into the hosted live demo ([Live demo](docs/src/admin/live-demo.md)). Keep
+new demo data in a `seed_*`
 function, so the screenshots and the demo stay alike.
 
 To run it locally against a throw-away database and vault (Chrome and a
@@ -480,8 +480,8 @@ like the rest of the project.
 release may contain breaking changes.
 
 **Build artifacts.** `.github/workflows/release.yml` builds the server
-binaries (Linux x86_64/ARM64, Windows x64) and the desktop installers
-(AppImage, `.deb`, `.rpm` and Flatpak bundles for x86_64/aarch64, `.dmg`,
+binaries (Linux x86_64/ARM64, Windows x64) and the desktop installers (AppImage, `.deb`, `.rpm` and Flatpak bundles for
+x86_64/aarch64, `.dmg`,
 and for Windows x64 and ARM64 `.msi`, NSIS `-setup.exe` and a portable
 `.zip`), the desktop installers *with local server* (job `local-server`: the
 app plus the server as `teamcraft-server` and PostgreSQL's programs from

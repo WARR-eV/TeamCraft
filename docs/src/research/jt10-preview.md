@@ -25,32 +25,31 @@ NX keeps inside its parts ([3D preview of NX parts](nx-jt-preview.md)).
   the box, cover and plate (dataset mds2-2146) serve as reference.
 * **Container.** As in JT 9 (80-byte version text, TOC, segments), but the
   TOC offset and segment offsets are 64-bit, and segments that are
-  compressed as a whole (scene graph, metadata, B-rep, PMI) use
-  **LZMA in the `.xz` container** (CRC-64) instead of zlib. Shape LOD
+  compressed as a whole (scene graph, metadata, B-rep, PMI) use **LZMA in the `.xz` container** (CRC-64) instead of
+  zlib. Shape LOD
   segments are not compressed as a whole.
-* **Mesh.** The *Tri-Strip Set Shape LOD* keeps the JT 9 topology coder
-  (dual VF mesh, the same 22 symbol arrays, Deering normals), so
+* **Mesh.** The *Tri-Strip Set Shape LOD* keeps the JT 9 topology coder (dual VF mesh, the same 22 symbol arrays,
+  Deering normals), so
   `mesh/jt.rs` is reused. New are:
-  * the *third-generation Int32 compressed data packet*: bitlength fields
-    with "nibbler"-coded limits (4-bit nibbles plus a continue bit; run
-    widths and lengths in 4-bit fields), a probability context with an
-    escape flag per entry, a move-to-front codec (window of 16), and
-    out-of-band values **only when the context has an escape entry** –
-    this rule and the 4/4 constants are not in the text of the
-    specification and were found by checking that the code text is
-    consumed exactly;
-  * one packet for the upper 32 bits of the 8th attribute-mask context
-    (JT 9: two packets of 30 and 4 bits) and the large masks as a plain
-    word array;
-  * vertex coordinates as raw `f32` bits (Lag-1 predicted) or quantised
-    codes; normals as one packet of combined Deering codes
-    (octant, sextant, θ, ψ from the top – as the text of the
-    specification says; the sample code in its Annex B swaps octant and
-    sextant);
-  * NX writes two blocks the specification does not list (a length plus a
-    constant 16-byte id after the vertex bindings, and five bytes before the
-    first packet); the reader recognises them by the length and otherwise
-    follows the specification.
+    * the *third-generation Int32 compressed data packet*: bitlength fields
+      with "nibbler"-coded limits (4-bit nibbles plus a continue bit; run
+      widths and lengths in 4-bit fields), a probability context with an
+      escape flag per entry, a move-to-front codec (window of 16), and
+      out-of-band values **only when the context has an escape entry** –
+      this rule and the 4/4 constants are not in the text of the
+      specification and were found by checking that the code text is
+      consumed exactly;
+    * one packet for the upper 32 bits of the 8th attribute-mask context (JT 9: two packets of 30 and 4 bits) and the
+      large masks as a plain
+      word array;
+    * vertex coordinates as raw `f32` bits (Lag-1 predicted) or quantised
+      codes; normals as one packet of combined Deering codes (octant, sextant, θ, ψ from the top – as the text of the
+      specification says; the sample code in its Annex B swaps octant and
+      sextant);
+    * NX writes two blocks the specification does not list (a length plus a
+      constant 16-byte id after the vertex bindings, and five bytes before the
+      first packet); the reader recognises them by the length and otherwise
+      follows the specification.
 * **Validation.** Every LOD carries hashes (Bob Jenkins' lookup2 on the
   decoded symbols). With the layout above the composite topology hash and
   the vertex hash match in 24 of 24 LODs of the NIST file.
@@ -65,8 +64,8 @@ NX keeps inside its parts ([3D preview of NX parts](nx-jt-preview.md)).
   section and trace-line geometry is marked `__PLM_PS_Hidden = 1`.
 * **Result.** A prototype decoded all 8 parts as closed, consistently
   oriented meshes with a positive volume; the stored normals agree with the
-  face normals (mean cosine ≥ 0.99). All 36 placements match NX's own
-  (translations within 6e-6 mm, rotations within 4e-6), the part sizes
+  face normals (mean cosine ≥ 0.99). All 36 placements match NX's own (translations within 6e-6 mm, rotations within
+  4e-6), the part sizes
   match NIST's STEP files (box 152.4 × 101.6 × 73 mm, cover 152.4 × 101.6 ×
   25.05 mm, plate 120 × 71.16 × 5 mm).
 * **LZMA in Rust.** [`lzma-rs`](https://github.com/gendx/lzma-rs) is pure
@@ -82,8 +81,8 @@ Implement: `src/mesh/jt10.rs` reads stand-alone JT 10 files (format id
 `jt`): container with LZMA, scene graph with transforms, units and hidden
 nodes, LOD 0 of every tri-strip shape, refined like NX parts and placed per
 instance; the hashes are checked. The thumbnail of a `.jt` file is rendered
-from its 3D preview. Stand-alone JT 8 and 9 files get a clear message
-(no openly licensed test file; their scene graph uses the older element
+from its 3D preview. Stand-alone JT 8 and 9 files get a clear message (no openly licensed test file; their scene graph
+uses the older element
 layout).
 
 Not now: shattered files (a partition that names another `.jt` file),
@@ -127,6 +126,6 @@ synthetic assemblies.
   version 10.0 Rev B (2015) and version 10.5 Rev B (2023); ISO 14306. JT is a trademark of Siemens; the
   JT data format is © Siemens.
 * NIST, *Design, Manufacturing, and Inspection Data for a Box Assembly*
-  (NX and JT files in `tests/fixtures/cad/nist/mtc-assembly`) and
-  *Reference Knowledge Graphs of STEP and QIF Data for a Three-Part Box
+  (NX and JT files in `tests/fixtures/cad/nist/mtc-assembly`) and *Reference Knowledge Graphs of STEP and QIF Data for a
+  Three-Part Box
   Assembly* (mds2-2146, STEP reference).
