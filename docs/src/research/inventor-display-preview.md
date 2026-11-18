@@ -4,8 +4,8 @@
 
 ## Question
 
-Can TeamCraft show native Autodesk Inventor parts (`.ipt`) and assemblies
-(`.iam`) in the 3D viewer without Inventor, Inventor View or a
+Can TeamCraft show native Autodesk Inventor parts (`.ipt`) and assemblies (`.iam`) in the 3D viewer without Inventor,
+Inventor View or a
 translation service, and with the same quality as the NX and SOLIDWORKS
 previews ([3D preview of NX parts](nx-jt-preview.md),
 [3D preview of SOLIDWORKS files](solidworks-display-preview.md))?
@@ -17,10 +17,10 @@ document is split into **segments**. `RSeSegInfo` lists them, and each
 segment has two streams with the same id:
 
 * `M<id>`, the meta stream:
-  * the text `RSe Meta Stream Version 8`, the segment name (UTF-16) and its
-    class UUID, then two dates;
-  * then a zlib body: the length of every section in the segment, and the
-    table of section classes (UUIDs).
+    * the text `RSe Meta Stream Version 8`, the segment name (UTF-16) and its
+      class UUID, then two dates;
+    * then a zlib body: the length of every section in the segment, and the
+      table of section classes (UUIDs).
 * `B<id>`, the data stream: an 18-byte header, then zlib. Inflated, it is a
   flat list of sections:
   `u32 class word | payload | u32 length again | u8 0`.
@@ -38,17 +38,17 @@ elements. The element type names a class of the table: a point (3 ×
 * Every part has one `PmGraphicsSegment`. It is the scene graph Inventor
   draws the part with.
 * **One section of class `D79AD3F3` per B-rep face** holds:
-  * the owning face (a key);
-  * the vertices (`f32` xyz, **centimetres**, part coordinates);
-  * a plain `u32` triangle list, counter-clockwise around the outward
-    normal;
-  * a unit surface normal per vertex;
-  * the uv parameters and edge flags, which the preview does not need.
+    * the owning face (a key);
+    * the vertices (`f32` xyz, **centimetres**, part coordinates);
+    * a plain `u32` triangle list, counter-clockwise around the outward
+      normal;
+    * a unit surface normal per vertex;
+    * the uv parameters and edge flags, which the preview does not need.
 * A simpler class `A79EACD2` has the same arrays without the extras. It is
   used:
-  * for the quads of work planes (owned by no face, and left out);
-  * for a second triangulation of a face;
-  * in a few files, as the only mesh of a face.
+    * for the quads of work planes (owned by no face, and left out);
+    * for a second triangulation of a face;
+    * in a few files, as the only mesh of a face.
 * **Bodies:** the faces come in body groups. A record before each group
   tells solid bodies (1) from surface bodies and construction copies (0).
   The preview takes the solid bodies; a part without any shows all its
@@ -58,18 +58,18 @@ elements. The element type names a class of the table: a point (3 ×
   boundary vertices bit for bit. Welding on the exact `f32` values closes
   the mesh, whereas welding with a 1 µm tolerance breaks tiny features.
 * **Tested files:**
-  * all 873 parts of the Autodesk Inventor 2022 sample set (saved with
-    Inventor 2019 and 2022);
-  * the two NIST parts in `tests/fixtures/cad` (Inventor 2021).
+    * all 873 parts of the Autodesk Inventor 2022 sample set (saved with
+      Inventor 2019 and 2022);
+    * the two NIST parts in `tests/fixtures/cad` (Inventor 2021).
 * **Results:**
 
-  | Result | Parts |
-  |---|---|
-  | Decode failures | 0 |
-  | Closed and consistently oriented | 790 |
-  | Watertight, but touching themselves (springs, propeller blades, multi-body mould plates) | 18 |
-  | Open, because they are true surface models | 9 |
-  | Empty: sketches, route and skeleton parts without a body | 56 |
+  | Result                                                                                   | Parts |
+  |------------------------------------------------------------------------------------------|-------|
+  | Decode failures                                                                          | 0     |
+  | Closed and consistently oriented                                                         | 790   |
+  | Watertight, but touching themselves (springs, propeller blades, multi-body mould plates) | 18    |
+  | Open, because they are true surface models                                               | 9     |
+  | Empty: sketches, route and skeleton parts without a body                                 | 56    |
 
   NIST ctc-01 has the same bounding box as its NX and STEP versions:
   800 × 450 × 150 mm.
@@ -77,8 +77,8 @@ elements. The element type names a class of the table: a point (3 ×
   quality, similar to SOLIDWORKS. Every vertex carries the exact surface
   normal, so the same **PN-triangle refinement** as for NX and SOLIDWORKS
   applies.
-* **Stored preview image:** the summary information
-  (`\x05Zrxrt4arFafyu34gYa3l3ohgHg`, property 17) holds a PNG of 180 or
+* **Stored preview image:** the summary information (`\x05Zrxrt4arFafyu34gYa3l3ohgHg`, property 17) holds a PNG of 180
+  or
   512 pixels, which TeamCraft already shows.
 
 ### Assemblies: occurrences and placements
@@ -87,27 +87,27 @@ elements. The element type names a class of the table: a point (3 ×
   proxies, so the preview is put together from the part files, as for NX
   and SOLIDWORKS.
 * **Which files:** the stream `UFRxDoc` holds:
-  * the table of referenced files: the author's absolute path, a file id,
-    and flags for iPart/iAssembly factories and members;
-  * one record per occurrence: occurrence id, file id, title, and 8 flag
-    bytes. Bit `0x40` of the last flag byte means *not visible*.
+    * the table of referenced files: the author's absolute path, a file id,
+      and flags for iPart/iAssembly factories and members;
+    * one record per occurrence: occurrence id, file id, title, and 8 flag
+      bytes. Bit `0x40` of the last flag byte means *not visible*.
 * **Where:** the `AmRxSegment` holds one section `232792BC` per occurrence:
-  * a packed 4 × 4 matrix: one `u32` mask says which elements are +1, 0 or
-    −1, and the others follow as `f64`;
-  * the occurrence id, to join with `UFRxDoc`.
+    * a packed 4 × 4 matrix: one `u32` mask says which elements are +1, 0 or
+      −1, and the others follow as `f64`;
+    * the occurrence id, to join with `UFRxDoc`.
 
   The matrix uses column vectors (`p' = R·p + t`) and centimetres.
 * **Sub-assemblies** are files of their own and are placed relative to
   their parent.
 * **Checks across all 249 sample assemblies:**
-  * all of them parse;
-  * all 7 700 occurrences resolve to a file;
-  * 233 of the 243 assemblies that store a bounding box reproduce it
-    exactly with the decoded placements. With the transposed rotation only
-    40 do, all symmetric cases.
-  * The misses are six cable and harness assemblies, whose wires are
-    virtual components, and one at 0.9 %.
-  * The visibility bit agrees with Inventor's own DWFx exports.
+    * all of them parse;
+    * all 7 700 occurrences resolve to a file;
+    * 233 of the 243 assemblies that store a bounding box reproduce it
+      exactly with the decoded placements. With the transposed rotation only
+      40 do, all symmetric cases.
+    * The misses are six cable and harness assemblies, whose wires are
+      virtual components, and one at 0.9 %.
+    * The visibility bit agrees with Inventor's own DWFx exports.
 * **Flexible sub-assemblies** (addendum 2026-11-11). A parent re-poses
   children deeper down with override sets (class `F17A4562`): a path of
   occurrence ids from the parent to the sub-assembly, and refs to override
@@ -126,10 +126,10 @@ elements. The element type names a class of the table: a point (3 ×
   that place for 2 564 of 2 565 occurrences (all with the byte 0).
   Suppressed components are left out.
 * **Not decoded:**
-  * design views other than the one active when the file was saved
-    (`DesignViewSegment`): in the sample set only Buffer Prep Skid shows a
-    difference, a room enclosure hidden in its *Default* view;
-  * the weld beads of weldments, which are stored in the assembly itself.
+    * design views other than the one active when the file was saved (`DesignViewSegment`): in the sample set only
+      Buffer Prep Skid shows a
+      difference, a room enclosure hidden in its *Default* view;
+    * the weld beads of weldments, which are stored in the assembly itself.
 
 ### The exact geometry
 
@@ -146,8 +146,8 @@ elements. The element type names a class of the table: a point (3 ×
   ShapeManager body and does not support assemblies. It confirmed the
   section framing and the UUID naming. No code was taken: TeamCraft is
   MPL-2.0.
-* The **Open Design Alliance** SDK is paid. Autodesk's own readers
-  (Inventor View / Apprentice) are Windows-only and not redistributable.
+* The **Open Design Alliance** SDK is paid. Autodesk's own readers (Inventor View / Apprentice) are Windows-only and not
+  redistributable.
 * No Autodesk software or SDK was used, and nothing was decompiled. The
   layout was found by analysing files, which EU law permits for
   interoperability (Directive 2009/24/EC Art. 6, UrhG §69e).
@@ -165,13 +165,12 @@ elements. The element type names a class of the table: a point (3 ×
   bodies, or all faces of a surface-only part), weld them on their exact
   coordinates and refine them with PN triangles like NX and SOLIDWORKS.
 * `inventor-assembly`:
-  * compose the preview from the part and sub-assembly files, found by file
-    name;
-  * use the placements of `AmRxSegment`, with the poses a parent gives
-    children of flexible sub-assemblies, and leave out the occurrences that
-    `UFRxDoc` marks as not visible or suppressed;
-  * this is the same pipeline as NX and SOLIDWORKS assemblies
-    (`services/assemblies.rs`).
+    * compose the preview from the part and sub-assembly files, found by file
+      name;
+    * use the placements of `AmRxSegment`, with the poses a parent gives
+      children of flexible sub-assemblies, and leave out the occurrences that
+      `UFRxDoc` marks as not visible or suppressed;
+    * this is the same pipeline as NX and SOLIDWORKS assemblies (`services/assemblies.rs`).
 * The thumbnails of Inventor parts and assemblies are rendered from the 3D
   preview instead of the stored PNG. An assembly none of whose parts are in
   TeamCraft keeps the stored image.
@@ -181,8 +180,8 @@ elements. The element type names a class of the table: a point (3 ×
 
 A user's 44 Inventor parts all failed with *damaged compressed data*. The
 files were intact, but every `M<id>` and `B<id>` stream below `RSeStorage`
-held a **Zstandard** frame (magic `28 B5 2F FD`, RFC 8878) instead of zlib
-(`78 5E`). Which Inventor version started writing Zstandard is not known:
+held a **Zstandard** frame (magic `28 B5 2F FD`, RFC 8878) instead of zlib (`78 5E`). Which Inventor version started
+writing Zstandard is not known:
 the version could not be read from those files, and every file we have is
 zlib – the Autodesk samples (Inventor 2019 and 2022), NIST 2021 and the
 NIST STC set saved with Inventor 2024. No openly licensed Inventor file
@@ -208,8 +207,7 @@ Tests repack a NIST part with Zstandard (every segment, the frame also a
 few bytes off) and check that every segment unpacks to the same bytes as
 from the zlib original, and that a Zstandard part gives the same preview
 mesh as with zlib; damaged Zstandard streams are errors, never panics. The fuzz
-target `invpart` gets a small synthetic seed with Zstandard segments
-(`fuzz/seeds/invpart/zstd-segments.ipt`).
+target `invpart` gets a small synthetic seed with Zstandard segments (`fuzz/seeds/invpart/zstd-segments.ipt`).
 
 Failed conversions are cached, so the preview cache (3), the thumbnail
 cache (7) and the shape signatures (3) got new versions: the parts that
