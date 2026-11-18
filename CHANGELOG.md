@@ -109,6 +109,16 @@ see the notices in the README.
   0.2.9 as the release that fixes it (confirmed on Windows) instead of "the
   next release".
 
+### Fixed
+
+- Trigram indexes of the item search could be missing without anyone
+  noticing (#308): migrations 0023 and 0031 swallowed *every* error while
+  creating them. Migration 0072 creates the six indexes again where they are
+  missing; only an unavailable or forbidden `pg_trgm` extension is
+  tolerated, any other error stops the migration. The server logs a warning
+  at every start that names missing search indexes
+  (`db::check_search_indexes`).
+
 ## [0.2.9] - 2026-11-15
 
 Changes since the `v0.2.8` tag.
