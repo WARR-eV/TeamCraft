@@ -175,6 +175,19 @@ see the notices in the README.
 
 ### Fixed
 
+- **Umlauts from a Mac broke Inventor assemblies on Windows.** macOS hands
+  out file names decomposed (Unicode NFD, `a` + U+0308 for `ä`), Windows and
+  its CAD programs write them composed (NFC); NTFS and ext4 see two different
+  names. A CAD folder imported from a Mac was stored decomposed, the desktop
+  app on Windows wrote the parts under those names, and an assembly asked for
+  every part with an umlaut. Now every file and folder name is composed: on
+  upload and check-in (server), in the folder import, the working folder and
+  its state (desktop); CAD references stored decomposed are recognised too.
+  Migration 0073 composes the names stored before (files, folders, references
+  and the item names the folder import took from such file names). A Get or
+  the Workspace tab gives a file the app wrote under a decomposed name its
+  composed name, and the import log of an earlier Mac import still skips the
+  items it created.
 - Live demo, desktop sign-in (#325, #336): the confirmation page still held
   the visitor's real computer name – the appearance forms in the header
   repeat the page's address as their `back` target, `device=…` included. For

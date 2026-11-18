@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use crate::workspace;
+use crate::{layout, workspace};
 
 /// More files than this are refused: import such trees in parts.
 pub const MAX_FILES: usize = 20_000;
@@ -28,8 +28,10 @@ const SKIPPED_DIRS: [&str; 7] = [
 pub struct ScannedFile {
     /// Absolute path, for the upload.
     pub path: PathBuf,
-    /// Path below the scanned folder with `/` separators, for the report.
+    /// Path below the scanned folder with `/` separators, for the report and
+    /// the folders of the upload (names composed, see `layout::nfc`).
     pub rel: String,
+    /// File name, composed; `path` keeps the name on disk.
     pub name: String,
     pub size: u64,
 }
@@ -87,13 +89,16 @@ pub fn scan(root: &Path) -> Result<Scan, String> {
                 ));
             }
             let path = entry.path();
+            // name and folder as the server stores them: composed (NFC), also
+            // for a folder on a Mac, which hands out decomposed names
             let rel = path
                 .strip_prefix(root)
                 .unwrap_or(&path)
                 .components()
-                .map(|c| c.as_os_str().to_string_lossy().to_string())
+                .map(|c| layout::nfc(&c.as_os_str().to_string_lossy()))
                 .collect::<Vec<_>>()
                 .join("/");
+            let name = layout::nfc(&name);
             let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
             result.files.push(ScannedFile {
                 path,
@@ -144,5 +149,36 @@ mod tests {
         assert_eq!(scan.files[1].size, 4);
         assert!(scan.files[1].path.is_absolute() || scan.files[1].path.starts_with(&root));
         assert!(super::scan(&root.join("missing")).is_err());
+    }
+
+    #[test]
+    fn names_from_a_mac_are_composed() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("ROVER");
+        // as macOS hands them out: decomposed (NFD)
+        let disk = root.join("Rad Mitte").join("Planetentra\u{308}ger2.ipt");
+        std::fs::create_dir_all(disk.parent().unwrap()).unwrap();
+        std::fs::write(&disk, "part").unwrap();
+        let sub = root.join("Za\u{308}hne");
+        std::fs::create_dir_all(&sub).unwrap();
+        std::fs::write(sub.join("Ritzel.ipt"), "part").unwrap();
+        let scan = scan(&root).unwrap();
+        let files: Vec<(&str, &str)> = scan
+            .files
+            .iter()
+            .map(|f| (f.rel.as_str(), f.name.as_str()))
+            .collect();
+        assert_eq!(
+            files,
+            vec![
+                (
+                    "Rad Mitte/Planetentr\u{e4}ger2.ipt",
+                    "Planetentr\u{e4}ger2.ipt"
+                ),
+                ("Z\u{e4}hne/Ritzel.ipt", "Ritzel.ipt")
+            ]
+        );
+        // the upload reads the file under its name on disk
+        assert!(scan.files[0].path.is_file());
     }
 }

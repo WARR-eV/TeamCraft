@@ -1156,6 +1156,11 @@ mod tests {
         assert_eq!(ok("Rover 2 (old)/Parts"), "Rover 2 (old)/Parts");
         assert_eq!(ok("a..b/v1.2"), "a..b/v1.2", "dots inside names are fine");
         assert_eq!(ok("Ölwanne/Gehäuse"), "Ölwanne/Gehäuse");
+        // folder names from macOS (decomposed) become composed (NFC)
+        assert_eq!(
+            ok("O\u{308}lwanne/Geha\u{308}use"),
+            "\u{d6}lwanne/Geh\u{e4}use"
+        );
         assert_eq!(ok("CONSOLE/COM10"), "CONSOLE/COM10");
         for bad in [
             "..",

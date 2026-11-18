@@ -347,6 +347,16 @@ group, and a file keeps its folder when new versions arrive. While a
 revision is checked out, the revision page can move a file to another
 folder.
 
+**Umlauts and accents.** macOS hands out file names *decomposed* (Unicode
+NFD: `a` followed by a combining diaeresis for `ä`), Windows and the CAD
+programs there write them *composed* (NFC). The two look the same, but on
+Windows and Linux they are different files, and an assembly saved on Windows
+does not find a part whose name came through a Mac. TeamCraft therefore keeps
+every file and folder name composed: the server composes what it receives,
+the folder import and the working folder use composed names on every system,
+and a file an older app version wrote under a decomposed name is renamed at
+the next Get or when the Workspace tab looks at it.
+
 **Read-only rule.** Files you have **not** checked out are read-only on disk (the read-only attribute on Windows, no
 write permission on Linux and macOS).
 CAD programs then open them read-only, and nobody edits a file that cannot be
