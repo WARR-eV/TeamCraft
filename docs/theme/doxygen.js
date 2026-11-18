@@ -5,7 +5,7 @@
   "use strict";
   var root = typeof path_to_root === "string" ? path_to_root : "";
   // the version in the title and footer: bumped with Cargo.toml (release checklist)
-  var version = "0.2.7";
+  var version = "0.2.10";
   var tabs = [
     { label: "Main Page", href: "index.html", match: /\/TeamCraft\/(index\.html)?$|^\/(index\.html)?$/ },
     { label: "User Guide", href: "guide/getting-started.html", match: /\/guide\// },
