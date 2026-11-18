@@ -21,6 +21,11 @@ see the notices in the README.
   CR/LF in a display name, unbounded reply buffering). The unmaintained notice
   for `chrono` (RUSTSEC-2026-0543, not a vulnerability) is ignored in
   `deny.toml` until the move to `jiff` or `time` (`docs/OPEN_WORK.md`).
+- Single sign-on without `TEAMCRAFT_OIDC_VIEWER_GROUP` is pointed out
+  (#311): every account of the identity provider can then sign in as a
+  viewer. The server logs a warning at every start (`Config::warnings`) and
+  *Admin → Users* says so; the behaviour itself is unchanged. The users
+  guide recommends a viewer group for shared identity providers.
 
 ### Added
 

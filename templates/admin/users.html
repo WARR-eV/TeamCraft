@@ -8,7 +8,7 @@
     <h1>Users</h1>
     <p class="subtitle">
       {% if oidc %}Single sign-on users are created at their first login; their role follows the IdP groups
-      <span class="mono">{{ oidc.admin_group }}</span> (admin) and <span class="mono">{{ oidc.editor_group }}</span> (CAD editor){% if oidc.viewer_group %}, access requires <span class="mono">{{ oidc.viewer_group }}</span>{% endif %}.
+      <span class="mono">{{ oidc.admin_group }}</span> (admin) and <span class="mono">{{ oidc.editor_group }}</span> (CAD editor){% if oidc.viewer_group %}, access requires <span class="mono">{{ oidc.viewer_group }}</span>{% else %}; <strong>every account of the identity provider can sign in as a viewer</strong> – set <span class="mono">TEAMCRAFT_OIDC_VIEWER_GROUP</span> to admit only its members{% endif %}.
       {% else %}Local accounts with username and password.{% endif %}
       What CAD editors may change is limited to their <a href="/projects">project groups</a>.
     </p>
