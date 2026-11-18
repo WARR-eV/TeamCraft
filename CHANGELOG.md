@@ -21,6 +21,32 @@ see the notices in the README.
   CR/LF in a display name, unbounded reply buffering). The unmaintained notice
   for `chrono` (RUSTSEC-2026-0543, not a vulnerability) is ignored in
   `deny.toml` until the move to `jiff` or `time` (`docs/OPEN_WORK.md`).
+- **Daily quota of the built-in assistant** per user (#306, F16): at most
+  `TEAMCRAFT_ASSISTANT_DAILY_RUNS` questions (default 200) and
+  `TEAMCRAFT_ASSISTANT_DAILY_TOKENS` model tokens (default 2 000 000) in the
+  last 24 hours, counted from the `assistant.run` audit entries; beyond that
+  a question answers 429 with `Retry-After` before anything is sent to the
+  provider. `0` turns a limit off. MCP requests cost no model tokens of the
+  server and stay unlimited.
+- Operations guide: **Data at rest** (#314) – TeamCraft does not encrypt the
+  vault, the preview cache or the database; for sensitive data, disk
+  encryption of the server is a requirement and backups that leave the
+  server are written with `--encrypt`. `teamcraft backup` without
+  `--encrypt` now prints a note saying so. **Checking the vault
+  regularly** (#315) – downloads are not re-hashed, so a weekly
+  `teamcraft vault check --verify-hashes` (systemd timer and cron examples)
+  finds changed or damaged blobs. **When to run `vault gc --apply`** (#318) –
+  in a quiet period right after a backup, with the default grace period.
+- Single sign-on without `TEAMCRAFT_OIDC_VIEWER_GROUP` is pointed out
+  (#311): every account of the identity provider can then sign in as a
+  viewer. The server logs a warning at every start (`Config::warnings`) and
+  *Admin → Users* says so; the behaviour itself is unchanged. The users
+  guide recommends a viewer group for shared identity providers.
+- Backups are owner-only (#307, F19): `teamcraft backup` sets the target
+  folder to `0700` before writing into it and, once the backup is complete,
+  every folder in it to `0700` and every file to `0600`, whatever the umask
+  (vault copies kept the vault's own modes before). Only the account that
+  ran the backup and root can read it. Windows keeps the folder's ACL.
 
 ### Added
 
@@ -43,6 +69,30 @@ see the notices in the README.
   *Check out and open* uses. Audited as `project.default_cad`; the group's JSON carries
   `default_cad` and `default_cad_version`; `GET /api/v1/formats` names each
   format's `family`. Migration 0073.
+- **TeamCraft Desktop: several servers and accounts** (#322, #323).
+  *Settings → Connections* lists the saved connections (server, account,
+  working folder) with *Switch* and *Remove*; *Add another account…* signs in
+  a second account on the same server; *Switch server…* and the connect
+  screen change the server without signing out. The sign-in of the
+  connection left behind is parked in the keychain (`api-token@<id>`, or a
+  private `token-<id>` file without one) and returns on switching back.
+  Every connection after the first gets its own working folder next to the
+  default one (`TeamCraft-<server>`), so files of servers with the same item
+  numbers never mix; existing installations keep their folder. Before this,
+  changing the server signed out and threw the sign-in away.
+- **TeamCraft Desktop on the live demo** (#325): the public demo account may
+  now confirm the desktop sign-in in the browser (it was refused as a
+  write). Visitors share that account, so their computer name is replaced by
+  a random `demo-computer-…` before the confirmation page, the one-time code,
+  the token name or the audit log see it. The app reads what the browser
+  reads; every change stays refused, and the token goes with the nightly
+  reset.
+- **Items without a project group** are pointed out to administrators
+  (#310): *Project groups* shows how many there are – everyone can read
+  them and every CAD editor change them – with a link to *Vault → Without
+  group*. New items and moves already require a group, so these are items
+  from older versions. The permissions guide warns that visibility is a deny
+  list and that sensitive data belongs in a restricted group from the start.
 - The **live demo** is online: <https://teamcraft-demo.tailc7ef5b.ts.net>
   (sign in as `demo` / `try-teamcraft`, read-only, reset every night), linked
   from the top of the README and the documentation's start page. The runbook (*Admin guide → Live demo*) now also
@@ -79,6 +129,11 @@ see the notices in the README.
 
 ### Changed
 
+- The preview cache is limited to **10 GiB by default** (#309):
+  `TEAMCRAFT_PREVIEW_CACHE_MAX_MB` defaults to `10240` instead of `0`, so the
+  hourly housekeeping trims `<vault>/previews` (least recently used first)
+  instead of letting it grow until the disk is full. Trimmed previews are
+  made again when needed; `0` keeps the cache unlimited.
 - CI: the macOS build (`build (macos-latest)`, on `main` only) is advisory
   and no longer part of **CI result**. GitHub's hosted macOS arm64 runners
   often stay unavailable ("The job was not acquired by Runner of type hosted

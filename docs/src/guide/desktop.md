@@ -177,7 +177,9 @@ or KWallet on Linux). Where there is none, it uses a file only your user
 account can read and says so at the start and in *Settings*. An address with
 plain `http://` to another computer gets a warning when you connect: the token
 and all data would cross the network unencrypted – use the `https://` address
-of the server. The app uses the same skins
+of the server. On a hosted live demo the app signs in to the public
+account under a random computer name and can look at everything but change
+nothing. of the server. The app uses the same skins
 and 3D viewer as the web interface; the models are converted by the server,
 and *Loading* or the reason a model cannot be shown appears on the canvas of
 the *3D viewer* tab (see [Files](files.md)). *Settings → Appearance*: *TeamCraft* (the
@@ -187,6 +189,20 @@ and *TeamCraft Dark* stay fixed, the distribution skins are dark. *Settings → 
 a local account (it
 asks for the current one; wrong ones count like failed sign-ins, and your web
 sessions end); single-sign-on accounts do not see it.
+
+**Several servers and accounts.** *Settings → Connections* lists every
+server and account the app keeps a sign-in for, with its working folder.
+*Switch* changes to another one, and the window reloads; *Add another
+account…* signs in a second account on the same server; *Switch server…*
+(also the connect screen) goes to another server **without signing you
+out** – the sign-in you leave stays in the keychain and is back when you
+switch again. Each connection after the first gets a **working folder of its
+own** next to the default one (`TeamCraft-plm.example.org`, numbered for a
+second account there), never inside another one, because two servers can use
+the same item numbers and project codes; the first connection keeps the
+folder it had. *Remove* forgets a connection and its sign-in; its working
+folder stays on your disk. Check-outs belong to the connection they were made
+in – switch back to check them in.
 
 The window is built for daily work: object tabs on top, under them the
 toolbar of the open object with its one next step filled (see

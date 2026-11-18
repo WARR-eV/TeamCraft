@@ -40,6 +40,12 @@ pub async fn projects(State(st): State<AppState>, ctx: WebCtx) -> AppResult<Resp
     } else {
         Vec::new()
     };
+    // administrators: items without a group, readable by everyone (#310)
+    let ungrouped_items = if ctx.me.is_admin() {
+        projects::count_ungrouped_items(&st.db).await?
+    } else {
+        0
+    };
     render(
         &st,
         &ctx,
@@ -51,6 +57,7 @@ pub async fn projects(State(st): State<AppState>, ctx: WebCtx) -> AppResult<Resp
             "manager_gaps": crate::services::manager_gaps::to_json(&gaps),
             "manager_gap_ids": gaps.iter().map(|g| g.project_id).collect::<Vec<_>>(),
             "stale_days": crate::services::manager_gaps::STALE_DAYS,
+            "ungrouped_items": ungrouped_items,
         }),
     )
 }

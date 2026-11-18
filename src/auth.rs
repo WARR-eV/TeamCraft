@@ -306,9 +306,11 @@ pub const DEMO_READ_ONLY: &str = "This is a read-only live demo: look around as 
      like, but nothing can be changed here. Install TeamCraft to try it with your own data.";
 
 /// Refuses (403) every request of the live demo's public account that could
-/// change something: only `GET`, `HEAD` and signing out pass – also for
-/// routes that read through a `POST`, which keeps the rule simple and
-/// complete. Every other account is unaffected, so an administrator still
+/// change something: only `GET`, `HEAD`, signing out and the browser
+/// confirmation of the desktop sign-in (#325, under a random computer name,
+/// `services::desktop::demo_device`) pass – also for routes that read
+/// through a `POST`, which keeps the rule simple and complete. The desktop
+/// app's token then reads like the browser and is refused every write here. Every other account is unaffected, so an administrator still
 /// seeds and runs the demo.
 fn refuse_demo_write(state: &AppState, parts: &Parts, actor: &Actor) -> Result<(), AppError> {
     if !state.config.is_demo_user(&actor.username)
@@ -320,7 +322,7 @@ fn refuse_demo_write(state: &AppState, parts: &Parts, actor: &Actor) -> Result<(
         .extensions
         .get::<OriginalUri>()
         .map_or_else(|| parts.uri.path(), |uri| uri.0.path());
-    if path == "/logout" {
+    if path == "/logout" || path == "/desktop/authorize" {
         return Ok(());
     }
     Err(AppError::Forbidden(DEMO_READ_ONLY.into()))
