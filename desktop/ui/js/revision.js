@@ -13,6 +13,7 @@ import { addFilesDialog, checkinDialog, doCancelCheckout, doCheckout, doObsolete
 import { openChange } from "./change.js";
 import { openRequest, requestChangeDialog } from "./requests.js";
 import { bomFromCadDialog, importBomDialog } from "./bom-import.js";
+import { cadTargetChip, groupDefault, mainCadFile, openWithCad } from "./cad-open.js";
 
 /** Opens a revision tab; `viewerFile` (a file id) picks the file of its 3D viewer. */
 export function openRevision(number, code, sub, viewerFile) {
@@ -157,6 +158,21 @@ export function renderRevision(tab, body, toolbar) {
   }
   var checkinTitle = "Upload the changed files from your workspace and end your check-out – the revision stays in work";
   var noChanges = " (no local changes found)";
+  // Check out and open: the main CAD file in the program chosen for it
+  // (the group's default CAD program, else the newest installed one that
+  // fits the file) – the chip next to the button names that program.
+  var cadFile = mainCadFile(d.files, groupDefault(rev).family);
+  var mineLock = rev.checked_out_by === state.me.id;
+  var noCadFile = "This revision has no native CAD file (part, assembly or drawing of one CAD program)";
+  var openTool = mineLock
+    ? tool("Open in CAD", "launch", function () { openCadFile(tab, cadFile); },
+      { disabled: !cadFile, title: cadFile ? "Open " + cadFile.filename + " from your workspace in the CAD program" : noCadFile })
+    : tool("Check out and open", "launch", function () { checkOutAndOpen(tab, cadFile); }, {
+      primary: next === "checkout", disabled: !can.checkout || !cadFile,
+      title: !can.checkout ? why.checkout : cadFile ? "Take the lock, copy the files into your workspace and open " + cadFile.filename + " in the CAD program" : noCadFile
+    });
+  var cadOpen = [openTool, cadTargetChip(rev, cadFile)];
+  if (next === "checkout") next = "checkout-open";
   var lock = rev.checked_out_by ? [
     act("checkin", "Check in…", "checkin", function () { checkinDialog(tab); },
       checkinTitle + (d.localChanges === false ? noChanges : "")),
@@ -186,6 +202,7 @@ export function renderRevision(tab, body, toolbar) {
   d.localChangesFresh = false;
   append(toolbar, [
     toolGroup("Lock", lock),
+    toolGroup("Open", cadOpen),
     toolGroup("Work", [
       act("edit", "Edit", "edit", function () { editDialog(tab); }, "Edit the attributes"),
       tool("Get…", "download", function () { getStructureDialog(rev); }, { title: "Copy this item and everything it consists of (BOM, referenced CAD files) into your working folder" }),
@@ -430,6 +447,20 @@ export function exportStep(rev, name) {
   return call("cad_export_step", { project: rev.project_code, item: rev.item_number, code: rev.code, file: name });
 }
 
+/** Check out and open: takes the lock (the files come into the working
+ * folder), then opens the main CAD file in the chosen program. */
+export function checkOutAndOpen(tab, file) {
+  var rev = tab.data.rev;
+  doCheckout(tab, function () {
+    openWithCad(rev, file).catch(function (e) { toast(errorText(e), "error"); });
+  });
+}
+
+/** Opens a CAD file of my own check-out from the working folder. */
+export function openCadFile(tab, file) {
+  openWithCad(tab.data.rev, file).catch(function (e) { toast(errorText(e), "error"); });
+}
+
 export function revFiles(tab, el) {
   var d = tab.data, can = revisionAbilities(d);
   if (!d.files.length) {
@@ -450,7 +481,7 @@ export function revFiles(tab, el) {
         h("span.mono.small.dim", { text: f.sha256.slice(0, 12) + "…", title: f.sha256 }),
         h("span.row", null, [
           fmt ? h("button.small", { type: "button", on: { click: function () { tab.sub = "viewer"; tab.viewerFile = f.id; renderActive(); } } }, "3D") : null,
-          h("button.small", { type: "button", title: "Copy into the workspace and open with the default application", on: { click: function () { openFile(tab, f.filename); } } }, "Open"),
+          h("button.small", { type: "button", title: "Copy into the workspace and open – CAD files in the CAD program chosen for them, other files with the default application", on: { click: function () { openFile(tab, f.filename); } } }, "Open"),
           h("button.small", { type: "button", on: { click: function () { showVersions(tab, f, can.edit); } } }, "Versions"),
           h("button.small", { type: "button", title: "Request a change to " + f.filename + " (change request)", on: { click: function () { requestChangeDialog(d.rev, f.filename); } } }, "Request…")
         ])

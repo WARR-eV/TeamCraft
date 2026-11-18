@@ -13,6 +13,7 @@ mod api;
 mod autoallow;
 mod bomimport;
 mod cadexport;
+mod cadlaunch;
 mod commands;
 mod compat;
 mod crash;
@@ -258,6 +259,9 @@ fn main() {
             commands::import_bom,
             commands::cad_programs,
             commands::cad_export_step,
+            commands::cad_installed,
+            commands::cad_open_plan,
+            commands::workspace_open_cad,
             commands::scan_folder,
             commands::agent_profiles,
             commands::set_agent_profiles,

@@ -272,6 +272,29 @@
 </section>
 {% endif %}
 
+<section class="card" id="default-cad">
+  <h2>Default CAD program</h2>
+  <p>{% if default_cad_label %}CAD files of this group open in <strong>{{ default_cad_label }}</strong> with <em>Check out and open</em> in TeamCraft Desktop.
+    {% else %}<span class="muted">None set</span> – TeamCraft Desktop opens each file with the newest installed program that fits its file type.{% endif %}</p>
+  {% if can_manage %}
+  <form class="stack" method="post" action="/projects/{{ project.id }}/default-cad">
+    <div class="stack">
+      <label>Program
+        <select name="program">
+          <option value="" {% if not project.default_cad %}selected{% endif %}>None – newest installed program per file type</option>
+          {% for s in cad_families %}<option value="{{ s.id }}" {% if project.default_cad == s.id %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Version <span class="hint">e.g. 2026 – empty = the newest installed</span>
+        <input type="text" name="version" value="{{ project.default_cad_version }}" maxlength="32" placeholder="2026" autocomplete="off">
+      </label>
+    </div>
+    <div class="actions"><button class="primary" type="submit">Save</button></div>
+  </form>
+  {% endif %}
+  <p class="hint">TeamCraft Desktop looks for the program on each computer: the chosen version, else the newest installed version of the program, else the program the operating system opens the file with. Files of another CAD program open in the newest installed version of their own program. <em>Import CAD folder</em> in the desktop app detects the program (and, for Inventor, the version) and offers to set it here.</p>
+</section>
+
 <section class="card" id="numbering">
   <h2>Item numbers</h2>
   <p>Scheme <span class="mono">{{ numbering.scheme }}</span>
