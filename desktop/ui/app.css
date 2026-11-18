@@ -241,6 +241,21 @@ tr.row-conflict td:first-child, tr.row-clash td:first-child { box-shadow: inset 
   border-radius: var(--radius-xs);
 }
 
+/* The CAD program next to "Check out and open" (js/cad-open.js). */
+.cad-target {
+  margin-left: 2px;
+  padding: 0 8px;
+  font-size: 12px; line-height: 22px; font-weight: 500;
+  white-space: nowrap;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+.cad-target:disabled { cursor: default; color: var(--text-dim); }
+.cad-target.is-fallback { border-style: dashed; }
+
 /* ---------------------------------------------------------------- connect */
 
 .connect { position: fixed; inset: 0; display: grid; place-items: center; overflow: auto; padding: 32px 16px; }

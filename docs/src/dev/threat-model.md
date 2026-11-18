@@ -1,3 +1,4 @@
+| Opening a file starts a program        | E      | *Check out and open* starts only programs found in fixed install folders (*Program Files*, `/Applications`, the `PATH`) or the SOLIDWORKS folder from `HKLM` – never a path from the server or the web view; the web view sends only format families and versions, which only pick among those programs; the file is one located inside the working folder (`workspace::locate`), passed as one argument without a shell (`desktop/src/cadlaunch.rs`, `commands::workspace_open_cad`) | `desktop/src/cadlaunch.rs` `scan_finds_versioned_installations`, `plans_follow_the_group_and_the_file`, `registry_answers_are_read` | mitigated; a program planted in *Program Files* needs administrator rights there |
 # Threat model
 
 What TeamCraft protects, from whom, where the trust boundaries are, and – per

@@ -10,6 +10,7 @@ import { openChange } from "./change.js";
 import { reviewerProblem } from "./release-rules.js";
 import { requestChangeDialog } from "./requests.js";
 import { refreshStructure } from "./navigator.js";
+import { fileFamily, openWithCad } from "./cad-open.js";
 
 // ---------------------------------------------------------------- 3D viewer
 
@@ -362,12 +363,15 @@ export function openFile(tab, filename, local, warned) {
     var ready = local ? Promise.resolve() :
       getting(call("workspace_download", { project: rev.project_code, item: rev.item_number, code: rev.code }));
     return ready.then(function () {
+      // a native CAD file: in the CAD program chosen for it (cad-open.js)
+      var file = (tab.data.files || []).filter(function (f) { return f.filename === filename; })[0];
+      if (fileFamily(file)) return openWithCad(rev, file);
       return call("workspace_open", { project: rev.project_code, item: rev.item_number, code: rev.code, file: filename });
     });
   }).catch(function (e) { if (e) toast(errorText(e), "error"); });
 }
 
-export function doCheckout(tab) {
+export function doCheckout(tab, then) {
   var rev = tab.data.rev;
   run("Checking out " + rev.item_number + "/" + rev.code, function () {
     return getting(call("workspace_checkout", { project: rev.project_code, item: rev.item_number, code: rev.code }));
@@ -379,6 +383,8 @@ export function doCheckout(tab) {
     tab.sub = "workspace";
     reloadActive();
     refreshWorklistCount();
+    // Check out and open: the files are in the working folder now
+    if (then) then(r);
   }, function () {});
 }
 

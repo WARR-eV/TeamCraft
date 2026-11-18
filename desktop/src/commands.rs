@@ -20,7 +20,7 @@ use tokio::sync::Notify;
 use crate::{
     acp, addfiles,
     api::{self, Api, ApiError, Transfer},
-    bomimport, cadexport, folderimport, layout, localserver,
+    bomimport, cadexport, cadlaunch, folderimport, layout, localserver,
     settings::{self, Settings, TokenStorage},
     signin, update, workspace, AppState,
 };
@@ -1304,6 +1304,73 @@ pub async fn cad_export_step(
         .and_then(|n| n.to_str())
         .unwrap_or_default()
         .to_string())
+}
+
+/// The CAD programs found on this computer (for *Check out and open*).
+#[tauri::command]
+pub async fn cad_installed() -> Vec<cadlaunch::Installed> {
+    tokio::task::spawn_blocking(|| cadlaunch::installed().to_vec())
+        .await
+        .unwrap_or_default()
+}
+
+/// Which program would open a file (shown next to *Check out and open*).
+#[tauri::command]
+pub async fn cad_open_plan(wish: cadlaunch::Wish) -> cadlaunch::OpenPlan {
+    tokio::task::spawn_blocking(move || cadlaunch::plan(cadlaunch::installed(), &wish))
+        .await
+        .unwrap_or_else(|_| cadlaunch::plan(&[], &cadlaunch::Wish::default()))
+}
+
+/// Opens a workspace file of a revision with the CAD program chosen for it
+/// (the project group's default, else the newest installed program that
+/// fits the file, else the operating system's default application).
+/// Returns how it was opened.
+#[tauri::command]
+pub async fn workspace_open_cad(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    project: Option<String>,
+    item: String,
+    code: String,
+    file: String,
+    wish: cadlaunch::Wish,
+) -> CmdResult<cadlaunch::OpenPlan> {
+    let api = signed_in_api(&state)?;
+    let (_, found) = workspace::locate(
+        &api,
+        &workspace_root(&app, &state),
+        project.as_deref(),
+        &item,
+        &code,
+        &file,
+    )
+    .await?;
+    let Some(path) = found.filter(|p| p.is_file()) else {
+        return Err(ApiError::local(format!(
+            "{file} is not in the working folder – check out or use “Get files” first."
+        )));
+    };
+    let mut plan =
+        tokio::task::spawn_blocking(move || cadlaunch::plan(cadlaunch::installed(), &wish))
+            .await
+            .map_err(|e| ApiError::local(format!("The program could not be chosen: {e}")))?;
+    if let Some(program) = plan.program.clone() {
+        match cadlaunch::launch(&program, &path) {
+            Ok(()) => return Ok(plan),
+            Err(e) => {
+                // the system's program as a last resort
+                plan.reason = format!("{e} – opened with the default application instead.");
+                plan.label = "Default app".into();
+                plan.program = None;
+                plan.fallback = true;
+            }
+        }
+    }
+    app.opener()
+        .open_path(path.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|e| ApiError::local(format!("Could not open {}: {e}", path.display())))?;
+    Ok(plan)
 }
 
 /// Scans a CAD folder for the import wizard (nothing is uploaded).

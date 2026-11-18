@@ -24,12 +24,23 @@ see the notices in the README.
 
 ### Added
 
+- **Check out and open** in TeamCraft Desktop: one button on the revision
+  toolbar takes the lock, gets the files and opens the main CAD file in the
+  CAD program; the chip next to it names the program (e.g. *Inventor 2026*).
+  The program is the project group's default CAD program in its version,
+  else its newest installed version; without a default (or for a file of
+  another program) the newest installed version of the program that fits the
+  file type; else the system's default application. Installed programs are
+  found by their install folders (Windows, SOLIDWORKS via the registry,
+  macOS, FreeCAD on Linux). *Open* in the Files tab uses the same choice.
+  *Import CAD folder* detects the folder's CAD program – Inventor with the
+  release year read from the files' properties – and offers to set it as the
+  group's default.
 - **Default CAD program per project group** (*Project groups → the group →
   Default CAD program*, managers and administrators; `PUT
   /api/v1/projects/{code}/default-cad` with `{program, version?}`): the
   program and version, e.g. Autodesk Inventor 2026 or SolidWorks 2025, that
-  TeamCraft Desktop's *Check out and open* is to use (the desktop part is in
-  progress). Audited as `project.default_cad`; the group's JSON carries
+  *Check out and open* uses. Audited as `project.default_cad`; the group's JSON carries
   `default_cad` and `default_cad_version`; `GET /api/v1/formats` names each
   format's `family`. Migration 0073.
 - The **live demo** is online: <https://teamcraft-demo.tailc7ef5b.ts.net>

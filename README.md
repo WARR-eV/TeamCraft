@@ -273,9 +273,9 @@ end-to-end tests against a real PostgreSQL.
 - **Numbering schemes** – generated item numbers per project group from
   `{PROJECT}`, `{TYPE}`, `{YYYY}` and `{SEQ:n}`.
 - **Default CAD program per project group** – e.g. Inventor 2026 or
-  SolidWorks 2025, for TeamCraft Desktop's *Check out and open* (the desktop
-  part is in progress): without one, the newest installed program that fits
-  the file type.
+  SolidWorks 2025: TeamCraft Desktop's *Check out and open* opens the group's
+  CAD files with it (without one: the newest installed program that fits the
+  file type); *Import CAD folder* detects the program and offers to set it.
 - **Custom attributes** – vendor, supplier part number, RoHS … as text,
   number, yes/no or choice list per item type, versioned with each revision;
   search by attribute value.
