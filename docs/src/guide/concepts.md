@@ -83,6 +83,21 @@ hand or imported), the counter continues after the highest existing number
 of the same pattern – so a new scheme can take over an existing numbering
 convention – and existing items never change their numbers.
 
+## Default CAD program
+
+Each project group can name a **default CAD program** – the program and, if
+you like, its version (*Autodesk Inventor 2026*, *SolidWorks 2025*). Managers
+set it on the group's page (*Default CAD program*) or with `PUT
+/api/v1/projects/{code}/default-cad`; every change is audited
+(`project.default_cad`); the group's JSON carries it as `default_cad` and
+`default_cad_version`. TeamCraft Desktop's *Check out and open*, which uses it,
+is in progress (`docs/OPEN_WORK.md`). It opens the group's CAD files with
+it: the chosen version if it is installed, otherwise the newest installed
+version of that program. Files of another CAD program, and every file of a
+group without a default, open in the newest installed version of the program
+that fits the file type; without a fitting program the operating system
+opens the file.
+
 ## Attributes and classification
 
 Besides name, description, material, mass and unit cost, a revision can

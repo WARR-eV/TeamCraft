@@ -24,6 +24,14 @@ see the notices in the README.
 
 ### Added
 
+- **Default CAD program per project group** (*Project groups → the group →
+  Default CAD program*, managers and administrators; `PUT
+  /api/v1/projects/{code}/default-cad` with `{program, version?}`): the
+  program and version, e.g. Autodesk Inventor 2026 or SolidWorks 2025, that
+  TeamCraft Desktop's *Check out and open* is to use (the desktop part is in
+  progress). Audited as `project.default_cad`; the group's JSON carries
+  `default_cad` and `default_cad_version`; `GET /api/v1/formats` names each
+  format's `family`. Migration 0073.
 - The **live demo** is online: <https://teamcraft-demo.tailc7ef5b.ts.net>
   (sign in as `demo` / `try-teamcraft`, read-only, reset every night), linked
   from the top of the README and the documentation's start page. The runbook (*Admin guide → Live demo*) now also

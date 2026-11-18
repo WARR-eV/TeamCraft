@@ -1016,6 +1016,30 @@ pub fn is_family(id: &str) -> bool {
     families().iter().any(|s| s.id == id)
 }
 
+/// Longest version of a project group's default CAD program ("2026",
+/// "V5-6R2024", "NX 2312").
+pub const MAX_CAD_VERSION: usize = 32;
+
+/// The version of a default CAD program as stored: trimmed, inner runs of
+/// white space collapsed; letters, digits, spaces and `. - _ /` only, at most
+/// [`MAX_CAD_VERSION`] characters. `None` for anything else (`""` is valid:
+/// any version).
+pub fn cad_version(raw: &str) -> Option<String> {
+    let version = raw.split_whitespace().collect::<Vec<_>>().join(" ");
+    let allowed = |c: char| c.is_ascii_alphanumeric() || " .-_/".contains(c);
+    (version.chars().count() <= MAX_CAD_VERSION && version.chars().all(allowed)).then_some(version)
+}
+
+/// "Autodesk Inventor 2026": the name of a family with its version, `""`
+/// for no or an unknown family.
+pub fn program_label(family: &str, version: &str) -> String {
+    match families().into_iter().find(|s| s.id == family) {
+        Some(s) if version.is_empty() => s.name.to_string(),
+        Some(s) => format!("{} {version}", s.name),
+        None => String::new(),
+    }
+}
+
 /// How a file list is shown for a preferred CAD program.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct FamilyGrouping {
@@ -1083,6 +1107,7 @@ pub fn catalogue() -> Vec<serde_json::Value> {
                         "extensions": f.extensions,
                         "preview": info.preview,
                         "searchable_text": f.extensions.first().is_some_and(|e| crate::textindex::indexes(&format!("x.{e}"))),
+                        "family": info.family,
                         "ambiguous": f.extensions.iter().any(|e| AMBIGUOUS.contains(e)),
                         "creo_iterations": f.extensions.iter().any(|e| CREO_ITERATED.contains(e)) && f.system == "creo",
                     })
@@ -2135,5 +2160,30 @@ mod tests {
         );
         assert_eq!(g.collapsed, [false, false, false]);
         assert!(g.other_families.is_empty());
+    }
+
+    #[test]
+    fn default_cad_versions_are_short_plain_text() {
+        assert_eq!(cad_version(" 2026 ").as_deref(), Some("2026"));
+        assert_eq!(cad_version("V5-6R2024").as_deref(), Some("V5-6R2024"));
+        assert_eq!(cad_version("NX   2312").as_deref(), Some("NX 2312"));
+        assert_eq!(cad_version("").as_deref(), Some(""));
+        assert_eq!(
+            cad_version("2026 SP1.2/x_y").as_deref(),
+            Some("2026 SP1.2/x_y")
+        );
+        for bad in ["<b>2026</b>", "2026\"", "2026;", "2026\u{7f}", "é"] {
+            assert_eq!(cad_version(bad), None, "{bad}");
+        }
+        assert!(cad_version(&"9".repeat(MAX_CAD_VERSION)).is_some());
+        assert!(cad_version(&"9".repeat(MAX_CAD_VERSION + 1)).is_none());
+    }
+
+    #[test]
+    fn program_labels_name_the_family_and_version() {
+        assert_eq!(program_label("inventor", "2026"), "Autodesk Inventor 2026");
+        assert_eq!(program_label("solidworks", ""), "SolidWorks");
+        assert_eq!(program_label("exchange", "1"), "", "not a family");
+        assert_eq!(program_label("", "2026"), "");
     }
 }
