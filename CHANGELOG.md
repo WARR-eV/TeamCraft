@@ -56,6 +56,11 @@ see the notices in the README.
 
 ### Changed
 
+- The preview cache is limited to **10 GiB by default** (#309):
+  `TEAMCRAFT_PREVIEW_CACHE_MAX_MB` defaults to `10240` instead of `0`, so the
+  hourly housekeeping trims `<vault>/previews` (least recently used first)
+  instead of letting it grow until the disk is full. Trimmed previews are
+  made again when needed; `0` keeps the cache unlimited.
 - CI: the macOS build (`build (macos-latest)`, on `main` only) is advisory
   and no longer part of **CI result**. GitHub's hosted macOS arm64 runners
   often stay unavailable ("The job was not acquired by Runner of type hosted

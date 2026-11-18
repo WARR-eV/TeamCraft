@@ -231,7 +231,7 @@ expired sessions, staged uploads and unreferenced blobs (also `vault gc
 | Staged BOM imports and unfinished chunked uploads           | removed when expired, with their vault blobs unless something refers to them                                                                   |
 | Webhook deliveries, idle assistant conversations            | `TEAMCRAFT_WEBHOOK_RETENTION_DAYS`, `TEAMCRAFT_ASSISTANT_RETENTION_DAYS`                                                                       |
 | Audit log                                                   | `TEAMCRAFT_AUDIT_RETENTION_DAYS` (default: for ever); one `audit.purge` entry per removal                                                      |
-| Preview cache                                               | previews of blobs the database no longer refers to, files of old cache versions and leftovers; `TEAMCRAFT_PREVIEW_CACHE_MAX_MB` trims the rest |
+| Preview cache                                               | previews of blobs the database no longer refers to, files of old cache versions and leftovers; `TEAMCRAFT_PREVIEW_CACHE_MAX_MB` (10 GiB by default) trims the rest |
 | Old versions of files set to *keep only the latest version* | after `TEAMCRAFT_RETENTION_LATEST_GRACE_DAYS` (default 7), see below                                                                           |
 
 ### Keep only the latest version (large result files)

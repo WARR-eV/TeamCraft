@@ -266,7 +266,7 @@ pub struct Config {
     pub preview: crate::preview::PreviewLimits,
     /// Size the preview cache (`<vault>/previews`) is trimmed to by the
     /// hourly housekeeping, least recently used first
-    /// (`TEAMCRAFT_PREVIEW_CACHE_MAX_MB`; 0 = no limit).
+    /// (`TEAMCRAFT_PREVIEW_CACHE_MAX_MB`; default 10 GiB, 0 = no limit, #309).
     pub preview_cache_max_bytes: u64,
     /// Largest chunk of a chunked, resumable upload (`PATCH /api/v1/uploads/{id}`).
     pub upload_chunk_bytes: u64,
@@ -340,6 +340,9 @@ pub struct Config {
 /// must not empty the audit trail.
 pub const MIN_AUDIT_RETENTION_DAYS: u32 = 30;
 
+/// Default preview cache limit in MiB (10 GiB, #309): without one the cache
+/// grew until the disk was full.
+pub const DEFAULT_PREVIEW_CACHE_MB: u64 = 10 * 1024;
 /// Largest preview cache limit in MiB (`TEAMCRAFT_PREVIEW_CACHE_MAX_MB`, 16 TiB).
 const MAX_PREVIEW_CACHE_MB: u64 = 16 * 1024 * 1024;
 
@@ -951,7 +954,7 @@ impl Config {
             }
         };
         // 0 = no limit; at most 16 TiB
-        let preview_cache_max_mb = env.parse_or("TEAMCRAFT_PREVIEW_CACHE_MAX_MB", 0u64)?;
+        let preview_cache_max_mb = env.parse_or("TEAMCRAFT_PREVIEW_CACHE_MAX_MB", DEFAULT_PREVIEW_CACHE_MB)?;
         if preview_cache_max_mb > MAX_PREVIEW_CACHE_MB {
             bail!("TEAMCRAFT_PREVIEW_CACHE_MAX_MB must be between 0 (no limit) and {MAX_PREVIEW_CACHE_MB}");
         }
@@ -1978,9 +1981,16 @@ mod tests {
         let d = config_from(&[("TEAMCRAFT_DB_PASSWORD", "x")]).unwrap();
         assert_eq!(d.audit_retention_days, 0, "the audit log is kept for ever");
         assert_eq!(
-            d.preview_cache_max_bytes, 0,
-            "the preview cache has no limit"
+            d.preview_cache_max_bytes,
+            10 * 1024 * 1024 * 1024,
+            "the preview cache is limited to 10 GiB"
         );
+        let unlimited = config_from(&[
+            ("TEAMCRAFT_DB_PASSWORD", "x"),
+            ("TEAMCRAFT_PREVIEW_CACHE_MAX_MB", "0"),
+        ])
+        .unwrap();
+        assert_eq!(unlimited.preview_cache_max_bytes, 0, "0 = no limit");
         let c = config_from(&[
             ("TEAMCRAFT_DB_PASSWORD", "x"),
             ("TEAMCRAFT_AUDIT_RETENTION_DAYS", "3650"),
