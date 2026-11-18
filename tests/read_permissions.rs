@@ -1385,6 +1385,12 @@ async fn viewer_members_read_and_ungrouped_items_stay_visible() {
         StatusCode::OK,
         "items without a group stay visible"
     );
+    // administrators are told about it on the project groups page (#310)
+    app.user("root", Role::Admin).await;
+    let cookie = app.login("root").await;
+    let html = app.get_page("/projects", Some(&cookie)).await.text();
+    assert!(html.contains("1 item has no project group"), "{html}");
+    assert!(html.contains("/vault?folder=none"));
     app.teardown().await;
 }
 

@@ -147,7 +147,11 @@ become a crate later, but there is no second user for that today.
 ### Neutral types (sketch)
 
 ```rust
-pub struct ToolSpec { pub name: String, pub description: String, pub schema: Value }
+pub struct ToolSpec {
+    pub name: String,
+    pub description: String,
+    pub schema: Value
+}
 
 pub enum Turn {
     User(String),
@@ -156,14 +160,37 @@ pub enum Turn {
     Assistant { text: String, calls: Vec<ToolCall>, raw: Value },
     ToolResults(Vec<ToolResult>),            // Anthropic: one user message; OpenAI: one tool message each
 }
-pub struct ToolCall   { pub id: String, pub name: String, pub input: Result<Value, String> } // Err = unparsable arguments
-pub struct ToolResult { pub call_id: String, pub name: String, pub text: String, pub is_error: bool }
+pub struct ToolCall {
+    pub id: String,
+    pub name: String,
+    pub input: Result<Value, String>
+} // Err = unparsable arguments
+pub struct ToolResult {
+    pub call_id: String,
+    pub name: String,
+    pub text: String,
+    pub is_error: bool
+}
 
-pub struct Request<'a> { pub model: &'a str, pub system: &'a str, pub tools: &'a [ToolSpec],
-                         pub turns: &'a [Turn], pub max_tokens: u32 }
+pub struct Request<'a> {
+    pub model: &'a str,
+    pub system: &'a str,
+    pub tools: &'a [ToolSpec],
+    pub turns: &'a [Turn],
+    pub max_tokens: u32
+}
 pub enum Stop { Done, ToolCalls, Truncated, Refused, Paused }
-pub struct Usage { pub input: u64, pub cached_input: u64, pub output: u64, pub reported: bool }
-pub struct Reply { pub turn: Turn /* Assistant */, pub stop: Stop, pub usage: Usage }
+pub struct Usage {
+    pub input: u64,
+    pub cached_input: u64,
+    pub output: u64,
+    pub reported: bool
+}
+pub struct Reply {
+    pub turn: Turn /* Assistant */,
+    pub stop: Stop,
+    pub usage: Usage
+}
 
 pub trait Provider: Send + Sync {          // pure: no I/O, so fixtures test it directly
     fn encode(&self, req: &Request) -> HttpCall;       // path, headers (without the key), JSON body
