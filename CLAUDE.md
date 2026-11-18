@@ -181,9 +181,11 @@ src/webhooks.rs    outgoing event webhooks: outbox worker (SKIP LOCKED), HMAC si
                    services/webhooks.rs = admin CRUD + emit() inside the event's transaction
 templates/         MiniJinja templates, embedded via include_str!
 static/            web-only CSS (style.css) / JS (app.js), embedded
-shared/            UI files of web UI and desktop app (css/skins.css, fonts/, js/viewer.js; rules in shared/README.md):
+shared/            UI files of web UI and desktop app (css/skins.css, css/assistant.css, fonts/, js/viewer.js, js/assistant.js,
+                   js/format.js + states.js + markdown.js + dom.js; rules and drift guards in shared/README.md):
                    served at /static/shared/… via a build.rs asset table (scripts under /static/shared/v/<version>/),
-                   mirrored into desktop/ui/static/shared by desktop/build.rs; SPDX MPL-2.0 header on every file
+                   mirrored into desktop/ui/static/shared by desktop/build.rs; SPDX MPL-2.0 header on every file;
+                   test-vectors/*.json pin the Rust twins (src/ui_vectors.rs) and the JS (scripts/shared-vectors.test.mjs)
 migrations/        sqlx migrations, embedded, applied on start
 tests/             end-to-end tests; tests/common creates a temporary database (with fixture project groups) per test
 tests/fixtures/cad openly licensed NIST CAD files (Inventor, NX, SolidWorks, Creo, CATIA V5, STEP) with manifest.tsv, checked by tests/cad_fixtures.rs

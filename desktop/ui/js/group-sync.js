@@ -2,7 +2,8 @@
 // TeamCraft Desktop – Whole project groups locally.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { api, call, dialog, enc, errorText, field, h, label, state, toast } from "./core.js";
+import { api, call, dialog, enc, errorText, field, h, state, toast } from "./core.js";
+import { label } from "/static/shared/js/format.js";
 import { freshProjects } from "./shell.js";
 
 // ------------------------------------------- whole project groups locally

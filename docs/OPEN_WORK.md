@@ -324,6 +324,20 @@ half a state behind. Prefer tests that fail on a real regression over tests that
   `tests/change_request_paths.rs` pins the REST paths), `desktop/ui/app.js` (~5000 → ES modules per view, no bundler) –
   desktop done (`desktop/ui/js/*.js`, `js/main.js` starts the app; `scripts/check-desktop-modules.mjs` in the CI job
   `ui` checks that every import resolves and every name of another module is imported)
+- [ ] **Shared UI without drift** (web UI and desktop app, `docs/src/research/shared-ui.md`,
+  `docs/src/dev/shared-ui.md`):
+  - [x] guards: the test vectors in `shared/test-vectors/` are run against the Rust (`src/ui_vectors.rs`) and the JS
+    side (`scripts/shared-vectors.test.mjs`); `check-desktop-modules.mjs` rejects a re-declared shared export; the CSS
+    ownership test, the `STYLED_TWICE` ratchet and the no-literal-colour test cover the stylesheets
+  - [x] labels, number, size and age formats, state glyphs and markdown-lite shared (`shared/js/format.js`,
+    `states.js`, `markdown.js`, `dom.js`); the desktop's own copies and its second markdown parser are removed
+  - [ ] `shared/css/components.css`, one family per PR, each shrinking `STYLED_TWICE`: badge/state glyph/lock/priority
+    (the desktop takes the shared badge builder and drops its SVG state icons), tables and tree rows,
+    card/stat/empty/notice, menu pop-up, lifecycle track (`done`/`current`/`future` on the desktop), thread/impact
+    group, viewer bar and legend
+  - [ ] the viewer as an ES module (`export function mount`), and the web's `<time>` rewrite via `format.js`
+  - [ ] widgets `menu.js`, `tabs.js`, `tree.js` and the icon sprite `shared/icons/sprite.svg`
+  - [ ] the component gallery: a hidden, admin-only `/dev/ui` page plus a debug-build desktop gallery
 - [ ] One request/response contract for web, REST and MCP where they do the same thing (e.g. BOM, where-used,
   change requests): shared view structs in `services::*` instead of three hand-built JSON/HTML shapes
 - [ ] Typed ids (`ItemId`, `RevisionId`, `ChangeId`, … as newtypes over `Uuid`) at the service boundary, so that ids

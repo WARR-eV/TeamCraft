@@ -2,7 +2,8 @@
 // TeamCraft Desktop – Import of a CAD folder tree.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, TAURI, api, append, call, dialog, enc, errorText, field, h, label, state, toast } from "./core.js";
+import { $, TAURI, api, append, call, dialog, enc, errorText, field, h, state, toast } from "./core.js";
+import { label } from "/static/shared/js/format.js";
 import { canEdit, canEditProject, freshProjects, refreshWorklistCount } from "./shell.js";
 import { activeProject, selectView } from "./navigator.js";
 import { table } from "./tabs.js";

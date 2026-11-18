@@ -287,10 +287,16 @@ code base. These are the most important rules:
       `skins_meet_contrast` and `dark_token_blocks_identical` (`src/domain.rs`)
       check the WCAG contrast and that the two dark blocks match.
     * **Shared UI files** (`shared/`): what both the web UI and the desktop
-      app use – skins, fonts, the 3D viewer. The server embeds the folder
+      app use – skins, fonts, the 3D viewer, the assistant, formatters. The server embeds the folder
       without a hand-written list (`build.rs`), the desktop build copies it;
       every `.css`/`.js`/`.svg` starts with
       `/* SPDX-License-Identifier: MPL-2.0 */`. Rules in `shared/README.md`.
+      A rule or component both apps need lives there **once**: labels,
+      formats, state glyphs and markdown-lite in `shared/js/`, pinned to
+      `shared/test-vectors/` together with their Rust twins. CI fails when an
+      app re-declares a shared function or restyles a shared class, and when a
+      new class is styled in both app stylesheets. Workflow:
+      [Shared UI](https://warr-ev.github.io/TeamCraft/dev/shared-ui.html).
     * **Density by tokens:** sizes of controls, rows and body text come from
       `--ctl-h`, `--ctl-h-sm`, `--row-h`, `--fs-body`, `--lh-body`; the web UI
       uses the defaults, the desktop app `data-density="compact"`. No

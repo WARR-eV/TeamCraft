@@ -3,11 +3,13 @@
 // server's assistant) or on a local ACP agent.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, api, append, call, clear, dialog, errorText, field, h, label, setStatus, state, toast, tool } from "./core.js";
+import { $, api, append, call, clear, dialog, errorText, field, h, setStatus, state, toast, tool } from "./core.js";
+import { markdown } from "/static/shared/js/markdown.js";
+import { label } from "/static/shared/js/format.js";
 import { refreshWorklistCount } from "./shell.js";
 import { navHead, selectView } from "./navigator.js";
 import { findTab, openTab, renderActive } from "./tabs.js";
-import { assistantContext, companyAi, companyAiBusy, companyAiWhere, companyPanel, markdownLite } from "./assistant.js";
+import { assistantContext, companyAi, companyAiBusy, companyAiWhere, companyPanel, itemLink } from "./assistant.js";
 import { openWorkspaceFolder } from "./workspace.js";
 
 // ======================================================================
@@ -301,7 +303,7 @@ export function schedulePaint(nav) {
     blocks.forEach(function (cur) {
       cur.dirty = false;
       clear(cur.body);
-      cur.body.appendChild(cur.kind === "thought" ? h("p", { text: cur.text }) : markdownLite(cur.text));
+      cur.body.appendChild(cur.kind === "thought" ? h("p", { text: cur.text }) : markdown(cur.text, itemLink));
     });
     if (blocks.length) scrollAgent();
     if (agent.navDirty) {

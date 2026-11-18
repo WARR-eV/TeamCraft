@@ -1,0 +1,14 @@
+{
+  "about": "State → glyph shown before its label (badge) or alone (state glyph). An unknown state has no glyph. Pinned by src/ui_vectors.rs (the glyph filter behind macros.html) and scripts/shared-vectors.test.mjs (shared/js/states.js).",
+  "glyphs": {
+    "released": "✓", "approved": "✓", "accepted": "✓", "implemented": "✓", "pass": "✓", "sent": "✓",
+    "up_to_date": "✓", "unchanged": "✓",
+    "in_review": "○", "pending": "○", "in_triage": "○", "retrying": "○", "out_of_date": "○",
+    "modified": "○", "outdated": "○",
+    "rejected": "×", "fail": "×", "failed": "×", "conflict": "×", "clash": "×",
+    "obsolete": "–", "cancelled": "–", "withdrawn": "–", "deferred": "–", "missing": "–",
+    "in_work": "◐", "draft": "◐", "new": "◐",
+    "high": "▲", "critical": "▲▲"
+  },
+  "unknown": ["low", "normal", "admin", "lock", "state_from_a_newer_server", ""]
+}

@@ -2,7 +2,8 @@
 // TeamCraft Desktop – Change requests (ECR).
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { REQUEST_REASONS, TAURI, api, append, badge, call, confirmDialog, dialog, enc, errorText, field, fmtDate, fmtSize, h, invoke, label, moreMenu, priorityBadge, run, setStatus, toast, tool, toolGroup } from "./core.js";
+import { REQUEST_REASONS, TAURI, api, append, badge, call, confirmDialog, dialog, enc, errorText, field, h, invoke, moreMenu, priorityBadge, run, setStatus, toast, tool, toolGroup } from "./core.js";
+import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
 import { refreshWorklistCount, watchTool } from "./shell.js";
 import { openTab, reloadActive, renderTabs, table } from "./tabs.js";
 import { dd, dt, openRevision } from "./revision.js";

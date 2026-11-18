@@ -2,7 +2,8 @@
 // TeamCraft Desktop – References and change propagation; changes and history of a revision.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { api, badge, confirmDialog, dialog, enc, field, fmtDate, h, label, run, state, toast } from "./core.js";
+import { api, badge, confirmDialog, dialog, enc, field, h, run, state, toast } from "./core.js";
+import { fmtDate, label } from "/static/shared/js/format.js";
 import { canEditProject, refreshWorklistCount } from "./shell.js";
 import { selectView } from "./navigator.js";
 import { reloadActive, table } from "./tabs.js";

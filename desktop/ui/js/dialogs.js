@@ -2,7 +2,8 @@
 // TeamCraft Desktop – Dialogs: new item, settings, about.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, ITEM_TYPES, TAURI, api, call, dialog, errorText, field, h, label, materialField, setStatus, state, toast } from "./core.js";
+import { $, ITEM_TYPES, TAURI, api, call, dialog, errorText, field, h, materialField, setStatus, state, toast } from "./core.js";
+import { label } from "/static/shared/js/format.js";
 import { canEdit, canEditProject, freshProjects, refreshWorklistCount } from "./shell.js";
 import { activeProject, selectView } from "./navigator.js";
 import { openRevision } from "./revision.js";

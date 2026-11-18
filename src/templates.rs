@@ -73,6 +73,9 @@ pub fn environment(instance_name: &str) -> Result<Environment<'static>, minijinj
     env.add_filter("sig", filter_sig);
     env.add_filter("filesize", filter_filesize);
     env.add_filter("label", filter_label);
+    env.add_filter("glyph", |value: Option<String>| {
+        crate::domain::state_glyph(value.as_deref().unwrap_or_default())
+    });
     env.add_filter("urlencode", |value: String| util::pct_encode(&value));
     env.add_filter("age", filter_age);
     env.add_global("instance_name", instance_name.to_string());
@@ -121,7 +124,7 @@ fn filter_num(value: Option<f64>, decimals: Option<usize>) -> String {
 
 /// A number with exactly `decimals` places (default 2), so a column of
 /// costs or masses lines up at the decimal point; `—` when missing.
-fn filter_fixed(value: Option<f64>, decimals: Option<usize>) -> String {
+pub(crate) fn filter_fixed(value: Option<f64>, decimals: Option<usize>) -> String {
     match value {
         Some(v) => format!("{v:.prec$}", prec = decimals.unwrap_or(2)),
         None => "—".to_string(),
@@ -149,7 +152,7 @@ fn filter_filesize(value: i64) -> String {
 }
 
 /// `in_review` → `In Review`; a few codes have fixed labels (`in_work` → `WIP`).
-fn filter_label(value: Option<String>) -> String {
+pub(crate) fn filter_label(value: Option<String>) -> String {
     let Some(value) = value else {
         return String::new();
     };

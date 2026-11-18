@@ -5,6 +5,7 @@
 import { showConnect } from "./connect.js";
 import { agent } from "./agent.js";
 import { projectItems } from "./group-sync.js";
+import { label } from "/static/shared/js/format.js";
 
 export var TAURI = window.__TAURI__;
 export var invoke = TAURI.core.invoke;
@@ -237,33 +238,6 @@ export function moreMenu(items) {
   return wrap;
 }
 moreMenu.seq = 0;
-
-export function fmtDate(iso) {
-  if (!iso) return "—";
-  var d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
-}
-
-export function fmtSize(bytes) {
-  if (bytes === null || bytes === undefined) return "—";
-  var units = ["B", "KiB", "MiB", "GiB"];
-  var v = bytes, i = 0;
-  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
-  return (i === 0 ? v : v.toFixed(1)) + " " + units[i];
-}
-
-export function fmtNum(v, digits) {
-  if (v === null || v === undefined) return "—";
-  return Number(v).toLocaleString(undefined, { maximumFractionDigits: digits === undefined ? 3 : digits });
-}
-
-export var LABELS = { in_work: "WIP", in_review: "In Review", editor: "CAD editor" };
-export function label(code) {
-  if (!code) return "";
-  if (LABELS[code]) return LABELS[code];
-  return String(code).split("_").map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(" ");
-}
 
 export function badge(value, text) {
   var icon = null;

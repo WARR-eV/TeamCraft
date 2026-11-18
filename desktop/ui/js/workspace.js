@@ -2,7 +2,8 @@
 // TeamCraft Desktop – 3D viewer, workspace, check-out/in, edit, release, revise.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, api, badge, call, clear, confirmDialog, dialog, enc, errorText, field, fmtDate, fmtSize, h, invoke, label, lockBadge, materialField, run, setStatus, state, toast, tool } from "./core.js";
+import { $, api, badge, call, clear, confirmDialog, dialog, enc, errorText, field, h, invoke, lockBadge, materialField, run, setStatus, state, toast, tool } from "./core.js";
+import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
 import { isCancelled, refreshWorklistCount, uploadLine } from "./shell.js";
 import { reloadActive, renderActive, table } from "./tabs.js";
 import { PROGRAM_LABEL, cadPrograms, dd, exportProgram, exportStep, openRevision, previewFormat, revisionAbilities } from "./revision.js";
