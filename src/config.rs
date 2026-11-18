@@ -98,6 +98,8 @@ pub const KNOWN_VARIABLES: &[&str] = &[
     "TEAMCRAFT_DB_PORT",
     "TEAMCRAFT_DB_SSLMODE",
     "TEAMCRAFT_DB_USER",
+    "TEAMCRAFT_DEMO_PASSWORD",
+    "TEAMCRAFT_DEMO_USER",
     "TEAMCRAFT_ENV_FILE",
     "TEAMCRAFT_INSTANCE_NAME",
     "TEAMCRAFT_LOCAL_AGENTS",
@@ -304,6 +306,8 @@ pub struct Config {
     pub log_format: LogFormat,
     /// Initial administrator that is created when the database has no users.
     pub bootstrap_admin: Option<BootstrapAdmin>,
+    /// The read-only account of a hosted live demo; `None` = no demo.
+    pub demo: Option<DemoAccount>,
     /// Single sign-on via OpenID Connect (Authentik). `None` = disabled.
     pub oidc: Option<OidcConfig>,
     /// Whether username/password login for local accounts is offered.
@@ -832,6 +836,17 @@ pub struct BootstrapAdmin {
     pub password: String,
 }
 
+/// The public account of a hosted live demo (`TEAMCRAFT_DEMO_USER`,
+/// `TEAMCRAFT_DEMO_PASSWORD`): anybody signs in with it and may look at
+/// everything it may read, but every change is refused
+/// (`auth::refuse_demo_write`). The password is shown on the login page – it
+/// is public by design, not a secret.
+#[derive(Clone)]
+pub struct DemoAccount {
+    pub username: String,
+    pub password: String,
+}
+
 #[derive(Clone)]
 pub struct OidcConfig {
     /// Issuer URL, e.g. `https://auth.example.org/application/o/teamcraft/`.
@@ -1063,6 +1078,28 @@ impl Config {
             bail!("no login method enabled: configure TEAMCRAFT_OIDC_ISSUER_URL or set TEAMCRAFT_LOCAL_LOGIN=true");
         }
 
+        // a hosted live demo: one public, read-only local account
+        let demo = match env
+            .get("TEAMCRAFT_DEMO_USER")?
+            .map(|u| u.trim().to_ascii_lowercase())
+            .filter(|u| !u.is_empty())
+        {
+            None => None,
+            Some(username) => {
+                if !local_login {
+                    bail!("TEAMCRAFT_DEMO_USER needs local sign-in (TEAMCRAFT_LOCAL_LOGIN=true)");
+                }
+                let password = env.get("TEAMCRAFT_DEMO_PASSWORD")?.unwrap_or_default();
+                if password.chars().count() < 10 {
+                    bail!(
+                        "TEAMCRAFT_DEMO_PASSWORD (shown on the login page) must have at least 10 \
+                         characters when TEAMCRAFT_DEMO_USER is set"
+                    );
+                }
+                Some(DemoAccount { username, password })
+            }
+        };
+
         let mattermost_error_webhook = env.get("MATTERMOST_ERROR_WEBHOOK")?;
         if let Some(url) = &mattermost_error_webhook {
             if !(url.starts_with("https://") || url.starts_with("http://")) {
@@ -1177,6 +1214,7 @@ impl Config {
             cookie_secure,
             log_format,
             bootstrap_admin,
+            demo,
             oidc,
             local_login,
             setup_without_code: false,
@@ -1188,6 +1226,13 @@ impl Config {
             local_agents,
             webhooks,
         })
+    }
+
+    /// Whether `username` is the public account of a hosted live demo.
+    pub fn is_demo_user(&self, username: &str) -> bool {
+        self.demo
+            .as_ref()
+            .is_some_and(|d| d.username.eq_ignore_ascii_case(username.trim()))
     }
 
     /// Password-free summary for the startup log.
@@ -1434,6 +1479,45 @@ mod tests {
         assert_eq!(cfg.database_display, "teamcraft@localhost:5432/teamcraft");
         assert_eq!(cfg.database_password.as_deref(), Some("secret"));
         assert!(!cfg.summary().contains("secret"));
+        assert!(cfg.demo.is_none(), "no live demo by default");
+    }
+
+    #[test]
+    fn a_live_demo_needs_a_shown_password_and_local_sign_in() {
+        let cfg = config_from(&[
+            ("TEAMCRAFT_DEMO_USER", " Demo "),
+            ("TEAMCRAFT_DEMO_PASSWORD", "try-teamcraft"),
+        ])
+        .unwrap();
+        assert!(cfg.is_demo_user("demo") && cfg.is_demo_user("DEMO"));
+        assert!(!cfg.is_demo_user("admin"));
+        let err = config_from(&[("TEAMCRAFT_DEMO_USER", "demo")])
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(err.contains("TEAMCRAFT_DEMO_PASSWORD"), "{err}");
+        let short = config_from(&[
+            ("TEAMCRAFT_DEMO_USER", "demo"),
+            ("TEAMCRAFT_DEMO_PASSWORD", "short"),
+        ]);
+        assert!(short.is_err());
+        let sso_only = config_from(&[
+            ("TEAMCRAFT_DEMO_USER", "demo"),
+            ("TEAMCRAFT_DEMO_PASSWORD", "try-teamcraft"),
+            ("TEAMCRAFT_OIDC_ISSUER_URL", "https://auth.example.org/"),
+            ("TEAMCRAFT_OIDC_CLIENT_ID", "teamcraft"),
+            ("TEAMCRAFT_OIDC_CLIENT_SECRET", "s"),
+        ]);
+        assert!(sso_only
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("local sign-in"));
+        // an empty user name is no demo
+        assert!(config_from(&[("TEAMCRAFT_DEMO_USER", " ")])
+            .unwrap()
+            .demo
+            .is_none());
     }
 
     #[test]

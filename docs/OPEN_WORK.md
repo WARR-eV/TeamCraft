@@ -358,6 +358,11 @@ half a state behind. Prefer tests that fail on a real regression over tests that
 
 **Operations and repository**
 
+- [ ] Host the live demo (**maintainer action**). Ready in the code: the read-only demo account
+  (`TEAMCRAFT_DEMO_USER`, `TEAMCRAFT_DEMO_PASSWORD`), `scripts/seed-demo.sh` (the README demo data) and
+  `deploy/demo/demo.sh` (snapshot, nightly reset). Left: server, DNS, TLS, seed, snapshot, cron – the runbook is
+  [docs/src/admin/live-demo.md](src/admin/live-demo.md) – then link the demo from the top of the README and from
+  `docs/src/index.md`.
 - [ ] Test e-mail (SMTP) and Mattermost notifications against real servers (so far only against fakes)
 - [ ] Enable private vulnerability reporting (*Settings → Code security → Private vulnerability reporting*), which
   `SECURITY.md` points to
@@ -624,7 +629,7 @@ real files and belong to section 3 once such files are at hand.
 
 **Siemens NX**
 
-- [ ] (research first) How other PLMs connect NX (native vs. Teamcenter NX Manager), licences (student/academic) and
+- [ ] (research first) How other PLMs connect NX (native vs. through a PLM integration), licences (student/academic) and
   what is feasible for an open-source project
 - [ ] Folder import for the master model concept: the drawing `*_dwg*.prt` belongs into the item of the model
 - [ ] Test the BOM import with real NX BOM exports
@@ -633,7 +638,7 @@ real files and belong to section 3 once such files are at hand.
 
 ### 5. Feature demand (backlog)
 
-What users ask of PLM/PDM systems (reviews of Teamcenter, Vistapoint, Dokuly, OdooPLM and others, Siemens community
+What users ask of PLM/PDM systems (reviews of commercial and open-source PLM/PDM systems, vendor community
 enhancement requests), reduced to what TeamCraft does not have yet; what is present or done is left out. Entries
 that need the CAD programs themselves (add-ins, generated drawings) are listed too – they need a Windows machine
 with licensed CAD software to build and test. Like section 4, these are candidates, not commitments: a feature
@@ -734,7 +739,7 @@ needs an issue with a reason first (see *Direction*).
 - [ ] CAD clone workflows: clone an assembly with selective reuse, Save As / revise per component over a whole
   structure, shown as an indented tree
 - [ ] Interactive onboarding and contextual help
-- [ ] Migration tooling from Teamcenter, Windchill, Aras and SOLIDWORKS PDM
+- [ ] Migration tooling from commercial PLM/PDM systems
 - [ ] GA proofs: production readiness, migration and concurrency safety, scale validation, external security review,
   support and versioning policy
 
@@ -887,7 +892,7 @@ The history up to the open-source release is squashed into the first commit
 | –  | Preview images of native Inventor, Solid Edge and SolidWorks files                                                                                                    | `457e03d`            |
 | –  | Desktop: one workspace folder per project group; import of existing CAD folders                                                                                       | `8bf8e65`, `9557ffa` |
 | –  | Skins without distribution logos                                                                                                                                      | `099737e`            |
-| –  | Teamcenter working features: favorites, saved searches, Save As, BOM comparison                                                                                       | `9289aa4`            |
+| –  | Common PLM working features: favorites, saved searches, Save As, BOM comparison                                                                                       | `9289aa4`            |
 | –  | Release readiness of change orders: unreleased BOM children and references block the submit, *Add all* (web, API, desktop)                                            | `5c5b3fd`            |
 | –  | Work-in-progress / no-warranty notices (README, docs, web footer, desktop), `CONTRIBUTING.md`, `SECURITY.md`                                                          | `5c8eff3`            |
 | –  | Similar part search by 3D shape signature                                                                                                                             | `03f94dd`            |

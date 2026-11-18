@@ -3,6 +3,7 @@
     "defaultMode": "dontAsk",
     "allow": [
       "Search",
+      "WebFetch",
       "WebSearch",
       "Read(./**)",
       "Edit(./**)",

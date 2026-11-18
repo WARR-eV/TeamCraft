@@ -1,4 +1,4 @@
-//! BOM comparison between two revisions (Teamcenter's structure compare):
+//! BOM comparison between two revisions (structure compare):
 //! which lines were added, removed or changed (quantity, find number, notes
 //! and, over all levels, the resolved child revision). Lines are matched by
 //! child item and find number first, then by child item. Over all levels, the

@@ -207,8 +207,7 @@ For the rest TeamCraft shows what other PLM systems show:
 * **3D from a STEP export.** Attach a STEP export next to the native file.
   The desktop app on Windows creates it with your own Inventor or Solid Edge
   – the *STEP* button in the workspace or the option at check-in, like the
-  Inventor add-in of Autodesk Vault or the Solid Edge integration of
-  Teamcenter. It uses your licence (student licences included, within their
+  CAD add-ins of other PDM systems. It uses your licence (student licences included, within their
   terms); TeamCraft contains no Autodesk or Siemens software.
 
 ## Full-text search

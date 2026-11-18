@@ -240,7 +240,12 @@ pub async fn login_submit(
         ));
     }
     let client = auth::client_address(&headers, peer.map(|Extension(ConnectInfo(a))| a.ip()));
-    let keys = auth::SignInThrottle::keys(&form.username, client);
+    let mut keys = auth::SignInThrottle::keys(&form.username, client);
+    // The live demo's public account: a stranger's wrong passwords must not
+    // lock every visitor out, so only the per-address limit counts for it.
+    if st.config.is_demo_user(&form.username) {
+        keys.retain(|k| !k.starts_with("user:"));
+    }
     let branding = crate::services::branding::current(&st.db)
         .await
         .unwrap_or_default();

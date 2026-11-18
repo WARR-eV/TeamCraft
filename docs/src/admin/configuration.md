@@ -153,6 +153,7 @@ limit still are). Every variable also exists as `NAME_FILE`.
 | `TEAMCRAFT_BOOTSTRAP_ADMIN_USERNAME`, `TEAMCRAFT_BOOTSTRAP_ADMIN_PASSWORD` | `admin` / –                       | create this administrator on start when there are no accounts (public servers)                                                                                                                                                                          |
 | `TEAMCRAFT_OIDC_*`                                                         | –                                 | single sign-on, see [Users, roles and SSO](users.md) – also `TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS` (idle lifetime of SSO users' new tokens, `0` = off) and the back-channel logout URI                                                                       |
 | `TEAMCRAFT_APPROVAL_REAUTH`                                                | `off`                             | a fresh sign-in to sign off review decisions in the browser: `release` (every approval) or `every_decision` (approvals and rejections); see below                                                                                                       |
+| `TEAMCRAFT_DEMO_USER`, `TEAMCRAFT_DEMO_PASSWORD`                           | – (no demo)                       | a hosted **live demo**: the public local account and its password, shown on the login page (at least 10 characters; public, not a secret). That account reads everything it may read, every change is refused (403); see [Live demo](live-demo.md) |
 
 **Sign-off of review decisions.** With `TEAMCRAFT_APPROVAL_REAUTH` a reviewer
 confirms a decision on the change page with the account password, or – for
@@ -171,7 +172,9 @@ Failed password sign-ins are counted per username and per client address
 for 15 minutes from the first failure; when a counter is full the sign-in
 page answers `429 Too Many Requests` with `Retry-After` – even for the right
 password – until the 15 minutes have passed. A successful sign-in clears the
-username's counter. The counters live in the memory of each server process (a restart clears them). Behind a reverse
+username's counter. The public account of a live demo (`TEAMCRAFT_DEMO_USER`)
+is counted per client address only, so nobody can lock every visitor out with
+wrong passwords. The counters live in the memory of each server process (a restart clears them). Behind a reverse
 proxy on the same host or an
 internal network, the client address is the last `X-Forwarded-For` entry,
 the one the proxy added; a client that talks to the server directly is

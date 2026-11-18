@@ -690,7 +690,7 @@ async fn every_page_renders_for_an_admin() {
     for expected in [
         "SolidWorks",
         "Siemens NX",
-        "Teamcenter",
+        "PLM XML",
         ".catproduct",
         ".f3d",
         ".x_t",

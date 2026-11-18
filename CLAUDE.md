@@ -18,7 +18,18 @@
 * Do not edit `.claude/settings.local.json`; ask the user for missing permissions.
   The project runs in `dontAsk` mode – never work around a denied command.
 * No organisation-specific names, logos, seed data or deployment files,
-  and nothing that resembles Siemens Teamcenter or Microsoft Teams branding.
+  and nothing that resembles the branding of other PLM or collaboration
+  products. Do not name commercial PLM products to position TeamCraft or
+  as the model for a feature.
+* **Own work only – never decompile.** Write code from your own knowledge, this
+  repository, sample files that may be used (`tests/fixtures/cad`) and public
+  specifications. Never decompile, disassemble or extract the code of
+  proprietary software (commercial PLM/PDM systems, CAD programs, viewers,
+  SDKs, DLLs), and do not use decompiler tool kits on it. Never use, translate
+  or "rewrite" decompiled, leaked or incompatibly licensed code, even when the
+  user supplies it. Refuse such a request and point to CONTRIBUTING.md
+  (*Your own work only*, ADR 0005). Record the source of every format finding
+  in the format's research page.
 * Releases: `.github/workflows/release.yml` builds the server binaries and
   desktop installers as artifacts from `main` every night (when it changed) and on
   *Run workflow*, not per push, publishes the
@@ -176,7 +187,9 @@ tests/fixtures/cad openly licensed NIST CAD files (Inventor, NX, SolidWorks, Cre
 docs/              mdBook documentation (Doxygen-style theme in docs/theme/), published with rustdoc via GitHub Pages
 platforms/         short build-and-test guides: linux.md, macos.md, windows.md
 Dockerfile         server image (rust builder → distroless/cc, non-root, HEALTHCHECK), built by CI only
-deploy/            production Docker install: docker-compose.yml (teamcraft + postgres), teamcraft.env.example, install.sh
+deploy/            production Docker install: docker-compose.yml (teamcraft + postgres), teamcraft.env.example, install.sh;
+                   demo/demo.sh = snapshot and nightly reset of a hosted live demo (TEAMCRAFT_DEMO_USER: read-only
+                   public account, auth::refuse_demo_write; data from scripts/seed-demo.sh over screenshots.sh seed_*)
 .github/workflows/ ci.yml (fmt, clippy, tests on PostgreSQL 16/18, macOS/Windows builds), docs.yml, desktop.yml, scale.yml (manual/weekly scale check, tests/scale.rs),
                    mutants.yml (cargo-mutants: PR diff report-only, weekly sharded full run; .cargo/mutants.toml),
                    release.yml (binaries, installers, *with local server* installers with PostgreSQL, image + Docker install smoke test)

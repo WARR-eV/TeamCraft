@@ -3,7 +3,7 @@
 //! * STEP (`.step`, `.stp`, `.p21`) and IGES (`.iges`, `.igs`): the quoted strings of
 //!   the file – product names, descriptions, authors, organisation, layer and
 //!   entity names – without the numeric geometry.
-//! * Plain text formats (txt, md, csv, json, xml, yaml, log, Teamcenter PLM XML,
+//! * Plain text formats (txt, md, csv, json, xml, yaml, log, PLM XML,
 //!   OpenSCAD, motor thrust curves, …): the text itself, line by line, with its
 //!   decimal numbers – a text or CSV report reads like a PDF one (charset: byte
 //!   order mark, (mostly valid) UTF-8, else Windows-1252).

@@ -208,6 +208,12 @@ workflow annotation on GitHub) for every image the README shows that the run
 did not make – the run itself does not fail. Without `DESKTOP_APP` the
 `desktop-*.png` images are among them.
 
+The data loading lives in the script's `seed` and `seed_*` functions, apart
+from the captures: `scripts/seed-demo.sh` sources the script (it captures
+nothing when sourced) to load the same data into the hosted live demo
+([Live demo](docs/src/admin/live-demo.md)). Keep new demo data in a `seed_*`
+function, so the screenshots and the demo stay alike.
+
 To run it locally against a throw-away database and vault (Chrome and a
 matching chromedriver installed):
 
@@ -335,6 +341,85 @@ Do not add logos, artwork or branding of other products, and nothing that
 imitates the look of another vendor's software. Product names may be used to
 describe compatibility, for example "reads SolidWorks files".
 
+## Your own work only – no decompiled code
+
+Every contribution – code, tests, fixtures, documentation – must be the
+contributor's own work, written from their own skills and knowledge, or come
+from a source whose licence allows it (see above) and be credited as such.
+This applies in exactly the same way to code that an **AI agent** writes for
+you: it has to come from the agent's general knowledge and from material it
+may use, never from someone else's program code.
+
+**Not allowed, in no form and by nobody – neither people nor AI agents:**
+
+* **Decompiling, disassembling or otherwise extracting the program code of
+  proprietary software** – for example a commercial PLM or PDM system, a CAD
+  program, its viewers, SDKs, plug-ins, DLLs, .NET assemblies, Java archives
+  or firmware – and contributing anything that comes out of it: decompiled or
+  disassembled code, pseudocode, code translated into Rust, "cleaned up",
+  renamed, restructured or otherwise rewritten from it (by hand or by an AI
+  agent), and tables, constants or algorithms lifted from it. Rewriting code
+  that was decompiled does not make it your own work; even slightly changed
+  copies can infringe the original's copyright.
+* **Handing decompiled output to an AI agent** to "rewrite" or "re-implement"
+  it, asking an agent to decompile a program for this repository, or pointing
+  reverse-engineering tool kits (decompilers, disassemblers, agent tools built
+  on them) at proprietary programs for it.
+* **"Clean room" by decompilation.** TeamCraft does not accept the two-team
+  method either, where one person or agent decompiles a program and writes a
+  specification and another writes the code from it: the specification still
+  comes from the program's code, and with AI agents nobody can show that the
+  separation held.
+* **Leaked or confidential source code and documents** – vendor source code,
+  SDK headers, samples or manuals under a licence or NDA that does not allow
+  this use – and code copied, ported or translated from other projects whose
+  licence is not compatible with the MPL-2.0. If you have seen a vendor's
+  source code (for example as an employee) or are bound by an NDA about a
+  program, do not work on reading that program's files.
+
+**Why.** Most end-user licence agreements forbid decompiling the program,
+and copyright protects the program code itself. Where a law permits
+decompilation at all – narrowly, for example to achieve interoperability –
+it does not permit publishing the result or using it to write a similar
+program. A single such contribution could expose TeamCraft and everyone who
+distributes it to copyright and licence claims, and would force the project
+to remove the feature and rewrite the Git history.
+
+**What is allowed – this is how TeamCraft's readers of native formats are
+built:**
+
+* studying **files**: sample files that may be used (the openly licensed NIST
+  models in `tests/fixtures/cad`, files you made yourself with a program you
+  are licensed for) and what a program writes into them – a file format is
+  analysed from its data, never from the program's code;
+* **public specifications and standards** (STEP / ISO 10303, JT / ISO 14306,
+  published format documentation) and openly licensed code under a compatible
+  licence, credited in the README's licence table (as `vendor/openskp`);
+* comparing the **documented behaviour or output** of a program you use
+  legally – for example an export of the same model – without looking at its
+  code.
+
+Write down how a format was decoded in its research page in
+`docs/src/research/` – for each finding its source (which sample file, which
+section of which specification, which experiment) and whether it is
+confirmed or still a guess – so anyone can check the clean origin instead of
+taking it on faith.
+
+**AI agents** working on this repository follow the same rules: write the
+code from general knowledge, the repository's own code and documentation,
+the sample files and public specifications; refuse to decompile or
+disassemble proprietary programs or to use their output; and say so when a
+request would need it. If an agent produces something that looks copied –
+long verbatim passages, another code base's identifiers or comments, vendor
+names in internal symbols – do not submit it.
+
+**When in doubt, ask** in the issue before you write the code. A contribution
+that turns out to contain decompiled, leaked or incompatibly licensed code is
+removed – with a rewrite of the history if needed – and its author may be
+excluded from the project (see the [Code of Conduct](CODE_OF_CONDUCT.md)).
+Report a suspected case to the maintainers in an issue, or privately as
+described in [SECURITY.md](SECURITY.md).
+
 ## Commits and pull requests
 
 1. Fork the repository and create a branch from `main`.
@@ -346,7 +431,8 @@ describe compatibility, for example "reads SolidWorks files".
    [docs/OPEN_WORK.md](docs/OPEN_WORK.md).
 5. Open the pull request against `main`, describe what changed and how you
    tested it, and link the issue. CI has to pass before the pull request is
-   merged (see below).
+   merged (see below). The pull request template asks you to confirm that the
+   contribution is your own work and contains no decompiled code.
 
 ### Merging
 
@@ -377,9 +463,12 @@ not enough, because it stays in the history.
 ## Licence of contributions
 
 TeamCraft has no contributor licence agreement. By submitting a contribution,
-you confirm that you wrote it or have the right to submit it. You also agree
-that it is licensed under the [Mozilla Public License 2.0](LICENSE), like the
-rest of the project.
+you confirm that you wrote it (or your AI agent did, from its own knowledge)
+or have the right to submit it, and that it contains no code decompiled,
+disassembled or rewritten from proprietary software and no leaked or
+incompatibly licensed code (see [Your own work only](#your-own-work-only--no-decompiled-code)).
+You also agree that it is licensed under the [Mozilla Public License 2.0](LICENSE),
+like the rest of the project.
 
 ## Releases and versions
 

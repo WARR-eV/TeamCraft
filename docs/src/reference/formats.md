@@ -54,7 +54,7 @@ that are not in TeamCraft are left out, and so are components on a layer
 the assembly's layer settings hide (read from `/Root/UG_PART/UG_PART`), as
 in NX. Drawings have no 3D preview.
 
-Stand-alone `.jt` files (Teamcenter visualisation, exports of NX, CATIA,
+Stand-alone `.jt` files (PLM visualisation, exports of NX, CATIA,
 Creo):
 
 - **JT 10** (`src/mesh/jt10.rs`) carries parts and assembly in one file. The

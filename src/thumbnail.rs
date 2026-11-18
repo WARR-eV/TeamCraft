@@ -1,5 +1,5 @@
 //! Preview images that CAD programs store inside their own files – the
-//! thumbnails Autodesk Vault or Teamcenter show for native files (findings in
+//! thumbnails PDM systems show for native files (findings in
 //! `docs/src/research/cad-previews.md`). Only the image is read, never the
 //! geometry:
 //!

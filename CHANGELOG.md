@@ -13,8 +13,46 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Added
+
+- Contribution rule **own work only – no decompiled code**: code
+  decompiled, disassembled or rewritten from proprietary software, a "clean
+  room" through decompilation, and leaked or incompatibly licensed code are not accepted,
+  from people or from AI agents. Formats are decoded from sample files and
+  public specifications, and each finding's source is recorded in its
+  research page. The rule is in CONTRIBUTING.md (full), README and the book's
+  start page (short), CODE_OF_CONDUCT.md (with enforcement), ADR 0005,
+  CLAUDE.md and a new pull request template with a confirmation checkbox.
+- Everything for a hosted **live demo** (runbook: *Live demo* in the admin
+  guide). `TEAMCRAFT_DEMO_USER` and `TEAMCRAFT_DEMO_PASSWORD` make one local
+  account public and read-only: the login page shows it, every page carries a
+  *Live demo* banner, and every request of that account that is not
+  `GET`/`HEAD` is refused (403, sign-out excepted) in the web UI and the REST
+  API; wrong passwords for it count per client address only, so it cannot be
+  locked. `scripts/seed-demo.sh` loads the demo data of the README
+  screenshots (now reusable: `scripts/screenshots.sh` seeds in its own
+  `seed_*` functions and takes an existing administrator through
+  `ADMIN_PASSWORD_FILE`) and creates the account; `deploy/demo/demo.sh`
+  snapshots the seeded database and resets it to the snapshot every night.
+
 ### Changed
 
+- TeamCraft no longer presents itself as an alternative to a particular
+  commercial product: the README tagline now says only that the project is a
+  work in progress. The desktop import tutorial, the user guide and code
+  comments describe features without comparing them to one vendor's PLM
+  system. The research page is now *Popular features of commercial PLM
+  systems* (`research/plm-working-features.md`), and the other research
+  pages compare with "enterprise PLM" in general.
+- File formats: JT (`jt`) now belongs to *Visualisation formats* and PLM XML
+  (`plmxml`, label *PLM XML (product structure)*) to *Neutral exchange
+  formats*. The separate CAD-program entry for them is gone, so the
+  system id `teamcenter` no longer exists in `/formats`, the search filter
+  or the API's format list. A saved web search with that filter shows all
+  items; `GET /api/v1/items?system=teamcenter` answers 400 like any other
+  unknown program. Format ids and stored files are unchanged, and both
+  formats stay neutral (never collapsed). The comments of migrations 0007 and
+  0012 were edited (`db::EDITED_BEFORE_RELEASE`, no schema change).
 - Release workflow about 10 minutes shorter (29 → about 18): the macOS
   installer *with local server* compiled its server itself, but only after
   the slowest `server` build (Windows, 12 minutes) had finished, because the

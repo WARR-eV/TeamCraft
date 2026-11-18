@@ -4632,8 +4632,8 @@ async fn jt_files_show_their_assembly_in_3d() {
     app.teardown().await;
 }
 
-/// The most used Teamcenter working features: favorites, saved
-/// searches, Save As and the BOM comparison.
+/// The most used PLM working features: favorites, saved searches,
+/// Save As and the BOM comparison.
 #[tokio::test]
 async fn favorites_searches_save_as_and_bom_compare() {
     let app = app_or_skip!();

@@ -10,7 +10,7 @@
   Check your CAD data out and in, keep every version, release with reviews,
   follow changes through assemblies and see STEP, NX, mesh and point-cloud models
   in 3D – in the browser, in the desktop app or through the REST API.<br />
-  <em>Work in progress: an open-source alternative to Siemens Teamcenter.</em>
+  <em>Work in progress: there is no stable release yet.</em>
 </p>
 
 <div align="center">
@@ -500,6 +500,12 @@ setup, the checks CI runs, the code conventions and the licence of
 contributions. Report security problems privately, as described in
 [SECURITY.md](SECURITY.md). Open work and known gaps are listed in
 [docs/OPEN_WORK.md](docs/OPEN_WORK.md).
+
+**Your own work only.** Contributions must come from your own (or your AI
+agent's own) skills and knowledge. Never contribute code decompiled,
+disassembled or rewritten from proprietary software, and never leaked code. TeamCraft reads CAD formats
+from sample files and public specifications, never from anyone's program code
+([details](CONTRIBUTING.md#your-own-work-only--no-decompiled-code)).
 
 ## Licence
 

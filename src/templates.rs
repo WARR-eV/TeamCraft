@@ -577,6 +577,28 @@ mod tests {
             "error.html",
             json!({ "status": 404, "reason": "Not Found", "message": "gone", "flash": null, "local_login": true }),
         );
+        // a hosted live demo: the account on the login page, the banner on every page
+        let demo = json!({ "username": "demo", "password": "try-it-<out>" });
+        let html = render(
+            &env,
+            "login.html",
+            json!({ "next": "/", "next_encoded": "%2F", "error": null, "oidc_name": null,
+                    "username": "", "local_login": true, "flash": null, "demo": demo }),
+        );
+        assert!(html.contains("Sign in to the live demo as"), "{html}");
+        assert!(
+            html.contains("try-it-&lt;out&gt;"),
+            "the password is escaped"
+        );
+        assert!(html.contains("value=\"demo\""), "the username is filled in");
+        assert!(html.contains("class=\"demo-banner\""));
+        let html = render(
+            &env,
+            "error.html",
+            json!({ "status": 403, "reason": "Forbidden", "message": "read-only", "flash": null,
+                    "local_login": true, "demo": demo }),
+        );
+        assert!(html.contains("class=\"demo-banner\"") && html.contains("Live demo"));
         let html = render(
             &env,
             "error.html",

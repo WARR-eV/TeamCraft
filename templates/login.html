@@ -46,10 +46,14 @@
     {% if oidc_name and local_login %}<div class="divider">or with a local account</div>{% endif %}
 
     {% if local_login %}
+    {% if demo %}
+    <div class="notice demo-account" role="note">Sign in to the live demo as <strong class="mono">{{ demo.username }}</strong>
+      with the password <strong class="mono">{{ demo.password }}</strong> – read-only, nothing can be changed.</div>
+    {% endif %}
     <form class="stack" method="post" action="/login">
       <input type="hidden" name="next" value="{{ next }}">
       <label>Username
-        <input type="text" name="username" value="{{ username }}" autocomplete="username" required autofocus>
+        <input type="text" name="username" value="{{ username or (demo.username if demo else '') }}" autocomplete="username" required autofocus>
       </label>
       <label>Password
         <input type="password" name="password" autocomplete="current-password" required>

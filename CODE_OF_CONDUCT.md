@@ -11,6 +11,22 @@ for interpretation.
   person.
 - Keep private information of others, such as personal data or customer data
   from a deployment, out of issues and pull requests.
+- Respect other people's and companies' rights in their work. Contribute only
+  your own work (or your AI agent's, written from its own knowledge) and
+  openly licensed material that is credited. Never contribute code decompiled,
+  disassembled or rewritten from proprietary software, or leaked code. Do not
+  ask others or AI agents to produce it for the project
+  ([CONTRIBUTING.md](CONTRIBUTING.md#your-own-work-only--no-decompiled-code)).
+
+## Enforcement
+
+Report a violation to the maintainers, in an issue or privately through the
+channel named in [SECURITY.md](SECURITY.md). The maintainers remove
+contributions and comments that break this code. A
+contribution with decompiled, leaked or incompatibly licensed code is removed,
+with a rewrite of the Git history if needed. Depending on how serious and
+deliberate it was, its author gets a warning or a temporary or permanent ban
+from the project.
 
 ## Scope
 
