@@ -24,12 +24,16 @@ see the notices in the README.
 
 ### Added
 
+- The **live demo** is online: <https://teamcraft-demo.tailc7ef5b.ts.net>
+  (sign in as `demo` / `try-teamcraft`, read-only, reset every night), linked
+  from the top of the README and the documentation's start page. The runbook (*Admin guide → Live demo*) now also
+  describes Tailscale Funnel as the TLS
+  front for a server behind NAT or without an own domain.
 - 3D preview of files saved by **Inventor 2027** (#271, on top of the
   Zstandard segments read since 0.2.8): typed arrays with the new element
   types (4, 8, 14, 16 for `u32` numbers, `invpart::is_u32`) are read, so
   parts give their meshes; in assemblies without occurrence titles the
-  hidden components come from the active design view
-  (`DesignViewSegment`), and flag `0x40`, which marks *Reference*
+  hidden components come from the active design view (`DesignViewSegment`), and flag `0x40`, which marks *Reference*
   components there, no longer hides them. Older files read as before.
   Checked by hand against 229 files saved by Inventor 2027 (137 of 137 parts
   with a body, 33 of 33 assemblies), see the research page *Inventor 2026
@@ -44,8 +48,8 @@ see the notices in the README.
   CLAUDE.md and a new pull request template with a confirmation checkbox.
 - Everything for a hosted **live demo** (runbook: *Live demo* in the admin
   guide). `TEAMCRAFT_DEMO_USER` and `TEAMCRAFT_DEMO_PASSWORD` make one local
-  account public and read-only: the login page shows it, every page carries a
-  *Live demo* banner, and every request of that account that is not
+  account public and read-only: the login page shows it, every page carries a *Live demo* banner, and every request of
+  that account that is not
   `GET`/`HEAD` is refused (403, sign-out excepted) in the web UI and the REST
   API; wrong passwords for it count per client address only, so it cannot be
   locked. `scripts/seed-demo.sh` loads the demo data of the README
@@ -63,8 +67,8 @@ see the notices in the README.
   on `main` red since 2026-11-18 although the code was fine.
 - The repository moved from `rudalabs/TeamCraft` to **`WARR-eV/TeamCraft`**:
   every link, the install command, the documentation at
-  <https://warr-ev.github.io/TeamCraft/> and the container image
-  **`ghcr.io/warr-ev/teamcraft`** use the new names, and the release
+  <https://warr-ev.github.io/TeamCraft/> and the container image **`ghcr.io/warr-ev/teamcraft`** use the new names, and
+  the release
   workflow publishes `:edge` and versions from the new repository again (its
   publish guard still named the old one). `deploy/install.sh` accepts
   compose files with either image name, so installations made before and the
@@ -81,8 +85,8 @@ see the notices in the README.
   system. The research page is now *Popular features of commercial PLM
   systems* (`research/plm-working-features.md`), and the other research
   pages compare with "enterprise PLM" in general.
-- File formats: JT (`jt`) now belongs to *Visualisation formats* and PLM XML
-  (`plmxml`, label *PLM XML (product structure)*) to *Neutral exchange
+- File formats: JT (`jt`) now belongs to *Visualisation formats* and PLM XML (`plmxml`, label *PLM XML (product
+  structure)*) to *Neutral exchange
   formats*. The separate CAD-program entry for them is gone, so the
   system id `teamcenter` no longer exists in `/formats`, the search filter
   or the API's format list. A saved web search with that filter shows all
@@ -114,13 +118,13 @@ Changes since the `v0.2.8` tag.
 - **TeamCraft Local on Windows (0.2.8): "Try TeamCraft on this computer"
   failed** with `initdb: error: program "postgres" is needed by initdb but was
   not found` (*Das System kann den angegebenen Pfad nicht finden*). The app
-  passed its resource folder as Tauri gives it on Windows, a verbatim path
-  (`\\?\C:\…`), and PostgreSQL cannot use those. The app and `teamcraft
+  passed its resource folder as Tauri gives it on Windows, a verbatim path (`\\?\C:\…`), and PostgreSQL cannot use
+  those. The app and `teamcraft
   local` now strip the prefix (`localserver::without_verbatim_prefix`). The
   installer smoke test passed a plain path and so missed it; on Windows it now
   passes the folder the way the app does.
-- Logs written to a file or a service log carry no colour codes any more
-  (they showed up as `[2m…[0m` in the app's error message): colours only
+- Logs written to a file or a service log carry no colour codes any more (they showed up as `[2m…[0m` in the app's error
+  message): colours only
   when the output is a terminal.
 
 ## [0.2.8] - 2026-11-15
@@ -131,8 +135,8 @@ Changes since the `v0.2.7` tag.
 
 - **Try TeamCraft on a laptop with one download.** The release adds desktop
   installers *with local server* (`TeamCraft-with-local-server_…`: Windows
-  x64 setup, macOS `.dmg`, Linux x86_64 AppImage) – the app plus the server
-  (as `teamcraft-server`) and PostgreSQL's programs. Their connect screen
+  x64 setup, macOS `.dmg`, Linux x86_64 AppImage) – the app plus the server (as `teamcraft-server`) and PostgreSQL's
+  programs. Their connect screen
   offers *Try TeamCraft on this computer*: the app starts a private
   PostgreSQL cluster and the server, both only on 127.0.0.1, opens the
   browser to create the administrator and signs in; the server stops with
@@ -140,8 +144,8 @@ Changes since the `v0.2.7` tag.
   `teamcraft local [--port] [--data-dir] [--pg-bin]` does the same with an
   installed PostgreSQL: initdb with a random scram password on the first
   start, a free port and no Unix socket at every start, data in the per-user
-  data directory, a second instance on the same data refused
-  (`src/localserver.rs`, `tests/local_server.rs`). Release job
+  data directory, a second instance on the same data refused (`src/localserver.rs`, `tests/local_server.rs`). Release
+  job
   `local-server` bundles the newest PostgreSQL 18 build of
   theseus-rs/postgresql-binaries (checksum-checked, with PostgreSQL's
   licence) and smoke-tests every installer's bundled server
@@ -158,14 +162,13 @@ Changes since the `v0.2.7` tag.
   (`src/mesh/creo/asm.rs`) and found as `<name>.prt` / `<name>.asm`. The
   assembly's thumbnail is rendered from it. Decoded on public samples
   without a licence (kept out of the repository); the tests build
-  synthetic assemblies around the NIST part ctc-01
-  (`docs/src/research/creo-assembly-preview.md`).
+  synthetic assemblies around the NIST part ctc-01 (`docs/src/research/creo-assembly-preview.md`).
 
 - 3D preview of CATIA V5 products (`.CATProduct`), put together from the
   previews of their parts and sub-products like NX, SOLIDWORKS and Inventor
   assemblies. A product stores no file names: its instances, part numbers
-  and placements are read from its `CATProdCont` object stream
-  (`src/catprod.rs`), and a component is the CATIA file whose document UUID
+  and placements are read from its `CATProdCont` object stream (`src/catprod.rs`), and a component is the CATIA file
+  whose document UUID
   it refers to (among the files of the product's revision and those found
   by name), otherwise `<part number>.CATPart` / `.CATProduct`. The
   product's thumbnail is rendered from it. Hidden components are not
@@ -186,19 +189,19 @@ Changes since the `v0.2.7` tag.
   the thumbnail is rendered from it (the PNG Fusion stored is the fallback).
 - Offboarding (#173, step 9) – leavers removed only at the identity
   provider: **OpenID Connect Back-Channel Logout** at
-  `/auth/oidc/backchannel-logout` – a logout token signed by the provider
-  (checked against its `jwks_uri`, RS256 or ES256) ends every browser
+  `/auth/oidc/backchannel-logout` – a logout token signed by the provider (checked against its `jwks_uri`, RS256 or
+  ES256) ends every browser
   session of that user at once, audited as `user.idp_logout`;
   `TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS` gives the new API and desktop tokens of
   SSO users an idle lifetime (off by default); *Users* lists **SSO users
   without sign-in** – active SSO users without a sign-in or token use for
-  90 days who still hold memberships, tokens or check-outs. Migration 0071
-  (`users.idp_logout_at`). Automatic deprovisioning through SCIM is not
+  90 days who still hold memberships, tokens or check-outs. Migration 0071 (`users.idp_logout_at`). Automatic
+  deprovisioning through SCIM is not
   built; see the research note *Deprovisioning through the identity
   provider*.
 - Offboarding (#173, step 10), desktop app: *Check in all* and *Sign out*
-  list the check-outs with local changes and offer to check them in first
-  (sign-out also to park them); **Park…** uploads work in progress as new
+  list the check-outs with local changes and offer to check them in first (sign-out also to park them); **Park…**
+  uploads work in progress as new
   versions and keeps the check-out, so it survives a lost laptop; after a
   forced release the *Workspace* tab says *Released by X; your local changes
   are kept and need a new check-out*.
@@ -221,8 +224,8 @@ Changes since the `v0.2.7` tag.
   `docs/src/research/sketchup-preview.md`.
 - BOM quantities from the CAD instance counts (#247): the reference scan
   stores how often an NX or SOLIDWORKS 2015+ assembly, and a STEP assembly
-  with external part files, places each referenced file
-  (`file_references.instances`, `GET …/references`; migrations 0064 and
+  with external part files, places each referenced file (`file_references.instances`, `GET …/references`; migrations
+  0064 and
   0065 rescan the current files). The desktop *Import CAD Folder…* uses them
   as BOM quantities; *Quantities from CAD…* in the desktop app adds missing
   lines and corrects the quantity 1 of assemblies imported before.
@@ -248,8 +251,8 @@ Changes since the `v0.2.7` tag.
   is rendered from the 3D preview. Verified with the NIST box assembly (36
   placements equal to NX, sizes equal to NIST's STEP files). JT 9 files
   keep the reader of #200.
-- Offboarding (#173, step 8): **Season handover** of a project group
-  (`/projects/{id}/season`, managers and administrators): tick the members
+- Offboarding (#173, step 8): **Season handover** of a project group (`/projects/{id}/season`, managers and
+  administrators): tick the members
   who leave – or let the page tick those inactive since a date or past their
   new *member until* date – and run one plan: make the new lead a manager,
   release check-outs with a reason, set *member until*, remove members and
@@ -280,8 +283,7 @@ Changes since the `v0.2.7` tag.
   every item, by name, 500 per request), so a group with more than 500 items
   is listed completely – *All items* shows the first 500 by number. Items
   without files follow the files at the top of the group. *New* and *Import
-  CAD Folder…* start with the active group. With an older server Home shows
-  *All items*.
+  CAD Folder…* start with the active group. With an older server Home shows *All items*.
 - Desktop app (#255): a **Projects** page (rail, `Ctrl/Cmd+5`) to choose the
   active project group, create one, get groups into the workspace and import
   a CAD folder. **Home** becomes a file browser of the active group: names
@@ -300,22 +302,21 @@ Changes since the `v0.2.7` tag.
 - BOM quantities from Inventor assemblies (#247): the reference scan reads
   how often an `.iam` places each referenced file from the file descriptor
   table of its `UFRxDoc` stream (`src/invasm.rs`, checked against Inventor's
-  own API on 32 real assemblies: 190 of 190 files), so the folder import,
-  *Quantities from CAD…* and the BOM-from-references page get real
+  own API on 32 real assemblies: 190 of 190 files), so the folder import, *Quantities from CAD…* and the
+  BOM-from-references page get real
   quantities instead of 1. Suppressed occurrences are left out, as in
   Inventor's BOM (from the occurrence records in the same stream); a part
   with only suppressed occurrences counts 0 – it stays referenced but gets
   no BOM line. When the records do not add up, the counts include the
-  suppressed ones instead of guessing.
-  *Quantities from CAD…* reads the counts from the stored file, so it works
+  suppressed ones instead of guessing. *Quantities from CAD…* reads the counts from the stored file, so it works
   for assemblies imported before; `teamcraft rescan-references --format
   inventor-assembly` also refreshes the stored counts of those files.
 
 - Two optional rules of a project group's review policy (#152 step 9, both
-  off by default): *Requesters do not decide their own change requests*, and
-  *A reviewer confirms each "use as is" deviation* – a reviewer of the change
-  order confirms every concession of an as-built revision on its own
-  (`POST /api/v1/as-built-deviations/{id}/confirm`) before approving.
+  off by default): *Requesters do not decide their own change requests*, and *A reviewer confirms each "use as is"
+  deviation* – a reviewer of the change
+  order confirms every concession of an as-built revision on its own (`POST /api/v1/as-built-deviations/{id}/confirm`)
+  before approving.
   Migration 0062.
 - The Pack and Go manifest names, for every released revision, the change
   order that released it and its approvers (`released_by`), and
@@ -416,8 +417,8 @@ Changes since the `v0.2.7` tag.
   view. *Loading* and every error now appear on the canvas itself, and the
   viewer reports what it used to swallow: a shader program that did not link,
   a lost WebGL context (a model too large for the graphics process), an
-  upload that ran out of graphics memory, and empty, cut-off or invalid
-  (NaN) models. The mesh check is tested by `scripts/viewer-mesh.test.mjs`.
+  upload that ran out of graphics memory, and empty, cut-off or invalid (NaN) models. The mesh check is tested by
+  `scripts/viewer-mesh.test.mjs`.
 - Desktop: releasing with your own user name as reviewer left a draft change
   behind that could not be finished in the app (#291). The *Release…* dialog
   now refuses the own name before anything is created, says when nobody else
@@ -435,8 +436,8 @@ Changes since the `v0.2.7` tag.
   parametrisations are resolved from a seeded face (rocket body closed, nose
   from 102 to 9 open edges). Preview cache version 4, thumbnail cache
   version 9, shape signatures version 4.
-- Documentation site: the search box in the tab bar searched for ever
-  ("searching" never ended). mdBook 0.5 loads its search index only when its
+- Documentation site: the search box in the tab bar searched for ever ("searching" never ended). mdBook 0.5 loads its
+  search index only when its
   own search toggle opens the search, and the Doxygen theme hides that
   toggle; the theme now opens the search through it at the first focus, so
   the index loads and what was typed meanwhile is searched. A link with
@@ -471,8 +472,8 @@ Changes since the `v0.2.7` tag.
 - CI: a unit test killed at its 1 s limit because the runner stalled no
   longer fails the run – failed unit tests get two more attempts (nextest
   `retries`); a hang still fails every attempt, a stall is reported as
-  `FLAKY`. The 8-million-triangle limit test runs alone, and the vault tests
-  (a disk flush per stored file) get 10 s on Windows.
+  `FLAKY`. The 8-million-triangle limit test runs alone, and the vault tests (a disk flush per stored file) get 10 s on
+  Windows.
 
 ## [0.2.7] - 2026-11-10
 
@@ -557,8 +558,8 @@ Changes since the `v0.2.5` tag.
   `preferred_cad`, file formats carry `format_info.family`.
 - 3D preview of Rhino models (`.3dm`, Rhino 1 to 8) from the meshes Rhino
   stores (mesh objects, render meshes of polysurfaces and extrusions, block
-  instances placed); SubD objects are refined from their control net
-  (Catmull-Clark with creases). Hidden objects and layers are left out. The
+  instances placed); SubD objects are refined from their control net (Catmull-Clark with creases). Hidden objects and
+  layers are left out. The
   thumbnail is rendered from the 3D preview; models saved without meshes
   show the picture Rhino stored.
 - Branding (#184): administrators rename the header name and subtitle ("TeamCraft PLM") under *Admin → Branding*;
@@ -739,8 +740,8 @@ Changes since the `v0.2.5` tag.
   comparison (*Compare with …* lays another version or revision over the
   model) and 3D notes pinned to a picked point of a file version (#200).
 - Storage quotas per user and for the whole vault (a refused
-  upload gets 413 and stores nothing), optional malware scanning with ClamAV
-  (`TEAMCRAFT_CLAMD_ADDR`; infected files are refused and never stored),
+  upload gets 413 and stores nothing), optional malware scanning with ClamAV (`TEAMCRAFT_CLAMD_ADDR`; infected files are
+  refused and never stored),
   likely duplicates by name (`GET /api/v1/items/duplicates`, a hint after
   creating an item), bulk revise and obsolete (`POST /api/v1/items/bulk`, up to
   200 items, one transaction each), and a section plane and point-to-point
@@ -786,8 +787,8 @@ Changes since the `v0.2.5` tag.
 
 ### Changed
 
-- Desktop app, local agents: calls of TeamCraft's own read-only MCP tools
-  (by the server's `tools/list` annotations) are allowed once without a
+- Desktop app, local agents: calls of TeamCraft's own read-only MCP tools (by the server's `tools/list` annotations) are
+  allowed once without a
   permission prompt and marked *Allowed automatically (read-only)* in the
   tool list; the server still answers with the user's rights only. Write
   tools, other servers' tools, the agent's own tools and every request the

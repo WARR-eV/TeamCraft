@@ -361,11 +361,12 @@ half a state behind. Prefer tests that fail on a real regression over tests that
 
 **Operations and repository**
 
-- [ ] Host the live demo (**maintainer action**). Ready in the code: the read-only demo account
-  (`TEAMCRAFT_DEMO_USER`, `TEAMCRAFT_DEMO_PASSWORD`), `scripts/seed-demo.sh` (the README demo data) and
-  `deploy/demo/demo.sh` (snapshot, nightly reset). Left: server, DNS, TLS, seed, snapshot, cron – the runbook is
-  [docs/src/admin/live-demo.md](src/admin/live-demo.md) – then link the demo from the top of the README and from
-  `docs/src/index.md`.
+- [x] Host the live demo (**maintainer action**): <https://teamcraft-demo.tailc7ef5b.ts.net> (`demo` /
+  `try-teamcraft`), seeded with `scripts/seed-demo.sh`, snapshot and nightly reset with `deploy/demo/demo.sh`,
+  HTTPS through Tailscale Funnel (no own domain yet); linked from the top of the README and from
+  `docs/src/index.md`. Runbook: [docs/src/admin/live-demo.md](src/admin/live-demo.md). Left: confirm that wrong
+  passwords for `demo` are counted per visitor behind Funnel (check in the runbook, step 3b); later an own domain
+  with Caddy for more traffic.
 - [ ] Test e-mail (SMTP) and Mattermost notifications against real servers (so far only against fakes)
 - [ ] Enable private vulnerability reporting (*Settings → Code security → Private vulnerability reporting*), which
   `SECURITY.md` points to
