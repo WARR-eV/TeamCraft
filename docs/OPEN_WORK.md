@@ -190,7 +190,7 @@ structure should not prevent translations later). They may land in 1.x minor rel
 
 Requested by the user as the current top priority (before sections 1 and 2).
 
-- [x] Server: default CAD program per project group (`projects.default_cad`, `default_cad_version`, migration 0073),
+- [x] Server: default CAD program per project group (`projects.default_cad`, `default_cad_version`, migration 0074),
   set by managers and admins on the group page and with `PUT /api/v1/projects/{code}/default-cad`, audited
   (`project.default_cad`), in the group's JSON; `GET /api/v1/formats` names each format's `family`
   (`tests/project_default_cad.rs`).
