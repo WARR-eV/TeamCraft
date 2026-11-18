@@ -1,5 +1,6 @@
 //! Favorites, saved searches, Save As and the BOM comparison (the most used
-//! working features of Teamcenter, see docs/src/research/teamcenter.md).
+//! working features of commercial PLM systems, see
+//! docs/src/research/plm-working-features.md).
 
 use axum::{
     extract::{Path, Query, State},

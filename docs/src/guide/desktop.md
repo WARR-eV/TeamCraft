@@ -62,19 +62,26 @@ check-outs and reviews, and a **local working folder**:
   quantity the CAD file does not tell never replaces an existing one;
 * the *Graph* tab draws a navigable reference and BOM graph around the
   revision: the focused item in the middle, its BOM children and references
-  below, the assemblies that use it above. Node colour is the lifecycle state,
+  below (*ref*), the assemblies that use it above (*uses*). Every node is a
+  card with the item's preview image, file name and number. Node colour is
+  the lifecycle state (the legend names them),
   node size (and the ⚙ badge) the item's own BOM complexity; the small ×n in
   the top-left corner of a child is how many instances of it the assembly
-  contains (summed over its BOM lines). Click a node to go to it: the tab
+  contains (summed over its BOM lines, ×1 included). Click a node to go to it: the tab
   becomes that item – a sub-assembly shows its own graph, anything else its
   overview – and *← Back*, always in the same place (left of the tab row),
   leads back the way you came, one step per click; clicking the assembly you
   came from is the same step back. A click on the item in the middle opens
   its own overview. `Ctrl`+click (`⌘`+click on macOS) opens a node in a tab
-  of its own instead. The mouse wheel zooms on the cursor, dragging pans and
-  a double-click on the background fits the graph again. Large assemblies are
-  laid out in rows, and only the first 48 neighbours get a preview and their
-  complexity;
+  of its own instead. The mouse wheel zooms on the cursor, dragging pans –
+  also when the drag starts on a card, which then does not open – and a
+  double-click on the background fits the graph again; while previews are
+  still loading the view fits itself until you zoom or pan. Large
+  assemblies (more than 8 neighbours on a side) are laid out in rows, and
+  only the first 48 neighbours get a preview and their complexity (one
+  request each), the rest keep a basic card. The graph is drawn by the app
+  itself (SVG with an HTML layer for the cards, no external engine), in the
+  colours of the chosen skin;
 * the *Workspace* tab shows per file where it is, whether it is up to date,
   modified, outdated, in conflict, new, missing or a name clash, whether it
   is read-only, and who holds the lock for how long; opening an outdated
@@ -94,8 +101,23 @@ check-outs and reviews, and a **local working folder**:
   stays checked out to you and your local files are untouched. Once every
   byte is sent the server finishes the check-in on its own; the dialog says
   so (*too late to cancel*);
-* *Check in all* in the worklist checks in every check-out without local
-  changes and lists those that still have changes;
+* *Check in all* in the worklist first lists the check-outs with local
+  changes (modified or new files) and offers to **check them in first**
+  with their files; *Only the others* checks in just the check-outs without
+  local changes. Check-outs with a conflict always stay checked out – merge
+  them in their Workspace tab. *Sign out* (and *Change server*) asks the
+  same before it signs you out: *Check in and sign out*, *Park and sign
+  out* or *Sign out anyway*;
+* **Park…** (Workspace tab, *More ▾*, and a button of the check-in dialog)
+  uploads the ticked files as new versions but **keeps your check-out** –
+  work in progress is on the server even if your computer is lost, and
+  nobody else can change the revision meanwhile. Same conflict check as a
+  check-in; an empty comment is stored as *Work in progress (parked, still
+  checked out)*;
+* when somebody else released your check-out (an administrator, or a
+  manager of the group with a reason), the Workspace tab says *Released by
+  X; your local changes are kept and need a new check-out*, with the date
+  and the reason – until the revision is checked out again;
 * *Dependents to check* (worklist and home) shows one line per dependent
   revision with the number of changes it has to be checked against; the
   arrow lists them (a click opens the item that changed). On the home page
@@ -156,7 +178,9 @@ account can read and says so at the start and in *Settings*. An address with
 plain `http://` to another computer gets a warning when you connect: the token
 and all data would cross the network unencrypted – use the `https://` address
 of the server. The app uses the same skins
-and 3D viewer as the web interface; the models are converted by the server. *Settings → Appearance*: *TeamCraft* (the
+and 3D viewer as the web interface; the models are converted by the server,
+and *Loading* or the reason a model cannot be shown appears on the canvas of
+the *3D viewer* tab (see [Files](files.md)). *Settings → Appearance*: *TeamCraft* (the
 default) follows the light or dark
 appearance of the operating system and switches with it, *TeamCraft Light*
 and *TeamCraft Dark* stay fixed, the distribution skins are dark. *Settings → Change password…* changes the password of
@@ -204,9 +228,27 @@ back, and *Check in…* is highlighted.
   (*Request change…*, *Watch*, *Agent*);
 * change tab: **Review** (*Approve change* highlighted, *Reject* – the comment field
   of *Your review* goes with it, required for a rejection) while your review
-  is pending · **Lifecycle** (*Submit for review*, highlighted on your draft, *Withdraw*) · **Collaborate**;
+  is pending · **Lifecycle** (*Submit for review*, highlighted on your draft –
+  disabled with the reason as tooltip while the draft has no revision or no
+  reviewer –, *Withdraw*, *Cancel change* for a draft or rejected change, at
+  once) · **Collaborate**. On your draft the *Reviewers* panel has *Add
+  reviewer* (user names, any CAD editor or administrator – not you), *Remove*
+  per reviewer and the suggested reviewers;
 * change request tab: **Triage** (*Start triage* or *Create change order*
   highlighted, *Take up again*) · **Requester** (*Attach…*, *Withdraw*) · **Collaborate**.
+
+*Release…* creates a change order for the revision – with its unreleased
+dependencies by default – assigns the reviewers you tick (the other CAD
+editors of the project group) or type under *Other reviewers* (user names of
+any CAD editor or administrator) and submits it. Your own user name is
+refused before anything is created (four-eyes principle). When nobody else in
+the group can review, the dialog says so and creates a draft instead of
+submitting – a release always needs a second person, so a server with a
+single account cannot release (see [Separation of
+duties](changes.md#separation-of-duties)). If a revision or a reviewer is
+refused, the half-made draft is cancelled again and nothing is left behind;
+only a refused submit (for example an unreleased dependency) keeps the
+complete draft and opens it.
 
 Rare actions are in **More ▾** at the end: *Pack and Go…*, *Open in browser*, *Refresh* (`F5`) and *Mark obsolete…*. The
 menu works with the keyboard:
@@ -363,15 +405,49 @@ whose newer revision takes the place, stay where they are; files you
 changed are moved first. Identical copies are removed, emptied old folders
 too, and every step is written to `.teamcraft/migration.log`.
 
-## Run it
+## Install or run it
+
+The installers of every version are on the
+[Releases page](https://github.com/rudalabs/TeamCraft/releases) (see
+*Download* in the README for the file of each system). From source:
 
 ```sh
 cd desktop
 cargo run            # Linux needs the WebKitGTK development packages
 ```
 
-The platform guides list the system packages. Installers are not published
-yet; the app is built and tested from source.
+The platform guides list the system packages.
+
+## Try TeamCraft on this computer
+
+The downloads **with local server** (Windows x64 `-setup.exe`, macOS `.dmg`,
+Linux `.AppImage`, named `TeamCraft-with-local-server_…`) also contain the
+server, as `teamcraft-server`, and PostgreSQL's programs. They install
+**TeamCraft Local**, an app of its own (identifier
+`io.github.rudalabs.teamcraft.local`, own settings folder and keychain entry)
+next to the desktop app, which keeps its own server and sign-in. With no
+server configured – its first start – TeamCraft Local starts the local server
+by itself; later its connect screen offers **Try TeamCraft on this
+computer** below the server address:
+
+1. The app starts `teamcraft-server local` – a private PostgreSQL cluster and
+   the server, both only on `127.0.0.1` – and waits until it is ready (the
+   first start creates the database).
+2. The server's address `http://127.0.0.1:<port>` becomes the app's server,
+   and the browser sign-in opens. On the first start the browser shows
+   *Create the administrator*; afterwards it continues to the confirmation of
+   the app's sign-in.
+3. While the local server is the configured server, the app starts it again
+   at every launch (the splash says *Starting the local TeamCraft server …*).
+   It keeps the port, so the address and the token stay the same; if another
+   program took the port meanwhile, the app picks a free one and follows.
+
+The server stops when the app ends – also when it crashes: the app keeps a
+pipe to the server's standard input open, and the server shuts itself and
+PostgreSQL down when it closes. Its output goes to `local-server.log` in the
+app's settings folder; the data is in the per-user data folder shared with
+`teamcraft local` – see [Try it on your computer](local-server.md). The
+regular installers do not show the button.
 
 ## Update notice
 

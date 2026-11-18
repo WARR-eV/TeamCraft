@@ -99,7 +99,7 @@ async fn wait_for_database(config: &Config) -> Result<()> {
 /// seed data only, same schema). A database that applied the old text takes
 /// the new checksum instead of failing with "migration … was previously
 /// applied but has been modified".
-const EDITED_BEFORE_RELEASE: [i64; 5] = [2, 3, 5, 11, 12];
+const EDITED_BEFORE_RELEASE: [i64; 6] = [2, 3, 5, 7, 11, 12];
 
 /// Oldest supported PostgreSQL major version. CI tests this one and the
 /// newest; older servers are refused at start-up with a clear message

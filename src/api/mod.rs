@@ -376,6 +376,10 @@ pub fn router(state: &AppState) -> Router<AppState> {
         .route("/changes/{number}/items", post(add_change_item))
         .route("/changes/{number}/reviewers", post(add_change_reviewer))
         .route(
+            "/changes/{number}/reviewers/{username}",
+            delete(remove_change_reviewer),
+        )
+        .route(
             "/changes/{number}/reviewers/{username}/replace",
             post(replace_change_reviewer),
         )
@@ -391,6 +395,7 @@ pub fn router(state: &AppState) -> Router<AppState> {
         .route("/changes/{number}/submit", post(submit_change))
         .route("/changes/{number}/review", post(review_change))
         .route("/changes/{number}/withdraw", post(withdraw_change))
+        .route("/changes/{number}/cancel", post(cancel_change))
         .route(
             "/change-requests",
             get(change_requests::list).post(change_requests::create),
@@ -567,7 +572,7 @@ async fn index() -> Json<Value> {
             "PATCH  /api/v1/uploads/{id}                              header Upload-Offset, body = next chunk (≤ chunk_bytes) → 409 at any other offset",
             "POST   /api/v1/uploads/{id}/finish                       {comment?, check_in?} – verify size and sha256, store the new version (and release the check-out)",
             "DELETE /api/v1/uploads/{id}                              cancel the upload",
-            "GET    /api/v1/items/{number}/revisions/{code}/file-status   current version, sha256 and lock of every file",
+            "GET    /api/v1/items/{number}/revisions/{code}/file-status   current version, sha256 and lock of every file; released = {by_name, at, reason, message} when someone else released my check-out",
             "POST   /api/v1/items/{number}/revisions/{code}/file-status   {files: [{filename, sha256, base_version? | base_sha256?}]} → up_to_date | modified | outdated | conflict | new | missing",
             "POST   /api/v1/worklist/checkin-all                      {revisions?: [id]} – check in my check-outs without new files (lock release), one by one",
             "POST   /api/v1/items/{number}/revisions/{code}/cancel-checkout",
@@ -658,6 +663,7 @@ async fn index() -> Json<Value> {
             "GET    /api/v1/changes/{number}/impact                   impact analysis: items that depend on its revisions",
             "POST   /api/v1/changes/{number}/items                    {item, revision?, action?: release|obsolete|supersede, successor?} (obsolete and supersede lines are applied on release)",
             "POST   /api/v1/changes/{number}/reviewers                {username}",
+            "DELETE /api/v1/changes/{number}/reviewers/{username}     remove a reviewer from a draft",
             "POST   /api/v1/changes/{number}/reviewers/{old}/replace  {username}: replace a pending reviewer while in review",
             "GET    /api/v1/changes/{number}/suggested-reviewers?limit=  ranked reviewer suggestions with reasons (never assigns)",
             "GET    /api/v1/changes/{number}/readiness                release readiness: unreleased (blocking) and obsolete or file-scan (warning) dependencies",
@@ -665,6 +671,7 @@ async fn index() -> Json<Value> {
             "POST   /api/v1/changes/{number}/submit",
             "POST   /api/v1/changes/{number}/review                   {decision: approve|reject, comment?, meaning?} – needs the approve token scope",
             "POST   /api/v1/changes/{number}/withdraw",
+            "POST   /api/v1/changes/{number}/cancel                   cancel a draft or rejected change (its revisions are free again)",
             "GET    /api/v1/change-requests?status=open|all|<status>&scope=mine|assigned&item=&limit=&offset=",
             "POST   /api/v1/change-requests                           {title, description?, reason?, priority?, due_date?, items?: [{item, revision?, note?}]} – any signed-in user",
             "GET    /api/v1/change-requests/{number}                  request, items, comments, attachments, change orders, history, what I may do",
@@ -877,9 +884,9 @@ async fn desktop_token(
     State(st): State<AppState>,
     ApiJson(body): ApiJson<DesktopTokenBody>,
 ) -> AppResult<Json<Value>> {
-    Ok(Json(json!(
-        desktop::exchange(&st.db, &body.code, &body.verifier).await?
-    )))
+    let idle = st.config.oidc_token_idle_days;
+    let token = desktop::exchange(&st.db, &body.code, &body.verifier, idle).await?;
+    Ok(Json(json!(token)))
 }
 
 /// The personal start page of the desktop app (and the web dashboard).

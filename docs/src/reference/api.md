@@ -28,7 +28,10 @@ widens the user's rights. Choose it on the account page, with
 A refused request answers `403` and changes nothing. A `write` token cannot
 create a `full` token. `GET /api/v1/me` shows the `token_scope`. A token
 with an idle lifetime (the desktop app's) expires after that many days
-without use.
+without use. With `TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS`, `POST /api/v1/tokens`
+gives a single sign-on user a token with that idle lifetime when
+`expires_in_days` is missing or longer (the answer's `expires_at` and
+`idle_days` show it).
 
 ## Read permissions
 
@@ -157,8 +160,12 @@ curl -s -X POST -H "$H" -F file=@hub.step -F 'bases={"hub.step": 3}' \
 
 `GET …/revisions/{code}/file-status` returns every file with its current
 `version`, `sha256`, uploader and the lock (`locked_by`, `locked_by_name`,
-`locked_at`, `locked_by_me`, `locked_by_other`). `POST` the same path with the
-client's files to get the sync state of each local copy:
+`locked_at`, `locked_by_me`, `locked_by_other`). When somebody else released
+*your* check-out of the revision and nobody has checked it out since,
+`released` says so (`by_name`, `at`, `reason` and the `message` *Released by
+X; your local changes are kept and need a new check-out.*); otherwise it is
+`null`. `POST` the same path with the client's files to get the sync state of
+each local copy:
 
 ```sh
 curl -s -X POST -H "$H" -H 'Content-Type: application/json' \
@@ -389,7 +396,7 @@ the caller cannot read are left out; a successor there is a placeholder with
 | Change requests  | `GET/POST /change-requests`, `GET/PATCH /change-requests/{number}`, `comments`, `items`, `triage`, `assign`, `decide`, `reopen`, `withdraw`, `create-change`, `link-change`, `attachments`, `watch`                                                                                                                                |
 | Simulations      | `GET/POST /projects/{code}/result-templates`, `PUT/DELETE /result-templates/{id}`, `GET …/simulation`, `GET/POST …/simulation/bases`, `DELETE /simulation-bases/{id}`, `GET/POST/PUT …/simulation/results`, `…/results/import`, `PATCH/DELETE /simulation-results/{id}`, `…/simulation/compare`, `GET /items/{number}/simulations` |
 | As-built         | `GET …/as-built`, `PUT …/as-built/record`, `GET/POST …/as-built/deviations`, `PATCH/DELETE /as-built-deviations/{id}`, `GET /items/{number}/built-units`, `POST …/revisions/{code}/built-units`                                                                                                                                    |
-| Changes          | `GET/POST /changes`, items (`{item, revision?, action?: release\|obsolete\|supersede, successor?}`), reviewers, `suggested-reviewers`, `readiness`, `dependencies` (add all unreleased), `submit`, `review`, `withdraw`, `impact`                                                                                                  |
+| Changes          | `GET/POST /changes`, items (`{item, revision?, action?: release\|obsolete\|supersede, successor?}`), reviewers (`POST {username}`; `DELETE /changes/{n}/reviewers/{username}` on a draft), `suggested-reviewers`, `readiness`, `dependencies` (add all unreleased), `submit`, `review`, `withdraw`, `cancel` (a draft or rejected change; its revisions are free again), `impact` |
 | Projects         | `GET/POST /projects`, `GET /projects/manager-gaps` (admins), `GET/POST /projects/{code}/members`, `GET/PUT /projects/{code}/numbering` (`?scheme=` previews)                                                                                                                                                                                                              |
 | Notifications    | `GET /notifications`, `POST /notifications/read`, settings, watches                                                                                                                                                                                                                                                                |
 | Personal         | `GET /favorites`, `POST/DELETE /items/{number}/favorite`, `GET/POST /searches`, `DELETE /searches/{id}`                                                                                                                                                                                                                            |

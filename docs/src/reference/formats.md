@@ -18,7 +18,7 @@ list is on every server at `/formats` and `GET /api/v1/formats`
 | Autodesk Fusion              | `.f3d` `.f3z` (refs) `.f2d`                                                                                                  |
 | AutoCAD                      | `.dwg` `.dxf` `.dwt`                                                                                                         |
 | PTC Creo                     | `.prt` `.asm` (refs) `.drw` (refs) `.frm` `.lay` `.sec` `.mfg` `.neu` `.pvz` `.pvs`; iterations `name.prt.7` become versions |
-| CATIA V5                     | `.CATPart` `.CATProduct` (refs) `.CATDrawing` (refs) `.cgr` `.CATAnalysis` `.CATProcess` `.CATMaterial` `.3dxml`             |
+| CATIA V5                     | `.CATPart` (3D) `.CATProduct` (3D) `.CATDrawing` (refs) `.cgr` `.CATAnalysis` `.CATProcess` `.CATMaterial` `.3dxml`          |
 | Ansys SpaceClaim / Discovery | `.scdoc`                                                                                                                     |
 | FreeCAD, OpenSCAD            | `.FCStd`, `.scad`                                                                                                            |
 | SolidCraft, FieldCraft       | `.sc` `.solidcraft`, `.fieldcraft` – see [FieldCraft and SolidCraft](interop.md)                                             |
@@ -54,11 +54,23 @@ that are not in TeamCraft are left out, and so are components on a layer
 the assembly's layer settings hide (read from `/Root/UG_PART/UG_PART`), as
 in NX. Drawings have no 3D preview.
 
-Stand-alone `.jt` files (Teamcenter visualisation, exports of NX, CATIA,
-Creo) are previewed with the same reader when they are JT 9 with
-topologically compressed triangle LODs, as NX writes them; files of other JT
-versions (JT 10 with its other compression) report their version instead of a
-preview.
+Stand-alone `.jt` files (PLM visualisation, exports of NX, CATIA,
+Creo):
+
+- **JT 10** (`src/mesh/jt10.rs`) carries parts and assembly in one file. The
+  scene graph (an LZMA-compressed segment) gives every shape occurrence with
+  its transform, the units of the model and the nodes NX marks hidden
+  (section and trace-line geometry). Each shape's finest level of detail is
+  decoded with the JT 9 topology coder plus the newer integer codecs, its
+  hash checked, refined along the stored normals within the same budget as
+  NX parts and placed per instance.
+- **JT 9** with topologically compressed triangle LODs, as NX writes them:
+  an assembly (several shapes, or a placed one) is put together through its
+  scene graph like JT 10 – the JT 9.5 field widths (`I16` versions, `F32`
+  transforms), zlib instead of LZMA, metres unless the file names its units;
+  a single part goes through the reader of NX parts as before.
+- Other versions report their version. Not read: files that keep their parts
+  in other `.jt` files ("shattered"), colours, PMI and the B-rep segments.
 
 SOLIDWORKS files from 2015 on are read through their section container (`src/swpart.rs`). The 3D preview of a part is
 the display tessellation
@@ -78,6 +90,34 @@ virtual components are left out, and components are found by the file
 name of their stored path. Files saved before 2015 (OLE compound files) and
 drawings have no 3D preview.
 
+CATIA V5 parts (`.CATPart`, container `V5_CFV2`) are previewed from the
+visualisation data CATIA saves with them (`src/mesh/catia.rs`). That data is
+the container `CATCGRCont`, a `V5_CFV2` document nested in the file; its
+scene graph holds one uncompressed mesh per body. The reader takes:
+
+* the vertices in millimetres, stored with prefix sharing;
+* the exact surface normals of the curved faces;
+* the triangle lists, strips and fans of each B-rep face.
+
+The mesh is refined along the stored normals like an NX part. A part saved
+without visualisation data has no 3D preview, nor do drawings. Details are in
+[Research: 3D preview of CATIA V5 parts](../research/catia-cgr-preview.md).
+
+CATIA V5 products (`.CATProduct`) are put together from their parts
+(`src/catprod.rs`, `services/assemblies.rs`). A product names no files.
+The object stream of its container `CATProdCont` holds per instance:
+
+* the part number and the instance name (`_InstanceName`);
+* a link to the UUID of the referenced document's `CATProdCont`, which
+  every CATIA file lists in the container table at its start;
+* the placement (`_Position`): X, Y and Z axis and origin in millimetres.
+
+A component is the CATIA file of the product's revision (or a file found by
+name) with that UUID, otherwise `<part number>.CATPart` or `.CATProduct`.
+Sub-products are entered, hidden components are not recognised yet. Details
+are in
+[Research: 3D preview of CATIA V5 products](../research/catia-product-structure.md).
+
 Rhino models (`.3dm`, versions 1 to 8) are read as openNURBS archives (`src/mesh/rhino.rs`): nested chunks, the object,
 layer, block-definition
 and settings tables. The 3D preview shows what Rhino stored for display –
@@ -93,9 +133,22 @@ converted from the model unit to millimetres. Polysurfaces, extrusions and
 NURBS surfaces saved without render meshes, curves, points, annotations,
 linked blocks and colours are not shown; such a model keeps the preview
 bitmap Rhino stored as its thumbnail.
+Fusion designs (`.f3d`) are ZIP archives whose entries are mostly
+compressed with Zstandard (read by `src/fusion.rs` with the pure-Rust
+`ruzstd`, sizes capped and checked against the stored CRC-32). Their 3D
+preview is the display scene Fusion stores for fast opening
+(`OGS.BlobFolder/OGS/DefaultScene/world` and `stream_mesh_NNN`,
+`src/mesh/f3d.rs`): the triangles of every body face, welded per body,
+refined along their stored normals like NX parts and converted from
+centimetres to millimetres. Sketches, edges, dimensions and work geometry
+are left out. The thumbnail is rendered from the 3D preview; a file
+without a display scene shows `Previews/big.png`, the image Fusion
+stored. The exact B-rep (ShapeManager `.smb`) is not read. See
+[Research: 3D preview of Fusion designs](../research/fusion-ogs-preview.md).
 
 Inventor parts and assemblies are OLE compound files whose data lives in
-zlib-compressed segments below `RSeStorage` (`src/invpart.rs`). The 3D
+zlib- or Zstandard-compressed segments below `RSeStorage` (`src/invpart.rs`;
+Zstandard in newer files, told apart by the magic bytes). The 3D
 preview of a part is the display tessellation in `PmGraphicsSegment`
 (`src/mesh/inventor.rs`):
 - each B-rep face is an indexed triangle list (centimetres) with a unit
@@ -110,8 +163,37 @@ visibility of each occurrence come from the stream `UFRxDoc`, the
 placements from `AmRxSegment`, including the poses a parent gives the
 children of flexible sub-assemblies. Hidden and suppressed components are
 left out, and components are found by the file name of their stored path.
+Files of Inventor 2027 store no occurrence titles and keep what is hidden
+with the design views: for them the hidden components are those the active
+design view (`DesignViewSegment`) lists, and flag `0x40` (there: BOM
+structure *Reference*) is ignored. Their typed arrays name the kind of
+number (element types 4, 8, 14, 16 instead of 0); see
+[Research: Inventor 2026 and later](../research/inventor-zstd-streams.md).
 Not covered: design views other than the saved one, weld beads, drawings
 and presentations.
+
+Creo parts (`.prt.N`, `src/mesh/creo/`) store no display tessellation. The
+3D preview is tessellated from the B-rep in the `VisibGeom` section: the
+table of contents and the LZW-compressed sections (`container.rs`), the
+self-describing tagged format with its compressed numbers (`tagged.rs`),
+planes, cylinders, cones and tori with their contours and the edges sampled
+in both faces' parameter spaces (`brep.rs`), interpolating bicubic splines,
+rolling-ball fillets and ruled surfaces (`freeform.rs`), ear clipping of
+every face region in the parameter plane with every edge evaluated once on
+its most exact face, welding and PN refinement along the analytic normals
+(`tess.rs`). Lengths are converted to millimetres with the unit of the
+`UnitSystemDef` section (`mm`, `in`, …). Turned parts without a plane in
+the identity frame get their face parametrisations from a seeded face (see
+[Research: 3D preview of Creo parts](../research/creo-brep-preview.md)).
+
+Creo assemblies (`.asm.N`, `src/mesh/creo/asm.rs`) are put together from
+their parts like NX, SOLIDWORKS, Inventor and CATIA assemblies: the section
+`NeuAsmSld` lists the direct components – model name, part or
+sub-assembly, the images of the component's axes and its origin in the
+assembly's unit – and each is found as `<name>.prt` / `<name>.asm` (the
+iteration suffix is not part of the stored name). Family-table instances
+show their generic; drawings keep their stored JPEG (see
+[Research: 3D preview of Creo assemblies](../research/creo-assembly-preview.md)).
 
 SOLIDWORKS files from 2015 on are no OLE files any more but a sequence of
 Deflate-compressed sections (`src/swpart.rs`; verified with SOLIDWORKS 2018
@@ -178,7 +260,7 @@ Edge's OLE container); `.sc` must be a SolidCraft ZIP or JSON design.
 | IGES                     | `.iges` `.igs`                                |
 | Parasolid                | `.x_t` `.xmt_txt` `.x_b` `.xmt_bin`           |
 | ACIS                     | `.sat` `.sab`                                 |
-| JT (ISO 14306), PLM XML  | `.jt` (refs), `.plmxml`                       |
+| JT (ISO 14306), PLM XML  | `.jt` (3D, refs), `.plmxml`                   |
 | OpenCascade BREP, VDA-FS | `.brep` `.brp`, `.vda`                        |
 | 3D PDF (U3D / PRC)       | `.pdf` – recognised by its embedded 3D stream |
 

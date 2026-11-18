@@ -19,7 +19,7 @@ use argon2::{
 };
 use axum::{
     extract::{FromRequestParts, OriginalUri},
-    http::{header, request::Parts, HeaderMap},
+    http::{header, request::Parts, HeaderMap, Method},
 };
 use rand::{rngs::OsRng, RngCore};
 use serde::Serialize;
@@ -228,6 +228,26 @@ fn random_hex() -> String {
     hex::encode(bytes)
 }
 
+/// The one-time code of the first-start setup (128 random bits, hex): the
+/// server logs the setup link with it, and only that link offers *Create the
+/// administrator* – a request through a reverse proxy on the same computer
+/// looks local otherwise (see `web::auth_pages::setup_open`).
+pub fn setup_code() -> String {
+    let mut bytes = [0u8; 16];
+    OsRng.fill_bytes(&mut bytes);
+    hex::encode(bytes)
+}
+
+/// Compares two secrets without stopping at the first difference.
+pub fn secrets_equal(given: &str, expected: &str) -> bool {
+    let (a, b) = (given.as_bytes(), expected.as_bytes());
+    let mut diff = a.len() ^ b.len();
+    for i in 0..a.len().max(b.len()) {
+        diff |= usize::from(a.get(i).copied().unwrap_or(0) ^ b.get(i).copied().unwrap_or(0));
+    }
+    diff == 0
+}
+
 /// Tokens are high-entropy, so a fast hash is sufficient for storage.
 pub fn hash_token(token: &str) -> String {
     hex::encode(Sha256::digest(token.as_bytes()))
@@ -280,6 +300,32 @@ pub fn clear_flash_cookie(config: &Config) -> String {
 // Extractors
 // ---------------------------------------------------------------------------
 
+/// What the public account of a hosted live demo (`TEAMCRAFT_DEMO_USER`) is
+/// told when it tries to change something.
+pub const DEMO_READ_ONLY: &str = "This is a read-only live demo: look around as much as you \
+     like, but nothing can be changed here. Install TeamCraft to try it with your own data.";
+
+/// Refuses (403) every request of the live demo's public account that could
+/// change something: only `GET`, `HEAD` and signing out pass – also for
+/// routes that read through a `POST`, which keeps the rule simple and
+/// complete. Every other account is unaffected, so an administrator still
+/// seeds and runs the demo.
+fn refuse_demo_write(state: &AppState, parts: &Parts, actor: &Actor) -> Result<(), AppError> {
+    if !state.config.is_demo_user(&actor.username)
+        || matches!(parts.method, Method::GET | Method::HEAD)
+    {
+        return Ok(());
+    }
+    let path = parts
+        .extensions
+        .get::<OriginalUri>()
+        .map_or_else(|| parts.uri.path(), |uri| uri.0.path());
+    if path == "/logout" {
+        return Ok(());
+    }
+    Err(AppError::Forbidden(DEMO_READ_ONLY.into()))
+}
+
 /// Extracts the user of a browser session. Rejects with `401`, which the web
 /// UI turns into a redirect to the login page.
 pub struct WebUser(pub Actor);
@@ -292,6 +338,7 @@ impl FromRequestParts<AppState> for WebUser {
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
         if let Some(actor) = parts.extensions.get::<Actor>() {
+            refuse_demo_write(state, parts, actor)?;
             return Ok(WebUser(actor.clone()));
         }
         let token = cookie_value(&parts.headers, SESSION_COOKIE)
@@ -310,6 +357,7 @@ impl FromRequestParts<AppState> for WebUser {
         let actor = services::membership_conditions::apply(&state.db, actor, &origin).await?;
         parts.extensions.insert(actor.clone());
         parts.extensions.insert(origin);
+        refuse_demo_write(state, parts, &actor)?;
         Ok(WebUser(actor))
     }
 }
@@ -426,6 +474,7 @@ impl FromRequestParts<AppState> for ApiCaller {
         if !caller.scope.allows_request(parts.method.as_str(), path) {
             return Err(AppError::Forbidden(caller.scope.refusal().into()));
         }
+        refuse_demo_write(state, parts, &caller.actor)?;
         Ok(caller)
     }
 }

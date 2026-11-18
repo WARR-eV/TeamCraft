@@ -82,8 +82,12 @@ has the same notes under `/api/v1/file-versions/{id}/annotations`.
 |---------------------|-------------------------------------------------------------------------------------------------------------------------------|
 | B-rep (tessellated) | STEP (`.step`, `.stp`, `.p21`)                                                                                                |
 | Native CAD          | NX parts (`.prt`), SOLIDWORKS parts (`.sldprt`, 2015+), Inventor parts (`.ipt`) – the tessellation stored in the file; their assemblies from the parts |
+| Native CAD          | CATIA V5 parts (`.CATPart`) – the visualisation data stored in the file; products (`.CATProduct`) from the parts            |
 | Native CAD          | Rhino models (`.3dm`) – the meshes stored in the file, SubD objects refined from their control net                            |
 | Native CAD          | SketchUp models (`.skp`, SketchUp 3 to today) – their faces, components and groups in place                                   |
+| Native CAD          | Creo parts (`.prt.N`) – tessellated from the exact faces stored in the file; assemblies (`.asm.N`) from the parts            |
+|                     | Fusion designs (`.f3d`) – the display mesh Fusion stores                                                                      |
+| Visualisation       | JT (`.jt`): JT 10 parts and whole assemblies, placed; JT 9 as NX writes it                                                    |
 | Meshes              | STL, OBJ, PLY, OFF, 3MF (incl. components), AMF, glTF / GLB, 3DS                                                              |
 | Point clouds        | PTS, XYZ, LAS (uncompressed), PLY and OBJ without faces                                                                       |
 | Simulation results  | VTK (`.vtk`), VTU, VTP, CalculiX FRD – coloured by result fields                                                              |
@@ -96,6 +100,14 @@ B-rep kernel (or from the tessellated geometry of AP242 files), the mesh
 readers are part of TeamCraft. *Export STL* (in the toolbar on the view) saves the shown triangles, e.g.
 for 3D printing. The same conversion computes the shape signature of the
 [similar part search](similar-parts.md).
+
+While the model loads, the canvas says so, and when there is nothing to show
+the reason appears **on the canvas** (and in the line below it) – in the web
+UI and in the desktop app alike: the server's conversion error (for example a
+damaged or unsupported file), an empty, cut-off or invalid model, a graphics
+driver without WebGL 2 or one that could not compile the shaders, a model too
+large for the graphics memory, or a 3D view the graphics driver stopped
+(WebGL context lost). A preview never ends as a silently empty canvas.
 
 When a STEP preview shows only part of the model, the line below the viewer
 says **partial preview: N of M faces** – the missing faces use geometry the
@@ -110,21 +122,39 @@ several fields, a selector – see [Simulations](simulation.md#results-in-3d).
 Native CAD files (Inventor, Solid Edge, SolidWorks, NX, Creo, CATIA, …) are
 proprietary; TeamCraft does not read their exact geometry (see
 [Research: previews of native CAD files](../research/cad-previews.md)).
-The exceptions are **NX**, **SOLIDWORKS** and **Inventor**. All three save a
-tessellation of every part into the file: NX in a documented format (JT 9),
-SOLIDWORKS (2015 and later) as the display lists it draws the part with,
-Inventor as the triangle lists of its graphics segment.
+The exceptions are **NX**, **SOLIDWORKS**, **Inventor**, **CATIA V5** and
+**Creo**. The first four save a tessellation of every part into the file: NX
+in a documented format (JT 9), SOLIDWORKS (2015 and later) as the display
+lists it draws the part with, Inventor as the triangle lists of its graphics
+segment, and CATIA as the visualisation data it draws on screen (see
+[Research: 3D preview of CATIA V5 parts](../research/catia-cgr-preview.md)).
+Creo stores no tessellation, but its exact faces with every edge already
+sampled; TeamCraft triangulates those faces itself – planes, cylinders,
+cones, tori, spline, fillet and ruled faces (see
+[Research: 3D preview of Creo parts](../research/creo-brep-preview.md)),
+and puts Creo assemblies together from their parts (see
+[Research: 3D preview of Creo assemblies](../research/creo-assembly-preview.md)).
 
 TeamCraft shows that tessellation in the 3D viewer, refined along the
 exact surface normals stored with it, so round faces stay round.
 
-An **assembly** of any of these systems is put together from its part files.
+An **assembly** of NX, SOLIDWORKS or Inventor and a **CATIA product** are
+put together from their part files.
 Check the parts in, under their file names, either in the assembly's
 revision or as items of their own. The assembly then shows every component
 in its place, sub-assemblies included (see
 [Research: 3D preview of NX parts](../research/nx-jt-preview.md),
 [3D preview of SOLIDWORKS files](../research/solidworks-display-preview.md),
 [3D preview of Inventor files](../research/inventor-display-preview.md)).
+
+A CATIA product stores no file names, only an id of each component's
+document. TeamCraft finds the component among the CATIA files of the
+product's revision by that id, whatever the file is called now; a renamed
+or copied part is still found. Otherwise it looks for
+`<part number>.CATPart` (or `.CATProduct`) by name, as above (see
+[Research: 3D preview of CATIA V5 products](../research/catia-product-structure.md)).
+Keep parts whose part number differs from their file name in the
+product's revision.
 
 These components are left out:
 
@@ -133,6 +163,9 @@ These components are left out:
 * SOLIDWORKS components that are suppressed or hidden;
 * Inventor components that are hidden or suppressed in the assembly.
 
+CATIA products show hidden components, too: TeamCraft does not recognise
+them yet.
+
 **Rhino** models (`.3dm`, Rhino 1 to 8) are shown from the meshes Rhino
 saves with them: mesh objects, the render meshes of polysurfaces and
 extrusions, block instances in their places; SubD objects are refined
@@ -140,6 +173,9 @@ from their control net. Hidden objects and hidden layers are left out. A
 model saved without render meshes (*Save Small*, or very old files) has
 no 3D preview and shows the picture Rhino stored instead (see
 [Research: 3D preview of Rhino models](../research/rhino-3dm-preview.md)).
+**Fusion** designs (`.f3d`) carry the triangles Fusion draws on screen;
+TeamCraft shows them, refined the same way (see
+[Research: 3D preview of Fusion designs](../research/fusion-ogs-preview.md)).
 
 **SketchUp** models (`.skp`, SketchUp 3 to the current version) open in the
 3D viewer as well: SketchUp stores plain polygons, so TeamCraft triangulates
@@ -151,9 +187,14 @@ with only edges and no faces keeps its stored picture (see
 
 For the rest TeamCraft shows what other PLM systems show:
 
+* **JT files** (`.jt`, version 10) carry parts and assembly in one file:
+  the 3D preview shows every instance in its place, and the file's picture
+  is rendered from it (see
+  [Research: 3D preview of stand-alone JT files](../research/jt10-preview.md)).
 * **A picture of the 3D preview** for NX, SOLIDWORKS and Inventor parts and
-  assemblies and for Rhino and SketchUp models. It replaces the image stored in the file and is a 512 × 512
-  PNG with a transparent background, drawn once and cached. An assembly's
+  assemblies, CATIA parts and products, Creo parts and assemblies, Rhino and SketchUp models and Fusion
+  designs. It replaces the image stored in the file and is a 512 × 512 PNG
+  with a transparent background, drawn once and cached. An assembly's
   picture is drawn again when one of its parts changes. Drawings, and
   assemblies none of whose parts are in TeamCraft, keep the stored image.
 * **The preview image stored in the file.** Inventor drawings and
@@ -166,8 +207,7 @@ For the rest TeamCraft shows what other PLM systems show:
 * **3D from a STEP export.** Attach a STEP export next to the native file.
   The desktop app on Windows creates it with your own Inventor or Solid Edge
   – the *STEP* button in the workspace or the option at check-in, like the
-  Inventor add-in of Autodesk Vault or the Solid Edge integration of
-  Teamcenter. It uses your licence (student licences included, within their
+  CAD add-ins of other PDM systems. It uses your licence (student licences included, within their
   terms); TeamCraft contains no Autodesk or Siemens software.
 
 ## Full-text search

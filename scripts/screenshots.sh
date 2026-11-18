@@ -2,7 +2,8 @@
 # Seeds demo data into a fresh TeamCraft and captures the README screenshots.
 #
 # Expects a running TeamCraft at $BASE_URL with an EMPTY database, listening on
-# localhost (the first-start /setup page creates the administrator), plus
+# localhost (the first-start /setup page creates the administrator, with the
+# one-time code of its log in SETUP_CODE), plus
 # curl, jq, base64, Google Chrome and a matching chromedriver. Builds nothing.
 # Used by .github/workflows/screenshots.yml; see CONTRIBUTING.md, "Updating
 # the README screenshots".
@@ -20,6 +21,12 @@
 #   DESKTOP_APP       TeamCraft Desktop binary: also capture the desktop app
 #                     (Linux; needs Xvfb, xdotool and ImageMagick)  (unset)
 #   DESKTOP_DISPLAY   X display for the desktop app's Xvfb          (:99)
+#   ADMIN_PASSWORD_FILE  sign in as the existing administrator "admin"
+#                     instead of creating it on the first-start page (which
+#                     only localhost gets) – a hosted live demo   (unset)
+#   SETUP_CODE        the one-time code of the setup link the server logs
+#                     at start (login?setup=…) – needed for the first-start page
+#                     (not with ADMIN_PASSWORD_FILE)
 #   README            compared with the result: warns about images it
 #                     expects in media/screenshots/ that were not made (README.md)
 #
@@ -403,16 +410,27 @@ capture_change_request() {
 
 seed() {
     local code
-    log "creating the administrator through the first-start page"
-    new_password admin
-    code=$(web admin /setup --data-urlencode username=admin \
-        --data-urlencode "display_name=Alex Morgan" \
-        --data-urlencode "password@$WORK/pw-admin" \
-        --data-urlencode "password_repeat@$WORK/pw-admin")
-    if [[ $code == 403 ]]; then
-        die "the first-start setup is closed – the database must be empty and the server must listen on localhost"
+    if [[ -n ${ADMIN_PASSWORD_FILE:-} ]]; then
+        # a server that is not on localhost (a hosted live demo): the
+        # administrator "admin" exists already (TEAMCRAFT_BOOTSTRAP_ADMIN_*)
+        [[ -r $ADMIN_PASSWORD_FILE ]] || die "ADMIN_PASSWORD_FILE '$ADMIN_PASSWORD_FILE' is not readable"
+        log "signing in as the existing administrator admin"
+        # no trailing newline: curl's name@file reads the file verbatim
+        tr -d '\r\n' <"$ADMIN_PASSWORD_FILE" >"$WORK/pw-admin"
+        login_web admin
+    else
+        log "creating the administrator through the first-start page"
+        new_password admin
+        code=$(web admin /setup --data-urlencode username=admin \
+            --data-urlencode "display_name=Alex Morgan" \
+            --data-urlencode "password@$WORK/pw-admin" \
+            --data-urlencode "password_repeat@$WORK/pw-admin" \
+            --data-urlencode "setup_code=${SETUP_CODE:-}")
+        if [[ $code == 403 ]]; then
+            die "the first-start setup is closed – the database must be empty, the server must listen on localhost and SETUP_CODE must be the code of the setup link in its log (or set ADMIN_PASSWORD_FILE)"
+        fi
+        [[ $code == 303 || $code == 302 ]] || die "first-start setup failed (HTTP $code)"
     fi
-    [[ $code == 303 || $code == 302 ]] || die "first-start setup failed (HTTP $code)"
     api_token admin
 
     log "creating the users mchen and jlopez"
@@ -878,8 +896,9 @@ capture_desktop() {
     desktop_run -dark teamcraft-night
 }
 
-# desktop_run SUFFIX SKIN – starts the app with SKIN, captures the four
-# screens as desktop-*SUFFIX.png and quits the app again.
+# desktop_run SUFFIX SKIN – starts the app with SKIN, captures its screens
+# (home, worklist, revision, change order, graph, agent) as
+# desktop-*SUFFIX.png and quits the app again.
 desktop_run() {
     local suffix=$1 skin=$2 settings=$WORK/xdg-config/io.github.rudalabs.teamcraft/settings.json
     log "capturing TeamCraft Desktop, skin $skin (1440x900, Xvfb)"
@@ -927,10 +946,37 @@ desktop_run() {
     desktop_click 210 203 # "Waiting for my review": the enclosure change
     settle 2 "the change order tab"
     desktop_snap "desktop-change$suffix"
+    desktop_graph "$suffix"
     desktop_agent "$suffix"
     kill "$APP_PID" 2>/dev/null || true
     wait "$APP_PID" 2>/dev/null || true
     APP_PID=
+}
+
+# desktop_graph SUFFIX – the Graph tab of a revision: the BOM and reference
+# graph of the sensor mast assembly with its children, their ×n quantities
+# and preview images (desktop-graph.png is in the README and the book). The
+# mast tab cannot be clicked open directly – as a dependent to check its tab
+# shows the impacts above the sub-tabs, which moves them – so the way leads
+# through the bracket tab, whose layout desktop-revision.png shows: back to
+# it (Ctrl+PageUp, the change tab is the last one), its "Graph" sub-tab
+# right after "References", then the assembly above the bracket in its graph.
+# The graph fits itself into the pane (zoom capped at 1.4): the one "uses"
+# card sits at the pane's centre line, about 110 px above its middle.
+# desktop-graph-nav*.png (the bracket's graph) is the calibration image for
+# that click, not in the README. Afterwards the change tab is active again.
+desktop_graph() {
+    local suffix=$1
+    desktop_key ctrl+Page_Up
+    settle 2 "the bracket tab"
+    desktop_click 838 248 # sub-tab "Graph" of the mounting bracket
+    settle 3 "the graph of the mounting bracket"
+    desktop_snap "desktop-graph-nav$suffix"
+    desktop_click 898 528 # the card above the bracket: the sensor mast assembly
+    settle 4 "the graph of the sensor mast assembly"
+    desktop_snap "desktop-graph$suffix"
+    desktop_key ctrl+Page_Down
+    settle 2 "the change order tab"
 }
 
 # desktop_agent SUFFIX – the Agent view (Ctrl+4) with the scripted demo agent
@@ -965,12 +1011,12 @@ desktop_click() {
 # Simulation results: simulation-cfd-3d and simulation-results are in the
 # README, simulation-result-3d is an extra image. Seeded after the README's
 # web pages and the desktop run, so those images keep their content.
-capture_simulation() {
+# seed_simulation also loads them into a live demo (scripts/seed-demo.sh).
+seed_simulation() {
     log "adding a simulation with a 3D result"
     item sim simulation "Mast arm static analysis"
     result_vtu "$WORK/mast-arm-static.vtu"
-    local result
-    result=$(attach sim "$WORK/mast-arm-static.vtu" mast-arm-static.vtu)
+    SIM_RESULT=$(attach sim "$WORK/mast-arm-static.vtu" mast-arm-static.vtu)
     # The basis it was computed with and its result values – made up for the
     # screenshot, like the VTU. The natural frequency misses its limit on
     # purpose, so the table shows a pass and a fail.
@@ -983,8 +1029,17 @@ capture_simulation() {
         {"name": "Safety factor", "value": 1.9, "lower_limit": 1.5, "load_case": "LC1 wind 25 m/s"},
         {"name": "First natural frequency", "value": 36.5, "unit": "Hz", "lower_limit": 40, "load_case": "Modal"}]}' >/dev/null
     checkin sim
+    log "adding a simulation with a CFD result"
+    item cfd simulation "Mast fairing CFD"
+    result_cfd_vtu "$WORK/mast-fairing-cfd.vtu"
+    CFD_RESULT=$(attach cfd "$WORK/mast-fairing-cfd.vtu" mast-fairing-cfd.vtu)
+    checkin cfd
+}
+
+capture_simulation() {
+    seed_simulation
     viewport 1440 900 "$SCALE" false
-    open_page "/files/$result/preview"
+    open_page "/files/$SIM_RESULT/preview"
     wait_js 'document.getElementById("viewer-canvas").getAttribute("data-ready") !== null' 120 \
         "the 3D view of the simulation result"
     [[ $(js 'return document.querySelector(".viewer-legend") !== null;') == true ]] ||
@@ -995,12 +1050,7 @@ capture_simulation() {
     # CFD: flow around the mast fairing, coloured by velocity magnitude (the
     # README image). The viewer has no camera presets: the arrow keys turn
     # the model (view onto the flow plane, zoomed) and the selector picks the field.
-    log "adding a simulation with a CFD result"
-    item cfd simulation "Mast fairing CFD"
-    result_cfd_vtu "$WORK/mast-fairing-cfd.vtu"
-    result=$(attach cfd "$WORK/mast-fairing-cfd.vtu" mast-fairing-cfd.vtu)
-    checkin cfd
-    open_page "/files/$result/preview"
+    open_page "/files/$CFD_RESULT/preview"
     wait_js 'document.getElementById("viewer-canvas").getAttribute("data-ready") !== null' 120 \
         "the 3D view of the CFD result"
     [[ $(js 'return document.querySelector(".viewer-legend") !== null;') == true ]] ||
@@ -1018,20 +1068,24 @@ capture_simulation() {
 # its eight part files. The preview looks for the parts by file name in the
 # same revision first, so the seeded items stay as they are. Seeded after the
 # README's web pages and the desktop run, so those images keep their content.
-capture_nx() {
+seed_nx() {
     log "adding the NX model of the enclosure (nine NX files)"
-    local nx=$FIXTURES/mtc-assembly/nx f asm
+    local nx=$FIXTURES/mtc-assembly/nx f
     item nx_enclosure assembly "Electronics enclosure, NX model" \
         '{"description":"NX model of the enclosure (NIST MTC CRADA assembly) with its part files."}'
-    asm=$(attach nx_enclosure "$nx/NIST mtc crada assembly.prt")
+    NX_ASSEMBLY=$(attach nx_enclosure "$nx/NIST mtc crada assembly.prt")
     for f in "NIST mtc crada box" "NIST mtc crada cover" "NIST mtc crada plate" "NIST mtc crada polycarb" \
         "91274A118 SHCS" "91274A141 SHCS" "91304A112 FHSCS" "90591A141 HEX NUT"; do
         attach nx_enclosure "$nx/$f.prt" >/dev/null
     done
     checkin nx_enclosure
+}
+
+capture_nx() {
+    seed_nx
     viewport 1440 900 "$SCALE" false
     log "waiting for the 3D preview of the NX assembly (nine conversions)"
-    open_page "/files/$asm/preview"
+    open_page "/files/$NX_ASSEMBLY/preview"
     wait_js 'document.getElementById("viewer-canvas").getAttribute("data-ready") !== null' 300 \
         "the 3D preview of the NX assembly"
     [[ $(js 'return document.getElementById("viewer-canvas").getAttribute("data-ready");') == true ]] ||
@@ -1044,23 +1098,27 @@ capture_nx() {
 # As-built record – as-built is in the README: unit RVR-0007 of the sensor
 # mast with one deviation accepted as is and one still open (made-up facts).
 # The new as-built revision stays checked out by admin.
-capture_as_built() {
+seed_as_built() {
     log "recording sensor mast unit RVR-0007 as built"
-    local out ab_num ab_rev
+    local out ab_num
     out=$(japi admin POST "/items/${NUM[mast]}/revisions/latest/built-units" \
         '{"serial_number":"RVR-0007","built_on":"2026-10-28","note":"First field unit, assembled in the workshop."}')
-    ab_rev=$(jq -r '.id' <<<"$out")
+    AS_BUILT_REV=$(jq -r '.id' <<<"$out")
     ab_num=$(jq -r '.item_number' <<<"$out")
-    [[ -n $ab_rev && $ab_rev != null ]] || die "recording the unit returned no revision"
+    [[ -n $AS_BUILT_REV && $AS_BUILT_REV != null ]] || die "recording the unit returned no revision"
     japi admin POST "/items/$ab_num/revisions/latest/as-built/deviations" \
         '{"kind":"dimension","feature":"Bore Ø12 H7, mounting bracket","designed":"12.000 +0.018/0","built":"12.035","disposition":"use_as_is","note":"Accepted by MRB: joint secured with retaining compound."}' >/dev/null
     japi admin POST "/items/$ab_num/revisions/latest/as-built/deviations" \
         '{"kind":"component","feature":"Hex nut 90591A141, find no. 50","designed":"90591A141, zinc plated","built":"Second-source nut DIN 934 A2","disposition":"open","note":"Waiting for the supplier certificate."}' >/dev/null
     log "  $ab_num recorded"
+}
+
+capture_as_built() {
+    seed_as_built
     viewport 1440 900 "$SCALE" false
-    shot as-built "/revisions/$ab_rev" '#as-built'
+    shot as-built "/revisions/$AS_BUILT_REV" '#as-built'
     scheme dark
-    shot as-built-dark "/revisions/$ab_rev" '#as-built'
+    shot as-built-dark "/revisions/$AS_BUILT_REV" '#as-built'
     scheme light
 }
 
@@ -1068,10 +1126,10 @@ capture_as_built() {
 # images: the settings of a restricted group (as admin) and what a non-member
 # sees of a link into it. Seeded last, so the README images stay as they are;
 # signs the browser in as jlopez, so it must stay the last capture.
-capture_restricted() {
+seed_restricted() {
     log "adding the restricted project group LAB"
-    local lab_id out
-    lab_id=$(japi admin POST /projects \
+    local out
+    LAB_ID=$(japi admin POST /projects \
         '{"code":"LAB","name":"Sensor lab prototypes","description":"Prototype sensors that are not public yet.","visibility":"restricted"}' |
         jq -r '.id')
     japi admin POST /projects/LAB/members '{"username":"mchen","manager":true}' >/dev/null
@@ -1083,9 +1141,12 @@ capture_restricted() {
     bom_line rig lidar 1 20 "Prototype from the sensor lab"
     checkin lidar
     checkin rig
+}
 
+capture_restricted() {
+    seed_restricted
     viewport 1440 900 "$SCALE" false
-    shot project-restricted "/projects/$lab_id" 'form[action$="/visibility"]'
+    shot project-restricted "/projects/$LAB_ID" 'form[action$="/visibility"]'
 
     log "switching the browser to jlopez (not a member of LAB)"
     wd DELETE "/session/$SESSION/cookie" >/dev/null
@@ -1148,4 +1209,7 @@ main() {
     compare_with_readme
 }
 
-main "$@"
+# Sourced (scripts/seed-demo.sh): only the functions, no screenshots.
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+    main "$@"
+fi

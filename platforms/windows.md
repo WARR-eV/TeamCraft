@@ -4,6 +4,15 @@ Local build and test from PowerShell (Windows 10 / 11, x64 or ARM64). ARM64
 was tried in a Parallels VM on an Apple M1 – server and desktop app build and
 run natively; the extra steps are marked **ARM64**.
 
+**Just try it:** `TeamCraft-with-local-server_<version>_x64-setup.exe` from the
+[Releases page](https://github.com/rudalabs/TeamCraft/releases) installs
+*TeamCraft Local* for your user – the desktop app with the server and
+PostgreSQL, as an app of its own next to an installed TeamCraft (no
+administrator rights; SmartScreen: *More info → Run anyway*). Start
+*TeamCraft Local*; it starts its local server by itself. On ARM64 the x64 installer runs under
+emulation. See
+[Try it on your computer](https://rudalabs.github.io/TeamCraft/guide/local-server.html).
+
 ## 1. Prerequisites
 
 ```powershell
@@ -74,8 +83,8 @@ docker compose up -d db     # skip when you use the native PostgreSQL
 cargo run --release         # first build takes a few minutes
 ```
 
-Open <http://localhost:8080>, create the administrator on the login page,
-then a project group (*Projects → New project group*) and your first item.
+Open the setup link the server prints at start (`…/login?setup=…`), create
+the administrator, then a project group (*Projects → New project group*) and your first item.
 
 ## 3. Test
 

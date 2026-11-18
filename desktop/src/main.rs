@@ -18,6 +18,7 @@ mod compat;
 mod crash;
 mod folderimport;
 mod layout;
+mod localserver;
 mod resume;
 mod settings;
 mod signin;
@@ -57,6 +58,9 @@ pub struct AppState {
     pub agent_seq: AtomicU64,
     /// Cancel flag of the running Get (workspace downloads).
     pub get_cancel: Arc<AtomicBool>,
+    /// The local test server the app started (*Try TeamCraft on this
+    /// computer*, src/localserver.rs); ends with the app.
+    pub local_server: Mutex<Option<localserver::Running>>,
 }
 
 /// Name of this computer, shown on the browser confirmation page and used for
@@ -168,6 +172,9 @@ fn main() {
             crash::start_session(&crash_dir, move || {
                 let _ = handle.emit("crash-reports", ());
             });
+            // the token's keychain entry belongs to this app's identifier:
+            // TeamCraft Local (downloads with local server) has its own
+            settings::set_keychain_service(&app.config().identifier);
             let settings = settings::Settings::load(&config_dir);
             let zoom = settings.zoom.map(commands::clamp_zoom);
             let theme = window_theme(settings.skin.as_deref());
@@ -182,6 +189,7 @@ fn main() {
                 agent: Mutex::new(None),
                 agent_seq: AtomicU64::new(0),
                 get_cancel: Arc::new(AtomicBool::new(false)),
+                local_server: Mutex::new(None),
             });
             build_menu(app)?;
             if let Some(window) = app.get_webview_window("main") {
@@ -203,6 +211,7 @@ fn main() {
             commands::set_server,
             commands::server_notice,
             commands::server_url_insecure,
+            commands::local_server_start,
             commands::sign_in_browser,
             commands::cancel_sign_in,
             commands::sign_in_token,
@@ -221,6 +230,8 @@ fn main() {
             commands::workspace_migrate,
             commands::workspace_status,
             commands::workspace_checkin,
+            commands::workspace_park,
+            commands::workspace_local_changes,
             commands::pick_files,
             commands::workspace_add_plan,
             commands::workspace_add_files,

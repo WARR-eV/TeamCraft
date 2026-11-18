@@ -1,5 +1,4 @@
-//! Personal working sets: favorites (Teamcenter "Favorites") and saved item
-//! searches (Teamcenter "Saved Queries").
+//! Personal working sets: favorites and saved item searches.
 //! Both belong to one user only, so they are not audited.
 
 use chrono::{DateTime, Utc};

@@ -10,7 +10,7 @@ systems scope *read* access and what TeamCraft adopts. Date: 2026-11-05.
 |-------------------------------------------------------------|-----------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------|
 | Onshape                                                     | document (and folders); teams and the company/enterprise as grantees                          | private to the owner                                                             | share a document with users, teams or the whole company; permission levels view / copy / export / edit        | a document shared "view only" can still forbid export or copy; enterprise admins see everything      |
 | GitHub                                                      | repository                                                                                    | public or private chosen at creation; organisation base permission (read / none) | membership of the organisation or a team that has the repository                                              | a private repository answers **404**, never 403, to outsiders, so its existence is not confirmed     |
-| Typical PDM/PLM (Teamcenter, Windchill, Vault Professional) | project, context, folder or library; access control lists per object type and lifecycle state | everything inside a context is visible to its members                            | context membership plus role; rules per state ("released documents visible to all, in-work only to the team") | powerful, but rule sets become hard to audit; most installations use "project = visibility boundary" |
+| Typical enterprise PDM/PLM                                  | project, context, folder or library; access control lists per object type and lifecycle state | everything inside a context is visible to its members                            | context membership plus role; rules per state ("released documents visible to all, in-work only to the team") | powerful, but rule sets become hard to audit; most installations use "project = visibility boundary" |
 
 Common ground:
 
@@ -30,7 +30,7 @@ Common ground:
   anything in it.
 - **No per-object ACLs and no per-membership access levels** for now.
   A read-only member is a member with the global viewer role. Per-object
-  rules (Teamcenter-style) are hard to audit and not needed for the
+  rules (as in enterprise PLM systems) are hard to audit and not needed for the
   request "not everybody may see every repository".
 - **404 like GitHub.** A hidden item, file, change or group answers exactly
   like a missing one.
@@ -63,5 +63,5 @@ Common ground:
 - GitHub docs: "About repositories – repository visibility", "Repository
   roles for an organization", and the 404 behaviour for private repositories
   in the REST API documentation.
-- Teamcenter "Access Manager" and Windchill "context and access control"
-  documentation (vendor manuals, conceptual overview only).
+- Access control documentation of enterprise PDM/PLM systems (vendor
+  manuals, conceptual overview only).

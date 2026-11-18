@@ -3815,6 +3815,85 @@ async fn rhino_models_get_a_3d_preview_and_a_rendered_thumbnail() {
     app.teardown().await;
 }
 
+/// A Fusion design (`.f3d`) is previewed from the display scene stored in
+/// the archive (Zstandard entries), in millimetres, and its thumbnail is
+/// rendered from that preview like an NX part's.
+#[tokio::test]
+async fn fusion_designs_are_previewed_from_their_display_scene() {
+    let app = app_or_skip!();
+    let (_, eng) = app.user_in("eng", Role::Editor, &["GEARBOX"]).await;
+    app.api(
+        Method::POST,
+        "/api/v1/items",
+        &eng,
+        Some(json!({ "item_type": "part", "name": "Cube", "project": "GEARBOX" })),
+    )
+    .await;
+    // a 2 cm cube in a display scene, next to a sketch and an edge
+    let archive = teamcraft::fusion::sample::cube_archive(2.0, &[]);
+    let files = app
+        .api_multipart(
+            "/api/v1/items/PRT-000001/revisions/A/files",
+            &eng,
+            &[("cube.f3d", &archive)],
+            &[],
+        )
+        .await;
+    assert_eq!(files.status, StatusCode::CREATED, "{}", files.text());
+    let files = files.json();
+    let file = &files.as_array().unwrap()[0];
+    assert_eq!(file["format"], "fusion-design");
+    let id = file["id"].as_str().unwrap().to_string();
+
+    let r = app
+        .api(Method::GET, &format!("/api/v1/files/{id}/mesh"), &eng, None)
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let mesh = teamcraft::mesh::Mesh::decode(&r.body).unwrap();
+    assert_eq!(mesh.parts, 1, "one body");
+    assert!(
+        mesh.triangle_count() >= 12,
+        "{} triangles",
+        mesh.triangle_count()
+    );
+    for axis in 0..3 {
+        let coords = mesh.positions.iter().skip(axis).step_by(3);
+        let lo = coords.clone().fold(f32::MAX, |a, &b| a.min(b));
+        let hi = coords.fold(f32::MIN, |a, &b| a.max(b));
+        assert!(
+            lo.abs() < 1e-3 && (hi - 20.0).abs() < 1e-3,
+            "axis {axis}: {lo}..{hi} mm"
+        );
+    }
+
+    let thumbnail = app
+        .api(
+            Method::GET,
+            &format!("/api/v1/files/{id}/thumbnail"),
+            &eng,
+            None,
+        )
+        .await;
+    assert_eq!(thumbnail.status, StatusCode::OK, "{}", thumbnail.text());
+    assert_eq!(
+        thumbnail.header("content-type").as_deref(),
+        Some("image/png")
+    );
+    assert!(thumbnail.body.starts_with(&[0x89, b'P', b'N', b'G']));
+    // IHDR: the rendered size
+    assert_eq!(&thumbnail.body[16..24], &[0, 0, 2, 0, 0, 0, 2, 0]);
+    let again = app
+        .api(
+            Method::GET,
+            &format!("/api/v1/files/{id}/thumbnail"),
+            &eng,
+            None,
+        )
+        .await;
+    assert_eq!(again.body, thumbnail.body, "served from the cache");
+    app.teardown().await;
+}
+
 /// An NX assembly has no tessellation of its own: its 3D preview is put
 /// together from the previews of its part files, found by file name and
 /// placed as the assembly says (the NIST assembly: 36 instances of 8
@@ -4301,8 +4380,260 @@ async fn inventor_assemblies_are_put_together_from_their_parts() {
     app.teardown().await;
 }
 
-/// The most used Teamcenter working features: favorites, saved
-/// searches, Save As and the BOM comparison.
+/// A CATIA product names no files: its components are found by the UUID of
+/// their document (whatever the file is called), otherwise by part number;
+/// sub-products are entered, placements composed, and a component that is
+/// not in TeamCraft is left out. The product's thumbnail is rendered.
+#[tokio::test]
+async fn catia_products_are_put_together_from_their_parts() {
+    let Some(app) = common::setup_with(&[("TEAMCRAFT_MAX_UPLOAD_MB", "8")]).await else {
+        return;
+    };
+    let (_, eng) = app.user_in("eng", Role::Editor, &["GEARBOX"]).await;
+    app.api(
+        Method::POST,
+        "/api/v1/items",
+        &eng,
+        Some(json!({ "item_type": "assembly", "name": "Frame", "project": "GEARBOX" })),
+    )
+    .await;
+    let part = std::fs::read(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/cad/nist/ctc-01/catia-v5/nist_ctc_01_asme1_rd_ct5290_ra.CATPart"),
+    )
+    .unwrap();
+    let document = teamcraft::catprod::document(&part).unwrap();
+    let raw: Vec<u8> = document
+        .split('_')
+        .map(|w| u32::from_str_radix(w, 16).unwrap())
+        .flat_map(u32::to_be_bytes)
+        .collect();
+    let part_uuid: [u8; 16] = raw.try_into().unwrap();
+    let (top_uuid, holder_uuid) = ([1u8; 16], [2u8; 16]);
+    let moved =
+        |x: f64, y: f64, z: f64| Some([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, x, y, z]);
+    // a quarter turn about z: local x along world y, local y along -x
+    let turned = Some([
+        0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 2000.0, 0.0,
+    ]);
+    let top = teamcraft::catprod::sample(
+        top_uuid,
+        &[
+            // by document: the part number is not the file name
+            ("ctc", part_uuid, None),
+            ("Holder", holder_uuid, moved(1000.0, 0.0, 0.0)),
+            // an unknown document, found by part number
+            ("nist", [9; 16], turned),
+            // not in TeamCraft
+            ("gone", [7; 16], moved(0.0, 0.0, -5000.0)),
+        ],
+    );
+    let holder =
+        teamcraft::catprod::sample(holder_uuid, &[("ctc", part_uuid, moved(0.0, 500.0, 0.0))]);
+    let mut ids = Vec::new();
+    for (name, data) in [
+        ("Frame.CATProduct", &top),
+        ("Sub.CATProduct", &holder),
+        ("nist.CATPart", &part),
+    ] {
+        let files = app
+            .api_multipart(
+                "/api/v1/items/ASM-000001/revisions/A/files",
+                &eng,
+                &[(name, data.as_slice())],
+                &[],
+            )
+            .await;
+        assert_eq!(
+            files.status,
+            StatusCode::CREATED,
+            "{name}: {}",
+            files.text()
+        );
+        ids.push(files.json()[0]["id"].as_str().unwrap().to_string());
+    }
+    let r = app
+        .api(
+            Method::GET,
+            &format!("/api/v1/files/{}/mesh", ids[0]),
+            &eng,
+            None,
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let mesh = teamcraft::mesh::Mesh::decode(&r.body).unwrap();
+    // ctc-01 spans x -400..400, y -225..225, z -100..50 mm
+    let b = mesh.bounds();
+    let expect = [-400.0, -225.0, -100.0, 1400.0, 2400.0, 50.0];
+    for (got, want) in b.iter().zip(expect) {
+        assert!((got - want).abs() < 0.1, "{b:?}");
+    }
+    let r = app
+        .api(
+            Method::GET,
+            &format!("/api/v1/files/{}/thumbnail", ids[0]),
+            &eng,
+            None,
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert_eq!(r.header("content-type").as_deref(), Some("image/png"));
+    app.teardown().await;
+}
+
+/// A Creo assembly lists its components by model name: they are found as
+/// `<name>.prt` / `<name>.asm` (TeamCraft drops the iteration suffix),
+/// sub-assemblies are entered with their own unit (inches here), placements
+/// composed, and a component that is not in TeamCraft is left out. The
+/// assembly's thumbnail is rendered.
+#[tokio::test]
+async fn creo_assemblies_are_put_together_from_their_parts() {
+    let Some(app) = common::setup_with(&[("TEAMCRAFT_MAX_UPLOAD_MB", "8")]).await else {
+        return;
+    };
+    let (_, eng) = app.user_in("eng", Role::Editor, &["GEARBOX"]).await;
+    app.api(
+        Method::POST,
+        "/api/v1/items",
+        &eng,
+        Some(json!({ "item_type": "assembly", "name": "Frame", "project": "GEARBOX" })),
+    )
+    .await;
+    let part = std::fs::read(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/cad/nist/ctc-01/creo-10/nist_ctc_01_asme1_rd_cr10030.prt.5"),
+    )
+    .unwrap();
+    let identity = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    // a quarter turn about z: local x along world y, local y along -x
+    let quarter = [[0.0, 1.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 0.0, 1.0]];
+    let top = teamcraft::mesh::creo::asm::sample(
+        &[
+            ("CTC", false, identity, [0.0; 3]),
+            ("HOLDER", true, identity, [1000.0, 0.0, 0.0]),
+            ("CTC", false, quarter, [0.0, 2000.0, 0.0]),
+            // not in TeamCraft
+            ("GONE", false, identity, [0.0, 0.0, -5000.0]),
+        ],
+        "mm",
+    );
+    // the sub-assembly is in inches: 500 mm along y
+    let holder = teamcraft::mesh::creo::asm::sample(
+        &[("CTC", false, identity, [0.0, 500.0 / 25.4, 0.0])],
+        "in",
+    );
+    let mut ids = Vec::new();
+    for (name, data) in [
+        ("frame.asm.2", &top),
+        ("holder.asm.7", &holder),
+        ("ctc.prt.5", &part),
+    ] {
+        let files = app
+            .api_multipart(
+                "/api/v1/items/ASM-000001/revisions/A/files",
+                &eng,
+                &[(name, data.as_slice())],
+                &[],
+            )
+            .await;
+        assert_eq!(
+            files.status,
+            StatusCode::CREATED,
+            "{name}: {}",
+            files.text()
+        );
+        ids.push(files.json()[0]["id"].as_str().unwrap().to_string());
+    }
+    let r = app
+        .api(
+            Method::GET,
+            &format!("/api/v1/files/{}/mesh", ids[0]),
+            &eng,
+            None,
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let mesh = teamcraft::mesh::Mesh::decode(&r.body).unwrap();
+    // ctc-01 spans x -400..400, y -225..225, z -100..50 mm
+    let b = mesh.bounds();
+    let expect = [-400.0, -225.0, -100.0, 1400.0, 2400.0, 50.0];
+    for (got, want) in b.iter().zip(expect) {
+        assert!((got - want).abs() < 0.1, "{b:?}");
+    }
+    let r = app
+        .api(
+            Method::GET,
+            &format!("/api/v1/files/{}/thumbnail", ids[0]),
+            &eng,
+            None,
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert_eq!(r.header("content-type").as_deref(), Some("image/png"));
+    app.teardown().await;
+}
+
+/// A stand-alone JT 10 file carries its parts and its assembly: one upload
+/// gives the placed 3D preview (the NIST assembly: 36 instances of 8
+/// parts) and a thumbnail rendered from it.
+#[tokio::test]
+async fn jt_files_show_their_assembly_in_3d() {
+    let Some(app) = common::setup_with(&[("TEAMCRAFT_MAX_UPLOAD_MB", "8")]).await else {
+        return;
+    };
+    let (_, eng) = app.user_in("eng", Role::Editor, &["GEARBOX"]).await;
+    app.api(
+        Method::POST,
+        "/api/v1/items",
+        &eng,
+        Some(json!({ "item_type": "assembly", "name": "Crada", "project": "GEARBOX" })),
+    )
+    .await;
+    let data = std::fs::read(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/cad/nist/mtc-assembly/nx/NIST mtc crada assembly.jt"),
+    )
+    .unwrap();
+    let files = app
+        .api_multipart(
+            "/api/v1/items/ASM-000001/revisions/A/files",
+            &eng,
+            &[("crada.jt", data.as_slice())],
+            &[],
+        )
+        .await;
+    assert_eq!(files.status, StatusCode::CREATED, "{}", files.text());
+    let file = &files.json()[0];
+    assert_eq!(file["format"], "jt");
+    assert_eq!(file["format_info"]["preview"], "jt");
+    assert_eq!(file["format_info"]["thumbnail"], true);
+    let id = file["id"].as_str().unwrap().to_string();
+    let r = app
+        .api(Method::GET, &format!("/api/v1/files/{id}/mesh"), &eng, None)
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let mesh = teamcraft::mesh::Mesh::decode(&r.body).unwrap();
+    assert_eq!(mesh.parts, 36, "every instance placed");
+    let b = mesh.bounds();
+    assert!((b[3] - b[0] - 152.4).abs() < 0.01, "{b:?}");
+    assert!((b[4] - b[1] - 101.6).abs() < 0.01, "{b:?}");
+
+    let thumb = app
+        .api(
+            Method::GET,
+            &format!("/api/v1/files/{id}/thumbnail"),
+            &eng,
+            None,
+        )
+        .await;
+    assert_eq!(thumb.status, StatusCode::OK, "{}", thumb.text());
+    assert_eq!(thumb.header("content-type").as_deref(), Some("image/png"));
+    assert_eq!(png_size(&thumb.body), (512, 512));
+    app.teardown().await;
+}
+
+/// The most used PLM working features: favorites, saved searches,
+/// Save As and the BOM comparison.
 #[tokio::test]
 async fn favorites_searches_save_as_and_bom_compare() {
     let app = app_or_skip!();

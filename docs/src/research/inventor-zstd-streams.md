@@ -124,10 +124,14 @@ Arrays keep their form `u32 0x30000002, u32 count, u32 capacity, u32 type`.
 
 * `ruzstd` is built without its `hash` feature: the frames carry no
   checksum, so the extra dependency would do nothing.
-* The decoder refuses frames whose window is larger than 128 MiB. The
-  reader also refuses a frame whose declared content is larger than its
-  limit before it decodes anything, stops reading at the limit, and treats
-  a frame that yields another length than it declares as damaged.
+* The reader that went into `main` is the one of #276
+  (`invpart::unpack`): it tells the codecs apart by their magic bytes –
+  Zstandard where the zlib body would start, zlib when a valid zlib header
+  stands there, else the first Zstandard frame within 64 bytes – reads
+  consecutive frames, caps the output like zlib and the decoder window at
+  32 MiB. It does not use the codec byte, which is consistent with the
+  findings above (the frame starts right after it). A damaged frame is an
+  error, never a panic.
 
 ## Results with the fixed reader
 
@@ -152,8 +156,9 @@ Before the fix, none of the 229 files gave a 3D preview.
 ## Decision
 
 * Read both codecs in `src/invpart.rs`, chosen by the first bytes of the
-  body: a Zstandard frame with `ruzstd`, anything else as zlib.
-* Accept the `u32` type words of Inventor 2027 in arrays.
+  body (done in #276, see *The decoder*).
+* Accept the `u32` type words of Inventor 2027 in arrays
+  (`invpart::is_u32`: 0, 4, 8, 14, 16).
 * For an assembly none of whose occurrence records has a title, take the
   visibility from the active design view and ignore flag `0x40`. For every
   other assembly, keep the flag. The form is told by the records, not by a

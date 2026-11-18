@@ -152,7 +152,8 @@ The screenshots in `media/screenshots/` are made by
 [`scripts/screenshots.sh`](scripts/screenshots.sh), never by hand, so that they
 always show the same demo data. The script needs a running TeamCraft with an **empty** database that listens on
 localhost. It creates the administrator
-through the first-start page and two editors, the project group ROVER, parts
+through the first-start page (with the one-time code of the setup link in the
+server log, `SETUP_CODE`) and two editors, the project group ROVER, parts
 and assemblies with the NIST files from `tests/fixtures/cad`, a multi-level
 BOM, a released and a pending change order, check-outs and notifications,
 and after the main pages a change request, two simulations with results, an
@@ -175,7 +176,10 @@ an Xvfb display of 1440 × 900 without a window manager and captures the
 screen with ImageMagick. The app has no deep links, so `xdotool` drives it like
 a user: the Ctrl+2 shortcut (worklist) and clicks on navigator rows at fixed
 screen positions (the ROVER group, the checked-out bracket, the change order
-waiting for review). When the desktop layout or the demo data changes, check
+waiting for review), then Ctrl+PageUp back to the bracket, its *Graph*
+sub-tab and the sensor mast assembly above it in the graph
+(`desktop-graph.png`; `desktop-graph-nav.png` shows the bracket's graph the
+click aims at). When the desktop layout or the demo data changes, check
 that the `desktop-*.png` images still show what their names say and adjust the
 coordinates in `desktop_run`.
 
@@ -203,6 +207,12 @@ At the end of a run, `scripts/screenshots.sh` compares its PNGs with the
 workflow annotation on GitHub) for every image the README shows that the run
 did not make – the run itself does not fail. Without `DESKTOP_APP` the
 `desktop-*.png` images are among them.
+
+The data loading lives in the script's `seed` and `seed_*` functions, apart
+from the captures: `scripts/seed-demo.sh` sources the script (it captures
+nothing when sourced) to load the same data into the hosted live demo
+([Live demo](docs/src/admin/live-demo.md)). Keep new demo data in a `seed_*`
+function, so the screenshots and the demo stay alike.
 
 To run it locally against a throw-away database and vault (Chrome and a
 matching chromedriver installed):
@@ -303,8 +313,13 @@ code base. These are the most important rules:
 * **Tests:** new behaviour comes with tests. Put unit tests next to the code
   and end-to-end tests in `tests/` (`api_flow.rs` for the REST API,
   `web_ui.rs` for the web interface).
-* **Documentation:** keep `README.md`, `docs/src/`, `platforms/*.md` and
-  `desktop/README.md` in sync with your change.
+* **Documentation:** every change updates the documentation in the same pull
+  request – a pull request without it is not finished. Check `CHANGELOG.md`
+  (an entry under *Unreleased*), `README.md` (features, licence table),
+  `docs/src/` (user and admin guide, `reference/api.md` for routes,
+  `admin/configuration.md` for settings, `dev/threat-model.md` for
+  security-relevant changes), `docs/OPEN_WORK.md`, `platforms/*.md` and, for
+  the desktop app, `desktop/README.md` and `docs/src/guide/desktop.md`.
 
 ## Dependencies, research and branding
 
@@ -326,6 +341,85 @@ Do not add logos, artwork or branding of other products, and nothing that
 imitates the look of another vendor's software. Product names may be used to
 describe compatibility, for example "reads SolidWorks files".
 
+## Your own work only – no decompiled code
+
+Every contribution – code, tests, fixtures, documentation – must be the
+contributor's own work, written from their own skills and knowledge, or come
+from a source whose licence allows it (see above) and be credited as such.
+This applies in exactly the same way to code that an **AI agent** writes for
+you: it has to come from the agent's general knowledge and from material it
+may use, never from someone else's program code.
+
+**Not allowed, in no form and by nobody – neither people nor AI agents:**
+
+* **Decompiling, disassembling or otherwise extracting the program code of
+  proprietary software** – for example a commercial PLM or PDM system, a CAD
+  program, its viewers, SDKs, plug-ins, DLLs, .NET assemblies, Java archives
+  or firmware – and contributing anything that comes out of it: decompiled or
+  disassembled code, pseudocode, code translated into Rust, "cleaned up",
+  renamed, restructured or otherwise rewritten from it (by hand or by an AI
+  agent), and tables, constants or algorithms lifted from it. Rewriting code
+  that was decompiled does not make it your own work; even slightly changed
+  copies can infringe the original's copyright.
+* **Handing decompiled output to an AI agent** to "rewrite" or "re-implement"
+  it, asking an agent to decompile a program for this repository, or pointing
+  reverse-engineering tool kits (decompilers, disassemblers, agent tools built
+  on them) at proprietary programs for it.
+* **"Clean room" by decompilation.** TeamCraft does not accept the two-team
+  method either, where one person or agent decompiles a program and writes a
+  specification and another writes the code from it: the specification still
+  comes from the program's code, and with AI agents nobody can show that the
+  separation held.
+* **Leaked or confidential source code and documents** – vendor source code,
+  SDK headers, samples or manuals under a licence or NDA that does not allow
+  this use – and code copied, ported or translated from other projects whose
+  licence is not compatible with the MPL-2.0. If you have seen a vendor's
+  source code (for example as an employee) or are bound by an NDA about a
+  program, do not work on reading that program's files.
+
+**Why.** Most end-user licence agreements forbid decompiling the program,
+and copyright protects the program code itself. Where a law permits
+decompilation at all – narrowly, for example to achieve interoperability –
+it does not permit publishing the result or using it to write a similar
+program. A single such contribution could expose TeamCraft and everyone who
+distributes it to copyright and licence claims, and would force the project
+to remove the feature and rewrite the Git history.
+
+**What is allowed – this is how TeamCraft's readers of native formats are
+built:**
+
+* studying **files**: sample files that may be used (the openly licensed NIST
+  models in `tests/fixtures/cad`, files you made yourself with a program you
+  are licensed for) and what a program writes into them – a file format is
+  analysed from its data, never from the program's code;
+* **public specifications and standards** (STEP / ISO 10303, JT / ISO 14306,
+  published format documentation) and openly licensed code under a compatible
+  licence, credited in the README's licence table (as `vendor/openskp`);
+* comparing the **documented behaviour or output** of a program you use
+  legally – for example an export of the same model – without looking at its
+  code.
+
+Write down how a format was decoded in its research page in
+`docs/src/research/` – for each finding its source (which sample file, which
+section of which specification, which experiment) and whether it is
+confirmed or still a guess – so anyone can check the clean origin instead of
+taking it on faith.
+
+**AI agents** working on this repository follow the same rules: write the
+code from general knowledge, the repository's own code and documentation,
+the sample files and public specifications; refuse to decompile or
+disassemble proprietary programs or to use their output; and say so when a
+request would need it. If an agent produces something that looks copied –
+long verbatim passages, another code base's identifiers or comments, vendor
+names in internal symbols – do not submit it.
+
+**When in doubt, ask** in the issue before you write the code. A contribution
+that turns out to contain decompiled, leaked or incompatibly licensed code is
+removed – with a rewrite of the history if needed – and its author may be
+excluded from the project (see the [Code of Conduct](CODE_OF_CONDUCT.md)).
+Report a suspected case to the maintainers in an issue, or privately as
+described in [SECURITY.md](SECURITY.md).
+
 ## Commits and pull requests
 
 1. Fork the repository and create a branch from `main`.
@@ -337,7 +431,29 @@ describe compatibility, for example "reads SolidWorks files".
    [docs/OPEN_WORK.md](docs/OPEN_WORK.md).
 5. Open the pull request against `main`, describe what changed and how you
    tested it, and link the issue. CI has to pass before the pull request is
-   merged.
+   merged (see below). The pull request template asks you to confirm that the
+   contribution is your own work and contains no decompiled code.
+
+### Merging
+
+Several pull requests land on `main` on a busy day, and one that was green
+against yesterday's `main` can break today's: a shared fixture, a test that
+another pull request changed, formatting after a conflict resolution.
+
+* Merge only with a green **CI result** against the *current* `main`. If
+  `main` moved since the last run, update the branch (merge `main` into it)
+  and wait for CI again – or let the merge queue do it, where it is enabled.
+* A red `main` comes first: fix it (or revert the commit that broke it)
+  before anything else is merged, so that every red ✗ on `main` points to
+  one real failure.
+* **CI result** is the one check that sums up the CI workflow: it is green
+  when every job passed or was skipped on purpose (a pull request that only
+  changes `*.md`, `docs/` or `platforms/` skips the Rust jobs), red when
+  one failed or was cancelled. CI also runs on `merge_group`, so a merge
+  queue (Settings → Rules) tests each pull request against the `main` it
+  lands on.
+* Release builds do not run per push to `main` (see "Releases and
+  versions"), so a cancelled build no longer shows up as a failure there.
 
 **Never commit secrets:** no passwords, tokens, private keys, `.env` files,
 database dumps or vault data. If it happens anyway, tell the maintainers
@@ -347,9 +463,12 @@ not enough, because it stays in the history.
 ## Licence of contributions
 
 TeamCraft has no contributor licence agreement. By submitting a contribution,
-you confirm that you wrote it or have the right to submit it. You also agree
-that it is licensed under the [Mozilla Public License 2.0](LICENSE), like the
-rest of the project.
+you confirm that you wrote it (or your AI agent did, from its own knowledge)
+or have the right to submit it, and that it contains no code decompiled,
+disassembled or rewritten from proprietary software and no leaked or
+incompatibly licensed code (see [Your own work only](#your-own-work-only--no-decompiled-code)).
+You also agree that it is licensed under the [Mozilla Public License 2.0](LICENSE),
+like the rest of the project.
 
 ## Releases and versions
 
@@ -357,17 +476,31 @@ rest of the project.
 [Semantic Versioning](https://semver.org); while the version is `0.x`, any
 release may contain breaking changes.
 
-**Build artifacts.** Every push to `main` runs
-`.github/workflows/release.yml`, which builds the server binaries (Linux
-x86_64/ARM64, Windows x64) and the desktop installers (AppImage, `.deb`,
-`.rpm` and Flatpak bundles for x86_64/aarch64, `.dmg`, and for Windows x64
-and ARM64 `.msi`, NSIS `-setup.exe` and a portable `.zip`) and keeps them
-as workflow artifacts for 14 days. *Run workflow* on the Actions page builds
-any branch the same way.
+**Build artifacts.** `.github/workflows/release.yml` builds the server
+binaries (Linux x86_64/ARM64, Windows x64) and the desktop installers
+(AppImage, `.deb`, `.rpm` and Flatpak bundles for x86_64/aarch64, `.dmg`,
+and for Windows x64 and ARM64 `.msi`, NSIS `-setup.exe` and a portable
+`.zip`), the desktop installers *with local server* (job `local-server`: the
+app plus the server as `teamcraft-server` and PostgreSQL's programs from
+theseus-rs/postgresql-binaries, checksum-checked, for Windows x64, macOS
+Apple silicon and Linux x86_64; each smoke-tested with its bundled server) –
+that job takes the server binaries of the `server` job instead of building them
+again (for macOS the `server` job builds an unreleased `sidecar-macos-aarch64`
+artifact, in parallel with the others), and the Tauri CLI comes
+prebuilt through `taiki-e/install-action`
+and keeps them as workflow artifacts for 14 days. It builds `main`
+every night (01:07 UTC) when `main` has changed outside the documentation
+since its last successful build, not on every push: with several merges a
+day, each push cancelled the build of the one before and left a red ✗ on
+that commit. *Run workflow* on the Actions page builds any branch at once
+the same way. A pull request that changes the workflow, `packaging/` or
+`desktop/tauri.conf.json` (or `desktop/tauri.local-server.conf.json`) builds
+everything before it is merged.
 
 **Container image.** The same workflow builds `ghcr.io/rudalabs/teamcraft`
 from the `Dockerfile` on an amd64 and an arm64 runner and publishes it:
-`:edge` for every push to `main`, `:<version>`, `:<major>.<minor>` and
+`:edge` from `main` (the nightly build, or *Run workflow* on `main` for a
+fresh one at once), `:<version>`, `:<major>.<minor>` and
 `:latest` for a tag (`latest` also for 0.x, but not for suffixed versions
 such as `-rc.1`). A pull request that changes the `Dockerfile` or `deploy/`
 builds the image without publishing it. Before anything is published, a

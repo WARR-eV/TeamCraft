@@ -10,7 +10,7 @@ TeamCraft's import do? Investigated on 2026-11-04.
 |----------------------------|-----------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Autodesk Vault             | **Autoloader**, or *Check In Project* in Inventor                           | scans the folder with the Inventor project file (`.ipj`), reports missing references, uploads in batches (up to 20 000–30 000 Inventor files), keeps the folder structure, works on a copy – the source files stay untouched; DWF creation can be switched off for speed |
 | SolidWorks PDM             | copy/paste of folders, scan tools, VAR import programs                      | migration guides: scan first, map folders and properties, fix broken references and duplicates before the import, decide whether files come in at their existing revision                                                                                                |
-| Teamcenter with Solid Edge | SEEC *Data Preparation*: *Analyze*, then *Add to Teamcenter* (with dry run) | expects a flat source folder **without duplicate file names**; *Analyze* reports duplicate names, duplicate document numbers and broken links; item IDs are generated when the document number is empty; Design Manager can flatten folders and rename duplicates        |
+| Solid Edge with a PLM      | *Data Preparation*: *Analyze*, then add to the PLM (with dry run)           | expects a flat source folder **without duplicate file names**; *Analyze* reports duplicate names, duplicate document numbers and broken links; item IDs are generated when the document number is empty; Design Manager can flatten folders and rename duplicates        |
 
 The common pattern:
 
@@ -26,7 +26,7 @@ The common pattern:
 
 ## Decision for TeamCraft
 
-TeamCraft matches CAD references by **file name**, like Teamcenter – so file
+TeamCraft matches CAD references by **file name** – so file
 names must be unique within an import. The desktop app gets an **Import folder…** wizard:
 
 * **Scan (dry run):** walks the folder, skips lock/backup files and
@@ -64,10 +64,9 @@ check afterwards.
   [TriMech – data migration best practices](https://trimech.com/solidworks-pdm-data-migration-best-practices-guide/),
   [GoEngineer – manually importing CAD data](https://www.goengineer.com/blog/manually-importing-cad-data-into-solidworks-pdm-overview),
   [Javelin – how to prep for a PDM migration](https://www.javelin-tech.com/blog/2022/05/how-to-prep-for-a-solidworks-pdm-migration/)
-* Solid Edge and Teamcenter:
-  [SEEC Data Preparation tools](https://support.sw.siemens.com/en-US/okba/PL8547626/Using-the-SEEC-Data-Preparation-Tools-simplified-workflow/index.html),
+* Solid Edge with a PLM:
+  [Data Preparation tools](https://support.sw.siemens.com/en-US/okba/PL8547626/Using-the-SEEC-Data-Preparation-Tools-simplified-workflow/index.html),
   [Analyze](https://soliddna.com/SEHelp/ST5/EN/a_h/analyze2ad.htm),
-  [Add to Teamcenter](https://www.soliddna.com/SEHelp/ST5/EN/a_h/addtoteamcenter1a.htm),
   [Design Manager – flatten folder structure](https://support.sw.siemens.com/en-US/okba/PL8015842/Using-Design-Manager-to-flatten-folder-structure/index.html)
 
 ## Status

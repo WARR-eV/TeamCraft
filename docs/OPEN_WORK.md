@@ -78,7 +78,14 @@ feature milestone – the features in *What works* are enough; what is missing i
 
 *Security*
 
-- Open findings of the [threat model](src/dev/threat-model.md) (F1–F19 there):
+- Open findings of the [threat model](src/dev/threat-model.md) (F1–F20 there):
+    - [x] First-start setup behind a reverse proxy on the same computer: `/setup` needs the one-time code of the setup
+      link the server logs (`teamcraft local` excepted)
+    - [ ] Client address from `X-Forwarded-For` is believed from every peer on a private address (`auth::client_address`):
+      with Docker's published port (peer = the bridge gateway) or clients on a campus network without a proxy, any
+      client can claim an address – `allowed_networks` of restricted groups, the per-address sign-in throttle and
+      the read log can be fooled. Fix: an explicit list of trusted proxies (default loopback only), documented for
+      Docker
     - [x] F1: failed password sign-ins throttled per username and client address (`TEAMCRAFT_SIGNIN_MAX_FAILURES`,
       429 with `Retry-After`)
     - [x] F1 (rest): wrong current passwords of the own password change (web form and `POST /api/v1/me/password`)
@@ -96,8 +103,9 @@ feature milestone – the features in *What works* are enough; what is missing i
     - [x] F5: `Strict-Transport-Security` when the public URL is https
     - [ ] F6: OIDC with a plain `http://` issuer: refuse it outside `localhost`, or verify ID token signatures (JWKS)
       for it – a decision, since it can break installations with an internal IdP
-    - [ ] F7: end TeamCraft sessions of users removed at the IdP (shorter SSO sessions, back-channel logout or a
-      periodic check)
+    - [x] F7: end TeamCraft sessions of users removed at the IdP – OpenID Connect back-channel logout
+      (`/auth/oidc/backchannel-logout`, #173 step 9). Left: shorter SSO sessions for providers without back-channel
+      logout (`TEAMCRAFT_OIDC_SESSION_HOURS`, unpublished `ga/oidc-hardening` work)
     - [ ] F8: re-check the hash of a blob while it is downloaded (or periodically), not only in `vault check`
     - [x] F9: disk quota per user and in total for uploads (`services::quotas`, `teamcraft user quota` /
       `teamcraft vault quota`, `tests/quotas.rs`)
@@ -142,6 +150,11 @@ feature milestone – the features in *What works* are enough; what is missing i
   SmartScreen and Gatekeeper
 - [ ] Desktop app run and tested on Windows x64/ARM64, macOS and Linux for each RC (a short manual test script in
   `docs/src/dev/release-checklist.md`)
+- [x] One download to try TeamCraft on a laptop: desktop installers *with local server* (Windows x64, macOS Apple
+  silicon, Linux x86_64 AppImage) with the server and PostgreSQL, *Try TeamCraft on this computer*, and
+  `teamcraft local` for an installed PostgreSQL ([research](src/research/local-test-server.md),
+  [guide](src/guide/local-server.md)). Left: the manual check in section 3; Windows ARM64 and Linux ARM64 variants if
+  testers ask
 - [x] Accessibility: keyboard use and screen-reader labels on the main web flows checked (WCAG 2.2 AA for contrast
   is already tested) – `every_rendered_page_is_accessible` checks labels, accessible names, `alt`, `tabindex`,
   `lang`, heading levels and `<th scope>` on every rendered page; sign-in, new item, check-in, BOM and new change
@@ -187,6 +200,10 @@ half a state behind. Prefer tests that fail on a real regression over tests that
   twice. Open: an item whose *creation* answer was lost (network gone between the server's commit and the app's
   log) is created again on the next run – fixed in code with an idempotency key for `POST /items`
   (`tests/item_idempotency.rs`) – **database tests written, not yet run against a real database**
+- [ ] BOM import time grows faster than the number of lines: 1 000 lines 3.9 s, 10 000 lines 101 s on a developer
+  machine (2026-11-12, debug build, `ten_thousand_lines_import_in_one_transaction`), about n^1.4. Find the step that
+  grows (plan lookups, per-row statements, counters) and make it linear; then lower `MAX_TEN_FOLD_GROWTH` in
+  `tests/import_scale_and_concurrency.rs` from 60 towards 20
 - [x] **Atomic processes** – the folder import per item is covered too (see *Import*); the rest is done, see *Done*
 - [ ] Coverage map: keep the feature → tests table of #65 in `CONTRIBUTING.md` (or `docs/src/dev/`) up to date, and
   make CI fail when the integration tests are skipped (`TEAMCRAFT_REQUIRE_DB_TESTS=1`, already set) – #65 was merged
@@ -231,6 +248,9 @@ half a state behind. Prefer tests that fail on a real regression over tests that
 - [x] `cargo deny` in CI (`deny.toml`, job *dependencies*): permissive licences only, security advisories, unknown
   registries and git sources; duplicate versions only warn. Three transitive "unmaintained" notices are ignored with
   reasons in `deny.toml` (cgmath, proc-macro-error, ttf-parser) – open: replace them when the parent crates move
+- [ ] Move from `chrono` to `jiff` or `time`: chrono is unmaintained (RUSTSEC-2026-0543, ignored in `deny.toml`
+  since 2026-11-18). TeamCraft uses it directly (timestamps in 40+ modules, `sqlx` feature `chrono`, `zip` feature
+  `chrono`); sqlx and pdf_oxide pull it in too, so the ignore stays until they move as well
 - [ ] Branch protection on `main` (**maintainer action**, needs admin rights): a ruleset with required checks – fmt and
   clippy, tests on PostgreSQL 16 and 18, build (windows-latest), cargo deny (Cargo.toml), local links and images.
   None exists today (the API answers 404 for the protection and `[]` for rulesets); that is how #65 and #137 were
@@ -253,12 +273,12 @@ half a state behind. Prefer tests that fail on a real regression over tests that
 - [ ] Flaky desktop test on macOS: `resume::tests::a_wrong_part_is_started_over_and_a_complete_one_only_renamed`
   (`desktop/src/resume.rs`, the assertion on the recorded `Range` headers) fails in about 2 of 15 runs – record the
   header before the test server answers, or compare the set of ranges instead of their order
-- [ ] Decide the release builds on `main` (disputed in the CI review, so not changed): today every push to `main`
-  builds all 14 release jobs (server, desktop installers, Flatpak, image; ~110–170 runner-min, ~50 min wall clock)
-  and a newer push cancels the run, so cancelled commits get no `:edge` image. Options: (a) keep as is; (b) image +
-  Docker smoke test per push, the other artifacts nightly, on tags and by hand; (c) per push only when packaging
-  inputs change. Either way: add `packaging/**` and `desktop/tauri.conf.json` to the PR paths of `release.yml`, so a
-  Flatpak or bundle change is built before it is merged
+- [x] Release builds on `main` (#275): every push to `main` built all 14 release jobs (~110–170 runner-min) and
+  a newer push cancelled the running build, so about half of the commits on `main` showed a red ✗ without a real
+  failure. Now nightly (skipped when only documentation changed since the last good build), on `v*` tags and by
+  hand; `:edge` follows `main` within a day. A pull request that changes `packaging/**` or
+  `desktop/tauri.conf.json` builds everything before it is merged. CI, CodeQL and the desktop workflow no longer
+  cancel or replace runs on `main` either
 - [ ] Run `scale.yml` once by hand – its schedule has never fired yet – and make a failing scheduled run open an
   issue instead of only an e-mail
 - [x] `fuzz.yml` had never built a single target: the prebuilt `cargo-fuzz` from `taiki-e/install-action` is a musl
@@ -341,6 +361,11 @@ half a state behind. Prefer tests that fail on a real regression over tests that
 
 **Operations and repository**
 
+- [ ] Host the live demo (**maintainer action**). Ready in the code: the read-only demo account
+  (`TEAMCRAFT_DEMO_USER`, `TEAMCRAFT_DEMO_PASSWORD`), `scripts/seed-demo.sh` (the README demo data) and
+  `deploy/demo/demo.sh` (snapshot, nightly reset). Left: server, DNS, TLS, seed, snapshot, cron – the runbook is
+  [docs/src/admin/live-demo.md](src/admin/live-demo.md) – then link the demo from the top of the README and from
+  `docs/src/index.md`.
 - [ ] Test e-mail (SMTP) and Mattermost notifications against real servers (so far only against fakes)
 - [ ] Enable private vulnerability reporting (*Settings → Code security → Private vulnerability reporting*), which
   `SECURITY.md` points to
@@ -349,6 +374,13 @@ half a state behind. Prefer tests that fail on a real regression over tests that
   [platforms/windows.md](../platforms/windows.md))
 - [ ] Install and start the release Flatpak bundles (x86_64, aarch64) and the portable Windows zips (x64, arm64) once –
   built and checked as files only (#66); GNOME runtime 49 may be end of life on Flathub, move to the current one
+- [ ] Install the three installers *with local server* once on real computers and click *Try TeamCraft on this
+  computer* – CI starts each installer's bundled server (first start, setup page, clean stop) but not the app's
+  button; on macOS check whether Gatekeeper lets the quarantined app start `teamcraft-server` and PostgreSQL
+- [ ] Windows: a browser reported `TeamCraft-with-local-server_0.2.7_x64-setup.exe` (a CI artifact) as a virus –
+  detection name unknown. The bundled PostgreSQL is now trimmed (no PL/Python interpreter, no test or extra programs);
+  check the next build with VirusTotal and report remaining detections to the vendor (Microsoft: WDSI file submission)
+  as false positives; code signing would be the lasting fix
 - [ ] Release v0.1.0 again from the current `main` (re-tag), when asked – the published v0.1.0 is from `6f68f9a` and
   has no Flatpak, Windows ARM64 or portable builds
 
@@ -417,7 +449,18 @@ real files and belong to section 3 once such files are at hand.
   manager, releases check-outs with a reason, sets "member until" (`project_members.expires_at`, flag only), removes
   members and demotes the old managers – each step through its own service and audited. Left: the access review page
   for internal groups, ownership hand-over from the season page (today: *Hand over work* on the user page).
-- [ ] Steps 9–10: IdP-driven offboarding, desktop working folder.
+- [x] Step 9: IdP-driven offboarding – (a) *SSO users without sign-in* on the admin *Users* page
+  (`services::offboarding::idle_sso_users`: no sign-in or token use for 90 days, still holding memberships, tokens or
+  check-outs); (b) `TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS` caps new tokens of SSO users (`users::token_lifetime_for`);
+  (c) OpenID Connect Back-Channel Logout (`oidc::verify_logout_token`, `users::idp_logout`, migration 0071), tests
+  in `tests/oidc_flow.rs` with a signed logout token of the fake provider; (d) SCIM: research page only
+  (`docs/src/research/scim-deprovisioning.md`, not now). Left: a logout token with only `sid` (refused today), an
+  API route for the idle report.
+- [x] Step 10: desktop working folder – *Check in all* and *Sign out* list the check-outs with local changes
+  (`layout::local_changes`) and offer to check them in first (sign-out also to park them); *Park…* uploads work in
+  progress as new versions and keeps the lock (`POST …/files`, `files::attach`); after a forced release the
+  Workspace tab says *Released by X; your local changes are kept and need a new check-out* (`released` of
+  `…/file-status`, `checkouts::released_from`, read from the audit log).
 
 **Desktop app**
 
@@ -461,8 +504,17 @@ real files and belong to section 3 once such files are at hand.
 
 - [ ] Test real STEP exports of the CAD programs, assembly placements (`mapped_item` – parts of an assembly can
   overlap) and length units
-- [ ] Readers for IGES, BREP, Parasolid, JT, FBX, DAE, USD and E57 – recognised, not previewed (no pure-Rust readers
-  yet; candidate: `e57` crate)
+- [ ] Readers for IGES, BREP, Parasolid, FBX, DAE, USD and E57 – recognised, not previewed (no pure-Rust readers
+  yet; candidate: `e57` crate). JT 9 and 10 are read with their scene graph (`src/mesh/jt10.rs`); open there: JT 8, shattered
+  JT files (parts in other `.jt` files), a real JT 9.5 assembly as a test file (the tests build synthetic ones) – no
+  openly licensed test files yet
+- [x] Creo assemblies from their parts (`src/mesh/creo/asm.rs`, section `NeuAsmSld`, components by `<name>.prt` /
+  `<name>.asm`; units read, parts in mm). Open: an openly licensed Creo assembly as a test file (the tests build
+  synthetic ones; the decoding samples have no licence), family-table instances (shown as their generic), suppressed
+  components and simplified representations, faces older Creo files store as stubs
+- [x] CATIA V5 products from their parts (`src/catprod.rs`, components by document UUID or part number). Open: hidden
+  components (`VPGlobal`?), components without a document of their own, V5-6R20xx products and an openly licensed
+  product as a test file (the tests build synthetic ones)
 
 **Simulation management (FEA/CFD)**
 
@@ -580,7 +632,7 @@ real files and belong to section 3 once such files are at hand.
 
 **Siemens NX**
 
-- [ ] (research first) How other PLMs connect NX (native vs. Teamcenter NX Manager), licences (student/academic) and
+- [ ] (research first) How other PLMs connect NX (native vs. through a PLM integration), licences (student/academic) and
   what is feasible for an open-source project
 - [ ] Folder import for the master model concept: the drawing `*_dwg*.prt` belongs into the item of the model
 - [ ] Test the BOM import with real NX BOM exports
@@ -589,7 +641,7 @@ real files and belong to section 3 once such files are at hand.
 
 ### 5. Feature demand (backlog)
 
-What users ask of PLM/PDM systems (reviews of Teamcenter, Vistapoint, Dokuly, OdooPLM and others, Siemens community
+What users ask of PLM/PDM systems (reviews of commercial and open-source PLM/PDM systems, vendor community
 enhancement requests), reduced to what TeamCraft does not have yet; what is present or done is left out. Entries
 that need the CAD programs themselves (add-ins, generated drawings) are listed too – they need a Windows machine
 with licensed CAD software to build and test. Like section 4, these are candidates, not commitments: a feature
@@ -679,7 +731,7 @@ needs an issue with a reason first (see *Direction*).
 
 - [ ] Managed/SaaS and hybrid deployment (on-premises vault, cloud collaboration)
 - [ ] Permissions per object, per attribute and per lifecycle state; external (supplier) users
-- [ ] SAML, SCIM provisioning, ending sessions of users removed at the IdP (F7), built-in MFA
+- [ ] SAML, SCIM provisioning (research: *Deprovisioning through the identity provider*, not now), built-in MFA
 - [ ] Token scopes per project group (F2), project API keys
 - [ ] OpenAPI description, a stable versioned API, an event bus connector (Kafka/AMQP)
 - [ ] AI: per-user budgets (F16), prompt-injection protection for writes, AI-assisted impact analysis, semantic search
@@ -690,7 +742,7 @@ needs an issue with a reason first (see *Direction*).
 - [ ] CAD clone workflows: clone an assembly with selective reuse, Save As / revise per component over a whole
   structure, shown as an indented tree
 - [ ] Interactive onboarding and contextual help
-- [ ] Migration tooling from Teamcenter, Windchill, Aras and SOLIDWORKS PDM
+- [ ] Migration tooling from commercial PLM/PDM systems
 - [ ] GA proofs: production readiness, migration and concurrency safety, scale validation, external security review,
   support and versioning policy
 
@@ -843,7 +895,7 @@ The history up to the open-source release is squashed into the first commit
 | –  | Preview images of native Inventor, Solid Edge and SolidWorks files                                                                                                    | `457e03d`            |
 | –  | Desktop: one workspace folder per project group; import of existing CAD folders                                                                                       | `8bf8e65`, `9557ffa` |
 | –  | Skins without distribution logos                                                                                                                                      | `099737e`            |
-| –  | Teamcenter working features: favorites, saved searches, Save As, BOM comparison                                                                                       | `9289aa4`            |
+| –  | Common PLM working features: favorites, saved searches, Save As, BOM comparison                                                                                       | `9289aa4`            |
 | –  | Release readiness of change orders: unreleased BOM children and references block the submit, *Add all* (web, API, desktop)                                            | `5c5b3fd`            |
 | –  | Work-in-progress / no-warranty notices (README, docs, web footer, desktop), `CONTRIBUTING.md`, `SECURITY.md`                                                          | `5c8eff3`            |
 | –  | Similar part search by 3D shape signature                                                                                                                             | `03f94dd`            |
@@ -941,7 +993,8 @@ README licence table, follow the definition of done in `CLAUDE.md`. The docs are
   `tests/api_password.rs`, `tests/notification_settings_api.rs`, the metrics tests) run for the first time in its CI.
 - GA items started but not yet in a pull request (work kept in local worktrees): assistant budget (phase 4, F16),
   scoped tokens (F2), download hardening (F8, F10), retention and cleanup, parser hardening (F11,
-  F13, F14), MCP hardening (F15, F17), backup hardening (F19: file modes, signed manifest), OIDC hardening (F6, F7),
+  F13, F14), MCP hardening (F15, F17), backup hardening (F19: file modes, signed manifest), OIDC hardening (F6, F7
+  session hours – back-channel logout is done),
   OpenAPI description; not
   started: MCP versioning, CLI and configuration freeze, accessibility leftovers, SBOM and attestations, upgrade
   proofs per release, scale targets, JSON logs.

@@ -121,8 +121,8 @@ Two ways to get parts into one coordinate system:
    system's assembly file. A part used several times (four fins) is either
    exported once with all instances, or once per instance as its own file.
 2. **Parts in their local frame plus placements.** The BOM line stores a
-   4×4 transform per instance (Teamcenter's *occurrence* transforms, the
-   SOLIDWORKS component tree, NX's structure). This is what CAD-integrated
+   4×4 transform per instance (the *occurrence* transforms of enterprise
+   PLM systems, the SOLIDWORKS component tree, NX's structure). This is what CAD-integrated
    PLM does, but it needs the placements in the PLM – and keeping them in
    sync is exactly the CAD-integration work that is fragile.
 
@@ -147,7 +147,7 @@ is flagged ("copies stacked at the same place").
 | SOLIDWORKS             | *Mass Properties* from the solid and the part material; assemblies from the components                                                   | *Override Mass Properties*: mass, CG and inertia per part or assembly                                                      |
 | Creo                   | mass properties from the solid and the density in the material                                                                          | *assigned mass properties* per part                                                                                        |
 | Onshape                | mass properties tool, material library per part                                                                                         | per-part mass override                                                                                                     |
-| Teamcenter / Windchill | store mass as attributes the CAD integration writes on save                                                                             | attributes editable; stale when the CAD side was not saved                                                                 |
+| Enterprise PLM         | store mass as attributes the CAD integration writes on save                                                                             | attributes editable; stale when the CAD side was not saved                                                                 |
 | OpenRocket             | components of revolution with analytic mass, CG and longitudinal / rotational inertia from material densities (bulk, surface, line)     | per-component mass override and CG override, optionally covering the sub-components                                        |
 | RocketPy               | takes the vehicle as given numbers: dry mass, CG without motor, inertia tuple `(I11, I22, I33, I12, I13, I23)` about that CG             | – (the motor's mass and inertia are combined with the rocket by parallel axis, in the coordinate system the user declares) |
 

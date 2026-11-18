@@ -12,6 +12,8 @@ on:
       - "scripts/check-desktop-modules.mjs"
       - "scripts/desktop-tab-order.test.mjs"
       - "scripts/desktop-files-view.test.mjs"
+      - "scripts/desktop-release-rules.test.mjs"
+      - "scripts/viewer-mesh.test.mjs"
       - "static/**"
       - "shared/**"
       - "media/logos/**"
@@ -25,6 +27,8 @@ on:
       - "scripts/check-desktop-modules.mjs"
       - "scripts/desktop-tab-order.test.mjs"
       - "scripts/desktop-files-view.test.mjs"
+      - "scripts/desktop-release-rules.test.mjs"
+      - "scripts/viewer-mesh.test.mjs"
       - "static/**"
       - "shared/**"
       - "media/logos/**"
@@ -35,9 +39,12 @@ on:
 permissions:
   contents: read
 
+# A newer push to a pull request replaces its running checks; each commit on
+# main keeps its own run, so that no commit on main shows a red ✗ only
+# because a later push cancelled its run (#275).
 concurrency:
-  group: desktop-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: true
+  group: desktop-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -76,6 +83,13 @@ jobs:
       # the pure rules of the Files view of Home (orders, labels, pages)
       - name: Test the rules of the Files view
         run: node scripts/desktop-files-view.test.mjs
+      # the reviewers of the release dialog and when a draft can be submitted
+      - name: Test the release rules
+        run: node scripts/desktop-release-rules.test.mjs
+      # the mesh check of the shared 3D viewer: empty, cut-off or invalid
+      # models end in a message, not in an empty canvas (#290)
+      - name: Test the 3D viewer's mesh check
+        run: node scripts/viewer-mesh.test.mjs
 
   test:
     name: desktop (${{ matrix.os }})

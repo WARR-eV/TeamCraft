@@ -1,5 +1,5 @@
 -- File formats of the CAD programs (see src/cadformat.rs): SolidWorks,
--- NX / Teamcenter, Solid Edge, Inventor, Fusion, AutoCAD, Creo, CATIA, the
+-- NX, Solid Edge, Inventor, Fusion, AutoCAD, Creo, CATIA, the
 -- neutral formats (STEP, IGES, Parasolid, JT, ACIS, STL) and more.
 --
 -- NULL = not classified yet: TeamCraft classifies such files at startup

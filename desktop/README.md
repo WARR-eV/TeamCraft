@@ -20,6 +20,7 @@ TeamCraft server – it is a client, not an offline copy.
 | Area | What the desktop app does |
 |---|---|
 | Sign-in | **Sign in with the browser** (single sign-on or password, confirmed on a TeamCraft page) or a personal access token; *cancel* stops the sign-in at once |
+| Local test server | Downloads *with local server* only – an app of its own, *TeamCraft Local* (own identifier, settings and keychain entry): on its first start, with no server configured, and with *Try TeamCraft on this computer* on the connect screen it starts the bundled `teamcraft-server local` (private PostgreSQL + server on 127.0.0.1), signs in through the browser (the first start creates the administrator there) and starts the server again at every launch while it is the configured server; it stops when the app ends (`src/localserver.rs`, log in `local-server.log`) |
 | Navigator | *Home*: a file browser of the **active project group** – *Files*: its folders and the files in them, as in the working folder (folders first, then the files by name – case-blind, digits by value; one folder per request from `GET /projects/{code}/files`, 500 entries at a time with *show … more*; items without files below the files; with an older server the items instead), *All items*: every item in one list, or the *Structure* view. The name comes first (the number/revision dimmed after it); sorted by name, number, type or state (kept per computer); *Projects* (`Ctrl/Cmd+5`): choose the active group (mine first), create a group (*New*, CAD editors), *Get…* groups into the workspace, *Import CAD folder…*. Both are loaded again on *Refresh* (a group created in the web UI shows without a restart); *My Worklist* (check-outs, reviews, my open changes); change orders by status; full-text search |
 | Toolbar | Below the tab strip, acting on the active tab: grouped buttons that keep their place (revision: Lock · Work · Lifecycle · Collaborate; change: Review · Lifecycle · Collaborate; request: Triage · Requester · Collaborate), the **next step highlighted** (*Check out*, *Check in…* with local changes, *Release…* on a clean check-out, *Revise* when released, *Submit for review* / *Approve change* on a change), greyed-out buttons with a tooltip saying why, rare actions (*Pack and Go…*, *Open in browser*, *Refresh*, *Mark obsolete…*) in **More ▾** – keyboard: `Enter`/`Space`/`↓` open, arrows move, `Esc` closes |
 | Tab order | Drag a tab to move it (pointer events, an insertion bar shows the landing place, the strip scrolls at its edges, `Esc` cancels; a plain click still activates, a dragged tab keeps its state and is not activated). Keyboard: arrow keys, `Home`, `End` move the focus between the tabs (WAI-ARIA tabs, roving tabindex, `Enter`/`Space` activates), `Ctrl+Shift+PageUp/PageDown` move the active tab. Right click (or the menu key): *Move to start*, *Move to end*, *Close*, *Close others*, *Close tabs to the right*. The order is kept while the app runs (open tabs are not restored on start). Rules in `ui/js/tab-order.js`, tested by `scripts/desktop-tab-order.test.mjs` (`node`); the dragging itself is checked by hand |
@@ -29,14 +30,15 @@ TeamCraft server – it is a client, not an offline copy.
 | Get | *Get…* on a revision: the item with its BOM (revision rule *latest* or *released*) and the parts its CAD files reference, resolved by the server (`…/workset`); only missing and outdated files are downloaded (SHA-256, checked after the download), recorded one by one so an interrupted Get continues where it stopped – also inside a large file: the bytes received stay in `<name>.<sha>.teamcraft-download` and the next Get asks only for the rest (`Range` / `If-Range`, `src/resume.rs`), checks the SHA-256 of the whole file and renames it into place; progress and *Cancel* in the status bar. No browser downloads |
 | Add files | *Add files…* (Files section and *More ▾*): file picker → the files are **copied** into the working folder of the revision (checked out first if needed; sub-folder selectable, originals untouched) and listed as *new* in *Check in…* (option *Check in now*; remembered in `.teamcraft/added.json` until checked in). A name that exists is a new version and asks first. The Files section says why it is unavailable (locked by someone else, in review, released = frozen → Revise). Pure logic and tests in `src/addfiles.rs`; drag and drop onto the window is not supported (`dragDropEnabled` is off) |
 | Old workspaces | Folders of the older layout `<group>/<item>/<revision>/` (and `<item>/<revision>/`) are found after the sign-in; the app offers to move the files into the new layout – never overwriting a file, keeping files whose place is taken and listing them, writing every step to `.teamcraft/migration.log` |
-| Check in all | *Check in all* in the worklist (navigator and home page): every check-out without local changes is checked in on the server (lock released, one revision at a time); revisions with modified, new or conflicting files stay checked out and are listed |
+| Check in all | *Check in all* in the worklist (navigator and home page): the check-outs with local changes (modified, new, conflicting files) are listed first, with the offer to check them in with their files; then every check-out without local changes is checked in on the server (lock released, one revision at a time); check-outs with a conflict stay checked out. *Sign out* asks the same: *Check in and sign out*, *Park and sign out*, *Sign out anyway*. The list is the pure `layout::local_changes` |
+| Park | *Park…* (Workspace tab, *More ▾*, the check-in dialog): the ticked files go up as new versions through the upload endpoint (`POST …/files`) and the check-out **stays** – work in progress survives a lost laptop. After somebody else released your check-out, the Workspace tab shows *Released by X; your local changes are kept and need a new check-out* (`released` of the server's file status) |
 | Native CAD previews | The preview image stored in Inventor and Solid Edge files in the Files tab, a picture of the 3D preview for NX and SOLIDWORKS files; on Windows *STEP* in the Workspace tab and *Create STEP exports … first* at check-in export with the installed Inventor or Solid Edge (COM automation through Windows PowerShell; uses your own licence) |
 | Preferred CAD program | The account setting of the web UI (`preferred_cad` of `GET /api/v1/me`, read at sign-in): when a revision has files of that program, the Files tab lists the native files of other CAD programs (`format_info.family`) in a collapsed *N files in other CAD formats (…)* group; neutral files (STEP, JT, STL, PDF, …) stay visible. Grouped in `ui/js/revision.js` (`groupByFamily`) with the same rule as the server's `cadformat::group_by_family`; display only |
 | Whole project groups locally | the download icon in the navigator (*Tools → Get Project Groups…*): copies the files of every item of the chosen groups – latest released or latest revision – into the working folder with their folder structure; unchanged files are skipped, locally modified files kept, name clashes reported. For new team members or a fresh computer |
 | Import a CAD folder | the folder icon in the navigator (*Tools → Import CAD Folder…*): scans an existing folder (dry run: items, duplicate file names, skipped lock/backup files), then creates one item per part or assembly with the drawings and exports of the same name, project files in one document item, optional BOM lines from the assembly references, and checks every item in right after its files (assemblies once more after their BOM lines), so an interrupted import never leaves items checked out – a new run of the same folder also releases the check-outs an earlier, interrupted run left behind; a final report lists the new items and files, BOM lines, check-ins and problems (with *Open* for the top assembly); interrupted imports continue where they stopped (remembered per project group, so the same folder can also be imported into another group). Tutorial: *Help → How to Import a CAD Folder* |
 | New item | *New* (`Ctrl/Cmd+N`): choose the CAD files first – name and type follow from the first file; they are uploaded right after the item is created |
 | Import BOM | *Import BOM…* in the *Structure* tab (and the *More* menu) of a revision you have checked out, *Tools → Import BOM as New Assembly…* for a new one: a BOM exported by the CAD program (CSV, TSV, Excel, ODS or a STEP assembly, chosen in the native dialog) goes to the server's BOM import as a dry run first – the dialog shows the counts of lines, new and existing items, the notes and the first lines – and *Import* creates the lines and missing items in one transaction (numbers from the file or the group's numbering scheme, reuse of existing items optional) |
-| Release and changes | *Release…* creates and submits a change order – with the unreleased dependencies (BOM children, drawings) by default; *Release readiness* panel with *Add all*; approve/reject from the worklist |
+| Release and changes | *Release…* creates and submits a change order – with the unreleased dependencies (BOM children, drawings) by default; the own user name is refused as reviewer, with nobody else in the group it creates a draft, and a refused revision or reviewer cancels the half-made draft again (#291); *Release readiness* panel with *Add all*; on a draft *Add reviewer* by user name, *Remove* and *Cancel change*, *Submit for review* disabled with the reason while a revision or reviewer is missing; approve/reject from the worklist |
 | Change requests | *Request change…* on a revision tab and *Request…* on a file (Files and Workspace tabs) raise a change request prefilled with item, revision and file name, with an optional screenshot or PDF (native file dialog, uploaded by the Rust side); request tabs with discussion, decision (accept / defer / reject), *Create change order*, attachments; *Requests assigned to me* and *My open requests* in the worklist |
 | Change propagation | *Dependents to check* grouped by dependent revision (one worklist line with a count, expandable; on the home page **Open**, **Revise**, **Acknowledge all…** per dependent and **Acknowledge…** per change), *Check needed* on the revision tab, references, *As released* rule, impact analysis |
 | Notifications | Bell with unread count and toasts; **Watch** / **Unwatch** |
@@ -62,14 +64,32 @@ x86_64; Windows ARM64 runs as a preview that never blocks. A separate job
 parses every script of `ui/`, the web UI and `shared/` (`node --check`; Node.js is only
 used by CI, the app has no build step). Nothing is packaged or published.
 
-## Run from source
+## Download or run from source
 
-There is no release yet. The release workflow already builds the installers
-(Linux AppImage/`.deb`/`.rpm` and a Flatpak bundle for x86_64 and aarch64,
-macOS `.dmg`, Windows x64 and ARM64 `.msi`/`-setup.exe` plus a portable
-`.zip` with `TeamCraft.exe`, which needs the WebView2 runtime of Windows
-10/11) – see *Download* in the [main README](../README.md#download). Until the
-first release, build and run the app locally. Linux needs
+The installers of every tagged version (0.x pre-releases) are on the
+[Releases page](https://github.com/rudalabs/TeamCraft/releases): Linux
+AppImage/`.deb`/`.rpm` and a Flatpak bundle for x86_64 and aarch64, macOS
+`.dmg`, Windows x64 and ARM64 `.msi`/`-setup.exe` plus a portable `.zip` with
+`TeamCraft.exe`, which needs the WebView2 runtime of Windows 10/11 – see
+*Download* in the [main README](../README.md#download).
+
+**With local server.** `TeamCraft-with-local-server_…` (Windows x64
+`-setup.exe`, macOS `.dmg`, Linux x86_64 `.AppImage`) is the same app plus the
+server (`teamcraft-server`, a Tauri `externalBin`) and PostgreSQL's programs
+(resources `postgresql/`), built as an app of its own: *TeamCraft Local*, identifier
+`io.github.rudalabs.teamcraft.local` (the overlay sets `productName` and `identifier`; the token's keychain
+service follows the identifier, `settings::set_keychain_service`), so it never takes over the desktop app's
+server and token. Without a configured server (its first start) it starts the local server by itself; its
+connect screen offers *Try TeamCraft on this computer* (`src/localserver.rs`): the app starts `teamcraft-server local
+--port <p> --exit-with-stdin`, waits for `/readyz` and signs in through the
+browser; the server stops when the app ends. The release job `local-server`
+builds it with `tauri.local-server.conf.json`; to build it locally, put the
+server binary at `binaries/teamcraft-server-<target triple>[.exe]` and
+PostgreSQL's `bin/`, `lib/`, `share/` under `local-server/postgresql/`, then
+`cargo tauri build --config tauri.local-server.conf.json`. See
+[Try it on your computer](../docs/src/guide/local-server.md).
+
+To build and run the app locally, Linux needs
 the WebKitGTK development files:
 
 ```sh
@@ -123,6 +143,12 @@ Where the app keeps its data:
   *Settings*; the next start with a keychain moves the file into it (also the file of older app
   versions). On macOS an unsigned build may ask once whether TeamCraft may use the keychain item (again after an update);
 * the working folder: `Documents/TeamCraft/<project group>/<folder>/<file>` with `Documents/TeamCraft/.teamcraft/state.json` (configurable in *Settings*).
+* TeamCraft Local (downloads *with local server*): its own settings folder and keychain service
+  `io.github.rudalabs.teamcraft.local` (`~/.config/io.github.rudalabs.teamcraft.local`, …), so its server and
+  token are separate from the desktop app's;
+* the local test server (downloads *with local server*): its data in the per-user data directory shared
+  with `teamcraft local` (`~/.local/share/teamcraft/local-server`, `~/Library/Application Support/TeamCraft/local-server`,
+  `%LOCALAPPDATA%\TeamCraft\local-server`), its port in the settings, its output in `local-server.log` next to them.
 
 ## Layout
 
@@ -139,8 +165,9 @@ src/commands.rs    the commands the UI calls (every network and file access)
 src/api.rs         REST client (/api/v1, bearer token) – the web view never talks to the server
 src/abortable.rs   Cancel of long operations: streamed check-in body that stops half-way, Pack and Go download dropped on cancel
 src/signin.rs      browser sign-in: PKCE, loopback listener on 127.0.0.1
+src/localserver.rs *Try TeamCraft on this computer*: finds the bundled teamcraft-server and postgresql/bin, starts `teamcraft-server local`, waits for /readyz
 src/compat.rs      version handshake (pure): does the app fit the server version (also tested by tests/desktop_compat.rs)
-src/layout.rs      working-folder rules (pure): folder mapping, state.json, Get planning, migration planning
+src/layout.rs      working-folder rules (pure): folder mapping, state.json, Get planning, migration planning, local changes before Check in all / sign-out
 src/resume.rs      Get resumes a large file half-way: partial file per content, Range/If-Range, SHA-256 check before the rename
 src/workspace.rs   Get, status, read-only handling, check-in, migration of the old layout
 src/settings.rs    settings.json (incl. the configured agents), the token in the OS keychain (file fallback), http:// check

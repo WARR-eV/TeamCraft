@@ -302,3 +302,30 @@ pub(super) async fn withdraw_change(
     changes::withdraw(&st.db, &me, change.id).await?;
     Ok(Json(change_json(&st, &me, &number).await?))
 }
+
+/// `POST /api/v1/changes/{number}/cancel` – cancels a draft or rejected change
+/// (its revisions are free for another change again).
+pub(super) async fn cancel_change(
+    State(st): State<AppState>,
+    ApiUser(me): ApiUser,
+    Path(number): Path<String>,
+) -> AppResult<Json<Value>> {
+    let change = changes::get_by_number(&st.db, &me, &number).await?;
+    changes::cancel(&st.db, &me, change.id).await?;
+    Ok(Json(change_json(&st, &me, &number).await?))
+}
+
+/// `DELETE /api/v1/changes/{number}/reviewers/{username}` – removes a
+/// reviewer from a draft change.
+pub(super) async fn remove_change_reviewer(
+    State(st): State<AppState>,
+    ApiUser(me): ApiUser,
+    Path((number, username)): Path<(String, String)>,
+) -> AppResult<Json<Value>> {
+    let change = changes::get_by_number(&st.db, &me, &number).await?;
+    let reviewer = users::find_by_username(&st.db, &username)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Unknown user '{username}'.")))?;
+    changes::remove_reviewer(&st.db, &me, change.id, reviewer.id).await?;
+    Ok(Json(change_json(&st, &me, &number).await?))
+}

@@ -566,11 +566,39 @@ mod tests {
             json!({ "next": "/", "next_encoded": "%2F", "error": "bad", "oidc_name": "Single Sign-On",
                                            "username": "max", "local_login": true, "flash": null }),
         );
+        // first start without the setup link: where to find it
+        render(
+            &env,
+            "login.html",
+            json!({ "next": "/", "next_encoded": "%2F", "setup_needs_code": true, "local_login": true, "flash": null }),
+        );
         render(
             &env,
             "error.html",
             json!({ "status": 404, "reason": "Not Found", "message": "gone", "flash": null, "local_login": true }),
         );
+        // a hosted live demo: the account on the login page, the banner on every page
+        let demo = json!({ "username": "demo", "password": "try-it-<out>" });
+        let html = render(
+            &env,
+            "login.html",
+            json!({ "next": "/", "next_encoded": "%2F", "error": null, "oidc_name": null,
+                    "username": "", "local_login": true, "flash": null, "demo": demo }),
+        );
+        assert!(html.contains("Sign in to the live demo as"), "{html}");
+        assert!(
+            html.contains("try-it-&lt;out&gt;"),
+            "the password is escaped"
+        );
+        assert!(html.contains("value=\"demo\""), "the username is filled in");
+        assert!(html.contains("class=\"demo-banner\""));
+        let html = render(
+            &env,
+            "error.html",
+            json!({ "status": 403, "reason": "Forbidden", "message": "read-only", "flash": null,
+                    "local_login": true, "demo": demo }),
+        );
+        assert!(html.contains("class=\"demo-banner\"") && html.contains("Live demo"));
         let html = render(
             &env,
             "error.html",
@@ -1712,14 +1740,24 @@ mod tests {
         assert!(html.contains("/access-log\""), "the whole log is linked");
         assert!(html.contains("/conditions\"") && html.contains("main-office, &lt;x&gt;"));
         assert!(html.contains("10.1.2.3") && html.contains("value=\"12\""));
-        render(
+        let html = render(
             &env,
             "admin/users.html",
             with_common(json!({
                 "users": [user()], "roles": roles(),
                 "oidc": { "admin_group": "a", "editor_group": "e", "viewer_group": null },
+                "idle_sso_days": 90,
+                "idle_sso": [{
+                    "user_id": ME, "username": "lena", "display_name": "Lena <L>",
+                    "last_login_at": null, "last_active_at": TS, "idp_logout_at": TS,
+                    "memberships": 2, "tokens": 1, "checkouts": 40,
+                }],
             })),
         );
+        assert!(html.contains("SSO users without sign-in") && html.contains("90 days"));
+        assert!(html.contains("Lena &lt;L&gt;"), "names are escaped");
+        assert!(html.contains(&format!("/users/{ME}/holdings\"")));
+        assert!(html.contains(">never<") && html.contains(">40<"));
         let html = render(
             &env,
             "admin/user_edit.html",

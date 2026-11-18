@@ -469,11 +469,11 @@ export function importTutorial() {
     return h("section.stack", null, [h("h3", { text: title }), h("ul", null, points.map(function (p) { return h("li", { text: p }); }))]);
   }
   dialog("How to import a CAD folder", h("div.stack.tutorial", null, [
-    h("p", { text: "Like Autodesk Vault's Autoloader or the data preparation of Teamcenter: prepare the data, scan it (nothing is uploaded), then import. Hundreds of files are fine." }),
+    h("p", { text: "Like the import tools of other PDM systems: prepare the data, scan it (nothing is uploaded), then import. Hundreds of files are fine." }),
     step("1 · Prepare the data in the CAD program", [
       "Collect each product into one clean folder with Pack and Go – Inventor: File → Save As → Pack and Go (with the project file .ipj); Solid Edge: Pack and Go in Design Manager or Revision Manager; SolidWorks: File → Pack and Go.",
       "Open the top assembly once and fix missing references – broken links stay broken after the import.",
-      "Give every file a unique name. TeamCraft, like Teamcenter, recognises CAD references by file name: two different Bracket.ipt in two subfolders are reported as duplicates and only the first one is imported.",
+      "Give every file a unique name. TeamCraft recognises CAD references by file name: two different Bracket.ipt in two subfolders are reported as duplicates and only the first one is imported.",
       "Optional: export STEP files next to the models for the 3D preview – or let the app create them later at check-in (Windows, with Inventor or Solid Edge)."
     ]),
     step("2 · Scan", [

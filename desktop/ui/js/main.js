@@ -13,7 +13,7 @@
 
 import { $, TAURI, call, errorText, h, invoke, setStatus, state, toast } from "./core.js";
 import { applySkin } from "./skins.js";
-import { checkServerVersion, initConnect, showConnect } from "./connect.js";
+import { checkServerVersion, initConnect, showConnect, startLocalServer, tryLocalServer } from "./connect.js";
 import { enterShell, initShell, onPackageProgress, refreshWorklistCount, uploadLine } from "./shell.js";
 import { selectView } from "./navigator.js";
 import { activeTab, reloadActive } from "./tabs.js";
@@ -138,9 +138,20 @@ export function boot() {
     state.zoom = s.zoom || 1;
     showZoom();
     applySkin(s.skin);
-    if (!s.server_url) showConnect("server");
-    else if (!s.signed_in) { showConnect("signin"); checkServerVersion(); }
-    else enterShell();
+    var open = function () {
+      // no server yet: TeamCraft Local (downloads with local server) starts
+      // its own; the regular app asks for the address
+      if (!s.server_url && s.local_server_available) tryLocalServer();
+      else if (!s.server_url) showConnect("server");
+      else if (!s.signed_in) { showConnect("signin"); checkServerVersion(); }
+      else enterShell();
+    };
+    // the app's own local test server: start it first (src/localserver.rs)
+    if (s.local_server_in_use) {
+      startLocalServer().then(function (base) { s.server_url = base; open(); }, function (err) {
+        showConnect("server", "The local TeamCraft server could not be started: " + errorText(err));
+      });
+    } else open();
     // what an earlier session left behind: the user decides whether to share it
     checkCrashReports();
   }, function (err) {

@@ -37,3 +37,8 @@ Thumbs.db
 # Desktop app: assets copied from shared/ and media/ by desktop/build.rs, generated schemas
 desktop/ui/static/
 desktop/gen/
+
+# Desktop app "with local server": server binary and PostgreSQL put there by release.yml
+desktop/binaries/
+desktop/local-server/
+.pg-download/

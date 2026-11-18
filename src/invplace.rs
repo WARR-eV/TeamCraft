@@ -334,6 +334,7 @@ fn component(name: &str, m: &[[f64; 4]; 4]) -> Component {
         translation,
         layer: None,
         occurrence: None,
+        document: None,
     }
 }
 
@@ -902,6 +903,120 @@ mod tests {
             (p[0] - 10.0).abs() < 1e-9 && (p[1] - 21.0).abs() < 1e-9 && (p[2] - 30.0).abs() < 1e-9,
             "{p:?}"
         );
+    }
+
+    /// `DesignViewSegment` with the views "Default" (hides `default_hides`)
+    /// and "Front" (hides `front_hides`), "Front" active.
+    fn design_views(default_hides: &[u32], front_hides: &[u32]) -> Vec<(u8, Vec<u8>)> {
+        let words = |v: &[u32]| v.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>();
+        let refs = |sections: &[u32]| -> Vec<u8> {
+            let r: Vec<u32> = sections.iter().map(|&i| (i + 1) | 0x8000_0000).collect();
+            array(0, r.len(), &words(&r))
+        };
+        // 0 list of views, 1 and 2 views, 3 and 4 their hidden lists
+        let mut list = vec![0u8; 6];
+        list.extend(refs(&[1, 2]));
+        list.extend(text16("Front"));
+        let view = |name: &str, hidden: u32| {
+            let mut v = vec![0u8; 6];
+            v.extend(text16(name));
+            v.extend(refs(&[hidden]));
+            v
+        };
+        let hidden = |ids: &[u32]| {
+            let mut h = vec![0u8; 6];
+            // element type 8: the occurrence ids of Inventor 2027
+            h.extend(array(8, ids.len(), &words(ids)));
+            h
+        };
+        vec![
+            (0, list),
+            (1, view("Default", 3)),
+            (1, view("Front", 4)),
+            (2, hidden(default_hides)),
+            (2, hidden(front_hides)),
+        ]
+    }
+
+    fn assembly_2027(views: Option<Vec<(u8, Vec<u8>)>>) -> Vec<u8> {
+        let placements = vec![
+            (0, placement(1, [0.0; 3], true)),
+            (0, placement(2, [1.0, 0.0, 0.0], false)),
+            (0, placement(3, [2.0, 0.0, 0.0], false)),
+        ];
+        // Inventor 2027: no titles; flag 0x40 marks the Reference component 2
+        let doc = doc(
+            &[(1, r"C:\A\Shaft.ipt"), (2, r"C:\A\Bolt.ipt")],
+            &[(1, 1, "", true), (1, 2, "", false), (2, 3, "", true)],
+        );
+        let classes = [OCCURRENCE, 0xFDCD_32FE, OVERRIDE_SET, OVERRIDE];
+        let view_classes = [VIEW_LIST, VIEW, VIEW_HIDDEN];
+        let mut segments: Vec<crate::invpart::tests::SegmentSpec> =
+            vec![(PLACEMENTS, &classes, placements)];
+        if let Some(views) = views {
+            segments.push((DESIGN_VIEWS, &view_classes, views));
+        }
+        file(&segments, &[("/UFRxDoc", doc)])
+    }
+
+    fn ids(c: &[Component]) -> Vec<u32> {
+        c.iter()
+            .map(|c| c.occurrence.as_ref().unwrap().id)
+            .collect()
+    }
+
+    #[test]
+    fn inventor_2027_takes_the_hidden_components_from_the_active_design_view() {
+        // "Front" is active and hides the Bolt (3); "Default" would hide 1
+        let c = components(&assembly_2027(Some(design_views(&[1], &[3])))).unwrap();
+        assert_eq!(
+            ids(&c),
+            [1, 2],
+            "flag 0x40 (Reference) does not hide 2, the active view hides 3"
+        );
+        // nothing hidden in the active view: everything is shown
+        let c = components(&assembly_2027(Some(design_views(&[1, 2, 3], &[])))).unwrap();
+        assert_eq!(ids(&c), [1, 2, 3]);
+        // no design views: nothing is hidden either
+        let c = components(&assembly_2027(None)).unwrap();
+        assert_eq!(ids(&c), [1, 2, 3]);
+        // a damaged view segment never panics and hides nothing
+        let mut views = design_views(&[], &[3]);
+        views[0].1.truncate(9);
+        let c = components(&assembly_2027(Some(views))).unwrap();
+        assert_eq!(ids(&c), [1, 2, 3]);
+    }
+
+    #[test]
+    fn titled_records_keep_flag_0x40_as_hidden() {
+        // records with titles (up to Inventor 2022): the flag decides, the
+        // design views are not read
+        let doc = doc(
+            &[(1, r"C:\A\Shaft.ipt"), (2, r"C:\A\Bolt.ipt")],
+            &[
+                (1, 1, "Shaft:1", true),
+                (1, 2, "Shaft:2", false),
+                (2, 3, "Bolt:1", true),
+            ],
+        );
+        let classes = [OCCURRENCE, 0xFDCD_32FE, OVERRIDE_SET, OVERRIDE];
+        let view_classes = [VIEW_LIST, VIEW, VIEW_HIDDEN];
+        let bytes = file(
+            &[
+                (
+                    PLACEMENTS,
+                    &classes,
+                    vec![
+                        (0, placement(1, [0.0; 3], true)),
+                        (0, placement(2, [1.0, 0.0, 0.0], false)),
+                        (0, placement(3, [2.0, 0.0, 0.0], false)),
+                    ],
+                ),
+                (DESIGN_VIEWS, &view_classes, design_views(&[], &[3])),
+            ],
+            &[("/UFRxDoc", doc)],
+        );
+        assert_eq!(ids(&components(&bytes).unwrap()), [1, 3]);
     }
 
     #[test]

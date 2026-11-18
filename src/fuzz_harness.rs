@@ -32,9 +32,12 @@ pub const MESH_FORMATS: &[&str] = &[
     "rhino",
     "pts",
     "las",
+    "jt",
     "vtk-legacy",
     "vtk-unstructured",
     "calculix-frd",
+    "fusion-design",
+    "catia-part",
     "sketchup",
 ];
 
@@ -124,11 +127,14 @@ pub fn htmltext(data: &[u8]) {
     let _ = crate::htmltext::decode(data, false);
 }
 
-/// Every mesh and simulation result reader except STEP.
+/// Every mesh and simulation result reader except STEP, and the instances
+/// of CATIA products.
 pub fn mesh(data: &[u8]) {
     for format in MESH_FORMATS {
         let _ = crate::mesh::read(format, data);
     }
+    let _ = crate::catprod::components(data);
+    let _ = crate::catprod::document(data);
 }
 
 /// File names whose format `cadformat::detect` decides by content (the
@@ -222,12 +228,29 @@ pub fn mesh_step(data: &[u8]) {
 /// A target: its name (as in `fuzz/fuzz_targets/<name>.rs`) and entry point.
 pub type Target = (&'static str, fn(&[u8]));
 
+/// Creo part container: table of contents, every section inflated and
+/// parsed, the unit, the 3D preview tessellated from the B-rep and the
+/// components of an assembly.
+pub fn creopart(data: &[u8]) {
+    if let Ok(toc) = crate::mesh::creo::container::toc(data) {
+        for e in toc.iter().take(400) {
+            if let Ok(Some(body)) = crate::mesh::creo::container::section(data, &toc, &e.name) {
+                let _ = crate::mesh::creo::tagged::parse(&body);
+            }
+        }
+        let _ = crate::mesh::creo::unit_mm(data, &toc);
+    }
+    let _ = crate::mesh::read("creo-part", data);
+    let _ = crate::mesh::creo::asm::components(data);
+}
+
 /// Every target by name: the fuzz targets and the corpus test use this list.
 pub const TARGETS: &[Target] = &[
     ("stepbom", stepbom),
     ("swpart", swpart),
     ("nxpart", nxpart),
     ("invpart", invpart),
+    ("creopart", creopart),
     ("cadrefs", cadrefs),
     ("bomtable", bomtable),
     ("thumbnail", thumbnail),

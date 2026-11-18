@@ -33,8 +33,10 @@ use crate::{
 
 /// Bump to invalidate every cached preview (reader fixes, new format).
 /// Bump `shape::VERSION` with it: the shape signatures stored in the
-/// database are computed from these meshes.
-pub const CACHE_VERSION: u32 = 2;
+/// database are computed from these meshes. 3: Inventor files with
+/// Zstandard segments (#271), cached as failed before. 4: Creo parts in
+/// millimetres (inch parts were 25.4 times too small), turned Creo parts.
+pub const CACHE_VERSION: u32 = 4;
 
 /// Conversions that run at the same time.
 pub const MAX_PARALLEL: usize = 2;
@@ -168,7 +170,8 @@ pub enum PreviewFormat {
     Step,
     /// Siemens NX parts: the lightweight (JT) representation they store.
     NxPart,
-    /// Standalone JT visualisation files (JT 9).
+    /// Standalone JT visualisation files: JT 10 with its scene graph (parts
+    /// and assemblies), JT 9 as NX writes it.
     Jt,
     /// SOLIDWORKS parts: the display tessellation they store.
     SwPart,
@@ -180,8 +183,18 @@ pub enum PreviewFormat {
     InvPart,
     /// Inventor assemblies: put together from the previews of their parts.
     InvAssembly,
+    /// CATIA V5 parts: the visualisation (CGR) data they store.
+    CatiaPart,
+    /// CATIA V5 products: put together from the previews of their parts.
+    CatiaProduct,
     /// SketchUp models: their faces triangulated, components placed.
     SketchUp,
+    /// PTC Creo parts: tessellated from the B-rep they store.
+    CreoPart,
+    /// PTC Creo assemblies: put together from the previews of their parts.
+    CreoAssembly,
+    /// Autodesk Fusion designs: the display scene they store.
+    FusionDesign,
     Pts,
     Xyz,
     Las,
@@ -193,7 +206,7 @@ pub enum PreviewFormat {
 }
 
 impl PreviewFormat {
-    pub const ALL: [PreviewFormat; 25] = [
+    pub const ALL: [PreviewFormat; 30] = [
         PreviewFormat::Stl,
         PreviewFormat::Obj,
         PreviewFormat::Ply,
@@ -211,7 +224,12 @@ impl PreviewFormat {
         PreviewFormat::Rhino,
         PreviewFormat::InvPart,
         PreviewFormat::InvAssembly,
+        PreviewFormat::CatiaPart,
+        PreviewFormat::CatiaProduct,
         PreviewFormat::SketchUp,
+        PreviewFormat::CreoPart,
+        PreviewFormat::CreoAssembly,
+        PreviewFormat::FusionDesign,
         PreviewFormat::Pts,
         PreviewFormat::Xyz,
         PreviewFormat::Las,
@@ -251,7 +269,12 @@ impl PreviewFormat {
             PreviewFormat::Rhino => "rhino",
             PreviewFormat::InvPart => "inventor-part",
             PreviewFormat::InvAssembly => "inventor-assembly",
+            PreviewFormat::CatiaPart => "catia-part",
+            PreviewFormat::CatiaProduct => "catia-product",
             PreviewFormat::SketchUp => "sketchup",
+            PreviewFormat::CreoPart => "creo-part",
+            PreviewFormat::CreoAssembly => "creo-assembly",
+            PreviewFormat::FusionDesign => "fusion-design",
             PreviewFormat::Pts => "pts",
             PreviewFormat::Xyz => "xyz",
             PreviewFormat::Las => "las",
@@ -272,16 +295,21 @@ impl PreviewFormat {
 
     /// B-rep formats are tessellated (slower) – the rest is read as is.
     pub fn is_brep(self) -> bool {
-        matches!(self, PreviewFormat::Step)
+        matches!(self, PreviewFormat::Step | PreviewFormat::CreoPart)
     }
 
     /// Assemblies whose preview is put together from their parts' previews
     /// (`services::assemblies`): NX files without a lightweight
-    /// representation of their own, SOLIDWORKS and Inventor assemblies.
+    /// representation of their own, SOLIDWORKS and Inventor assemblies,
+    /// CATIA products, Creo assemblies.
     pub fn may_be_assembly(self) -> bool {
         matches!(
             self,
-            PreviewFormat::NxPart | PreviewFormat::SwAssembly | PreviewFormat::InvAssembly
+            PreviewFormat::NxPart
+                | PreviewFormat::SwAssembly
+                | PreviewFormat::InvAssembly
+                | PreviewFormat::CatiaProduct
+                | PreviewFormat::CreoAssembly
         )
     }
 
@@ -405,13 +433,20 @@ fn signature_outcome(mesh: &crate::mesh::Mesh) -> shape::Outcome {
 
 /// The `teamcraft` binary that runs isolated jobs (`preview-mesh`,
 /// `text-extract`); `None` in tests and other binaries, which run them
-/// in-process.
+/// in-process. The desktop downloads *with local server* ship the same
+/// binary as `teamcraft-server` ([`crate::localserver::SIDECAR_NAME`]): next
+/// to the app's own `TeamCraft` executable, `teamcraft` would be the same
+/// file name on Windows and macOS.
 pub fn worker_exe() -> Option<PathBuf> {
-    std::env::current_exe().ok().filter(|exe| {
-        exe.file_stem()
-            .and_then(|s| s.to_str())
-            .is_some_and(|s| s == "teamcraft")
-    })
+    std::env::current_exe()
+        .ok()
+        .filter(|exe| is_worker_name(exe))
+}
+
+fn is_worker_name(exe: &Path) -> bool {
+    exe.file_stem()
+        .and_then(|s| s.to_str())
+        .is_some_and(|s| s == "teamcraft" || s == crate::localserver::SIDECAR_NAME)
 }
 
 /// One-at-a-time turns per key ([`Previews::render`]): who asks for a key
@@ -1141,6 +1176,28 @@ pub fn cache_entry(name: &str) -> CacheEntry<'_> {
 mod tests {
     use super::*;
 
+    /// The binary isolates its conversions under both of its names – also
+    /// as `teamcraft-server` in the desktop downloads with local server.
+    #[test]
+    fn worker_names() {
+        for name in [
+            "/usr/bin/teamcraft",
+            "teamcraft.exe",
+            "/Applications/TeamCraft.app/Contents/MacOS/teamcraft-server",
+            "teamcraft-server.exe",
+        ] {
+            assert!(is_worker_name(Path::new(name)), "{name}");
+        }
+        for name in [
+            "teamcraft-desktop",
+            "TeamCraft",
+            "local_server-5e3f",
+            "deps/teamcraft-1a2b",
+        ] {
+            assert!(!is_worker_name(Path::new(name)), "{name}");
+        }
+    }
+
     #[test]
     fn partial_previews_get_no_shape_signature() {
         let mut mesh = crate::mesh::Mesh {
@@ -1228,6 +1285,16 @@ mod tests {
             PreviewFormat::of("Pump.IAM"),
             Some(PreviewFormat::InvAssembly)
         );
+        assert_eq!(
+            PreviewFormat::of("Frame.CATProduct"),
+            Some(PreviewFormat::CatiaProduct)
+        );
+        assert!(PreviewFormat::CatiaProduct.may_be_assembly());
+        assert_eq!(
+            PreviewFormat::of("Frame.asm.12"),
+            Some(PreviewFormat::CreoAssembly)
+        );
+        assert!(PreviewFormat::CreoAssembly.may_be_assembly());
         assert_eq!(PreviewFormat::of("Bracket.par"), None, "native CAD");
         assert_eq!(
             PreviewFormat::of("plate.iges"),

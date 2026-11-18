@@ -5,6 +5,7 @@
 # User Guide
 
 - [Getting started](guide/getting-started.md)
+- [Try it on your computer](guide/local-server.md)
 - [Concepts](guide/concepts.md)
 - [Vault, check-out and check-in](guide/vault.md)
 - [Files, versions and 3D preview](guide/files.md)
@@ -28,6 +29,7 @@
 - [Branding: your own logos](admin/branding.md)
 - [Upgrading and rolling back](admin/upgrade.md)
 - [Operations](admin/operations.md)
+- [Live demo](admin/live-demo.md)
 - [Support policy](admin/support-policy.md)
 
 # Reference
@@ -53,20 +55,29 @@
     - [0002 Outbox for notifications and webhooks](dev/adr/0002-outbox.md)
     - [0003 Content-addressed vault](dev/adr/0003-content-addressed-vault.md)
     - [0004 No Node.js, no bundler](dev/adr/0004-no-node.md)
+    - [0005 Own work only, no decompiled code](dev/adr/0005-no-decompiled-code.md)
 
 # Research
 
 - [Research notes](research/index.md)
+    - [A hosted live demo](research/live-demo.md)
+    - [One download to try TeamCraft on a laptop](research/local-test-server.md)
+    - [Deprovisioning through the identity provider (SCIM)](research/scim-deprovisioning.md)
+    - [3D preview of CATIA V5 parts](research/catia-cgr-preview.md)
+    - [3D preview of CATIA V5 products](research/catia-product-structure.md)
     - [Instance counts of Inventor assemblies](research/inventor-instance-counts.md)
     - [Crash reports from the desktop app](research/crash-reporting.md)
     - [Mass properties from exported meshes](research/mass-properties.md)
     - [3D preview of Fusion designs](research/fusion-ogs-preview.md)
     - [3D preview of Inventor files](research/inventor-display-preview.md)
     - [Inventor 2026 and later: Zstandard streams](research/inventor-zstd-streams.md)
+    - [3D preview of Creo parts](research/creo-brep-preview.md)
+    - [3D preview of Creo assemblies](research/creo-assembly-preview.md)
     - [3D preview of SOLIDWORKS files](research/solidworks-display-preview.md)
     - [Mutation testing with cargo-mutants](research/mutation-testing.md)
     - [3D preview of NX parts](research/nx-jt-preview.md)
     - [3D preview of Rhino models](research/rhino-3dm-preview.md)
+    - [3D preview of stand-alone JT files](research/jt10-preview.md)
     - [3D preview of SketchUp models](research/sketchup-preview.md)
     - [Text from HTML reports](research/html-report-text.md)
     - [Text from PDF reports](research/pdf-text-extraction.md)
@@ -76,7 +87,7 @@
     - [Jira connector for change requests and change orders](research/jira-connector.md)
     - [Previews of native CAD files](research/cad-previews.md)
     - [Importing existing CAD folder trees](research/cad-folder-import.md)
-    - [Popular features of Teamcenter](research/teamcenter.md)
+    - [Popular features of commercial PLM systems](research/plm-working-features.md)
     - [Openly licensed CAD files for end-to-end tests](research/cad-test-files.md)
     - [Read permissions for project groups](research/read-permissions.md)
     - [As-built records](research/as-built.md)

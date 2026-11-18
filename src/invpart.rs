@@ -6,22 +6,22 @@
 //! ```text
 //! M<id>: u32 25 "RSe Meta Stream Version 8" | u16 | 16 bytes
 //!        | u32 n, n × UTF-16 segment name | class UUID | 3 × u32
-//!        | u32 n, ASCII date | u32 n, ASCII date | u8 codec | compressed body:
+//!        | u32 n, ASCII date | u32 n, ASCII date | u8 | zlib/zstd body:
 //!          7 × u16 | u32 sections, sections × u32 (bit 31 + length) | u32
 //!          | u32 n, n × 10 bytes | u32 | u32 n, n × 28 bytes | u32
 //!          | u32 classes, classes × (UUID, u16, u32, u16, u32)
-//! B<id>: 16 bytes, u8 4, u8 codec | compressed body: per section
+//! B<id>: 18 bytes | zlib/zstd body: per section
 //!          u32 class word (low byte: class table index) | payload
 //!          | u32 payload length again | u8 0
 //! ```
 //!
-//! The codec byte is 1 for zlib (up to Inventor 2025) and 2 for one Zstandard
-//! frame (Inventor 2026 and later, see
-//! `docs/src/research/inventor-zstd-streams.md`); the reader goes by the
-//! frame magic of the body itself.
+//! The bodies are zlib (Inventor 2019–2024 as tested) or Zstandard (newer
+//! files, issue #271), told apart by their magic bytes. Where the header of a
+//! Zstandard stream ends is not known from real files: the frame is taken at
+//! the zlib offset, else at the first Zstandard magic close to it.
 //!
 //! Classes are named by the first 32 bits of their UUID (`time_low`). Every
-//! length is checked against the data before it is used, decompressed streams
+//! length is checked against the data before it is used, unpacked streams
 //! are capped, and a damaged file is an error, never a panic.
 #![deny(
     clippy::unwrap_used,
@@ -37,15 +37,25 @@ use flate2::read::ZlibDecoder;
 
 /// Largest meta or data stream read (compressed).
 const MAX_RAW: u64 = 256 * 1024 * 1024;
-/// Bytes before the compressed body of a data stream.
+/// Bytes before the zlib body of a data stream (Zstandard: see `unpack`).
 const DATA_HEADER: usize = 18;
+/// Magic number of a Zstandard frame (RFC 8878).
+const ZSTD_MAGIC: [u8; 4] = [0x28, 0xB5, 0x2F, 0xFD];
+/// How far before or after the zlib offset a Zstandard frame is looked for.
+const ZSTD_SLACK: usize = 64;
+/// Largest Zstandard window a frame may ask for: the decoder allocates it up
+/// front, so it is also capped by the output limit (at least 1 MiB).
+const MAX_ZSTD_WINDOW: u64 = 32 * 1024 * 1024;
+/// Most Zstandard frames read one after the other from one stream.
+const MAX_ZSTD_FRAMES: usize = 64;
 /// Marker of a typed array.
 pub const ARRAY: u32 = 0x3000_0002;
-/// Element type of plain `u32` arrays in files of Inventor 2019–2022.
+/// Element type of plain `u32` arrays in files up to Inventor 2025.
 pub const ELEM_U32: u32 = 0;
 /// Element types of `u32` arrays in files of Inventor 2027, which name the
 /// kind of number where older files have 0: three kinds of integers (8 for
-/// triangle indices and occurrence ids) and 16 for refs to sections.
+/// triangle indices and occurrence ids) and 16 for refs to sections
+/// (`docs/src/research/inventor-zstd-streams.md`).
 const U32_2027: [u32; 4] = [4, 8, 0xE, 0x10];
 /// Element type of key arrays (`u32` too).
 pub const ELEM_KEYS: u32 = 0x1000_0000;
@@ -81,7 +91,7 @@ fn usize_at(data: &[u8], at: usize) -> Option<usize> {
     usize::try_from(u32_at(data, at)?).ok()
 }
 
-/// One segment: its section lengths, its class table and the decompressed data.
+/// One segment: its section lengths, its class table and the inflated data.
 #[derive(Debug)]
 pub struct Segment {
     /// Payload length of every section, in order.
@@ -247,7 +257,7 @@ impl<'a> Cursor<'a> {
     }
 }
 
-/// The segment named `name` (e.g. `PmGraphicsSegment`), decompressing at most
+/// The segment named `name` (e.g. `PmGraphicsSegment`), inflating at most
 /// `limit` bytes; `Ok(None)` when the file has no such segment.
 pub fn segment<F: Read + Seek>(
     ole: &mut cfb::CompoundFile<F>,
@@ -272,11 +282,11 @@ pub fn segment<F: Read + Seek>(
         if seg_name != name {
             continue;
         }
-        let body = decompress(raw.get(body_at..).unwrap_or_default(), limit)?;
+        let body = unpack(&raw, body_at, limit)?;
         let (lengths, classes) = meta_body(&body).ok_or_else(|| bad("damaged meta stream"))?;
         let data_path = std::path::PathBuf::from(format!("/RSeStorage/B{id}"));
         let raw = read_stream(ole, &data_path, MAX_RAW)?;
-        let data = decompress(raw.get(DATA_HEADER..).unwrap_or_default(), limit)?;
+        let data = unpack(&raw, DATA_HEADER, limit)?;
         return Ok(Some(Segment {
             lengths,
             classes,
@@ -301,42 +311,84 @@ pub fn read_stream<F: Read + Seek>(
     Ok(out)
 }
 
-/// Start of a Zstandard frame (RFC 8878): the streams of Inventor 2026 and
-/// later. Earlier files hold zlib streams, which never start like this.
-const ZSTD_MAGIC: [u8; 4] = [0x28, 0xB5, 0x2F, 0xFD];
-
-/// The body of a meta or data stream, at most `limit` bytes: zlib up to
-/// Inventor 2025, one Zstandard frame from Inventor 2026 on.
-fn decompress(data: &[u8], limit: u64) -> io::Result<Vec<u8>> {
-    let mut out = Vec::new();
-    if data.starts_with(&ZSTD_MAGIC) {
-        let mut frame = ruzstd::decoding::StreamingDecoder::new(data)
-            .map_err(|_| bad("damaged compressed data"))?;
-        // 0: the frame does not say how long its content is
-        let declared = frame.decoder.content_size();
-        if declared > limit {
-            return Err(bad("segment larger than the preview reads"));
-        }
-        (&mut frame)
-            .take(limit.saturating_add(1))
-            .read_to_end(&mut out)
-            .map_err(|_| bad("damaged compressed data"))?;
-        if declared != 0 && declared != out.len() as u64 {
-            return Err(bad("damaged compressed data"));
-        }
-    } else {
-        ZlibDecoder::new(data)
-            .take(limit.saturating_add(1))
-            .read_to_end(&mut out)
-            .map_err(|_| bad("damaged compressed data"))?;
+/// The compressed body of a meta or data stream whose zlib body starts at
+/// `at`: Zstandard when a frame starts there, zlib when a zlib header does,
+/// else the first Zstandard frame within [`ZSTD_SLACK`] bytes of `at`.
+fn unpack(raw: &[u8], at: usize, limit: u64) -> io::Result<Vec<u8>> {
+    let body = raw.get(at..).unwrap_or_default();
+    if body.starts_with(&ZSTD_MAGIC) {
+        return unzstd(body, limit);
     }
+    if !zlib_header(body) {
+        let from = at.saturating_sub(ZSTD_SLACK);
+        let to = at
+            .saturating_add(ZSTD_SLACK + ZSTD_MAGIC.len())
+            .min(raw.len());
+        if let Some(near) = raw.get(from..to).and_then(|w| {
+            w.windows(ZSTD_MAGIC.len())
+                .position(|m| m == ZSTD_MAGIC)
+                .and_then(|k| raw.get(from + k..))
+        }) {
+            return unzstd(near, limit);
+        }
+    }
+    inflate(body, limit)
+}
+
+/// A zlib header: Deflate with a window of at most 32 KiB and a check sum
+/// that divides by 31 (RFC 1950).
+fn zlib_header(data: &[u8]) -> bool {
+    match data {
+        [cmf, flg, ..] => {
+            cmf & 0x0F == 8 && cmf >> 4 <= 7 && (u16::from(*cmf) << 8 | u16::from(*flg)) % 31 == 0
+        }
+        _ => false,
+    }
+}
+
+fn inflate(data: &[u8], limit: u64) -> io::Result<Vec<u8>> {
+    let mut out = Vec::new();
+    ZlibDecoder::new(data)
+        .take(limit.saturating_add(1))
+        .read_to_end(&mut out)
+        .map_err(|_| bad("damaged compressed data"))?;
     if out.len() as u64 > limit {
         return Err(bad("segment larger than the preview reads"));
     }
     Ok(out)
 }
 
-/// The segment name and where the compressed body starts.
+/// Zstandard frames, one after the other while the next one starts right
+/// behind; the output is capped like the zlib output.
+fn unzstd(data: &[u8], limit: u64) -> io::Result<Vec<u8>> {
+    let mut out = Vec::new();
+    let mut rest = data;
+    for _ in 0..MAX_ZSTD_FRAMES {
+        if !rest.starts_with(&ZSTD_MAGIC) {
+            break;
+        }
+        let left = limit.saturating_add(1).saturating_sub(out.len() as u64);
+        let mut decoder = ruzstd::decoding::StreamingDecoder::new_with_max_window_size(
+            &mut rest,
+            MAX_ZSTD_WINDOW.min(limit.max(1 << 20)),
+        )
+        .map_err(|_| bad("damaged compressed data"))?;
+        (&mut decoder)
+            .take(left)
+            .read_to_end(&mut out)
+            .map_err(|_| bad("damaged compressed data"))?;
+        if out.len() as u64 > limit {
+            return Err(bad("segment larger than the preview reads"));
+        }
+        if !decoder.decoder.is_finished() {
+            // the frame stopped before its end: no further frame can follow
+            break;
+        }
+    }
+    Ok(out)
+}
+
+/// The segment name and where the zlib body starts.
 fn meta_head(raw: &[u8]) -> Option<(String, usize)> {
     const VERSION: &[u8] = b"RSe Meta Stream Version ";
     let n = usize_at(raw, 0)?;
@@ -367,7 +419,7 @@ fn meta_head(raw: &[u8]) -> Option<(String, usize)> {
     Some((name, at + 1))
 }
 
-/// Section lengths and class table of a decompressed meta body.
+/// Section lengths and class table of an inflated meta body.
 fn meta_body(body: &[u8]) -> Option<(Vec<usize>, Vec<u32>)> {
     let mut at = 14;
     let n = usize_at(body, at)?;
@@ -407,44 +459,9 @@ pub(crate) mod tests {
     /// A segment to write: (name, classes, sections as (class index, payload)).
     pub(crate) type SegmentSpec<'a> = (&'a str, &'a [u32], Vec<(u8, Vec<u8>)>);
 
-    /// How the streams of a test file are compressed.
-    #[derive(Clone, Copy, Debug, PartialEq)]
-    pub(crate) enum Codec {
-        /// Up to Inventor 2025.
-        Zlib,
-        /// Inventor 2026 and later.
-        Zstd,
-    }
-
-    impl Codec {
-        /// The byte before a compressed body.
-        fn byte(self) -> u8 {
-            match self {
-                Codec::Zlib => 1,
-                Codec::Zstd => 2,
-            }
-        }
-
-        fn compress(self, data: &[u8]) -> Vec<u8> {
-            match self {
-                Codec::Zlib => zlib(data),
-                Codec::Zstd => zstd(data),
-            }
-        }
-    }
-
-    /// Writes a minimal Inventor-like compound file with zlib streams:
+    /// Writes a minimal Inventor-like compound file with the given segments:
     /// (name, classes, sections as (class index, payload)).
     pub(crate) fn file(segments: &[SegmentSpec], extra: &[(&str, Vec<u8>)]) -> Vec<u8> {
-        file_with(Codec::Zlib, segments, extra)
-    }
-
-    /// [`file`] with the streams compressed by `codec`.
-    pub(crate) fn file_with(
-        codec: Codec,
-        segments: &[SegmentSpec],
-        extra: &[(&str, Vec<u8>)],
-    ) -> Vec<u8> {
         use std::io::Write;
         let mut ole = cfb::CompoundFile::create(std::io::Cursor::new(Vec::new())).unwrap();
         ole.create_storage("/RSeStorage").unwrap();
@@ -465,7 +482,7 @@ pub(crate) mod tests {
                 meta.extend(19u32.to_le_bytes());
                 meta.extend(b"01/01/2026 00:00:00");
             }
-            meta.push(codec.byte());
+            meta.push(1);
             let mut body = vec![0u8; 14];
             body.extend((sections.len() as u32).to_le_bytes());
             for (_, p) in sections {
@@ -481,7 +498,7 @@ pub(crate) mod tests {
                 body.extend(c.to_le_bytes());
                 body.extend([0; 24]);
             }
-            meta.extend(codec.compress(&body));
+            meta.extend(zlib(&body));
             let mut data = Vec::new();
             for (class, p) in sections {
                 data.extend([*class, 1, 0, 0]);
@@ -490,8 +507,7 @@ pub(crate) mod tests {
                 data.push(0);
             }
             let mut stream = vec![0u8; DATA_HEADER];
-            stream[DATA_HEADER - 2..].copy_from_slice(&[4, codec.byte()]);
-            stream.extend(codec.compress(&data));
+            stream.extend(zlib(&data));
             ole.create_stream(format!("/RSeStorage/Mseg{k}"))
                 .unwrap()
                 .write_all(&meta)
@@ -515,21 +531,41 @@ pub(crate) mod tests {
         z.finish().unwrap()
     }
 
-    /// One Zstandard frame with compressed blocks.
     pub(crate) fn zstd(data: &[u8]) -> Vec<u8> {
         ruzstd::encoding::compress_to_vec(data, ruzstd::encoding::CompressionLevel::Fastest)
     }
 
-    /// A Zstandard frame as Inventor writes it, by hand: single segment,
-    /// `declared` as the 4-byte content size, no checksum, one raw block.
-    fn raw_frame(declared: u32, data: &[u8]) -> Vec<u8> {
-        let mut frame = ZSTD_MAGIC.to_vec();
-        frame.push(0xA0);
-        frame.extend(declared.to_le_bytes());
-        let header = (data.len() as u32) << 3 | 1;
-        frame.extend(&header.to_le_bytes()[..3]);
-        frame.extend(data);
-        frame
+    /// The same Inventor file with every `RSeStorage` segment repacked as
+    /// Zstandard (as issue #271 reports for newer files), the frame `shift`
+    /// bytes behind (or before) where the zlib body started.
+    pub(crate) fn as_zstd(bytes: &[u8], shift: isize) -> Vec<u8> {
+        use std::io::Write;
+        let mut ole = cfb::CompoundFile::open(std::io::Cursor::new(bytes.to_vec())).unwrap();
+        let streams: Vec<(String, std::path::PathBuf)> = ole
+            .read_storage("/RSeStorage")
+            .unwrap()
+            .filter(|e| e.is_stream())
+            .map(|e| (e.name().to_string(), e.path().to_path_buf()))
+            .collect();
+        for (name, path) in streams {
+            let at = match name.chars().next() {
+                Some('M') => {
+                    meta_head(&read_stream(&mut ole, &path, MAX_RAW).unwrap())
+                        .unwrap()
+                        .1
+                }
+                Some('B') => DATA_HEADER,
+                _ => continue,
+            };
+            let raw = read_stream(&mut ole, &path, MAX_RAW).unwrap();
+            let body = unpack(&raw, at, MAX_RAW).unwrap();
+            let mut out = raw[..at.saturating_add_signed(shift.min(0))].to_vec();
+            out.extend(vec![0u8; shift.max(0) as usize]);
+            out.extend(zstd(&body));
+            ole.create_stream(&path).unwrap().write_all(&out).unwrap();
+        }
+        ole.flush().unwrap();
+        ole.into_inner().into_inner()
     }
 
     /// A typed array as Inventor writes it.
@@ -577,136 +613,23 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn zstandard_streams_read_like_zlib_streams() {
-        let segments: [SegmentSpec; 2] = [
-            ("PmAppSegment", &[1], vec![(0, vec![9; 3])]),
-            (
-                "PmGraphicsSegment",
-                &[0xAAAA_0001, POINT3F],
-                vec![(1, vec![1, 2]), (0, array(0x101, 1, &[0; 12]))],
-            ),
-        ];
-        let read = |codec: Codec| {
-            let mut ole = open(file_with(codec, &segments, &[]));
-            let seg = segment(&mut ole, "PmGraphicsSegment", 1 << 20)
-                .unwrap()
-                .unwrap();
-            let sections: Vec<(u32, Vec<u8>)> = seg
-                .sections()
-                .map(|s| s.map(|s| (s.class, s.payload.to_vec())))
-                .collect::<io::Result<_>>()
-                .unwrap();
-            (seg.classes.clone(), sections)
-        };
-        let old = read(Codec::Zlib);
-        assert_eq!(old.1.len(), 2);
-        assert_eq!(read(Codec::Zstd), old);
-    }
-
-    #[test]
-    fn a_zstandard_body_is_told_by_its_first_bytes() {
-        let text = b"sections, sections, sections and more sections".repeat(40);
-        // compressed blocks, as the encoder writes them
-        assert_eq!(decompress(&zstd(&text), 1 << 20).unwrap(), text);
-        // the frame Inventor writes: content size up front, raw block
-        assert_eq!(
-            decompress(&raw_frame(text.len() as u32, &text), 1 << 20).unwrap(),
-            text
-        );
-        // zlib as before, and neither of the two is an error
-        assert_eq!(decompress(&zlib(&text), 1 << 20).unwrap(), text);
-        for junk in [&b""[..], b"\x28\xb5\x2f", b"plain text", &ZSTD_MAGIC] {
-            assert!(decompress(junk, 1 << 20).is_err(), "{junk:?}");
-        }
-    }
-
-    #[test]
-    fn zstandard_bodies_are_capped_and_checked() {
-        let data = vec![7u8; 5000];
-        let limit_error = |r: io::Result<Vec<u8>>| {
-            let e = r.unwrap_err().to_string();
-            assert!(e.contains("larger than the preview reads"), "{e}");
-        };
-        // exactly at the limit is fine, one byte less is not
-        assert_eq!(decompress(&zstd(&data), 5000).unwrap().len(), 5000);
-        limit_error(decompress(&zstd(&data), 4999));
-        // a frame that declares more than the limit is refused up front,
-        // whatever it really holds
-        limit_error(decompress(&raw_frame(1 << 20, b"tiny"), 4999));
-        // … also by the decoder, which takes no window above 128 MiB
-        assert!(decompress(&raw_frame(1 << 30, b"tiny"), u64::MAX).is_err());
-        // … and one that yields another length than it declares is damaged
-        for declared in [3u32, 5] {
-            let e = decompress(&raw_frame(declared, b"four"), 1 << 20).unwrap_err();
-            assert!(e.to_string().contains("damaged compressed data"), "{e}");
-        }
-        // every truncation of a frame is an error, never a panic
-        let frame = zstd(&b"abcdefgh".repeat(300));
-        for cut in 0..frame.len() {
-            assert!(decompress(&frame[..cut], 1 << 20).is_err(), "cut at {cut}");
-        }
-        // … and so is every flipped byte, or it still decodes within the limit
-        for at in 0..frame.len() {
-            let mut bad = frame.clone();
-            bad[at] ^= 0x5A;
-            if let Ok(out) = decompress(&bad, 4096) {
-                assert!(out.len() <= 4096);
-            }
-        }
-    }
-
-    #[test]
-    fn the_array_types_of_inventor_2027_are_u32() {
-        let seg = Segment {
-            lengths: vec![],
-            classes: vec![POINT3F],
-            data: vec![],
-        };
-        for elem in [ELEM_U32, 4, 8, 0xE, 0x10] {
-            assert!(is_u32(elem), "{elem}");
-            let a = array(elem, 3, &[0; 12]);
-            let read = Cursor::new(&a, 0).array(&seg).unwrap();
-            assert_eq!((read.count, read.bytes.len(), read.elem), (3, 12, elem));
-        }
-        // keys are four bytes too, but no plain numbers
-        assert!(!is_u32(ELEM_KEYS));
-        assert_eq!(seg.element_size(ELEM_KEYS), Some(4));
-        // bytes (6) and unknown types end the read
-        for elem in [6, 5, 0x20, 0x11] {
-            assert!(!is_u32(elem), "{elem}");
-            assert!(Cursor::new(&array(elem, 3, &[0; 12]), 0)
-                .array(&seg)
-                .is_none());
-        }
-        // the second count is a capacity: the data holds `count` elements
-        let mut a = array(8, 2, &[1, 0, 0, 0, 2, 0, 0, 0]);
-        a[8..12].copy_from_slice(&7u32.to_le_bytes());
-        let mut c = Cursor::new(&a, 0);
-        assert_eq!(c.array(&seg).unwrap().bytes, [1, 0, 0, 0, 2, 0, 0, 0]);
-        assert_eq!(c.at, a.len());
-    }
-
-    #[test]
     fn damaged_segments_are_errors_not_panics() {
-        for codec in [Codec::Zlib, Codec::Zstd] {
-            let bytes = file_with(
-                codec,
-                &[(
-                    "PmGraphicsSegment",
-                    &[1],
-                    vec![(0, vec![7; 40]), (0, vec![8; 4])],
-                )],
-                &[],
-            );
-            // every truncation of the whole file
-            for cut in (0..bytes.len()).step_by(97) {
-                if let Ok(mut ole) =
-                    cfb::CompoundFile::open(std::io::Cursor::new(bytes[..cut].to_vec()))
-                {
-                    if let Ok(Some(seg)) = segment(&mut ole, "PmGraphicsSegment", 1 << 20) {
-                        for s in seg.sections() {
-                            let _ = s;
-                        }
+        let bytes = file(
+            &[(
+                "PmGraphicsSegment",
+                &[1],
+                vec![(0, vec![7; 40]), (0, vec![8; 4])],
+            )],
+            &[],
+        );
+        // every truncation of the whole file
+        for cut in (0..bytes.len()).step_by(97) {
+            if let Ok(mut ole) =
+                cfb::CompoundFile::open(std::io::Cursor::new(bytes[..cut].to_vec()))
+            {
+                if let Ok(Some(seg)) = segment(&mut ole, "PmGraphicsSegment", 1 << 20) {
+                    for s in seg.sections() {
+                        let _ = s;
                     }
                 }
             }
@@ -720,12 +643,126 @@ pub(crate) mod tests {
         let all: Vec<_> = seg.sections().collect();
         assert_eq!(all.len(), 1);
         assert!(all[0].is_err());
-        // a size limit
+        // an inflate limit
         let mut ole = open(file(
             &[("PmGraphicsSegment", &[1], vec![(0, vec![0; 5000])])],
             &[],
         ));
         assert!(segment(&mut ole, "PmGraphicsSegment", 100).is_err());
+    }
+
+    /// The segments of the walk test above, written with zlib.
+    fn two_segments() -> Vec<u8> {
+        file(
+            &[
+                ("PmAppSegment", &[1], vec![(0, vec![9; 3])]),
+                (
+                    "PmGraphicsSegment",
+                    &[0xAAAA_0001, POINT3F],
+                    vec![(1, vec![1, 2]), (0, array(0x101, 1, &[0; 12]))],
+                ),
+            ],
+            &[],
+        )
+    }
+
+    fn sections_of(bytes: Vec<u8>) -> io::Result<Vec<(u32, Vec<u8>)>> {
+        let mut ole = open(bytes);
+        let seg =
+            segment(&mut ole, "PmGraphicsSegment", 1 << 20)?.ok_or_else(|| bad("no segment"))?;
+        seg.sections()
+            .map(|s| s.map(|s| (s.class, s.payload.to_vec())))
+            .collect()
+    }
+
+    #[test]
+    fn zstandard_segments_read_like_zlib_ones() {
+        let zlib = sections_of(two_segments()).unwrap();
+        assert_eq!(zlib.len(), 2);
+        // the frame where the zlib body was, and a few bytes off either way
+        for shift in [0, 1, 4, 16, -2, -1] {
+            let packed = as_zstd(&two_segments(), shift);
+            assert_eq!(sections_of(packed).unwrap(), zlib, "shift {shift}");
+        }
+    }
+
+    #[test]
+    fn zstandard_bodies_are_told_apart_from_zlib_by_their_magic() {
+        let data = b"PmGraphicsSegment ".repeat(50);
+        assert_eq!(unpack(&zlib(&data), 0, 1 << 20).unwrap(), data);
+        assert_eq!(unpack(&zstd(&data), 0, 1 << 20).unwrap(), data);
+        // frames one after the other
+        let mut two = zstd(&data[..300]);
+        two.extend(zstd(&data[300..]));
+        assert_eq!(unpack(&two, 0, 1 << 20).unwrap(), data);
+        // a header byte before the frame (the u8 of the meta stream)
+        let mut late = vec![2u8];
+        late.extend(zstd(&data));
+        assert_eq!(unpack(&late, 0, 1 << 20).unwrap(), data);
+        // a frame too far behind the expected start is not searched for
+        let mut far = vec![0u8; ZSTD_SLACK + 1];
+        far.extend(zstd(&data));
+        assert!(unpack(&far, 0, 1 << 20).is_err());
+        assert!(zlib_header(&zlib(&data)) && !zlib_header(&zstd(&data)));
+    }
+
+    /// The NIST parts with every segment repacked as Zstandard: each
+    /// segment unpacks to the same bytes as from the zlib original (the
+    /// preview is built from these bytes alone).
+    #[test]
+    fn nist_parts_repacked_as_zstandard_unpack_to_the_same_segments() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/cad/nist");
+        let zlib = std::fs::read(format!(
+            "{dir}/ftc-11/inventor-2021/INV_nist_ftc_11_asme1_2021.ipt"
+        ))
+        .unwrap();
+        let zstd = as_zstd(&zlib, 0);
+        let (mut a, mut b) = (open(zlib), open(zstd));
+        for name in ["PmGraphicsSegment", "PmAppSegment", "PmBRepSegment"] {
+            let x = segment(&mut a, name, MAX_RAW).unwrap();
+            let y = segment(&mut b, name, MAX_RAW).unwrap();
+            let (x, y) = (x.expect(name), y.expect(name));
+            assert_eq!(x.lengths, y.lengths, "{name}");
+            assert_eq!(x.classes, y.classes, "{name}");
+            assert!(x.data == y.data, "{name}: data differs");
+        }
+    }
+
+    #[test]
+    fn damaged_zstandard_segments_are_errors_not_panics() {
+        let data: Vec<u8> = (0..2_000u32)
+            .flat_map(|k| (k % 251).to_le_bytes())
+            .collect();
+        let packed = zstd(&data);
+        // the output limit holds for Zstandard too
+        assert!(unpack(&packed, 0, 1000).is_err());
+        assert_eq!(unpack(&packed, 0, data.len() as u64).unwrap(), data);
+        // every truncation and bytes flipped all over the frame
+        for cut in 0..packed.len() {
+            let _ = unpack(&packed[..cut], 0, 1 << 20);
+        }
+        for at in 0..packed.len() {
+            let mut bad = packed.clone();
+            bad[at] ^= 0x5A;
+            let _ = unpack(&bad, 0, 1 << 20);
+        }
+        // a frame header asking for a huge window
+        let mut huge = ZSTD_MAGIC.to_vec();
+        huge.extend([0x00, 0xF8, 0, 0, 0, 0]);
+        assert!(unpack(&huge, 0, 1 << 30).is_err());
+        // the whole file, cut and corrupted
+        let bytes = as_zstd(&two_segments(), 0);
+        for cut in (0..bytes.len()).step_by(61) {
+            if let Ok(mut ole) =
+                cfb::CompoundFile::open(std::io::Cursor::new(bytes[..cut].to_vec()))
+            {
+                if let Ok(Some(seg)) = segment(&mut ole, "PmGraphicsSegment", 1 << 20) {
+                    for s in seg.sections() {
+                        let _ = s;
+                    }
+                }
+            }
+        }
     }
 
     #[test]
@@ -748,5 +785,31 @@ pub(crate) mod tests {
         let mut c = Cursor::new(&empty, 0);
         assert_eq!(c.array(&seg).unwrap().count, 0);
         assert_eq!(c.at, 8);
+    }
+
+    #[test]
+    fn the_array_types_of_inventor_2027_are_u32() {
+        let seg = Segment {
+            lengths: vec![],
+            classes: vec![POINT3F],
+            data: vec![],
+        };
+        for elem in [ELEM_U32, 4, 8, 0xE, 0x10] {
+            assert!(is_u32(elem), "{elem}");
+            let a = array(elem, 3, &[0; 12]);
+            let read = Cursor::new(&a, 0).array(&seg).unwrap();
+            assert_eq!((read.count, read.bytes.len(), read.elem), (3, 12, elem));
+            assert_eq!(seg.element_class(elem), Some(elem));
+        }
+        // keys are four bytes too, but no plain numbers
+        assert!(!is_u32(ELEM_KEYS));
+        assert_eq!(seg.element_size(ELEM_KEYS), Some(4));
+        // bytes (6) and unknown types end the read
+        for elem in [6, 5, 0x20, 0x11] {
+            assert!(!is_u32(elem), "{elem}");
+            assert!(Cursor::new(&array(elem, 3, &[0; 12]), 0)
+                .array(&seg)
+                .is_none());
+        }
     }
 }

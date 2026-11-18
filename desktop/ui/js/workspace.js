@@ -7,6 +7,7 @@ import { isCancelled, refreshWorklistCount, uploadLine } from "./shell.js";
 import { reloadActive, renderActive, table } from "./tabs.js";
 import { PROGRAM_LABEL, cadPrograms, dd, exportProgram, exportStep, openRevision, previewFormat, revisionAbilities } from "./revision.js";
 import { openChange } from "./change.js";
+import { reviewerProblem } from "./release-rules.js";
 import { requestChangeDialog } from "./requests.js";
 import { refreshStructure } from "./navigator.js";
 
@@ -29,6 +30,9 @@ export function revViewer(tab, el) {
   tab.viewerFile = current.id;
   var canvas = h("canvas.viewer-canvas", { tabindex: "0", "aria-label": "3D view of " + current.filename });
   var status = h("p.small.muted", { role: "status", text: "Loading" });
+  // "Loading …" and every error on the canvas itself: the status line below
+  // can be out of view, which left a failed preview a silent black canvas (#290)
+  var overlay = h("div.viewer-overlay.is-busy", null, h("span", { text: "Loading the 3D model …" }));
   var resetBtn = h("button.small", { type: "button", title: "Back to the initial view (double-click)" }, "Reset view");
   var upBtn = h("button.small", { type: "button", title: "Switch between Z-up and Y-up models" }, "Z up");
   // STL export of STEP/3MF/… models (e.g. for 3D printing); saved through a native dialog in Rust.
@@ -53,20 +57,29 @@ export function revViewer(tab, el) {
         on: { click: function () { tab.viewerFile = f.id; tab.viewerVersion = null; renderActive(); } }
       }, f.filename + "  v" + f.version);
     }))),
-    h("div", null, [canvas, h("div.viewer-bar", null, [status, h("div.row", null, [upBtn, resetBtn, stlBtn])]),
+    h("div", null, [h("div.viewer-stage", null, [canvas, overlay]), h("div.viewer-bar", null, [status, h("div.row", null, [upBtn, resetBtn, stlBtn])]),
       h("p.hint", { text: "Drag to rotate, wheel to zoom, arrow keys to turn, double-click to reset." })])
   ]));
   // the server converts the file into a mesh (pure Rust) – the app only draws it
   var versionId = tab.viewerVersion;
-  state.viewer = window.TeamCraftViewer.mount(canvas, {
-    statusEl: status,
-    resetBtn: resetBtn,
-    upBtn: upBtn,
-    onReady: function () { if (stlBtn) stlBtn.disabled = false; },
-    load: function () {
-      return invoke("file_bytes", versionId ? { kind: "version-mesh", id: versionId } : { kind: "mesh", id: current.id });
-    }
-  });
+  try {
+    state.viewer = window.TeamCraftViewer.mount(canvas, {
+      statusEl: status,
+      overlayEl: overlay,
+      resetBtn: resetBtn,
+      upBtn: upBtn,
+      onReady: function () { if (stlBtn) stlBtn.disabled = false; },
+      load: function () {
+        return invoke("file_bytes", versionId ? { kind: "version-mesh", id: versionId } : { kind: "mesh", id: current.id });
+      }
+    });
+  } catch (err) {
+    // the viewer script itself failed: still no silent canvas
+    clear(overlay);
+    overlay.className = "viewer-overlay is-error";
+    overlay.appendChild(h("span", { text: "The 3D view could not start: " + errorText(err) }));
+    status.textContent = errorText(err);
+  }
 }
 
 // ---------------------------------------------------------------- workspace
@@ -103,11 +116,14 @@ export function revWorkspace(tab, el) {
           }, { title: "Copy the current files of this revision into the working folder without checking out (read-only)" }),
           tool("Get with structure…", "download", function () { getStructureDialog(rev); },
             { title: "Copy this item and everything it consists of (BOM and referenced CAD files) into the working folder" }),
+          can.checkin && changed.length ? tool("Park…", "upload", function () { checkinDialog(tab, true); },
+            { title: "Upload your changes as new versions and keep the check-out – safe on the server if this computer is lost" }) : null,
           can.checkin ? tool("Check in…", "checkin", function () { checkinDialog(tab); }, { primary: changed.length > 0 }) : null
         ])
       ]),
       h("p.small.muted", null, ["Folder: ", h("span.mono", { text: ws.dir }),
         " · files you have not checked out are read-only; check out to change them."]),
+      ws.released ? releasedNotice(ws.released, changed.length + conflicts.length) : null,
       rev.checked_out_by ? h("p.small", null, [lockBadge(lockedByOther ? rev.checked_out_by_name : "You", !lockedByOther),
         " checked out " + fmtDate(rev.checked_out_at) + " (" + lockAge(rev.checked_out_at) + ")" +
         (lockedByOther ? " – locked by " + rev.checked_out_by_name + ": only they can check in right now; your local changes stay in the working folder." : "")]) : null,
@@ -145,6 +161,17 @@ export function revWorkspace(tab, el) {
         (lockedByOther ? rev.checked_out_by_name + " holds the lock; check in after they released it." : "check out first, then check in.") }) : null
     ]));
   });
+}
+
+/** After somebody else released my check-out (issue #173, step 10): who,
+ * when, why – and that the local changes stay but need a new check-out. */
+export function releasedNotice(released, localChanges) {
+  var text = localChanges ? released.message : "Your check-out was released by " + released.by_name + ".";
+  return h("p.notice" + (localChanges ? ".error" : ""), { role: "status" }, [
+    h("strong", { text: text }),
+    " " + fmtDate(released.at) + (released.reason ? " – reason: " + released.reason.replace(/[.!?]?$/, ".") : ".") +
+      (localChanges ? " Check the revision out again, then check in or park your changes." : "")
+  ]);
 }
 
 /** "Get": an item with everything it consists of – BOM under a revision
@@ -380,7 +407,9 @@ export function doCancelCheckout(tab) {
 /** Follows the check-in upload of the open check-in dialog (`upload-progress`). */
 export var uploadWatcher = null;
 
-export function checkinDialog(tab) {
+/** "Check in…" (`park` false) or "Park…" (`park` true, issue #173 step 10):
+ * the same dialog with both buttons; `park` only decides the default one. */
+export function checkinDialog(tab, park) {
   var rev = tab.data.rev;
   Promise.all([call("workspace_status", { project: rev.project_code, item: rev.item_number, code: rev.code }), cadPrograms()]).then(function (r) {
     var ws = r[0], programs = r[1];
@@ -391,7 +420,7 @@ export function checkinDialog(tab) {
     });
     var comment = h("input", { type: "text", maxlength: "2000", placeholder: "What changed, e.g. wall thickness 2 → 2.5 mm" });
     var progressLine = h("p.small.muted.hidden", { role: "status" });
-    // Like the Vault add-in or the Teamcenter integration: viewables at check-in.
+    // Like the CAD add-ins of PDM systems: viewables at check-in.
     var exportable = boxes.filter(function (b) { return exportProgram(b.name, programs); });
     var withStep = h("input", { type: "checkbox", checked: true });
     var stepNote = exportable.length ? h("label.check", null, [withStep,
@@ -417,7 +446,7 @@ export function checkinDialog(tab) {
     var running = false, cancelled = false;
     var opts = { wide: true };
     function stopped() { return { status: 499, message: "Cancelled." }; }
-    dialog("Check in " + rev.item_number + "/" + rev.code, body, [
+    dialog((park ? "Park " : "Check in ") + rev.item_number + "/" + rev.code, body, [
       { label: "Cancel", onClick: function (d) {
         if (!running) { d.close(); return; }
         if (cancelled) return;
@@ -426,49 +455,53 @@ export function checkinDialog(tab) {
         progressLine.classList.remove("hidden");
         call("cancel_upload").catch(function () {});
       } },
-      {
-        label: "Check in and release", primary: true, submit: true, onClick: function (d) {
-          if (running) return;
-          running = true; cancelled = false; opts.modal = true;
-          var files = boxes.filter(function (b) { return b.input.checked; }).map(function (b) { return b.name; });
-          var toExport = stepNote && withStep.checked ? files.filter(function (n) { return exportProgram(n, programs); }) : [];
-          function show(text) { if (!cancelled) { progressLine.textContent = text; progressLine.classList.remove("hidden"); } }
-          // one export after the other: the CAD program handles one document at a time
-          var exported = toExport.reduce(function (chain, name) {
-            return chain.then(function () {
-              if (cancelled) throw stopped();
-              show("Exporting " + name + " to STEP with " + PROGRAM_LABEL[exportProgram(name, programs)] + " …");
-              return exportStep(rev, name).then(function (step) { if (files.indexOf(step) < 0) files.push(step); });
-            });
-          }, Promise.resolve());
-          exported.then(function () {
-            if (cancelled) throw stopped();
-            show("Checking in …");
-            uploadWatcher = function (p) { show(uploadLine(p)); };
-            return call("workspace_checkin", { project: rev.project_code, item: rev.item_number, code: rev.code, files: files, comment: comment.value });
-          }).then(function () {
-            running = false; uploadWatcher = null;
-            setStatus("");
-            d.close();
-            toast("Checked in " + rev.item_number + "/" + rev.code + (files.length ? " with " + files.join(", ") : "") +
-              (cancelled ? " – the server already had every file when you cancelled" : ""), cancelled ? "info" : null);
-            reloadActive();
-            refreshWorklistCount();
-          }, function (err) {
-            running = false; uploadWatcher = null; opts.modal = false;
-            setStatus("");
-            if (cancelled || isCancelled(err)) {
-              d.close();
-              toast("Check-in of " + rev.item_number + "/" + rev.code + " cancelled – nothing was stored; the revision is still checked out to you.", "info");
-              reloadActive();
-              return;
-            }
-            progressLine.classList.add("hidden");
-            d.fail(err);
-          });
-        }
-      }
+      // Park: the same upload, but the lock stays (issue #173, step 10) –
+      // the work is safe on the server, the revision stays yours.
+      { label: "Park (keep checked out)", primary: !!park, submit: !!park, onClick: function (d) { send(d, true); } },
+      { label: "Check in and release", primary: !park, submit: !park, onClick: function (d) { send(d, false); } }
     ], opts);
+    function send(d, parking) {
+      if (running) return;
+      var files = boxes.filter(function (b) { return b.input.checked; }).map(function (b) { return b.name; });
+      if (parking && !files.length) { d.fail("Tick the files to park – parking keeps the check-out and uploads only those."); return; }
+      running = true; cancelled = false; opts.modal = true;
+      var toExport = stepNote && withStep.checked ? files.filter(function (n) { return exportProgram(n, programs); }) : [];
+      function show(text) { if (!cancelled) { progressLine.textContent = text; progressLine.classList.remove("hidden"); } }
+      // one export after the other: the CAD program handles one document at a time
+      var exported = toExport.reduce(function (chain, name) {
+        return chain.then(function () {
+          if (cancelled) throw stopped();
+          show("Exporting " + name + " to STEP with " + PROGRAM_LABEL[exportProgram(name, programs)] + " …");
+          return exportStep(rev, name).then(function (step) { if (files.indexOf(step) < 0) files.push(step); });
+        });
+      }, Promise.resolve());
+      exported.then(function () {
+        if (cancelled) throw stopped();
+        show(parking ? "Parking …" : "Checking in …");
+        uploadWatcher = function (p) { show(uploadLine(p)); };
+        return call(parking ? "workspace_park" : "workspace_checkin", { project: rev.project_code, item: rev.item_number, code: rev.code, files: files, comment: comment.value });
+      }).then(function () {
+        running = false; uploadWatcher = null;
+        setStatus("");
+        d.close();
+        toast((parking ? "Parked " + files.join(", ") + " on the server – " + rev.item_number + "/" + rev.code + " stays checked out to you"
+          : "Checked in " + rev.item_number + "/" + rev.code + (files.length ? " with " + files.join(", ") : "")) +
+          (cancelled ? " – the server already had every file when you cancelled" : ""), cancelled ? "info" : null);
+        reloadActive();
+        refreshWorklistCount();
+      }, function (err) {
+        running = false; uploadWatcher = null; opts.modal = false;
+        setStatus("");
+        if (cancelled || isCancelled(err)) {
+          d.close();
+          toast("Check-in of " + rev.item_number + "/" + rev.code + " cancelled – nothing was stored; the revision is still checked out to you.", "info");
+          reloadActive();
+          return;
+        }
+        progressLine.classList.add("hidden");
+        d.fail(err);
+      });
+    }
   }, function (err) { toast(errorText(err), "error"); });
 }
 
@@ -533,7 +566,13 @@ export function releaseDialog(tab) {
         return m.active && m.user_id !== state.me.id && (m.role === "editor" || m.role === "admin");
       });
       if (!candidates.length) {
-        reviewerBox.appendChild(h("p.hint", { text: "No other CAD editors in " + rev.project_code + " – name reviewers below." }));
+        // A release needs a second person (four-eyes principle): with nobody
+        // else in the group, offer the draft first instead of a submit that
+        // cannot work (a single-user test server never gets past it).
+        submitNow.checked = false;
+        reviewerBox.appendChild(h("p.notice", { text: "Nobody else in " + rev.project_code + " can review this change. " +
+          "Name a CAD editor or administrator of another group below, or create the change as a draft – " +
+          "a release always needs a second person (four-eyes principle)." }));
       }
       candidates.forEach(function (m) {
         var input = h("input", { type: "checkbox" });
@@ -559,10 +598,11 @@ export function releaseDialog(tab) {
     { label: "Cancel", onClick: function (d) { d.close(); } },
     {
       label: "Create change", primary: true, submit: true, onClick: function (d) {
-        var reviewers = boxes.filter(function (b) { return b.input.checked; }).map(function (b) { return b.username; })
-          .concat(others.value.split(",").map(function (s) { return s.trim(); }).filter(Boolean));
-        if (submitNow.checked && !reviewers.length) { d.fail("Choose at least one reviewer to submit the change."); return; }
-        var number = null;
+        var problem = reviewerProblem(boxes.filter(function (b) { return b.input.checked; }).map(function (b) { return b.username; }),
+          others.value, state.me.username, submitNow.checked);
+        if (problem.error) { d.fail(problem.error); return; }
+        var reviewers = problem.reviewers;
+        var number = null, submitting = false;
         setStatus("Creating the change …");
         api("POST", "/changes", { title: title.value, description: desc.value, priority: priority.value }).then(function (c) {
           number = c.number;
@@ -574,6 +614,7 @@ export function releaseDialog(tab) {
             return p.then(function () { return api("POST", "/changes/" + enc(number) + "/reviewers", { username: username }); });
           }, Promise.resolve());
         }).then(function () {
+          submitting = true;
           return submitNow.checked ? api("POST", "/changes/" + enc(number) + "/submit") : null;
         }).then(function () {
           setStatus("");
@@ -583,9 +624,26 @@ export function releaseDialog(tab) {
           refreshWorklistCount();
           openChange(number);
         }, function (err) {
-          setStatus("");
-          d.fail(number ? errorText(err) + " – " + number + " exists as a draft; finish it in its tab." : err);
-          if (number) { tab.data = null; openChange(number); }
+          if (!number) { setStatus(""); d.fail(err); return; }
+          if (submitting) {
+            // complete (revisions and reviewers) – the change tab finishes it
+            setStatus("");
+            d.fail(errorText(err) + " – " + number + " stays a draft; fix this and submit it in its tab.");
+            tab.data = null;
+            openChange(number);
+            return;
+          }
+          // a revision, dependency or reviewer was refused: take the half-made
+          // draft back, so no orphan blocks the revisions (#291)
+          api("POST", "/changes/" + enc(number) + "/cancel").then(function () {
+            setStatus("");
+            d.fail(errorText(err) + " – nothing was released; the draft " + number + " was cancelled.");
+          }, function () {
+            setStatus("");
+            d.fail(errorText(err) + " – " + number + " exists as a draft; finish or cancel it in its tab.");
+            tab.data = null;
+            openChange(number);
+          });
         });
       }
     }

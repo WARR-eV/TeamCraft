@@ -47,5 +47,8 @@ service it needs is PostgreSQL. Step-by-step guides:
 TeamCraft is free software under the Mozilla Public License 2.0.
 Contributions are welcome; see
 [CONTRIBUTING.md](https://github.com/rudalabs/TeamCraft/blob/main/CONTRIBUTING.md).
+They must be the contributor's own work (or their AI agent's own work):
+code decompiled, disassembled or rewritten from proprietary software is
+never accepted ([ADR 0005](dev/adr/0005-no-decompiled-code.md)).
 Report security problems privately, as described in
 [SECURITY.md](https://github.com/rudalabs/TeamCraft/blob/main/SECURITY.md).

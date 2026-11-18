@@ -83,8 +83,8 @@ The lock keeps two people from changing a revision at the same time. When a
 lock was broken (*Force unlock*) and someone else checked in meanwhile, the
 original owner's files are out of date – checking them in would throw away
 the newer version. TeamCraft therefore checks every upload against the
-version it was **based on** (optimistic concurrency, as Vault and Teamcenter
-clients do):
+version it was **based on** (optimistic concurrency, as the clients of other
+PDM systems do):
 
 * The forms of the revision page send the versions the page showed; the
   desktop app sends the SHA-256 of the version each file was copied from;
@@ -166,11 +166,10 @@ revision afterwards.
 
 ## Favorites, saved searches, Save As
 
-* The **star** next to the title of a revision page keeps the item in **Vault → Favorites**
-  (like Teamcenter's Favorites). Favorites are personal.
+* The **star** next to the title of a revision page keeps the item in **Vault → Favorites**.
+  Favorites are personal.
 * **Saved searches:** filter the item list, then *Save this search* – the
-  named search appears above the list for one-click reuse (like Teamcenter's
-  Saved Queries).
+  named search appears above the list for one-click reuse.
 * **More → Save as…** on a revision page creates a new item from it: the attributes
   and, optionally, the current files and the BOM. The new item starts with
   revision A, checked out to you; the source does not change.

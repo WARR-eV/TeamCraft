@@ -25,6 +25,8 @@ use crate::{
 #[derive(Deserialize)]
 pub struct LoginQuery {
     next: Option<String>,
+    /// The one-time code of the setup link in the server log.
+    setup: Option<String>,
 }
 
 struct LoginPage<'a> {
@@ -33,8 +35,9 @@ struct LoginPage<'a> {
     flash: Option<Flash>,
     username: &'a str,
     skin: &'a str,
-    /// Offer the "create the administrator" form instead of the login.
-    setup: bool,
+    /// What the page offers for the first start (`Setup::Open`: the "create
+    /// the administrator" form instead of the login).
+    setup: Setup<'a>,
     /// Replaced logos (the built-in ones when empty).
     branding: &'a crate::services::branding::Branding,
 }
@@ -48,20 +51,49 @@ fn render_login(st: &AppState, page: LoginPage<'_>) -> AppResult<Response> {
         "oidc_name": st.oidc.as_ref().map(|o| o.display_name().to_string()),
         "username": page.username,
         "skin": page.skin,
-        "setup": page.setup,
+        "setup": matches!(page.setup, Setup::Open { .. }),
+        "setup_code": match page.setup { Setup::Open { code } => code, _ => "" },
+        "setup_needs_code": matches!(page.setup, Setup::NeedsCode),
         "branding": page.branding,
     });
     render_public(st, "login.html", data, page.flash)
 }
 
+/// What the login page offers for the first start.
+#[derive(Clone, Copy)]
+enum Setup<'a> {
+    /// Accounts exist, the server is public or password login is off.
+    Closed,
+    /// No account yet, but the page was not opened with the setup link of
+    /// the server log: it says where to find the link instead.
+    NeedsCode,
+    /// The "create the administrator" form; `code` goes back with it.
+    Open { code: &'a str },
+}
+
 /// First start: no account exists yet, password login is on and the server
-/// only listens on this computer – then whoever opens the page may create the
-/// administrator. Public servers create it with the CLI or
+/// only listens on this computer – then the administrator is created on the
+/// login page, opened with the setup link the server logs at start (its
+/// one-time code, `AppState::setup_code`). A loopback bind alone is not
+/// enough: behind a reverse proxy on the same computer every request looks
+/// local, and a proxy need not add `X-Forwarded-*` headers. Only
+/// `teamcraft local` (a fresh private port, opened by the desktop app)
+/// needs no code. Public servers create the administrator with the CLI or
 /// TEAMCRAFT_BOOTSTRAP_ADMIN_PASSWORD instead.
-async fn setup_open(st: &AppState) -> AppResult<bool> {
-    Ok(st.config.local_login
+async fn setup_state<'a>(st: &AppState, code: Option<&'a str>) -> AppResult<Setup<'a>> {
+    if !(st.config.local_login
         && st.config.bind_addr.ip().is_loopback()
         && users::count(&st.db).await? == 0)
+    {
+        return Ok(Setup::Closed);
+    }
+    if st.config.setup_without_code {
+        return Ok(Setup::Open { code: "" });
+    }
+    Ok(match code.map(str::trim).filter(|c| !c.is_empty()) {
+        Some(code) if auth::secrets_equal(code, &st.setup_code) => Setup::Open { code },
+        _ => Setup::NeedsCode,
+    })
 }
 
 #[derive(Deserialize)]
@@ -74,6 +106,23 @@ pub struct SetupForm {
     password: String,
     #[serde(default)]
     password_repeat: String,
+    /// Where the login page was going (e.g. the desktop app's
+    /// `/desktop/authorize?…`), so that the first start continues there.
+    #[serde(default)]
+    next: Option<String>,
+    /// The one-time code of the setup link (empty for `teamcraft local`).
+    #[serde(default)]
+    setup_code: Option<String>,
+}
+
+/// Where the first-start setup continues: the page the login was opened for,
+/// or the project groups (the first thing to create) instead of the empty
+/// dashboard.
+fn setup_target(next: Option<&str>) -> &str {
+    match next.map(str::trim) {
+        Some(n) if !n.is_empty() && n != "/" => n,
+        _ => "/projects",
+    }
 }
 
 pub async fn setup_submit(
@@ -81,11 +130,20 @@ pub async fn setup_submit(
     headers: HeaderMap,
     Form(form): Form<SetupForm>,
 ) -> AppResult<Response> {
-    if !setup_open(&st).await? {
-        return Err(AppError::Forbidden(
-            "The first-start setup is closed: accounts exist already (or the server is public)."
-                .into(),
-        ));
+    match setup_state(&st, form.setup_code.as_deref()).await? {
+        Setup::Open { .. } => {}
+        Setup::NeedsCode => {
+            return Err(AppError::Forbidden(
+                "Open the setup link from the server's log to create the administrator (its code is missing or out of date)."
+                    .into(),
+            ));
+        }
+        Setup::Closed => {
+            return Err(AppError::Forbidden(
+                "The first-start setup is closed: accounts exist already (or the server is public)."
+                    .into(),
+            ));
+        }
     }
     let created = if form.password != form.password_repeat {
         Err(AppError::BadRequest("The passwords do not match.".into()))
@@ -97,18 +155,23 @@ pub async fn setup_submit(
             let token =
                 users::create_session(&st.db, user.id, st.config.session_ttl, users::SignIn::Setup)
                     .await?;
-            Ok(signed_in_redirect(&st, &user, &token, Some("/projects")))
+            Ok(signed_in_redirect(
+                &st,
+                &user,
+                &token,
+                Some(setup_target(form.next.as_deref())),
+            ))
         }
         Err(e) if super::is_user_error(&e) => {
             let mut page = render_login(
                 &st,
                 LoginPage {
-                    next: None,
+                    next: form.next.as_deref(),
                     error: Some(e.public_message()),
                     flash: None,
                     username: form.username.trim(),
                     skin: skin_from_cookie(&headers),
-                    setup: setup_open(&st).await?,
+                    setup: setup_state(&st, form.setup_code.as_deref()).await?,
                     branding: &crate::services::branding::current(&st.db).await?,
                 },
             )?;
@@ -139,7 +202,7 @@ pub async fn login_page(
             flash: read_flash(&headers),
             username: "",
             skin: skin_from_cookie(&headers),
-            setup: setup_open(&st).await?,
+            setup: setup_state(&st, q.setup.as_deref()).await?,
             branding: &crate::services::branding::current(&st.db).await?,
         },
     )
@@ -177,7 +240,12 @@ pub async fn login_submit(
         ));
     }
     let client = auth::client_address(&headers, peer.map(|Extension(ConnectInfo(a))| a.ip()));
-    let keys = auth::SignInThrottle::keys(&form.username, client);
+    let mut keys = auth::SignInThrottle::keys(&form.username, client);
+    // The live demo's public account: a stranger's wrong passwords must not
+    // lock every visitor out, so only the per-address limit counts for it.
+    if st.config.is_demo_user(&form.username) {
+        keys.retain(|k| !k.starts_with("user:"));
+    }
     let branding = crate::services::branding::current(&st.db)
         .await
         .unwrap_or_default();
@@ -190,7 +258,7 @@ pub async fn login_submit(
                 flash: None,
                 username: form.username.trim(),
                 skin: skin_from_cookie(&headers),
-                setup: false,
+                setup: Setup::Closed,
                 branding: &branding,
             },
         )?;
@@ -287,6 +355,42 @@ pub async fn oidc_reauth(
 }
 
 #[derive(Deserialize)]
+pub struct LogoutTokenForm {
+    logout_token: String,
+}
+
+/// `POST /auth/oidc/backchannel-logout` – OpenID Connect Back-Channel Logout
+/// (issue #173, step 9): the identity provider posts a signed logout token;
+/// the user's browser sessions end. Not behind the cross-site guard of the
+/// web pages – the provider calls it directly and the signed token is the
+/// credential. 200 when done (also for an unknown subject), 400 for a token
+/// that does not pass, never cached.
+pub async fn oidc_backchannel_logout(
+    State(st): State<AppState>,
+    Form(form): Form<LogoutTokenForm>,
+) -> Response {
+    use axum::response::IntoResponse;
+    let no_store = || [(header::CACHE_CONTROL, HeaderValue::from_static("no-store"))];
+    let Some(oidc) = st.oidc.as_ref() else {
+        let text = "Single sign-on is not configured.";
+        return (StatusCode::NOT_FOUND, no_store(), text).into_response();
+    };
+    let result = async {
+        let sub = oidc.verify_logout_token(&form.logout_token).await?;
+        users::idp_logout(&st.db, &sub).await
+    }
+    .await;
+    match result {
+        Ok(_) => (StatusCode::OK, no_store()).into_response(),
+        Err(AppError::BadRequest(message)) => {
+            tracing::warn!(%message, "refused a back-channel logout token");
+            (StatusCode::BAD_REQUEST, no_store(), message).into_response()
+        }
+        Err(e) => e.into_response(),
+    }
+}
+
+#[derive(Deserialize)]
 pub struct CallbackQuery {
     code: Option<String>,
     state: Option<String>,
@@ -316,7 +420,7 @@ pub async fn oidc_callback(
                 flash: None,
                 username: "",
                 skin,
-                setup: false,
+                setup: Setup::Closed,
                 branding: &branding,
             },
         )
@@ -374,5 +478,23 @@ pub async fn oidc_callback(
             Ok(page)
         }
         Err(e) => Err(e),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::setup_target;
+
+    /// The first start continues where the login page was going (the
+    /// desktop app's authorize page), otherwise at the project groups.
+    #[test]
+    fn setup_continues_at_next() {
+        assert_eq!(
+            setup_target(Some("/desktop/authorize?port=5&state=x")),
+            "/desktop/authorize?port=5&state=x"
+        );
+        assert_eq!(setup_target(None), "/projects");
+        assert_eq!(setup_target(Some("")), "/projects");
+        assert_eq!(setup_target(Some("/")), "/projects");
     }
 }

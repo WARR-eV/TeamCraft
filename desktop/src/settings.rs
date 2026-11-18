@@ -21,11 +21,29 @@ use serde::{Deserialize, Serialize};
 const SETTINGS_FILE: &str = "settings.json";
 const TOKEN_FILE: &str = "token";
 
-/// Keychain entry of the token: service = the app identifier.
-#[cfg(any(target_os = "linux", target_os = "macos", windows))]
-const KEYCHAIN_SERVICE: &str = "io.github.rudalabs.teamcraft";
+/// Keychain entry of the token: service = the app identifier. The desktop
+/// app's identifier is the default; *TeamCraft Local* (the downloads with
+/// local server, `tauri.local-server.conf.json`) has its own, so the two never
+/// share a token – each has its own server (`set_keychain_service`).
+const DEFAULT_KEYCHAIN_SERVICE: &str = "io.github.rudalabs.teamcraft";
+static KEYCHAIN_SERVICE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 #[cfg(any(target_os = "linux", target_os = "macos", windows))]
 const KEYCHAIN_ACCOUNT: &str = "api-token";
+
+/// Uses the app identifier (`tauri.conf.json`, or the overlay of TeamCraft
+/// Local) as the keychain service; called once at start, before the token is
+/// read.
+pub fn set_keychain_service(identifier: &str) {
+    let _ = KEYCHAIN_SERVICE.set(identifier.to_string());
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", windows))]
+fn keychain_service() -> &'static str {
+    KEYCHAIN_SERVICE
+        .get()
+        .map(String::as_str)
+        .unwrap_or(DEFAULT_KEYCHAIN_SERVICE)
+}
 
 /// A secure credential store for the one token of the app.
 pub trait Keychain {
@@ -43,7 +61,7 @@ pub struct OsKeychain;
 #[cfg(any(target_os = "linux", target_os = "macos", windows))]
 impl OsKeychain {
     fn entry() -> Result<keyring::Entry, String> {
-        keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT).map_err(|e| e.to_string())
+        keyring::Entry::new(keychain_service(), KEYCHAIN_ACCOUNT).map_err(|e| e.to_string())
     }
 }
 
@@ -139,6 +157,10 @@ pub struct Settings {
     /// After a crash, ask at the next start whether to share the crash report
     /// (src/crash.rs); `None` = ask. Reports are never sent without asking.
     pub crash_prompt: Option<bool>,
+    /// The port of the local test server (*Try TeamCraft on this computer*,
+    /// src/localserver.rs). While `server_url` is `http://127.0.0.1:<this
+    /// port>`, the app starts that server when it starts.
+    pub local_server_port: Option<u16>,
     /// Not stored in settings.json.
     #[serde(skip)]
     pub token: Option<String>,
@@ -359,6 +381,27 @@ pub fn normalize_server_url(raw: &str) -> Result<String, String> {
 mod tests {
     use super::*;
     use std::cell::RefCell;
+
+    /// The desktop app keeps the keychain entry of every earlier version (its
+    /// identifier is the default service); TeamCraft Local – the downloads
+    /// with local server – is its own app with its own identifier, settings
+    /// folder and keychain entry, so it never takes over the desktop app's
+    /// server and token, nor the other way round.
+    #[test]
+    fn teamcraft_local_is_its_own_app() {
+        let read = |name: &str| -> serde_json::Value {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(name);
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap()
+        };
+        let app = read("tauri.conf.json");
+        let local = read("tauri.local-server.conf.json");
+        assert_eq!(app["identifier"], DEFAULT_KEYCHAIN_SERVICE);
+        let local_id = local["identifier"].as_str().expect("own identifier");
+        assert_ne!(local_id, DEFAULT_KEYCHAIN_SERVICE);
+        assert!(local_id.starts_with("io.github.rudalabs."), "{local_id}");
+        let local_name = local["productName"].as_str().expect("own product name");
+        assert_ne!(Some(local_name), app["productName"].as_str());
+    }
 
     /// An in-memory keychain; `working: false` behaves like a system without
     /// a Secret Service. Tests never touch the real OS keychain.

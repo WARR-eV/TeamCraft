@@ -13,8 +13,223 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Security
+
+- E-mail delivery: `lettre` 0.11.24 fixes six SMTP advisories (RUSTSEC-2026-0560
+  to 0565: STARTTLS reply injection, missing dot-stuffing after a bare LF/CR,
+  wrong recipient for quoted local parts, panics on a blank `EHLO` line or a
+  CR/LF in a display name, unbounded reply buffering). The unmaintained notice
+  for `chrono` (RUSTSEC-2026-0543, not a vulnerability) is ignored in
+  `deny.toml` until the move to `jiff` or `time` (`docs/OPEN_WORK.md`).
+
 ### Added
 
+- 3D preview of files saved by **Inventor 2027** (#271, on top of the
+  Zstandard segments read since 0.2.8): typed arrays with the new element
+  types (4, 8, 14, 16 for `u32` numbers, `invpart::is_u32`) are read, so
+  parts give their meshes; in assemblies without occurrence titles the
+  hidden components come from the active design view
+  (`DesignViewSegment`), and flag `0x40`, which marks *Reference*
+  components there, no longer hides them. Older files read as before.
+  Checked by hand against 229 files saved by Inventor 2027 (137 of 137 parts
+  with a body, 33 of 33 assemblies), see the research page *Inventor 2026
+  and later: Zstandard streams*.
+- Contribution rule **own work only – no decompiled code**: code
+  decompiled, disassembled or rewritten from proprietary software, a "clean
+  room" through decompilation, and leaked or incompatibly licensed code are not accepted,
+  from people or from AI agents. Formats are decoded from sample files and
+  public specifications, and each finding's source is recorded in its
+  research page. The rule is in CONTRIBUTING.md (full), README and the book's
+  start page (short), CODE_OF_CONDUCT.md (with enforcement), ADR 0005,
+  CLAUDE.md and a new pull request template with a confirmation checkbox.
+- Everything for a hosted **live demo** (runbook: *Live demo* in the admin
+  guide). `TEAMCRAFT_DEMO_USER` and `TEAMCRAFT_DEMO_PASSWORD` make one local
+  account public and read-only: the login page shows it, every page carries a
+  *Live demo* banner, and every request of that account that is not
+  `GET`/`HEAD` is refused (403, sign-out excepted) in the web UI and the REST
+  API; wrong passwords for it count per client address only, so it cannot be
+  locked. `scripts/seed-demo.sh` loads the demo data of the README
+  screenshots (now reusable: `scripts/screenshots.sh` seeds in its own
+  `seed_*` functions and takes an existing administrator through
+  `ADMIN_PASSWORD_FILE`) and creates the account; `deploy/demo/demo.sh`
+  snapshots the seeded database and resets it to the snapshot every night.
+
+### Changed
+
+- TeamCraft no longer presents itself as an alternative to a particular
+  commercial product: the README tagline now says only that the project is a
+  work in progress. The desktop import tutorial, the user guide and code
+  comments describe features without comparing them to one vendor's PLM
+  system. The research page is now *Popular features of commercial PLM
+  systems* (`research/plm-working-features.md`), and the other research
+  pages compare with "enterprise PLM" in general.
+- File formats: JT (`jt`) now belongs to *Visualisation formats* and PLM XML
+  (`plmxml`, label *PLM XML (product structure)*) to *Neutral exchange
+  formats*. The separate CAD-program entry for them is gone, so the
+  system id `teamcenter` no longer exists in `/formats`, the search filter
+  or the API's format list. A saved web search with that filter shows all
+  items; `GET /api/v1/items?system=teamcenter` answers 400 like any other
+  unknown program. Format ids and stored files are unchanged, and both
+  formats stay neutral (never collapsed). The comments of migrations 0007 and
+  0012 were edited (`db::EDITED_BEFORE_RELEASE`, no schema change).
+- Release workflow about 10 minutes shorter (29 → about 18): the macOS
+  installer *with local server* compiled its server itself, but only after
+  the slowest `server` build (Windows, 12 minutes) had finished, because the
+  job waits for the `server` job. The `server` job now builds the macOS server
+  in parallel with the others, as an artifact that is not released (there is
+  still no macOS server download), and the installer job reuses it like on
+  Linux and Windows.
+- CI: test and dev builds with line tables only (`CARGO_PROFILE_*_DEBUG`),
+  the CLI smoke test runs the binary the test run built instead of building
+  it again with `cargo run`, and the disk clean-up of the Linux test job runs
+  in the background while the toolchain and cache are set up.
+- Guide *Try it on your computer*: the Windows `initdb` error of 0.2.8 names
+  0.2.9 as the release that fixes it (confirmed on Windows) instead of "the
+  next release".
+
+## [0.2.9] - 2026-11-15
+
+Changes since the `v0.2.8` tag.
+
+### Fixed
+
+- **TeamCraft Local on Windows (0.2.8): "Try TeamCraft on this computer"
+  failed** with `initdb: error: program "postgres" is needed by initdb but was
+  not found` (*Das System kann den angegebenen Pfad nicht finden*). The app
+  passed its resource folder as Tauri gives it on Windows, a verbatim path
+  (`\\?\C:\…`), and PostgreSQL cannot use those. The app and `teamcraft
+  local` now strip the prefix (`localserver::without_verbatim_prefix`). The
+  installer smoke test passed a plain path and so missed it; on Windows it now
+  passes the folder the way the app does.
+- Logs written to a file or a service log carry no colour codes any more
+  (they showed up as `[2m…[0m` in the app's error message): colours only
+  when the output is a terminal.
+
+## [0.2.8] - 2026-11-15
+
+Changes since the `v0.2.7` tag.
+
+### Added
+
+- **Try TeamCraft on a laptop with one download.** The release adds desktop
+  installers *with local server* (`TeamCraft-with-local-server_…`: Windows
+  x64 setup, macOS `.dmg`, Linux x86_64 AppImage) – the app plus the server
+  (as `teamcraft-server`) and PostgreSQL's programs. Their connect screen
+  offers *Try TeamCraft on this computer*: the app starts a private
+  PostgreSQL cluster and the server, both only on 127.0.0.1, opens the
+  browser to create the administrator and signs in; the server stops with
+  the app, also after a crash (`desktop/src/localserver.rs`). New command
+  `teamcraft local [--port] [--data-dir] [--pg-bin]` does the same with an
+  installed PostgreSQL: initdb with a random scram password on the first
+  start, a free port and no Unix socket at every start, data in the per-user
+  data directory, a second instance on the same data refused
+  (`src/localserver.rs`, `tests/local_server.rs`). Release job
+  `local-server` bundles the newest PostgreSQL 18 build of
+  theseus-rs/postgresql-binaries (checksum-checked, with PostgreSQL's
+  licence) and smoke-tests every installer's bundled server
+  ([guide](https://rudalabs.github.io/TeamCraft/guide/local-server.html),
+  `docs/src/research/local-test-server.md`).
+- REST: `POST /api/v1/changes/{number}/cancel` cancels a draft or rejected
+  change (its revisions are free for another change), and
+  `DELETE /api/v1/changes/{number}/reviewers/{username}` removes a reviewer
+  from a draft – what the web UI could do already (#291).
+- 3D preview of PTC Creo assemblies (`.asm.N`), put together from the
+  previews of their parts and sub-assemblies like NX, SOLIDWORKS, Inventor
+  and CATIA assemblies. The direct components – model name, part or
+  sub-assembly, axes and origin – are read from the section `NeuAsmSld`
+  (`src/mesh/creo/asm.rs`) and found as `<name>.prt` / `<name>.asm`. The
+  assembly's thumbnail is rendered from it. Decoded on public samples
+  without a licence (kept out of the repository); the tests build
+  synthetic assemblies around the NIST part ctc-01
+  (`docs/src/research/creo-assembly-preview.md`).
+
+- 3D preview of CATIA V5 products (`.CATProduct`), put together from the
+  previews of their parts and sub-products like NX, SOLIDWORKS and Inventor
+  assemblies. A product stores no file names: its instances, part numbers
+  and placements are read from its `CATProdCont` object stream
+  (`src/catprod.rs`), and a component is the CATIA file whose document UUID
+  it refers to (among the files of the product's revision and those found
+  by name), otherwise `<part number>.CATPart` / `.CATProduct`. The
+  product's thumbnail is rendered from it. Hidden components are not
+  recognised yet.
+
+- 3D preview of PTC Creo parts (`.prt.N`): the exact B-rep stored in the
+  file (`VisibGeom`) is read – text table of contents, LZW sections, the
+  self-describing tagged format with its compressed numbers – and
+  tessellated: planes, cylinders, cones, tori, bicubic splines, rolling-ball
+  fillets and ruled surfaces with their contours, edges sampled in both
+  faces' parameter spaces, ear clipping per face region, welding and PN
+  refinement along the analytic normals (`src/mesh/creo/`). The thumbnail is
+  rendered from the preview (thumbnail cache version 8: every cached
+  thumbnail is made again once). New fuzz target `creopart`
+  (`docs/src/research/creo-brep-preview.md`).
+- 3D preview of Autodesk Fusion designs (`.f3d`) from the display mesh
+  Fusion stores in the file, refined along its exact normals like NX parts;
+  the thumbnail is rendered from it (the PNG Fusion stored is the fallback).
+- Offboarding (#173, step 9) – leavers removed only at the identity
+  provider: **OpenID Connect Back-Channel Logout** at
+  `/auth/oidc/backchannel-logout` – a logout token signed by the provider
+  (checked against its `jwks_uri`, RS256 or ES256) ends every browser
+  session of that user at once, audited as `user.idp_logout`;
+  `TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS` gives the new API and desktop tokens of
+  SSO users an idle lifetime (off by default); *Users* lists **SSO users
+  without sign-in** – active SSO users without a sign-in or token use for
+  90 days who still hold memberships, tokens or check-outs. Migration 0071
+  (`users.idp_logout_at`). Automatic deprovisioning through SCIM is not
+  built; see the research note *Deprovisioning through the identity
+  provider*.
+- Offboarding (#173, step 10), desktop app: *Check in all* and *Sign out*
+  list the check-outs with local changes and offer to check them in first
+  (sign-out also to park them); **Park…** uploads work in progress as new
+  versions and keeps the check-out, so it survives a lost laptop; after a
+  forced release the *Workspace* tab says *Released by X; your local changes
+  are kept and need a new check-out*.
+- 3D preview of Inventor parts (`.ipt`) from the display tessellation
+  Inventor stores in the file, welded and refined along its exact surface
+  normals like NX and SOLIDWORKS parts. Inventor assemblies (`.iam`) are
+  put together from the previews of their part and sub-assembly files, with
+  the placements stored in the assembly (re-posed flexible sub-assemblies
+  included); hidden and suppressed components are left out. The
+  thumbnails of Inventor parts and assemblies are rendered from the 3D
+  preview. New fuzz target `invpart`.
+- 3D preview of SketchUp models (`.skp`, SketchUp 3 to 2026): the faces are
+  triangulated (earcut port, holes included), components and groups placed
+  with their transforms, nested and scaled ones too, in millimetres; hidden
+  faces, hidden components, hidden tags (layers) and images are left out. The
+  thumbnail is rendered from the 3D preview; a file without faces keeps its
+  stored picture. SketchUp 2021+ files are read by an own reader, older ones
+  by the Rust port of OpenSKP (MIT), vendored unchanged in `vendor/openskp`.
+  39 test files of OpenSKP in `tests/fixtures/cad/openskp`. Research:
+  `docs/src/research/sketchup-preview.md`.
+- BOM quantities from the CAD instance counts (#247): the reference scan
+  stores how often an NX or SOLIDWORKS 2015+ assembly, and a STEP assembly
+  with external part files, places each referenced file
+  (`file_references.instances`, `GET …/references`; migrations 0064 and
+  0065 rescan the current files). The desktop *Import CAD Folder…* uses them
+  as BOM quantities; *Quantities from CAD…* in the desktop app adds missing
+  lines and corrects the quantity 1 of assemblies imported before.
+- Desktop app: **crash reports** – a panic, an uncaught UI error or a
+  session that ended unexpectedly is written locally (redacted); at the next
+  start the user sees the report and opens a prefilled GitHub issue, copies
+  or discards it. Nothing is sent on its own. Research:
+  `docs/src/research/crash-reporting.md`.
+- Desktop app, *Graph* tab: every BOM child shows a small **×n chip** – how
+  many instances of it the assembly contains, summed over its BOM lines –
+  and a drag that starts on a card pans the graph instead of opening it.
+- JT 9.5 assemblies in the 3D preview: a stand-alone JT 9 file with several
+  shapes (or a placed one) is put together through its scene graph like JT
+  10 – instances, transforms, units, hidden nodes – instead of showing its
+  parts piled up at the origin. Single-part JT 9 files and the JT inside NX
+  parts read exactly as before. Tested with JT 9.5 files built around the
+  real NIST hex nut (no openly licensed JT 9.5 assembly exists).
+- 3D preview of stand-alone JT 10 files (`.jt`, ISO 14306): parts and whole
+  assemblies from one file – the scene graph (LZMA via the pure-Rust
+  `lzma-rs`, MIT) with transforms, units and hidden nodes, each shape's
+  finest level of detail through the JT 9 topology coder plus the JT 10
+  integer codecs, hash-checked and refined along its normals. The thumbnail
+  is rendered from the 3D preview. Verified with the NIST box assembly (36
+  placements equal to NX, sizes equal to NIST's STEP files). JT 9 files
+  keep the reader of #200.
 - Offboarding (#173, step 8): **Season handover** of a project group
   (`/projects/{id}/season`, managers and administrators): tick the members
   who leave – or let the page tick those inactive since a date or past their
@@ -116,9 +331,26 @@ see the notices in the README.
   loosen. The access review shows the conditions and whether each member met
   them. The assistant applies the request's conditions (and, for a token, the
   `api_tokens` switch) at every tool step. Migration 0068.
+- 3D preview of CATIA V5 parts (`.CATPart`) from the visualisation (CGR)
+  data CATIA stores in the file, refined along its exact surface normals
+  like NX parts. Their thumbnail is rendered from it. Products are not
+  previewed yet.
 
 ### Changed
 
+- Release workflow: the installers *with local server* reuse the server
+  binaries of the `server` job (Linux x86_64, Windows x64) instead of building
+  them a second time (about 20 minutes on Windows), and the desktop jobs
+  install a prebuilt Tauri CLI instead of compiling it (9 minutes without a
+  cache).
+- README: the *Download* section moved up, right below the work-in-progress
+  notice, and starts with a link to the Releases page and which download to
+  pick; a *Download TeamCraft* line sits under the badges.
+- The first-start page (*Create the administrator*) continues where the
+  login was going – e.g. the desktop app's sign-in confirmation – instead of
+  always at the project groups (`next` kept through `POST /setup`).
+- The conversion workers (`preview-mesh`, `text-extract`) also run isolated
+  when the server binary is called `teamcraft-server`.
 - Performance: a request with a personal access token (REST API, MCP, the
   desktop app) is authenticated with one query instead of three; the use of
   the token is still recorded once a minute.
@@ -135,6 +367,70 @@ see the notices in the README.
 
 ### Fixed
 
+- **Security – first-start setup behind a reverse proxy.** *Create the
+  administrator* was offered to every request while no account existed and
+  the server listened on 127.0.0.1 – also to requests through a reverse proxy
+  on the same computer (the Linux packages bind 127.0.0.1:8080; nginx without
+  explicit settings sends `Host: 127.0.0.1` and no `X-Forwarded-*`), so anyone
+  reaching the proxy before the administrator could take the server over. The
+  page now needs the one-time code of the setup link the server logs at start
+  (`no administrator yet: open http://localhost:8080/login?setup=…`, new at
+  every start); without it the login page says where to find the link.
+  `teamcraft local` (and the desktop app *TeamCraft Local*) needs no code.
+  `scripts/screenshots.sh` takes the code in `SETUP_CODE`.
+- Desktop installers *with local server*: they install **TeamCraft Local**, an
+  app of its own next to the desktop app (identifier
+  `io.github.rudalabs.teamcraft.local`, own settings folder and keychain
+  entry). The first test build shared the desktop app's identity, so it
+  opened with the server and sign-in configured in the desktop app instead
+  of the local server. With no server configured TeamCraft Local now starts
+  its local server by itself.
+- Desktop installers *with local server*: PostgreSQL is bundled with only
+  the programs TeamCraft uses (`initdb`, `pg_ctl`, `postgres`) and the client
+  tools `psql`, `pg_dump`, `pg_restore`, `pg_isready`. The Windows build no
+  longer ships PL/Python's Python (Windows: `python.exe`, `Lib/`, `DLLs/`;
+  Linux: `lib/python3.x`), PostgreSQL's test program and about 35 unused tools; a browser
+  had reported the Windows installer as a virus. The release job fails if
+  one of the needed programs or `pg_trgm` is missing.
+- 3D viewer (web and desktop, #290): a preview that could not be shown could
+  end as a silently black canvas – in the desktop app the status line with
+  the reason sits below a canvas that fills the window, so it was often out of
+  view. *Loading* and every error now appear on the canvas itself, and the
+  viewer reports what it used to swallow: a shader program that did not link,
+  a lost WebGL context (a model too large for the graphics process), an
+  upload that ran out of graphics memory, and empty, cut-off or invalid
+  (NaN) models. The mesh check is tested by `scripts/viewer-mesh.test.mjs`.
+- Desktop: releasing with your own user name as reviewer left a draft change
+  behind that could not be finished in the app (#291). The *Release…* dialog
+  now refuses the own name before anything is created, says when nobody else
+  in the project group can review (a single account can never release –
+  four-eyes principle, no administrator override) and creates a draft
+  instead, and cancels the half-made draft again when a revision or reviewer
+  is refused – no orphaned drafts from failed attempts. The change tab
+  disables *Submit for review* with the reason while the draft has no
+  revision or reviewer (no more piles of error toasts) and has *Cancel
+  change*, *Add reviewer* by user name and *Remove* per reviewer.
+- Creo parts stored in inches (9 of the 16 NIST Creo parts, e.g. ftc-09)
+  are shown in millimetres: the length unit is read from the section
+  `UnitSystemDef` (they were 25.4 times too small). Turned Creo parts without
+  a plane in the identity frame no longer fall apart: their face
+  parametrisations are resolved from a seeded face (rocket body closed, nose
+  from 102 to 9 open edges). Preview cache version 4, thumbnail cache
+  version 9, shape signatures version 4.
+- Documentation site: the search box in the tab bar searched for ever
+  ("searching" never ended). mdBook 0.5 loads its search index only when its
+  own search toggle opens the search, and the Doxygen theme hides that
+  toggle; the theme now opens the search through it at the first focus, so
+  the index loads and what was typed meanwhile is searched. A link with
+  `?search=…` keeps its results open. The book's title and footer show the
+  current version (0.2.7) instead of 0.1.0.
+- Inventor 3D preview (#271): parts and assemblies whose segments are
+  compressed with Zstandard instead of zlib (seen in newer Inventor files;
+  every part failed with *damaged compressed data*) get their preview and
+  rendered thumbnail again. The compression is told by its magic bytes; the
+  Zstandard output is capped like the zlib output (pure-Rust `ruzstd`).
+  Preview cache version 3, thumbnail cache version 7 and shape signature
+  version 3: the failures cached before are converted again.
 - Desktop, *Graph* tab (#254): a click on a sub-assembly now turns the tab
   into that sub-assembly – tab title, header, toolbar and graph are its own –
   instead of re-centring the graph inside the tab of the assembly above it;
@@ -143,6 +439,10 @@ see the notices in the README.
   on the item in the middle opens its overview and no longer adds a step:
   each click used to add one, so the back control appeared although nothing
   had changed. `Ctrl`/`⌘`+click opens a node in a tab of its own.
+- Desktop, *Graph* tab on macOS and Linux (#242): WebKit ignored the
+  transforms of the SVG groups for the cards, so they landed away from their
+  edges; the cards now sit in an HTML layer above the SVG with the same zoom
+  and pan.
 - Every web page starts with a *Skip to the main content* link (visible
   while it has the keyboard focus), and the 17 empty column headers (action
   columns, the corner of the inertia tensor) have a name for screen readers.
@@ -162,15 +462,6 @@ Changes since the `v0.2.6` tag.
 
 ### Added
 
-- 3D preview of SketchUp models (`.skp`, SketchUp 3 to 2026): the faces are
-  triangulated (earcut port, holes included), components and groups placed
-  with their transforms, nested and scaled ones too, in millimetres; hidden
-  faces, hidden components, hidden tags (layers) and images are left out. The
-  thumbnail is rendered from the 3D preview; a file without faces keeps its
-  stored picture. SketchUp 2021+ files are read by an own reader, older ones
-  by the Rust port of OpenSKP (MIT), vendored unchanged in `vendor/openskp`.
-  39 test files of OpenSKP in `tests/fixtures/cad/openskp`. Research:
-  `docs/src/research/sketchup-preview.md`.
 - The *Material* field (*New item*, *Edit revision*, desktop app) suggests the
   materials of the library with their density while you type (a `<datalist>`,
   also without JavaScript); a name that is not in the library gets a hint.
@@ -259,7 +550,6 @@ Changes since the `v0.2.5` tag.
   `PUT /api/v1/branding/name` sets them (admins). The footer, About, version
   and licence notices stay TeamCraft. `TEAMCRAFT_INSTANCE_NAME` is now only
   the default.
-
 - Need-to-know project groups, step 5 (#151): access review of a restricted
   group (migration 0053, `project_access_reviews`). Page `/projects/{id}/access-review` for managers and
   administrators: members with role, group role, source (manual or identity
@@ -475,14 +765,6 @@ Changes since the `v0.2.5` tag.
 - Mutation testing with cargo-mutants (#170): configuration, a report-only
   check on pull requests and a weekly run; the gaps of the first
   whole-repository run are closed with unit tests (#207).
-- 3D preview of Inventor parts (`.ipt`) from the display tessellation
-  Inventor stores in the file, welded and refined along its exact surface
-  normals like NX and SOLIDWORKS parts. Inventor assemblies (`.iam`) are
-  put together from the previews of their part and sub-assembly files, with
-  the placements stored in the assembly (re-posed flexible sub-assemblies
-  included); hidden and suppressed components are left out. The
-  thumbnails of Inventor parts and assemblies are rendered from the 3D
-  preview. New fuzz target `invpart`.
 
 ### Changed
 
@@ -602,7 +884,9 @@ Changes since the `v0.2.0` tag.
   app keeps the private file and shows a warning. Server addresses with plain
   `http://` to another computer get a warning.
 
-[Unreleased]: https://github.com/rudalabs/TeamCraft/compare/v0.2.7...HEAD
+[Unreleased]: https://github.com/rudalabs/TeamCraft/compare/v0.2.9...HEAD
+[0.2.9]: https://github.com/rudalabs/TeamCraft/compare/v0.2.8...v0.2.9
+[0.2.8]: https://github.com/rudalabs/TeamCraft/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/rudalabs/TeamCraft/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/rudalabs/TeamCraft/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/rudalabs/TeamCraft/compare/v0.2.0...v0.2.5

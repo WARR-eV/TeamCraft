@@ -36,6 +36,8 @@ mod simulations;
 mod uploads;
 mod webhooks;
 
+// posted by the identity provider: mounted outside the cross-site guard
+pub(crate) use auth_pages::oidc_backchannel_logout;
 pub(crate) use bom::{package_response, package_rule};
 pub(crate) use branding::image as branding_image;
 pub(crate) use imports::{options_from as import_options, receive as receive_import};
@@ -715,6 +717,15 @@ pub(crate) fn render_public(
     if let Value::Object(map) = &mut data {
         map.insert("flash".into(), json!(flash));
         map.insert("local_login".into(), json!(st.config.local_login));
+        // a hosted live demo: the banner on every page, the account on the login page
+        map.insert(
+            "demo".into(),
+            json!(st
+                .config
+                .demo
+                .as_ref()
+                .map(|d| json!({ "username": d.username, "password": d.password }))),
+        );
         let skin = map
             .get("skin")
             .and_then(Value::as_str)

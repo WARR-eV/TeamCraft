@@ -22,11 +22,13 @@ pub mod backupcrypt;
 pub mod bomtable;
 pub mod cadformat;
 pub mod cadrefs;
+pub mod catprod;
 pub mod config;
 pub mod db;
 pub mod delivery;
 pub mod domain;
 pub mod error;
+pub mod fusion;
 #[doc(hidden)]
 pub mod fuzz_harness;
 pub mod htmltext;
@@ -35,6 +37,7 @@ pub mod invasm;
 pub mod invpart;
 pub mod invplace;
 pub mod llm;
+pub mod localserver;
 pub mod malware;
 pub mod massprops;
 pub mod mattermost;
@@ -104,6 +107,9 @@ pub struct AppState {
     pub sign_in: Arc<auth::SignInThrottle>,
     /// Request counters for `GET /metrics`.
     pub metrics: Arc<metrics::Metrics>,
+    /// One-time code of the first-start setup, new at every start (see
+    /// `auth::setup_code`); logged with the setup link.
+    pub setup_code: Arc<str>,
 }
 
 impl AppState {
@@ -155,6 +161,7 @@ impl AppState {
             db,
             sign_in,
             metrics: Arc::default(),
+            setup_code: auth::setup_code().into(),
             config: Arc::new(config),
             templates: Arc::new(templates),
             vault,
@@ -179,6 +186,12 @@ pub fn router(state: AppState) -> Router {
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
         .route("/metrics", get(metrics_endpoint))
+        // the identity provider posts here; outside the web pages' cross-site
+        // guard, the signed logout token is the credential (issue #173)
+        .route(
+            "/auth/oidc/backchannel-logout",
+            axum::routing::post(web::oidc_backchannel_logout),
+        )
         .nest("/api/v1", api::router(&state))
         .merge(web::router(&state))
         .layer(SetResponseHeaderLayer::if_not_present(

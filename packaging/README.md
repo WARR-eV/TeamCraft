@@ -22,7 +22,7 @@ cd packaging/aur/teamcraft-desktop-git && makepkg -si
 ```
 
 Then follow the message of the server package (PostgreSQL role, `systemctl
-enable --now teamcraft`, open <http://localhost:8080>). Once published:
+enable --now teamcraft`, open the setup link from `journalctl -u teamcraft`). Once published:
 `yay -S teamcraft-git teamcraft-desktop-git`.
 
 Publishing (AUR account with an SSH key): `git clone

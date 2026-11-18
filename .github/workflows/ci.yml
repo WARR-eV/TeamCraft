@@ -12,8 +12,14 @@ on:
   push:
     branches: [main]
     paths-ignore: ["**.md", "docs/**", "platforms/**"]
+  # Every pull request, also one that changes only documentation: the job
+  # "CI result" is the required check of main and must report on each of them.
+  # The changes job below skips the Rust jobs for documentation-only changes.
   pull_request:
-    paths-ignore: ["**.md", "docs/**", "platforms/**"]
+  # a merge queue (Settings → Rules) tests every pull request against the
+  # main it lands on; the required checks must run here too, so no path
+  # filter (a merge_group event has none anyway)
+  merge_group:
   # new security advisories appear without a code change
   schedule:
     - cron: "17 5 * * 1"
@@ -22,18 +28,58 @@ on:
 permissions:
   contents: read
 
+# A newer push to a pull request replaces its running checks. Everything else
+# – each commit on main, each merge-queue entry – gets its own group and is
+# never cancelled: with one group for main, a third push within one run
+# cancelled the waiting run of the second ("Canceling since a higher priority
+# waiting request exists"), and its commit showed a red ✗ (#275).
 concurrency:
-  group: ci-${{ github.ref }}-${{ github.event_name }}
+  group: ci-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  # Line tables only (file and line in backtraces, no variable info): the
+  # ~107 test binaries each link the whole library, and full debug info made
+  # linking the slowest part of the build and filled the runner's disk. The
+  # same idea as [profile.mutants] in Cargo.toml; local builds keep full info.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_TEST_DEBUG: line-tables-only
 
 jobs:
+  # Whether the Rust jobs have anything to check: not for a pull request
+  # that changes only documentation (*.md, docs/, platforms/ – the paths the
+  # push trigger ignores) and not for the weekly advisory run.
+  changes:
+    name: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.c.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 2
+      - id: c
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=true
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then code=false; fi
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            # the merge commit of the pull request: HEAD^1 is the base
+            changed=$(git diff --name-only HEAD^1 HEAD)
+            echo "$changed"
+            grep -qvE '.md$|^docs/|^platforms/' <<<"$changed" || code=false
+          fi
+          echo "code=$code" | tee -a "$GITHUB_OUTPUT"
+
   lint:
     name: fmt and clippy
-    if: github.event_name != 'schedule'
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -60,7 +106,8 @@ jobs:
     # cargo llvm-cov with the coverage report and floor
     # (docs/src/dev/coverage.md).
     name: tests (Linux, PostgreSQL ${{ matrix.postgres }})
-    if: github.event_name != 'schedule'
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
@@ -89,6 +136,16 @@ jobs:
       TEAMCRAFT_REQUIRE_PG_TOOLS: "1"
     steps:
       - uses: actions/checkout@v4
+      # The debug builds of every test binary filled the runner's disk (PR
+      # #295): drop preinstalled SDKs this job never uses (about 20 GB). In the
+      # background – deleting takes 1–2 minutes – while the toolchain and the
+      # cache are set up; "Wait for the disk space" waits for it before the build.
+      - name: Free disk space (in the background)
+        run: |
+          df -h /
+          # shellcheck disable=SC2016 # $1 belongs to the inner shell
+          nohup sh -c 'sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift; touch "$1"' \
+            sh "$RUNNER_TEMP/disk-freed" > /dev/null 2>&1 &
       - name: PostgreSQL ${{ matrix.postgres }} client tools (pg_dump, pg_restore)
         run: |
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
@@ -106,6 +163,11 @@ jobs:
         if: ${{ !matrix.coverage }}
         with:
           tool: cargo-nextest
+      - name: Wait for the disk space
+        run: |
+          for _ in $(seq 1 300); do [ -e "$RUNNER_TEMP/disk-freed" ] && break; sleep 1; done
+          test -e "$RUNNER_TEMP/disk-freed"
+          df -h /
       # nextest kills a test that runs over its limit (.config/nextest.toml:
       # 1 s for unit tests), so a hang fails at once instead of stalling the job
       - if: ${{ !matrix.coverage }}
@@ -113,20 +175,22 @@ jobs:
       - name: doc tests (nextest does not run them)
         if: ${{ !matrix.coverage }}
         run: cargo test --locked --doc
+      # the server binary the test run built (tests run it by CARGO_BIN_EXE);
+      # `cargo run` built it a second time with other features (71 s)
       - name: CLI smoke test
         if: ${{ !matrix.coverage }}
         env:
           TEAMCRAFT_DATABASE_URL: postgres://teamcraft@localhost:5432/teamcraft
         run: |
-          cargo run --locked --quiet -- migrate
-          cargo run --locked --quiet -- vault check
-          cargo run --locked --quiet -- preview-mesh --format step --input tests/fixtures/cube.step --output cube.tcm
+          ./target/debug/teamcraft migrate
+          ./target/debug/teamcraft vault check
+          ./target/debug/teamcraft preview-mesh --format step --input tests/fixtures/cube.step --output cube.tcm
           test -s cube.tcm
-          cargo run --locked --quiet -- backup "$RUNNER_TEMP/backup"
+          ./target/debug/teamcraft backup "$RUNNER_TEMP/backup"
           createdb -h localhost -U teamcraft teamcraft_restored
           TEAMCRAFT_DATABASE_URL=postgres://teamcraft@localhost:5432/teamcraft_restored \
           TEAMCRAFT_VAULT_DIR="$RUNNER_TEMP/vault-restored" \
-            cargo run --locked --quiet -- restore "$RUNNER_TEMP/backup"
+            ./target/debug/teamcraft restore "$RUNNER_TEMP/backup"
 
       - if: ${{ matrix.coverage }}
         uses: taiki-e/install-action@v2
@@ -178,7 +242,8 @@ jobs:
     # main and by hand. The test targets are type-checked, not linked: the
     # database tests do not run here.
     name: build (${{ matrix.os }})
-    if: github.event_name != 'schedule'
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -214,3 +279,29 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           manifest-path: ${{ matrix.manifest }}
+
+  # The one check that branch protection or the merge queue requires (see
+  # CONTRIBUTING.md, "Merging"): green when every job above passed or was
+  # skipped on purpose, red when one failed or was cancelled. One name instead
+  # of the job list keeps the rule valid when a job or a matrix entry changes,
+  # and a skipped matrix job reports under its unexpanded name, which a
+  # required check of that name would wait for forever.
+  result:
+    name: CI result
+    if: always()
+    needs: [changes, lint, test, build, dependencies]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: All jobs passed or were skipped
+        shell: bash
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for r in $RESULTS; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "::error::a CI job ended with '$r'"; exit 1 ;;
+            esac
+          done

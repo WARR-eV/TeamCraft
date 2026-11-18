@@ -14,6 +14,12 @@ export function showConnect(step, error) {
   $("connect").classList.remove("hidden");
   $("server-form").classList.toggle("hidden", step !== "server");
   $("signin-step").classList.toggle("hidden", step !== "signin");
+  // "Try TeamCraft on this computer" (downloads with local server only);
+  // "starting": the app starts its local server before signing in
+  $("local-server").classList.toggle("hidden", step !== "server" || !state.session.local_server_available);
+  $("local-server-wait").classList.add("hidden");
+  $("local-server-start").disabled = false;
+  $("local-server-boot").classList.toggle("hidden", step !== "starting");
   $("signin-wait").classList.add("hidden");
   $("signin-browser").disabled = false;
   if (!$("server-url").value) $("server-url").value = state.session.server_url || "";
@@ -59,6 +65,7 @@ export function checkServerVersion() {
 }
 
 export function initConnect() {
+  initLocalServer();
   $("server-url").addEventListener("input", function () {
     checkServerUrl($("server-url").value, $("server-http-warning"));
   });
@@ -103,4 +110,42 @@ export function initConnect() {
       enterShell();
     }, function (err) { showConnect("signin", errorText(err)); });
   });
+}
+
+/** The app's own local test server is the configured one: start it before
+ * signing in or opening the main window (src/localserver.rs). Resolves
+ * with its address, which follows a changed port. */
+export function startLocalServer() {
+  showConnect("starting");
+  return call("local_server_start").then(function (base) {
+    state.session.server_url = base;
+    return base;
+  });
+}
+
+/** "Try TeamCraft on this computer": start the bundled server, use it as the
+ * server and open the browser sign-in – on the first start the browser
+ * shows the page that creates the administrator, then the confirmation. */
+/** Starts the bundled server, makes it the app's server and opens the
+ * browser sign-in (the button, and the first start of TeamCraft Local). */
+export function tryLocalServer() {
+  showConnect("server");
+  $("local-server-start").disabled = true;
+  $("local-server-wait").classList.remove("hidden");
+  $("connect-error").classList.add("hidden");
+  call("local_server_start").then(function (base) {
+    return call("set_server", { url: base });
+  }).then(function (base) {
+    state.session.server_url = base;
+    state.session.signed_in = false;
+    state.session.local_server_in_use = true;
+    $("server-url").value = base;
+    showConnect("signin");
+    checkServerVersion();
+    $("signin-browser").click();
+  }, function (err) { showConnect("server", errorText(err)); });
+}
+
+export function initLocalServer() {
+  $("local-server-start").addEventListener("click", tryLocalServer);
 }
