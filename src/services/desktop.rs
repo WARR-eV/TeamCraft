@@ -165,12 +165,12 @@ pub struct DesktopToken {
 /// Exchanges a one-time code plus the PKCE verifier for a personal access
 /// token. Every failure looks the same to the caller. The token expires
 /// after [`TOKEN_DAYS`] without use – for a single sign-on user after
-/// `sso_idle_days` if that is shorter (`TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS`).
+/// the idle limit of `limits` if that is shorter (`TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS`).
 pub async fn exchange(
     pool: &PgPool,
     code: &str,
     verifier: &str,
-    sso_idle_days: u32,
+    limits: users::TokenLimits,
 ) -> AppResult<DesktopToken> {
     let invalid = || AppError::BadRequest("The sign-in code is invalid or expired.".into());
     if !code.starts_with(CODE_PREFIX) || !(43..=128).contains(&verifier.len()) {
@@ -194,7 +194,7 @@ pub async fn exchange(
     let token_name =
         domain::limit_text("Token name", &format!("TeamCraft Desktop – {device}"), 100)?;
     let asked = users::TokenLifetime::IdleDays(TOKEN_DAYS);
-    let lifetime = users::token_lifetime_for(pool, user_id, asked, sso_idle_days).await?;
+    let lifetime = users::token_lifetime_for(pool, user_id, asked, limits).await?;
     let (record, token) = users::create_token(
         pool,
         &actor,

@@ -31,7 +31,10 @@ with an idle lifetime (the desktop app's) expires after that many days
 without use. With `TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS`, `POST /api/v1/tokens`
 gives a single sign-on user a token with that idle lifetime when
 `expires_in_days` is missing or longer (the answer's `expires_at` and
-`idle_days` show it).
+`idle_days` show it; the default is 90 days). `TEAMCRAFT_TOKEN_MAX_DAYS`
+(default 365, `0` = no limit) shortens a missing or longer
+`expires_in_days` of every account to that many days; a value outside 1 to
+3650 is still refused (400).
 
 ## Read permissions
 

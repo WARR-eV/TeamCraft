@@ -56,6 +56,16 @@ see the notices in the README.
 
 ### Changed
 
+- **Token lifetimes are limited by default** (#313).
+  `TEAMCRAFT_TOKEN_MAX_DAYS` (new, default `365`, `0` = no limit) gives a
+  new personal token without an expiry, or with a longer one, that many
+  days – on the account page and through `POST /api/v1/tokens`; the account
+  page no longer offers *never expires* while the limit is on. Tokens that
+  renew on use (the desktop app's) keep renewing. `TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS`
+  now defaults to `90` instead of off: new tokens of single sign-on users
+  expire after 90 days without use. Existing tokens keep their lifetime;
+  `teamcraft user create-token` on the server is not limited. Set either
+  variable to `0` for the old behaviour.
 - CI: the macOS build (`build (macos-latest)`, on `main` only) is advisory
   and no longer part of **CI result**. GitHub's hosted macOS arm64 runners
   often stay unavailable ("The job was not acquired by Runner of type hosted
