@@ -41,6 +41,16 @@ in time. A failed backup removes what it wrote – the directory, if it
 created it – and the manifest is written last, so an interrupted backup is
 never taken for a complete one.
 
+**Permissions.** The dump contains password, session and token hashes and
+the webhook secrets. On Linux and macOS the backup directory is set to
+`0700` before anything is written into it, and when the backup is complete
+every folder in it gets `0700` and every file `0600`, whatever the umask of
+the process (an existing empty target folder is narrowed too). Only the
+account that ran the backup – and root – can read it; run the backup as the
+account that will copy it to the backup medium, or copy it as root. On
+Windows the permissions of the target folder apply. Encrypt backups that
+leave the server (below).
+
 Restore with the server stopped:
 
 ```sh

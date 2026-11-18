@@ -21,6 +21,11 @@ see the notices in the README.
   CR/LF in a display name, unbounded reply buffering). The unmaintained notice
   for `chrono` (RUSTSEC-2026-0543, not a vulnerability) is ignored in
   `deny.toml` until the move to `jiff` or `time` (`docs/OPEN_WORK.md`).
+- Backups are owner-only (#307, F19): `teamcraft backup` sets the target
+  folder to `0700` before writing into it and, once the backup is complete,
+  every folder in it to `0700` and every file to `0600`, whatever the umask
+  (vault copies kept the vault's own modes before). Only the account that
+  ran the backup and root can read it. Windows keeps the folder's ACL.
 
 ### Added
 
