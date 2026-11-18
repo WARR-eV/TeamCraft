@@ -475,7 +475,7 @@ mod tests {
         for expected in [
             "Sounding rocket",
             "Bracket &lt;b&gt;",
-            "Check in and release",
+            "type=\"submit\">Check in</button>",
             "/cancel-checkout?back=",
             "?back=%2Fvault%3Ffolder%3D",
             "enctype=\"multipart/form-data\"",
@@ -875,7 +875,10 @@ mod tests {
                 html.contains("/files/") && html.contains("/restore"),
                 "rollback offered"
             );
-            assert!(html.contains("Check in and release"), "check-in form");
+            assert!(
+                html.contains("type=\"submit\">Check in</button>"),
+                "check-in form"
+            );
             assert!(
                 html.contains(&format!("/files/{OTHER}/preview"))
                     && html.contains(&format!("/file-versions/{ME}/preview")),
