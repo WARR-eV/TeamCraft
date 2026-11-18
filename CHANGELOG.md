@@ -13,6 +13,15 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Security
+
+- E-mail delivery: `lettre` 0.11.24 fixes six SMTP advisories (RUSTSEC-2026-0560
+  to 0565: STARTTLS reply injection, missing dot-stuffing after a bare LF/CR,
+  wrong recipient for quoted local parts, panics on a blank `EHLO` line or a
+  CR/LF in a display name, unbounded reply buffering). The unmaintained notice
+  for `chrono` (RUSTSEC-2026-0543, not a vulnerability) is ignored in
+  `deny.toml` until the move to `jiff` or `time` (`docs/OPEN_WORK.md`).
+
 ### Added
 
 - Contribution rule **own work only – no decompiled code**: code
