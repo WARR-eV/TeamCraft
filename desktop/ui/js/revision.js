@@ -155,13 +155,13 @@ export function renderRevision(tab, body, toolbar) {
   function act(id, text, icon, onClick, title) {
     return tool(text, icon, onClick, { primary: next === id, disabled: !can[id], title: can[id] ? title : why[id] });
   }
-  var checkinTitle = "Upload the changed files from your workspace and release the lock";
+  var checkinTitle = "Upload the changed files from your workspace and end your check-out – the revision stays in work";
   var noChanges = " (no local changes found)";
   var lock = rev.checked_out_by ? [
     act("checkin", "Check in…", "checkin", function () { checkinDialog(tab); },
       checkinTitle + (d.localChanges === false ? noChanges : "")),
     act("cancel", rev.checked_out_by !== state.me.id ? "Force unlock" : "Cancel check-out", "cancel", function () { doCancelCheckout(tab); },
-      rev.checked_out_by !== state.me.id ? "Take the lock away from " + rev.checked_out_by_name + " (administrator)" : "Release the lock without uploading anything")
+      rev.checked_out_by !== state.me.id ? "Take the lock away from " + rev.checked_out_by_name + " (administrator)" : "End your check-out without uploading anything")
   ] : [
     act("checkout", "Check out", "checkout", function () { doCheckout(tab); }, "Take the lock and copy the files into your workspace")
   ];

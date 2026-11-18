@@ -129,7 +129,7 @@ check-outs and reviews, and a **local working folder**:
   revision and file name filled in and an optional screenshot or PDF; the
   worklist lists the requests assigned to you and your open ones;
 * on Windows with Inventor or Solid Edge installed, *STEP* (workspace) and
-  the check-in option create STEP exports for the 3D preview with that
+  the check-in option (off by default) create STEP exports for the 3D preview with that
   program; the Files tab shows the preview image stored in native files.
 * with a *Preferred CAD program* set on your account page in the web UI, the
   Files tab of a revision collapses the native files of other CAD programs

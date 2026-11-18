@@ -110,6 +110,15 @@ see the notices in the README.
 
 ### Changed
 
+- The check-in button is called **Check in** (desktop check-in dialog, revision
+  page and vault explorer of the web UI) instead of *Check in and release*: it
+  ends the check-out, the revision stays in work – "release" read like the
+  lifecycle *Release…* that freezes a revision for manufacturing. The tooltips
+  say so too (*end your check-out*).
+- The desktop check-in option **Create STEP exports with … first** is off by
+  default (#342): the export through Inventor did not finish for a large
+  assembly, and because the exports run before the upload, the whole check-in
+  failed with it. Tick it for a check-in that should bring a 3D preview.
 - The preview cache is limited to **10 GiB by default** (#309):
   `TEAMCRAFT_PREVIEW_CACHE_MAX_MB` defaults to `10240` instead of `0`, so the
   hourly housekeeping trims `<vault>/previews` (least recently used first)
@@ -174,9 +183,15 @@ see the notices in the README.
   every part with an umlaut. Now every file and folder name is composed: on
   upload and check-in (server), in the folder import, the working folder and
   its state (desktop); CAD references stored decomposed are recognised too.
-  Migration 0073 composes the names stored before. A Get or the Workspace tab
-  gives a file the app wrote under a decomposed name its composed name, and the
-  import log of an earlier Mac import still skips the items it created.
+  Migration 0073 composes the names stored before (files, folders, references
+  and the item names the folder import took from such file names). A Get or
+  the Workspace tab gives a file the app wrote under a decomposed name its
+  composed name, and the import log of an earlier Mac import still skips the
+  items it created.
+- Live demo, desktop sign-in (#325, #336): the confirmation page still held
+  the visitor's real computer name – the appearance forms in the header
+  repeat the page's address as their `back` target, `device=…` included. For
+  the demo account they now return to the address with the random name.
 - Trigram indexes of the item search could be missing without anyone
   noticing (#308): migrations 0023 and 0031 swallowed *every* error while
   creating them. Migration 0072 creates the six indexes again where they are

@@ -1313,7 +1313,7 @@ async fn vault_explorer_check_out_and_in() {
     );
     let folder = format!("/vault?folder={rover}&rev={rev}");
     let html = app.get_page(&folder, Some(&cookie)).await.text();
-    assert!(html.contains("Wheel hub") && html.contains("Check in and release"));
+    assert!(html.contains("Wheel hub") && html.contains("type=\"submit\">Check in</button>"));
 
     // cancel returns to the explorer at once, without a confirmation step
     let back = teamcraft::util::pct_encode(&folder);

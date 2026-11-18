@@ -422,7 +422,9 @@ export function checkinDialog(tab, park) {
     var progressLine = h("p.small.muted.hidden", { role: "status" });
     // Like the CAD add-ins of PDM systems: viewables at check-in.
     var exportable = boxes.filter(function (b) { return exportProgram(b.name, programs); });
-    var withStep = h("input", { type: "checkbox", checked: true });
+    // off by default (#342): a slow or failed export through the CAD program
+    // runs before the upload and takes the whole check-in down with it
+    var withStep = h("input", { type: "checkbox", checked: false });
     var stepNote = exportable.length ? h("label.check", null, [withStep,
       "Create STEP exports with " + exportable.map(function (b) { return PROGRAM_LABEL[exportProgram(b.name, programs)]; })
         .filter(function (v, i, a) { return a.indexOf(v) === i; }).join(" / ") +
@@ -431,7 +433,7 @@ export function checkinDialog(tab, park) {
       h("p.small.muted", null, ["From ", h("span.mono", { text: ws.dir })]),
       candidates.length ? h("div.stack", null, boxes.map(function (b) {
         return h("label.check", null, [b.input, b.name, " ", badge(b.state, SYNC_LABEL[b.state])]);
-      })) : h("p.empty", { text: "No modified or new files – checking in only releases the lock." }),
+      })) : h("p.empty", { text: "No modified or new files – checking in only ends your check-out; the revision stays in work." }),
       boxes.some(function (b) { return b.state === "conflict"; }) ? h("p.notice.error", { text: "Conflict: these files changed on the server since you got them. " +
         "The server refuses to overwrite the newer version (nothing is stored) – save your copy under another name, get the current files and merge." }) : null,
       stepNote,
@@ -458,7 +460,7 @@ export function checkinDialog(tab, park) {
       // Park: the same upload, but the lock stays (issue #173, step 10) –
       // the work is safe on the server, the revision stays yours.
       { label: "Park (keep checked out)", primary: !!park, submit: !!park, onClick: function (d) { send(d, true); } },
-      { label: "Check in and release", primary: !park, submit: !park, onClick: function (d) { send(d, false); } }
+      { label: "Check in", primary: !park, submit: !park, onClick: function (d) { send(d, false); } }
     ], opts);
     function send(d, parking) {
       if (running) return;
