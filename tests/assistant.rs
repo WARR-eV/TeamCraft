@@ -261,3 +261,58 @@ async fn local_agents_off_keeps_the_company_ai() {
     assert!(html.contains("company AI (no local option)"), "{html}");
     app.teardown().await;
 }
+
+/// The daily quota (#306): a user who used up the runs of the last 24 hours
+/// gets 429 with `Retry-After` before anything is sent to the provider;
+/// another user is not affected.
+#[tokio::test]
+async fn the_daily_quota_refuses_further_runs() {
+    // Nothing listens there: a run that passes the quota fails to connect.
+    let Some(app) = common::setup_with(&[
+        ("TEAMCRAFT_ASSISTANT_PROVIDER", "openai-compatible"),
+        ("TEAMCRAFT_ASSISTANT_BASE_URL", "http://127.0.0.1:9/v1"),
+        ("TEAMCRAFT_ASSISTANT_MODEL", "llama3.1:8b"),
+        ("TEAMCRAFT_ASSISTANT_DAILY_RUNS", "2"),
+    ])
+    .await
+    else {
+        return;
+    };
+    let (vera, token) = app.user("vera", Role::Viewer).await;
+    let (_, other) = app.user("otto", Role::Viewer).await;
+    // two runs in the last day (one older than 24 hours does not count)
+    for age in ["1 hour", "2 hours", "25 hours"] {
+        sqlx::query(
+            "INSERT INTO audit_log (at, user_id, username, action, entity_type, summary, details)
+             VALUES (now() - $2::interval, $1, 'vera', 'assistant.run', 'assistant', 'Assistant: Ask',
+                     '{\"input_tokens\": 100, \"output_tokens\": 20}')",
+        )
+        .bind(vera.id)
+        .bind(age)
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    }
+    let usage = teamcraft::services::assistant::daily_usage(&app.pool, vera.id)
+        .await
+        .unwrap();
+    assert_eq!((usage.runs, usage.tokens), (2, 240));
+    assert!(
+        (22 * 3600..=23 * 3600).contains(&usage.frees_in_secs),
+        "{usage:?}"
+    );
+
+    let ask = json!({ "question": "What needs my attention?" });
+    let r = app
+        .api(Method::POST, "/api/v1/assistant", &token, Some(ask.clone()))
+        .await;
+    assert_eq!(r.status, StatusCode::TOO_MANY_REQUESTS, "{}", r.text());
+    assert!(r.text().contains("limit of 2 questions"), "{}", r.text());
+    assert!(r.headers.contains_key("retry-after"), "{:?}", r.headers);
+    // another user still gets through to the (unreachable) provider
+    let r = app
+        .api(Method::POST, "/api/v1/assistant", &other, Some(ask))
+        .await;
+    assert_ne!(r.status, StatusCode::TOO_MANY_REQUESTS, "{}", r.text());
+    app.teardown().await;
+}
