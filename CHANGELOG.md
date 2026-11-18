@@ -166,6 +166,10 @@ see the notices in the README.
 
 ### Fixed
 
+- Live demo, desktop sign-in (#325, #336): the confirmation page still held
+  the visitor's real computer name – the appearance forms in the header
+  repeat the page's address as their `back` target, `device=…` included. For
+  the demo account they now return to the address with the random name.
 - Trigram indexes of the item search could be missing without anyone
   noticing (#308): migrations 0023 and 0031 swallowed *every* error while
   creating them. Migration 0072 creates the six indexes again where they are
