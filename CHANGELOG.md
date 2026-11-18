@@ -110,6 +110,15 @@ see the notices in the README.
 
 ### Changed
 
+- The check-in button is called **Check in** (desktop check-in dialog, revision
+  page and vault explorer of the web UI) instead of *Check in and release*: it
+  ends the check-out, the revision stays in work – "release" read like the
+  lifecycle *Release…* that freezes a revision for manufacturing. The tooltips
+  say so too (*end your check-out*).
+- The desktop check-in option **Create STEP exports with … first** is off by
+  default (#342): the export through Inventor did not finish for a large
+  assembly, and because the exports run before the upload, the whole check-in
+  failed with it. Tick it for a check-in that should bring a 3D preview.
 - The preview cache is limited to **10 GiB by default** (#309):
   `TEAMCRAFT_PREVIEW_CACHE_MAX_MB` defaults to `10240` instead of `0`, so the
   hourly housekeeping trims `<vault>/previews` (least recently used first)
