@@ -24,6 +24,12 @@ see the notices in the README.
 
 ### Added
 
+- **Items without a project group** are pointed out to administrators
+  (#310): *Project groups* shows how many there are – everyone can read
+  them and every CAD editor change them – with a link to *Vault → Without
+  group*. New items and moves already require a group, so these are items
+  from older versions. The permissions guide warns that visibility is a deny
+  list and that sensitive data belongs in a restricted group from the start.
 - 3D preview of files saved by **Inventor 2027** (#271, on top of the
   Zstandard segments read since 0.2.8): typed arrays with the new element
   types (4, 8, 14, 16 for `u32` numbers, `invpart::is_u32`) are read, so
