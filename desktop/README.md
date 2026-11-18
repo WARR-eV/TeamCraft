@@ -67,7 +67,7 @@ used by CI, the app has no build step). Nothing is packaged or published.
 ## Download or run from source
 
 The installers of every tagged version (0.x pre-releases) are on the
-[Releases page](https://github.com/rudalabs/TeamCraft/releases): Linux
+[Releases page](https://github.com/WARR-eV/TeamCraft/releases): Linux
 AppImage/`.deb`/`.rpm` and a Flatpak bundle for x86_64 and aarch64, macOS
 `.dmg`, Windows x64 and ARM64 `.msi`/`-setup.exe` plus a portable `.zip` with
 `TeamCraft.exe`, which needs the WebView2 runtime of Windows 10/11 – see
@@ -127,7 +127,7 @@ and in *Settings*: the token and all data would cross the network unencrypted (`
 loopback addresses are fine).
 
 Update notice: at most once a day the app asks the GitHub releases API
-(`api.github.com/repos/rudalabs/TeamCraft/releases/latest`, no redirects, 10 s timeout) for the latest
+(`api.github.com/repos/WARR-eV/TeamCraft/releases/latest`, no redirects, 10 s timeout) for the latest
 release. A newer version shows a link in the status bar to the release page; nothing is downloaded or
 installed. *×* hides it until the next version, *Settings → Updates* switches the check off.
 

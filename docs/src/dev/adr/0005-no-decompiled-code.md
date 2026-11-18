@@ -2,7 +2,7 @@
 
 **Status:** accepted (2026-11-14) – a contribution rule of the project,
 stated in full in
-[CONTRIBUTING.md](https://github.com/rudalabs/TeamCraft/blob/main/CONTRIBUTING.md#your-own-work-only--no-decompiled-code).
+[CONTRIBUTING.md](https://github.com/WARR-eV/TeamCraft/blob/main/CONTRIBUTING.md#your-own-work-only--no-decompiled-code).
 
 ## Context
 

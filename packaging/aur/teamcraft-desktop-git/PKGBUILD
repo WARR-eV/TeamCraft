@@ -1,4 +1,4 @@
-# Maintainer: TeamCraft contributors <https://github.com/rudalabs/TeamCraft>
+# Maintainer: TeamCraft contributors <https://github.com/WARR-eV/TeamCraft>
 pkgname=teamcraft-desktop-git
 _pkgname=teamcraft
 _appid=io.github.rudalabs.teamcraft
@@ -6,14 +6,14 @@ pkgver=0.1.0.r0.g0000000
 pkgrel=1
 pkgdesc='Desktop client of the TeamCraft PLM: check-out workspace, 3D viewer, reviews'
 arch=('x86_64' 'aarch64')
-url='https://github.com/rudalabs/TeamCraft'
+url='https://github.com/WARR-eV/TeamCraft'
 license=('MPL-2.0')
 depends=('webkit2gtk-4.1' 'gtk3' 'glib2' 'cairo' 'gdk-pixbuf2' 'libsoup3' 'xdotool' 'hicolor-icon-theme' 'gcc-libs' 'glibc')
 makedepends=('cargo' 'git')
 provides=('teamcraft-desktop')
 conflicts=('teamcraft-desktop')
 options=('!lto')
-source=("$_pkgname::git+https://github.com/rudalabs/TeamCraft.git")
+source=("$_pkgname::git+https://github.com/WARR-eV/TeamCraft.git")
 sha256sums=('SKIP')
 
 pkgver() {

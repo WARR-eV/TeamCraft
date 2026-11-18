@@ -1,6 +1,6 @@
 [Unit]
 Description=TeamCraft product lifecycle management server
-Documentation=https://rudalabs.github.io/TeamCraft/
+Documentation=https://warr-ev.github.io/TeamCraft/
 After=network-online.target postgresql.service
 Wants=network-online.target
 

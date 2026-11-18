@@ -6,7 +6,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the version numbers follow [Semantic Versioning](https://semver.org/).
 While the version is `0.x`, any release may contain breaking changes. The
 policy for supported versions is in the
-[support policy](https://rudalabs.github.io/TeamCraft/admin/support-policy.html).
+[support policy](https://warr-ev.github.io/TeamCraft/admin/support-policy.html).
 
 TeamCraft has no stable release yet. The project status is work in progress:
 see the notices in the README.
@@ -56,6 +56,19 @@ see the notices in the README.
 
 ### Changed
 
+- The repository moved from `rudalabs/TeamCraft` to **`WARR-eV/TeamCraft`**:
+  every link, the install command, the documentation at
+  <https://warr-ev.github.io/TeamCraft/> and the container image
+  **`ghcr.io/warr-ev/teamcraft`** use the new names, and the release
+  workflow publishes `:edge` and versions from the new repository again (its
+  publish guard still named the old one). `deploy/install.sh` accepts
+  compose files with either image name, so installations made before and the
+  deploy files of release tags up to v0.2.9 keep working; an installation
+  moves to the new image name with the first release after the move (or
+  with `edge`) when the installer runs again. The
+  desktop app's update check and crash reports point to the new repository.
+  The app ID `io.github.rudalabs.teamcraft` stays, so settings and the
+  keychain entry are kept.
 - TeamCraft no longer presents itself as an alternative to a particular
   commercial product: the README tagline now says only that the project is a
   work in progress. The desktop import tutorial, the user guide and code
@@ -127,7 +140,7 @@ Changes since the `v0.2.7` tag.
   `local-server` bundles the newest PostgreSQL 18 build of
   theseus-rs/postgresql-binaries (checksum-checked, with PostgreSQL's
   licence) and smoke-tests every installer's bundled server
-  ([guide](https://rudalabs.github.io/TeamCraft/guide/local-server.html),
+  ([guide](https://warr-ev.github.io/TeamCraft/guide/local-server.html),
   `docs/src/research/local-test-server.md`).
 - REST: `POST /api/v1/changes/{number}/cancel` cancels a draft or rejected
   change (its revisions are free for another change), and
@@ -821,7 +834,7 @@ Changes since the `v0.2.0` tag.
   `user.password_failed`.
 - Administrators can replace the wide logo (top left) and the square logo (bottom left, tab icon) under *Admin →
   Branding*; the desktop app shows them
-  too. See [Branding](https://rudalabs.github.io/TeamCraft/admin/branding.html).
+  too. See [Branding](https://warr-ev.github.io/TeamCraft/admin/branding.html).
 - `GET /metrics` in the Prometheus text format (request counts and latency,
   database pool, outbox backlogs, 3D preview queue), enabled by
   `TEAMCRAFT_METRICS_TOKEN`.
@@ -884,9 +897,9 @@ Changes since the `v0.2.0` tag.
   app keeps the private file and shows a warning. Server addresses with plain
   `http://` to another computer get a warning.
 
-[Unreleased]: https://github.com/rudalabs/TeamCraft/compare/v0.2.9...HEAD
-[0.2.9]: https://github.com/rudalabs/TeamCraft/compare/v0.2.8...v0.2.9
-[0.2.8]: https://github.com/rudalabs/TeamCraft/compare/v0.2.7...v0.2.8
-[0.2.7]: https://github.com/rudalabs/TeamCraft/compare/v0.2.6...v0.2.7
-[0.2.6]: https://github.com/rudalabs/TeamCraft/compare/v0.2.5...v0.2.6
-[0.2.5]: https://github.com/rudalabs/TeamCraft/compare/v0.2.0...v0.2.5
+[Unreleased]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.9...HEAD
+[0.2.9]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.8...v0.2.9
+[0.2.8]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.7...v0.2.8
+[0.2.7]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.6...v0.2.7
+[0.2.6]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.5...v0.2.6
+[0.2.5]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.0...v0.2.5

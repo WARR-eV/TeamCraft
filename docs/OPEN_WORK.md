@@ -399,7 +399,7 @@ answered for now: `none` is allowed, but needs a member who is a manager.
 Only finish what is in progress and fix bugs here; see *Direction*. The CAD-program entries are mostly checks with
 real files and belong to section 3 once such files are at hand.
 
-**Ownership and approval rules ([#152](https://github.com/rudalabs/TeamCraft/issues/152))**
+**Ownership and approval rules ([#152](https://github.com/WARR-eV/TeamCraft/issues/152))**
 
 - [x] Step 1: wider separation of duties (editors and the acting admin cannot review; suggester excludes them).
 - [x] Step 2: review policy per project group (min approvals, required reviewers, role group). Left: show the policy on
@@ -424,7 +424,7 @@ real files and belong to section 3 once such files are at hand.
   `requester_cannot_decide`, `concessions_need_review`; `tests/review_rules.rs`).
 - [x] Follow-up of step 1: show editors in the suggester as "knows the item, cannot review".
 
-**Offboarding for high-turnover teams ([#173](https://github.com/rudalabs/TeamCraft/issues/173))**
+**Offboarding for high-turnover teams ([#173](https://github.com/WARR-eV/TeamCraft/issues/173))**
 
 - [x] Step 0: runbook "When someone leaves" in `docs/src/admin/users.md`.
 - [x] Step 1: holdings report per user (`services::offboarding::holdings`: page `/users/{id}/holdings` for admins and
@@ -521,7 +521,7 @@ real files and belong to section 3 once such files are at hand.
 - [ ] OpenFOAM case summary (solver, time steps) from `controlDict` – the 3D preview of VTK and CalculiX results is
   done (#43)
 - [ ] Fluent, STAR-CCM+ and Simcenter 3D files, plan of the research page *Fluent, STAR-CCM+ and Simcenter 3D files*
-  ([#153](https://github.com/rudalabs/TeamCraft/pull/153), `docs/src/research/solver-files.md`). Every byte-level
+  ([#153](https://github.com/WARR-eV/TeamCraft/pull/153), `docs/src/research/solver-files.md`). Every byte-level
   rule is a hypothesis until it is checked with real files – the heads (1–4 KB) of STAR-CCM+ `.sim` files of two or
   three versions, NX 1980+ and older `.sim`/`.fem`/`.afm`, a Fluent `report-file-0.out` and `.trn`, a Simcenter 3D
   Nastran `.dat` and `.f06`, openly licensed or self-made, as fixtures
@@ -569,7 +569,7 @@ real files and belong to section 3 once such files are at hand.
 - [x] HTML reports of commercial FEA/CFD tools: own bounded HTML-to-text reader (`src/htmltext.rs`) in the isolated
   `text-extract` child, table rows as lines with ` | ` separators, scripts/styles/comments/hidden elements/embedded
   images skipped, nothing fetched; search, `read_file_text`, `propose_result_values` and the extraction templates use
-  the extracted text ([#141](https://github.com/rudalabs/TeamCraft/issues/141))
+  the extracted text ([#141](https://github.com/WARR-eV/TeamCraft/issues/141))
 - [ ] HTML reports: MHTML (`.mht`) and ZIP-packed multi-file reports (unpacking needs its own caps, see F13); text
   hidden
   by a style sheet (not inline) is not detected
@@ -577,7 +577,7 @@ real files and belong to section 3 once such files are at hand.
   out-of-date simulations; left: an *out of date* search filter, the `result` filter in the MCP `search_items` tool and
   in saved searches
 - [x] New simulation from a part/assembly revision in the web UI and `POST /items` with `basis`: prefilled form, basis
-  linked in the same transaction ([#178](https://github.com/rudalabs/TeamCraft/issues/178)); left: several bases at once
+  linked in the same transaction ([#178](https://github.com/WARR-eV/TeamCraft/issues/178)); left: several bases at once
 - [ ] Desktop: *New simulation from this revision…* on a part/assembly (creates the item with its basis), basis files
   checked out read-only into `basis/`, check-in of selected result time steps only
 - [x] Retention for large result files (`files.retention = 'latest'`): per file, old versions removed after a grace
@@ -981,7 +981,7 @@ Documented in the UI, keep in mind:
 Rules for all of them: research open source first (licences compatible with MPL-2.0: MIT, Apache-2.0, BSD, ISC, Zlib,
 MPL-2.0; LGPL only as a separately loaded component; no GPL/AGPL/SSPL, nothing proprietary), list used projects in the
 README licence table, follow the definition of done in `CLAUDE.md`. The docs are live at
-<https://rudalabs.github.io/TeamCraft/>.
+<https://warr-ev.github.io/TeamCraft/>.
 
 ## Pending verification (2026-11-07)
 

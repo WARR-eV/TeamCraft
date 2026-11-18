@@ -6,7 +6,7 @@ mkdir -p "$SNAP_COMMON/vault"
 if [ ! -f "$SNAP_COMMON/teamcraft.env" ]; then
     cat > "$SNAP_COMMON/teamcraft.env" <<'EOF'
 # TeamCraft (snap) configuration – documented at
-# https://rudalabs.github.io/TeamCraft/admin/configuration.html
+# https://warr-ev.github.io/TeamCraft/admin/configuration.html
 # After a change: sudo snap restart teamcraft.server
 
 TEAMCRAFT_BIND_ADDR=127.0.0.1:8080

@@ -5,7 +5,7 @@ often with embedded CSS and base64 images, or an HTML file with an assets
 folder). The result values sit in tables. How does TeamCraft get readable text
 with the table rows intact, in pure Rust, without a browser engine and without
 letting a hostile file hurt the server? Investigated on 2026-11-07 for
-[#141](https://github.com/rudalabs/TeamCraft/issues/141).
+[#141](https://github.com/WARR-eV/TeamCraft/issues/141).
 
 ## What was wrong before
 

@@ -1,11 +1,11 @@
-# Maintainer: TeamCraft contributors <https://github.com/rudalabs/TeamCraft>
+# Maintainer: TeamCraft contributors <https://github.com/WARR-eV/TeamCraft>
 pkgname=teamcraft-git
 _pkgname=teamcraft
 pkgver=0.1.0.r0.g0000000
 pkgrel=1
 pkgdesc='Open-source product lifecycle management (PLM) server: check-out/check-in vault, BOMs, change orders, 3D preview'
 arch=('x86_64' 'aarch64')
-url='https://github.com/rudalabs/TeamCraft'
+url='https://github.com/WARR-eV/TeamCraft'
 license=('MPL-2.0')
 depends=('gcc-libs' 'glibc')
 makedepends=('cargo' 'git')
@@ -15,7 +15,7 @@ conflicts=('teamcraft')
 backup=('etc/teamcraft/teamcraft.env')
 install=teamcraft.install
 options=('!lto')
-source=("$_pkgname::git+https://github.com/rudalabs/TeamCraft.git")
+source=("$_pkgname::git+https://github.com/WARR-eV/TeamCraft.git")
 sha256sums=('SKIP')
 
 pkgver() {

@@ -9,7 +9,7 @@
 #   docker compose logs -f teamcraft  logs
 #   docker compose pull && docker compose up -d   upgrade (data stays in the volumes)
 #
-# Guide: https://rudalabs.github.io/TeamCraft/admin/docker.html
+# Guide: https://warr-ev.github.io/TeamCraft/admin/docker.html
 # (The docker-compose.yml in the repository root is the development database.)
 
 name: teamcraft-server
@@ -37,7 +37,7 @@ services:
     stop_grace_period: 60s
 
   teamcraft:
-    image: ghcr.io/rudalabs/teamcraft:${TEAMCRAFT_VERSION:-latest}
+    image: ghcr.io/warr-ev/teamcraft:${TEAMCRAFT_VERSION:-latest}
     restart: unless-stopped
     depends_on:
       db:

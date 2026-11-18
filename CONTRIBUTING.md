@@ -14,7 +14,7 @@ kind is not tolerated.
 * **Try it and report what you find.** Follow the quick start in the
   [README](README.md) or the guide for [Linux](platforms/linux.md),
   [macOS](platforms/macos.md) or [Windows](platforms/windows.md), then
-  [open an issue](https://github.com/rudalabs/TeamCraft/issues) for each bug,
+  [open an issue](https://github.com/WARR-eV/TeamCraft/issues) for each bug,
   confusing behaviour or gap in the documentation you run into.
 * **Test with real CAD data.** Several parts were built from public format
   descriptions without the CAD programs at hand, and they need real files:
@@ -62,7 +62,7 @@ You need:
   platform. On Linux these are the WebKitGTK development packages.
 
 ```sh
-git clone https://github.com/rudalabs/TeamCraft.git && cd TeamCraft
+git clone https://github.com/WARR-eV/TeamCraft.git && cd TeamCraft
 docker compose up -d db     # PostgreSQL on 127.0.0.1:5432, no password needed
 cargo run                   # applies the migrations, serves http://localhost:8080
 ```
@@ -497,7 +497,7 @@ the same way. A pull request that changes the workflow, `packaging/` or
 `desktop/tauri.conf.json` (or `desktop/tauri.local-server.conf.json`) builds
 everything before it is merged.
 
-**Container image.** The same workflow builds `ghcr.io/rudalabs/teamcraft`
+**Container image.** The same workflow builds `ghcr.io/warr-ev/teamcraft`
 from the `Dockerfile` on an amd64 and an arm64 runner and publishes it:
 `:edge` from `main` (the nightly build, or *Run workflow* on `main` for a
 fresh one at once), `:<version>`, `:<major>.<minor>` and

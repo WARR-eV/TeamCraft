@@ -25,9 +25,9 @@ description: |
   PostgreSQL database; configure it in /var/snap/teamcraft/common/teamcraft.env
   and restart the service with `sudo snap restart teamcraft.server`.
 license: MPL-2.0
-website: https://github.com/rudalabs/TeamCraft
-source-code: https://github.com/rudalabs/TeamCraft
-issues: https://github.com/rudalabs/TeamCraft/issues
+website: https://github.com/WARR-eV/TeamCraft
+source-code: https://github.com/WARR-eV/TeamCraft
+issues: https://github.com/WARR-eV/TeamCraft/issues
 grade: devel
 confinement: strict
 

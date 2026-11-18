@@ -47,7 +47,7 @@ on its own (the update check only reads `api.github.com`).
 - **Start-up prompt.** At the next start a dialog shows the whole report and
   offers three choices:
     - *Report on GitHub*: opens a prefilled new issue at
-      `github.com/rudalabs/TeamCraft`; the full text is copied to the clipboard
+      `github.com/WARR-eV/TeamCraft`; the full text is copied to the clipboard
       in case the URL had to cut it.
     - *Copy*.
     - *Don't send*: deletes the reports.

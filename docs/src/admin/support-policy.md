@@ -7,7 +7,7 @@ the REST API, the MCP server, the command line and the desktop app.
 **Status.** TeamCraft has no stable release yet. It is a work in progress and
 comes without warranty. Until the first stable release, the rules below for
 `0.x` apply, and security fixes go into `main` only, as described in
-[SECURITY.md](https://github.com/rudalabs/TeamCraft/blob/main/SECURITY.md#supported-versions).
+[SECURITY.md](https://github.com/WARR-eV/TeamCraft/blob/main/SECURITY.md#supported-versions).
 
 ## Version numbers
 
@@ -53,13 +53,13 @@ notes and the security advisory name the versions that are affected.
 ## Reporting a bug
 
 - **Bugs and feature requests** that are not security problems: open an issue
-  at [github.com/rudalabs/TeamCraft/issues](https://github.com/rudalabs/TeamCraft/issues).
+  at [github.com/WARR-eV/TeamCraft/issues](https://github.com/WARR-eV/TeamCraft/issues).
   Include the version (the image tag or the release, or the commit from
   `git rev-parse --short HEAD`), the platform, the steps to reproduce, what you
   expected and what happened. Remove passwords, tokens and other secrets from
   logs before posting them.
 - **Security problems**: do not open a public issue. Report them privately as
-  described in [SECURITY.md](https://github.com/rudalabs/TeamCraft/blob/main/SECURITY.md#reporting-a-vulnerability)
+  described in [SECURITY.md](https://github.com/WARR-eV/TeamCraft/blob/main/SECURITY.md#reporting-a-vulnerability)
   through the GitHub security advisory form. The policy there sets out what
   is in scope and how a fix and its disclosure date are agreed.
 - **Questions about installation or operation**: check this documentation first,

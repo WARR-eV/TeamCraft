@@ -3,7 +3,7 @@
 ## Try it on your laptop
 
 Download the desktop app **with local server** from the
-[Releases page](https://github.com/rudalabs/TeamCraft/releases) (Windows x64,
+[Releases page](https://github.com/WARR-eV/TeamCraft/releases) (Windows x64,
 macOS Apple silicon, Linux x86_64) and start *TeamCraft Local*, an app of its
 own next to the regular desktop app: it starts a private server with its own database on
 your computer and opens the browser, where you create the administrator. With
@@ -13,7 +13,7 @@ Details: [Try it on your computer](local-server.md).
 ## Install on Linux with Docker
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/rudalabs/TeamCraft/main/deploy/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/WARR-eV/TeamCraft/main/deploy/install.sh | bash
 ```
 
 TeamCraft and PostgreSQL run as containers; the script offers to create the
@@ -26,7 +26,7 @@ The repository's `docker-compose.yml` starts a development database that
 needs no password:
 
 ```sh
-git clone https://github.com/rudalabs/TeamCraft.git && cd TeamCraft
+git clone https://github.com/WARR-eV/TeamCraft.git && cd TeamCraft
 docker compose up -d db
 cargo run --release
 ```
@@ -34,9 +34,9 @@ cargo run --release
 TeamCraft applies its database migrations on start and listens on
 <http://localhost:8080>. The platform guides cover native PostgreSQL
 installations and the desktop app:
-[Linux](https://github.com/rudalabs/TeamCraft/blob/main/platforms/linux.md) ·
-[macOS](https://github.com/rudalabs/TeamCraft/blob/main/platforms/macos.md) ·
-[Windows](https://github.com/rudalabs/TeamCraft/blob/main/platforms/windows.md).
+[Linux](https://github.com/WARR-eV/TeamCraft/blob/main/platforms/linux.md) ·
+[macOS](https://github.com/WARR-eV/TeamCraft/blob/main/platforms/macos.md) ·
+[Windows](https://github.com/WARR-eV/TeamCraft/blob/main/platforms/windows.md).
 
 ## First start
 

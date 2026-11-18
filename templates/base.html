@@ -107,7 +107,7 @@
 </header>
 {% endif %}
 <main id="main" {% block tc_context %}{% endblock %}>
-  {% if demo %}<div class="demo-banner" role="note"><strong>Live demo</strong> – read-only sample data (openly licensed NIST CAD models), reset regularly. Look around as much as you like; changes are refused. <a href="https://github.com/rudalabs/TeamCraft#quick-start">Install your own TeamCraft</a></div>{% endif %}
+  {% if demo %}<div class="demo-banner" role="note"><strong>Live demo</strong> – read-only sample data (openly licensed NIST CAD models), reset regularly. Look around as much as you like; changes are refused. <a href="https://github.com/WARR-eV/TeamCraft#quick-start">Install your own TeamCraft</a></div>{% endif %}
   {% if flash %}<div class="flash flash-{{ flash.kind }}" role="{% if flash.kind == 'error' %}alert{% else %}status{% endif %}"><span class="glyph" aria-hidden="true">{% if flash.kind == 'error' %}×{% elif flash.kind == 'success' %}✓{% else %}i{% endif %}</span><span>{{ flash.message }}</span></div>{% endif %}
   {% block content %}{% endblock %}
 </main>

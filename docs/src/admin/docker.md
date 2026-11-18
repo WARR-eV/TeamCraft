@@ -2,7 +2,7 @@
 
 The quickest way to run TeamCraft on a Linux server: one script sets up the
 TeamCraft container and a PostgreSQL container with Docker Compose. Nothing
-is built on your machine – the image `ghcr.io/rudalabs/teamcraft` comes from
+is built on your machine – the image `ghcr.io/warr-ev/teamcraft` comes from
 GitHub's container registry for `linux/amd64` and `linux/arm64`.
 
 > TeamCraft has no release yet (version 0.x). Until there is one, the
@@ -15,7 +15,7 @@ GitHub's container registry for `linux/amd64` and `linux/arm64`.
 You need Docker Engine with the Compose v2 plugin (`docker compose version`).
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/rudalabs/TeamCraft/main/deploy/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/WARR-eV/TeamCraft/main/deploy/install.sh | bash
 ```
 
 The script asks for `sudo` where it needs it and then:
@@ -39,7 +39,7 @@ To read the script first, download it and run it from the file – the same
 options work in both cases (`… | bash -s -- --user`):
 
 ```sh
-curl -fsSLO https://raw.githubusercontent.com/rudalabs/TeamCraft/main/deploy/install.sh
+curl -fsSLO https://raw.githubusercontent.com/WARR-eV/TeamCraft/main/deploy/install.sh
 less install.sh
 bash install.sh --dry-run      # prints every step, changes nothing
 bash install.sh
@@ -123,7 +123,7 @@ Run the installer again – it downloads the compose file of the new version,
 pulls the image and restarts; configuration, password and data stay:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/rudalabs/TeamCraft/main/deploy/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/WARR-eV/TeamCraft/main/deploy/install.sh | bash
 # or a specific version:  … | bash -s -- --version 0.3.0
 ```
 
@@ -180,7 +180,7 @@ makes its root file system read-only and drops all capabilities.
 ## Uninstall
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/rudalabs/TeamCraft/main/deploy/install.sh | bash -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/WARR-eV/TeamCraft/main/deploy/install.sh | bash -s -- --uninstall
 ```
 
 This removes the containers and keeps the volumes and `/opt/teamcraft`, so

@@ -12,7 +12,7 @@
     { label: "Administration", href: "admin/configuration.html", match: /\/admin\// },
     { label: "Reference", href: "reference/formats.html", match: /\/reference\// },
     { label: "Rust API", href: "api/teamcraft/index.html", match: /\/api\// },
-    { label: "Source", href: "https://github.com/rudalabs/TeamCraft", external: true }
+    { label: "Source", href: "https://github.com/WARR-eV/TeamCraft", external: true }
   ];
 
   // The colours follow the browser (prefers-color-scheme, see doxygen.css);

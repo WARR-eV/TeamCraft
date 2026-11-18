@@ -408,7 +408,7 @@ too, and every step is written to `.teamcraft/migration.log`.
 ## Install or run it
 
 The installers of every version are on the
-[Releases page](https://github.com/rudalabs/TeamCraft/releases) (see
+[Releases page](https://github.com/WARR-eV/TeamCraft/releases) (see
 *Download* in the README for the file of each system). From source:
 
 ```sh

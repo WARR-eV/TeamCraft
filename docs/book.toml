@@ -7,8 +7,8 @@ src = "src"
 
 [output.html]
 site-url = "/TeamCraft/"
-git-repository-url = "https://github.com/rudalabs/TeamCraft"
-edit-url-template = "https://github.com/rudalabs/TeamCraft/edit/main/docs/{path}"
+git-repository-url = "https://github.com/WARR-eV/TeamCraft"
+edit-url-template = "https://github.com/WARR-eV/TeamCraft/edit/main/docs/{path}"
 # colours follow the browser: Dracula by default, Doxygen light when the
 # browser prefers a light theme (docs/theme/doxygen.css)
 default-theme = "coal"

@@ -3,26 +3,26 @@
 ## Just try it: the desktop app with local server
 
 The `TeamCraft-with-local-server_<version>_amd64.AppImage` from the
-[Releases page](https://github.com/rudalabs/TeamCraft/releases) (x86_64)
+[Releases page](https://github.com/WARR-eV/TeamCraft/releases) (x86_64)
 is *TeamCraft Local*: the desktop app with the server and PostgreSQL, with
 its own settings next to an installed desktop app. `chmod +x` it and start
 it; it starts its local server by itself. With PostgreSQL installed
 (`postgresql` package: `initdb`, `pg_ctl`), `teamcraft local` from the server
 archive does the same without the app – as your normal user, not root. See
-[Try it on your computer](https://rudalabs.github.io/TeamCraft/guide/local-server.html).
+[Try it on your computer](https://warr-ev.github.io/TeamCraft/guide/local-server.html).
 
 ## Just run it: Docker
 
 To use TeamCraft on a Linux server or desktop without building anything:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/rudalabs/TeamCraft/main/deploy/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/WARR-eV/TeamCraft/main/deploy/install.sh | bash
 ```
 
 TeamCraft and PostgreSQL run as containers from `/opt/teamcraft`
 (`--user`: `~/teamcraft`); running the script again upgrades. Options,
 backups, TLS and uninstalling:
-[Install with Docker](https://rudalabs.github.io/TeamCraft/admin/docker.html).
+[Install with Docker](https://warr-ev.github.io/TeamCraft/admin/docker.html).
 The rest of this page builds TeamCraft from source.
 
 ## Build from source
@@ -48,7 +48,7 @@ sudo systemctl enable --now docker
 ## 2. Run
 
 ```sh
-git clone https://github.com/rudalabs/TeamCraft.git && cd TeamCraft
+git clone https://github.com/WARR-eV/TeamCraft.git && cd TeamCraft
 docker compose up -d db     # PostgreSQL on 127.0.0.1:5432, no password needed
 cargo run --release         # first build takes a few minutes
 ```
@@ -74,7 +74,7 @@ curl -s http://localhost:8080/readyz         # {"status":"ok",…}
 ```
 
 A guided tour through every feature is in the documentation:
-[Manual test tour](https://rudalabs.github.io/TeamCraft/guide/tour.html).
+[Manual test tour](https://warr-ev.github.io/TeamCraft/guide/tour.html).
 
 ## 4. Desktop app (optional)
 
