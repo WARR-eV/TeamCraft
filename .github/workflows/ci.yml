@@ -237,19 +237,41 @@ jobs:
           fi
 
   build:
-    # The Windows server ships, so it is built on every pull request. macOS
-    # (no server release, scarce runners, never failed on its own) only on
-    # main and by hand. The test targets are type-checked, not linked: the
-    # database tests do not run here.
-    name: build (${{ matrix.os }})
+    # The Windows server ships, so it is built on every pull request. The
+    # test targets are type-checked, not linked: the database tests do not
+    # run here.
+    name: build (windows-latest)
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ${{ fromJSON(github.event_name == 'pull_request' && '["windows-latest"]' || '["macos-latest", "windows-latest"]') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo build --locked
+      - name: type-check every target (tests, examples)
+        run: cargo check --locked --all-targets
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: unit tests (the database tests run on Linux; 1 s limit, see .config/nextest.toml)
+        run: cargo nextest run --locked --lib
+
+  build-macos:
+    # macOS (no server release, never failed on its own) only on main and by
+    # hand. Advisory: not in "CI result". GitHub's hosted macOS arm64 runners
+    # are scarce – since 2026-11-18 the job was cancelled again and again with
+    # "The job was not acquired by Runner of type hosted even after multiple
+    # attempts", which turned main red although nothing was wrong with the
+    # code. A real compile or test failure still shows as a red job here.
+    name: build (macos-latest)
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && github.event_name != 'pull_request'
+    runs-on: macos-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -285,7 +307,8 @@ jobs:
   # skipped on purpose, red when one failed or was cancelled. One name instead
   # of the job list keeps the rule valid when a job or a matrix entry changes,
   # and a skipped matrix job reports under its unexpanded name, which a
-  # required check of that name would wait for forever.
+  # required check of that name would wait for forever. build-macos is left
+  # out on purpose (advisory, see there).
   result:
     name: CI result
     if: always()
