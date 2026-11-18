@@ -74,7 +74,7 @@ feature milestone – the features in *What works* are enough; what is missing i
   and 2 of [agent-interface](src/research/agent-interface.md): provider, base URL, model and key (`_FILE`) in the
   configuration, `teamcraft assistant check`, the loop tests run for every provider, recorded fixtures per server
 - [ ] Per-user daily budget and admin feature switches for the assistant (phase 4), so that an operator can enable
-  it with a bought key without surprises
+  it with a bought key without surprises. Done: the daily quota per user (#306); left: the feature switches
 
 *Security*
 
@@ -117,7 +117,8 @@ feature milestone – the features in *What works* are enough; what is missing i
     - [ ] F14: fuzz targets for `simmesh` and `pdftext` (`resultscan` and `cadformat` have theirs since #156; the
       no-panic lints and the 3DS and Kelvin fixes are in `main` since #106/#108)
     - [ ] F15: prompt injection: confirmation of assistant drafts per write, or taint for MCP sessions as well
-    - [ ] F16: per-user quota for the assistant and MCP (with the daily budget in section 2, *Assistant*)
+    - [x] F16: per-user daily quota for the assistant (`TEAMCRAFT_ASSISTANT_DAILY_RUNS` / `_TOKENS`, #306);
+      left: a request rate limit for MCP (no model cost, load only)
     - [ ] F17: `teamcraft mcp`: no redirects, a warning (or refusal) for `http://` servers other than `localhost`
     - [x] F18: desktop token in the OS keychain (Windows Credential Manager, macOS Keychain, Secret Service); warn on
       `http://` server URLs – file fallback with a warning where there is no keychain
@@ -361,11 +362,12 @@ half a state behind. Prefer tests that fail on a real regression over tests that
 
 **Operations and repository**
 
-- [ ] Host the live demo (**maintainer action**). Ready in the code: the read-only demo account
-  (`TEAMCRAFT_DEMO_USER`, `TEAMCRAFT_DEMO_PASSWORD`), `scripts/seed-demo.sh` (the README demo data) and
-  `deploy/demo/demo.sh` (snapshot, nightly reset). Left: server, DNS, TLS, seed, snapshot, cron – the runbook is
-  [docs/src/admin/live-demo.md](src/admin/live-demo.md) – then link the demo from the top of the README and from
-  `docs/src/index.md`.
+- [x] Host the live demo (**maintainer action**): <https://teamcraft-demo.tailc7ef5b.ts.net> (`demo` /
+  `try-teamcraft`), seeded with `scripts/seed-demo.sh`, snapshot and nightly reset with `deploy/demo/demo.sh`,
+  HTTPS through Tailscale Funnel (no own domain yet); linked from the top of the README and from
+  `docs/src/index.md`. Runbook: [docs/src/admin/live-demo.md](src/admin/live-demo.md). Left: confirm that wrong
+  passwords for `demo` are counted per visitor behind Funnel (check in the runbook, step 3b); later an own domain
+  with Caddy for more traffic.
 - [ ] Test e-mail (SMTP) and Mattermost notifications against real servers (so far only against fakes)
 - [ ] Enable private vulnerability reporting (*Settings → Code security → Private vulnerability reporting*), which
   `SECURITY.md` points to

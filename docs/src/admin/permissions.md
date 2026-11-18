@@ -23,9 +23,20 @@ research note [Read permissions for project groups](../research/read-permissions
 | Viewer      | yes                 | read           | read             |
 | Viewer      | no                  | read           | – (not found)    |
 
-Items without a group are readable by everyone and editable by every CAD
-editor (unchanged). A read-only member of a restricted group is a member
-with the global **viewer** role; there is no per-group read/write level.
+A read-only member of a restricted group is a member with the global
+**viewer** role; there is no per-group read/write level.
+
+> **Warning – items without a group are open to everyone.** Visibility is a
+> deny list: TeamCraft hides only what lies in a restricted group the user
+> is not a member of. An item without a project group is readable by every
+> user and editable by every CAD editor. Every new item gets a group (the
+> form and `POST /api/v1/items` require one) and a move needs a target group,
+> so only items from older versions are without one. Administrators see
+> their number on *Project groups* with a link to the list
+> (*Vault → Without group*, `/vault?folder=none`); move each into a group on
+> its item page. Sensitive data – export-controlled designs, customers'
+> files – belongs in a **restricted** group from the start: an *internal*
+> group is readable by everyone too.
 
 ## Restricting a group
 

@@ -41,6 +41,16 @@ in time. A failed backup removes what it wrote – the directory, if it
 created it – and the manifest is written last, so an interrupted backup is
 never taken for a complete one.
 
+**Permissions.** The dump contains password, session and token hashes and
+the webhook secrets. On Linux and macOS the backup directory is set to
+`0700` before anything is written into it, and when the backup is complete
+every folder in it gets `0700` and every file `0600`, whatever the umask of
+the process (an existing empty target folder is narrowed too). Only the
+account that ran the backup – and root – can read it; run the backup as the
+account that will copy it to the backup medium, or copy it as root. On
+Windows the permissions of the target folder apply. Encrypt backups that
+leave the server (below).
+
 Restore with the server stopped:
 
 ```sh
@@ -118,6 +128,72 @@ styles), `SameSite=Lax` cookies plus an Origin check on every form, API
 tokens only as bearer tokens (never cookies), path-traversal-safe static
 files, content-addressed downloads with `X-Content-Type-Options: nosniff`.
 
+### Data at rest
+
+TeamCraft does not encrypt what it stores: the vault (`<vault>/objects`),
+the preview cache (`<vault>/previews`) and the database are plain files on
+the server's disks, and `teamcraft backup` writes plain files unless
+`--encrypt` is given (it prints a note when it is not). Whoever gets hold of
+a disk, a snapshot of the virtual machine or a backup medium reads every
+file and the password and token hashes.
+
+**For sensitive data – export-controlled designs, personal data,
+customers' files – encryption of the server's disks is a requirement, not
+an option:** LUKS/dm-crypt on Linux, BitLocker on Windows, FileVault on
+macOS, or the encrypted volumes of the cloud provider – for the vault, the
+PostgreSQL data directory and the swap space. Write every backup that leaves
+the server with `teamcraft backup --encrypt` and keep the passphrase apart
+from the backups ([Encrypted backups](#encrypted-backups)); the Docker
+installation's `tar` backup of the vault is plain and needs an encrypted
+target. Disk encryption protects a switched-off or stolen machine, not a
+running one: access to the running server stays protected by the operating
+system's accounts and TeamCraft's permissions.
+
+### Checking the vault regularly
+
+Downloads are served from the vault without hashing them again (that would
+read every byte twice). A blob changed or damaged on disk therefore shows up
+only in `teamcraft vault check --verify-hashes`, which hashes every blob the
+database refers to, or in the next backup, which refuses it. Run the check
+regularly, for example every week at night, and alert on a non-zero exit
+code (it prints `MISSING` and `CORRUPT` lines). A systemd timer for an
+installation from the binary:
+
+```ini
+# /etc/systemd/system/teamcraft-vault-check.service
+[Unit]
+Description=TeamCraft vault check
+
+[Service]
+Type=oneshot
+User=teamcraft
+EnvironmentFile=/etc/teamcraft/teamcraft.env
+ExecStart=/usr/local/bin/teamcraft vault check --verify-hashes
+```
+
+```ini
+# /etc/systemd/system/teamcraft-vault-check.timer
+[Unit]
+Description=Weekly TeamCraft vault check
+
+[Timer]
+OnCalendar=Sun 03:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+`sudo systemctl enable --now teamcraft-vault-check.timer`; a failed run shows
+in `systemctl --failed` and in your monitoring of failed units. With cron
+instead: `0 3 * * 0 teamcraft /usr/local/bin/teamcraft vault check
+--verify-hashes` in `/etc/cron.d/teamcraft` (cron mails the output of a
+failed run if mail is set up). Adjust the paths to your installation. In
+the Docker installation the host's timer runs `docker compose exec -T
+teamcraft teamcraft vault check --verify-hashes` in `/opt/teamcraft`
+(`WorkingDirectory=/opt/teamcraft`, as root). The check reads the whole vault: schedule it outside
+working hours on large vaults.
+
 ## Sizing
 
 TeamCraft is measured against a large synthetic vault (see
@@ -139,14 +215,18 @@ thousands of dependencies (about 220 ms).
 * **The `pg_trgm` extension** (part of PostgreSQL, "trusted", so the owner
   of the database may create it) backs the substring search over item
   numbers, names, attribute values and file names with trigram indexes.
-  Migrations 0023 and 0031 create it when they can; otherwise the search
+  The migrations create it when they can; otherwise the search
   still works but reads the
-  tables – a few hundred milliseconds per search at 100,000 items. If the
-  database role may not create extensions, an administrator can run
+  tables – a few hundred milliseconds per search at 100,000 items, and the
+  server logs a warning at every start that names the missing indexes.
+  Only a missing or forbidden extension is tolerated: with pg_trgm present,
+  an index that cannot be built stops the migration
+  (`migrations/0072_trigram_indexes_strict.sql`). If the
+  database role may not create extensions, an administrator runs
   `CREATE EXTENSION pg_trgm;` in the TeamCraft database and then the
-  `CREATE INDEX … gin_trgm_ops` statements of
-  `migrations/0023_performance_indexes.sql` and
-  `migrations/0031_attribute_search_index.sql`.
+  `CREATE INDEX IF NOT EXISTS … gin_trgm_ops` statements of
+  `migrations/0072_trigram_indexes_strict.sql` (an applied migration does
+  not run again).
 * **JIT is off and every statement gets a custom plan** in TeamCraft's
   sessions (`jit=off` and `plan_cache_mode=force_custom_plan`, sent as
   startup options of every connection; the server's settings for other
@@ -231,7 +311,7 @@ expired sessions, staged uploads and unreferenced blobs (also `vault gc
 | Staged BOM imports and unfinished chunked uploads           | removed when expired, with their vault blobs unless something refers to them                                                                   |
 | Webhook deliveries, idle assistant conversations            | `TEAMCRAFT_WEBHOOK_RETENTION_DAYS`, `TEAMCRAFT_ASSISTANT_RETENTION_DAYS`                                                                       |
 | Audit log                                                   | `TEAMCRAFT_AUDIT_RETENTION_DAYS` (default: for ever); one `audit.purge` entry per removal                                                      |
-| Preview cache                                               | previews of blobs the database no longer refers to, files of old cache versions and leftovers; `TEAMCRAFT_PREVIEW_CACHE_MAX_MB` trims the rest |
+| Preview cache                                               | previews of blobs the database no longer refers to, files of old cache versions and leftovers; `TEAMCRAFT_PREVIEW_CACHE_MAX_MB` (10 GiB by default) trims the rest |
 | Old versions of files set to *keep only the latest version* | after `TEAMCRAFT_RETENTION_LATEST_GRACE_DAYS` (default 7), see below                                                                           |
 
 ### Keep only the latest version (large result files)
@@ -276,6 +356,27 @@ within the grace period (`--grace-hours`, default 24, at least 1); `--apply`
 removes them. Run it after deleting files, or after `purge-versions` left
 content behind that was younger than an hour. Back up before the first
 `--apply`.
+
+**When to run `--apply`.** The grace period protects content on its way
+into the database: every upload stores its blob before the row that names
+it, and storing the same content again renews the blob's modification time.
+A blob is removed only when it was idle for the whole grace period and is
+checked again right before the removal. What is left is a window of a few
+instructions, and only for content that nobody had stored for the whole
+grace period and that someone uploads again at the very moment the
+collection removes it. To close it in practice:
+
+* run `vault gc --apply` in a quiet period – at night or in a maintenance
+  window – and right **after a backup**, so that anything removed by mistake
+  is still in the backup;
+* keep the default grace period of 24 hours (never shorter than the longest
+  upload, including resumed chunked uploads);
+* look at the dry run (without `--apply`) first: it lists what would go.
+
+The hourly housekeeping removes only the blobs it has just released itself –
+those of expired staged imports and upload sessions and of versions removed
+by *keep only the latest version* – with the same re-check and a grace period of one hour;
+other unreferenced content stays until you run `vault gc --apply`.
 
 ### Storage quotas
 
