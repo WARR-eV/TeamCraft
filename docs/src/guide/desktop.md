@@ -271,14 +271,14 @@ this computer.
 
 **Home** is a file browser of the active group, in three views:
 
-* *Files* (the view Home starts with): the **folders** of the group and the
-  **files** in them, as in its working folder – folders first, then the files
+* *Files* (the view Home starts with): the **folders** of the group and the **files** in them, as in its working
+  folder – folders first, then the files
   by name the way a file manager orders them (without regard to case, `Part2`
   before `Part10`), each with the state and the lock of its item. The file
   name comes first and the number and revision after it, so a narrow navigator
   cuts the number, not the name. A folder opens its own level – a large group
-  is never loaded as a whole, and a folder with more than 500 files offers
-  *show … more*. The files are those of the latest revision of every item;
+  is never loaded as a whole, and a folder with more than 500 files offers *show … more*. The files are those of the
+  latest revision of every item;
   items without files are listed below the files at the top of the group.
   The number next to the order is the rows of the whole group. A click on a
   file opens its item;
@@ -408,8 +408,8 @@ too, and every step is written to `.teamcraft/migration.log`.
 ## Install or run it
 
 The installers of every version are on the
-[Releases page](https://github.com/WARR-eV/TeamCraft/releases) (see
-*Download* in the README for the file of each system). From source:
+[Releases page](https://github.com/WARR-eV/TeamCraft/releases) (see *Download* in the README for the file of each
+system). From source:
 
 ```sh
 cd desktop
@@ -422,8 +422,8 @@ The platform guides list the system packages.
 
 The downloads **with local server** (Windows x64 `-setup.exe`, macOS `.dmg`,
 Linux `.AppImage`, named `TeamCraft-with-local-server_…`) also contain the
-server, as `teamcraft-server`, and PostgreSQL's programs. They install
-**TeamCraft Local**, an app of its own (identifier
+server, as `teamcraft-server`, and PostgreSQL's programs. They install **TeamCraft Local**, an app of its own
+(identifier
 `io.github.rudalabs.teamcraft.local`, own settings folder and keychain entry)
 next to the desktop app, which keeps its own server and sign-in. With no
 server configured – its first start – TeamCraft Local starts the local server
@@ -434,8 +434,8 @@ computer** below the server address:
    the server, both only on `127.0.0.1` – and waits until it is ready (the
    first start creates the database).
 2. The server's address `http://127.0.0.1:<port>` becomes the app's server,
-   and the browser sign-in opens. On the first start the browser shows
-   *Create the administrator*; afterwards it continues to the confirmation of
+   and the browser sign-in opens. On the first start the browser shows *Create the administrator*; afterwards it
+   continues to the confirmation of
    the app's sign-in.
 3. While the local server is the configured server, the app starts it again
    at every launch (the splash says *Starting the local TeamCraft server …*).
