@@ -24,6 +24,13 @@ see the notices in the README.
 
 ### Added
 
+- **TeamCraft Desktop on the live demo** (#325): the public demo account may
+  now confirm the desktop sign-in in the browser (it was refused as a
+  write). Visitors share that account, so their computer name is replaced by
+  a random `demo-computer-…` before the confirmation page, the one-time code,
+  the token name or the audit log see it. The app reads what the browser
+  reads; every change stays refused, and the token goes with the nightly
+  reset.
 - 3D preview of files saved by **Inventor 2027** (#271, on top of the
   Zstandard segments read since 0.2.8): typed arrays with the new element
   types (4, 8, 14, 16 for `u32` numbers, `invpart::is_u32`) are read, so

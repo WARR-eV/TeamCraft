@@ -15,8 +15,15 @@ live demo](../research/live-demo.md).
 * that account reads everything a CAD editor of its groups may read – pages,
   3D previews, BOMs, search, downloads, the REST API – but every request that
   is not `GET`/`HEAD` is refused with *This is a read-only live demo* (403),
-  sign-out excepted. It cannot change its password, create API tokens, watch
-  items or sign in to the desktop app;
+  sign-out excepted. It cannot change its password, create API tokens or watch
+  items;
+* the desktop app signs in to that account through the browser like
+  anywhere else, but under a **random computer name** (`demo-computer-…`):
+  visitors share the account, so the real name of their computer is neither
+  shown on the confirmation page nor stored in the token name or the audit
+  log. The app reads what the browser reads and every change is refused;
+  its token disappears with the nightly reset (`demo.sh reset` restores the
+  database);
 * wrong passwords for that account count per client address only, so nobody
   can lock every visitor out;
 * every other account – your administrator – works as usual.
