@@ -43,6 +43,12 @@ see the notices in the README.
 
 ### Added
 
+- **Items without a project group** are pointed out to administrators
+  (#310): *Project groups* shows how many there are – everyone can read
+  them and every CAD editor change them – with a link to *Vault → Without
+  group*. New items and moves already require a group, so these are items
+  from older versions. The permissions guide warns that visibility is a deny
+  list and that sensitive data belongs in a restricted group from the start.
 - The **live demo** is online: <https://teamcraft-demo.tailc7ef5b.ts.net>
   (sign in as `demo` / `try-teamcraft`, read-only, reset every night), linked
   from the top of the README and the documentation's start page. The runbook (*Admin guide → Live demo*) now also
