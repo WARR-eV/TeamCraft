@@ -24,6 +24,17 @@ see the notices in the README.
 
 ### Added
 
+- **TeamCraft Desktop: several servers and accounts** (#322, #323).
+  *Settings → Connections* lists the saved connections (server, account,
+  working folder) with *Switch* and *Remove*; *Add another account…* signs in
+  a second account on the same server; *Switch server…* and the connect
+  screen change the server without signing out. The sign-in of the
+  connection left behind is parked in the keychain (`api-token@<id>`, or a
+  private `token-<id>` file without one) and returns on switching back.
+  Every connection after the first gets its own working folder next to the
+  default one (`TeamCraft-<server>`), so files of servers with the same item
+  numbers never mix; existing installations keep their folder. Before this,
+  changing the server signed out and threw the sign-in away.
 - 3D preview of files saved by **Inventor 2027** (#271, on top of the
   Zstandard segments read since 0.2.8): typed arrays with the new element
   types (4, 8, 14, 16 for `u32` numbers, `invpart::is_u32`) are read, so

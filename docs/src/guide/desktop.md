@@ -188,6 +188,20 @@ a local account (it
 asks for the current one; wrong ones count like failed sign-ins, and your web
 sessions end); single-sign-on accounts do not see it.
 
+**Several servers and accounts.** *Settings → Connections* lists every
+server and account the app keeps a sign-in for, with its working folder.
+*Switch* changes to another one, and the window reloads; *Add another
+account…* signs in a second account on the same server; *Switch server…*
+(also the connect screen) goes to another server **without signing you
+out** – the sign-in you leave stays in the keychain and is back when you
+switch again. Each connection after the first gets a **working folder of its
+own** next to the default one (`TeamCraft-plm.example.org`, numbered for a
+second account there), never inside another one, because two servers can use
+the same item numbers and project codes; the first connection keeps the
+folder it had. *Remove* forgets a connection and its sign-in; its working
+folder stays on your disk. Check-outs belong to the connection they were made
+in – switch back to check them in.
+
 The window is built for daily work: object tabs on top, under them the
 toolbar of the open object with its one next step filled (see
 [The toolbar](#the-toolbar)) and the rare tools under *More*. The navigator shows a state as its symbol (a check:
