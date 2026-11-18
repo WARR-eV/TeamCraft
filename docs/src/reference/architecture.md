@@ -35,20 +35,18 @@
   Part 21 reader in `mesh/p21.rs` filters what the kernel gets, AP242
   tessellated geometry is read by `mesh/tessellated.rs`), reads the JT 9
   tessellation inside NX parts (`mesh/jt.rs`), the display tessellation
-  inside SOLIDWORKS parts (`mesh/sw.rs`) and Inventor parts
-  (`mesh/inventor.rs`), the CGR visualisation data inside CATIA V5 parts
-  (`mesh/catia.rs`) and the display scene inside Fusion designs
-  (`mesh/f3d.rs`, archive in `fusion.rs`) and refines them along their stored
+  inside SOLIDWORKS parts (`mesh/sw.rs`) and Inventor parts (`mesh/inventor.rs`), the CGR visualisation data inside
+  CATIA V5 parts (`mesh/catia.rs`) and the display scene inside Fusion designs (`mesh/f3d.rs`, archive in `fusion.rs`)
+  and refines them along their stored
   normals (`mesh/pn.rs`); Creo parts carry no tessellation, so their exact
   B-rep is read and triangulated (`mesh/creo/`: container, tagged format,
   surfaces, tessellation); stand-alone JT 10 files and JT 9.5 assemblies come with
   their scene graph (`mesh/jt10.rs`), Rhino models with their stored meshes
-  and SubD (`mesh/rhino.rs`), SketchUp models are triangulated with earcut
-  (`mesh/sketchup.rs`, `mesh/earcut.rs`; SketchUp 3–2020 through the vendored
-  `vendor/openskp`); NX, SOLIDWORKS, Inventor and Creo assemblies
-  (`mesh/creo/asm.rs`) and CATIA products (`catprod.rs`) are put together
-  from their parts' previews
-  (`services/assemblies.rs`);
+  and SubD (`mesh/rhino.rs`), SketchUp models are triangulated with earcut (`mesh/sketchup.rs`, `mesh/earcut.rs`;
+  SketchUp 3–2020 through the vendored
+  `vendor/openskp`); NX, SOLIDWORKS, Inventor and Creo assemblies (`mesh/creo/asm.rs`) and CATIA products (`catprod.rs`)
+  are put together
+  from their parts' previews (`services/assemblies.rs`);
   `preview.rs` caches the
   result and runs each conversion in a `teamcraft preview-mesh` child
   process with a time limit. The browser only draws the compact
@@ -65,35 +63,35 @@
 
 ## Source layout
 
-| Path                                 | Contents                                                                                                                                                          |
-|--------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `src/main.rs`                        | CLI: serve, local, migrate, user (incl. `holdings`, `deactivate`), vault check/signatures, assistant check, rescan-references, healthcheck, mcp (stdio bridge)          |
-| `src/localserver.rs`                | `teamcraft local`: a private PostgreSQL cluster (bundled or installed programs, scram password, 127.0.0.1 only) and the server for a test installation; started by the desktop app *with local server* |
-| `src/lib.rs`                         | `AppState`, router, health endpoints, security headers, the OIDC back-channel logout route (outside the web pages' CSRF guard)                                    |
-| `src/domain.rs`                      | roles, lifecycle, revision letters, skins, validation                                                                                                             |
-| `src/services/`                      | items, revisions, files, chunked uploads, BOM, changes, references, impacts, simulations, projects, users, …; offboarding: `offboarding` (holdings report, idle SSO users), `checkouts`, `deactivation`, `ownership`, `manager_gaps`, `season` |
-| `src/auth.rs`, `src/oidc.rs`         | passwords, sessions, tokens; OpenID Connect sign-in (authorization code + PKCE) and back-channel logout tokens checked against the provider's keys |
-| `src/web/`, `templates/`, `static/`  | HTML interface                                                                                                                                                    |
-| `shared/`                            | UI files of both the web UI and the desktop app: skins and tokens, fonts, 3D viewer (`shared/README.md`)                                                          |
-| `src/api/`                           | REST API                                                                                                                                                          |
-| `src/mcp/`                           | MCP server for AI assistants (`POST /api/v1/mcp`): JSON-RPC, tools and prompts over the services                                                                  |
-| `src/llm/`                           | provider-neutral LLM layer: conversation types, `Provider` (wire format, pure), `Transport`; `anthropic.rs` = Messages API, `openai.rs` = Chat Completions        |
-| `src/assistant.rs`                   | built-in assistant: tool loop over `src/llm` with the MCP tools, markdown rendering                                                                               |
-| `src/pagecontext.rs`                 | the page context the assistant sidebar sends (kind, identifiers, view, rule, query, rows shown): parsing and caps; the services resolve it with the user's rights |
-| `src/cadformat.rs`, `src/cadrefs.rs` | format registry, references inside CAD files                                                                                                                      |
-| `src/nxpart.rs`, `src/swpart.rs`     | NX part stream container, SOLIDWORKS 2015+ section container (references, preview images, assembly placements)                                                    |
-| `src/invpart.rs`, `src/invplace.rs`, `src/invasm.rs` | Inventor segments below `RSeStorage` (zlib or Zstandard); assembly components and placements for the 3D preview (`UFRxDoc`, `AmRxSegment`); occurrence counts for BOM quantities |
-| `src/massprops.rs`                   | mass properties of closed meshes (volume, CG, inertia; Eberly), edge check, parallel axis roll-up                                                                 |
-| `src/fusion.rs`                      | Fusion design archives: ZIP with Zstandard entries (display scene, preview image)                                                                                 |
-| `src/mesh.rs`, `src/preview.rs`      | 3D readers and the preview cache; `src/simmesh.rs` + `src/simmesh/`: VTK/VTU/VTP/FRD results with fields                                                          |
-| `src/shape.rs`                       | shape signatures (extents, area, volume, D2 distribution) for the similar part search                                                                             |
-| `src/webhooks.rs`                    | event webhooks: outbox worker, HMAC-SHA256 signature, backoff, target (SSRF) guard                                                                                |
-| `migrations/`                        | PostgreSQL schema                                                                                                                                                 |
-| `tests/`                             | end-to-end tests, each against its own temporary database                                                                                                         |
-| `desktop/`                           | the Tauri desktop client (separate Cargo project); its UI is plain ES modules in `desktop/ui/js` without a build step (e.g. `graph.js` for the *Graph* tab, checked in Chromium and WebKit by `scripts/desktop-graph-check.mjs`) |
-| `vendor/`                            | vendored third-party crates, unchanged, with their licences (`vendor/README.md`)                                                                                  |
-| `docs/`                              | this documentation (mdBook)                                                                                                                                       |
-| `platforms/`                         | build and test guides for Linux, macOS and Windows                                                                                                                |
+| Path                                                 | Contents                                                                                                                                                                                                                                       |
+|------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `src/main.rs`                                        | CLI: serve, local, migrate, user (incl. `holdings`, `deactivate`), vault check/signatures, assistant check, rescan-references, healthcheck, mcp (stdio bridge)                                                                                 |
+| `src/localserver.rs`                                 | `teamcraft local`: a private PostgreSQL cluster (bundled or installed programs, scram password, 127.0.0.1 only) and the server for a test installation; started by the desktop app *with local server*                                         |
+| `src/lib.rs`                                         | `AppState`, router, health endpoints, security headers, the OIDC back-channel logout route (outside the web pages' CSRF guard)                                                                                                                 |
+| `src/domain.rs`                                      | roles, lifecycle, revision letters, skins, validation                                                                                                                                                                                          |
+| `src/services/`                                      | items, revisions, files, chunked uploads, BOM, changes, references, impacts, simulations, projects, users, …; offboarding: `offboarding` (holdings report, idle SSO users), `checkouts`, `deactivation`, `ownership`, `manager_gaps`, `season` |
+| `src/auth.rs`, `src/oidc.rs`                         | passwords, sessions, tokens; OpenID Connect sign-in (authorization code + PKCE) and back-channel logout tokens checked against the provider's keys                                                                                             |
+| `src/web/`, `templates/`, `static/`                  | HTML interface                                                                                                                                                                                                                                 |
+| `shared/`                                            | UI files of both the web UI and the desktop app: skins and tokens, fonts, 3D viewer (`shared/README.md`)                                                                                                                                       |
+| `src/api/`                                           | REST API                                                                                                                                                                                                                                       |
+| `src/mcp/`                                           | MCP server for AI assistants (`POST /api/v1/mcp`): JSON-RPC, tools and prompts over the services                                                                                                                                               |
+| `src/llm/`                                           | provider-neutral LLM layer: conversation types, `Provider` (wire format, pure), `Transport`; `anthropic.rs` = Messages API, `openai.rs` = Chat Completions                                                                                     |
+| `src/assistant.rs`                                   | built-in assistant: tool loop over `src/llm` with the MCP tools, markdown rendering                                                                                                                                                            |
+| `src/pagecontext.rs`                                 | the page context the assistant sidebar sends (kind, identifiers, view, rule, query, rows shown): parsing and caps; the services resolve it with the user's rights                                                                              |
+| `src/cadformat.rs`, `src/cadrefs.rs`                 | format registry, references inside CAD files                                                                                                                                                                                                   |
+| `src/nxpart.rs`, `src/swpart.rs`                     | NX part stream container, SOLIDWORKS 2015+ section container (references, preview images, assembly placements)                                                                                                                                 |
+| `src/invpart.rs`, `src/invplace.rs`, `src/invasm.rs` | Inventor segments below `RSeStorage` (zlib or Zstandard); assembly components and placements for the 3D preview (`UFRxDoc`, `AmRxSegment`); occurrence counts for BOM quantities                                                               |
+| `src/massprops.rs`                                   | mass properties of closed meshes (volume, CG, inertia; Eberly), edge check, parallel axis roll-up                                                                                                                                              |
+| `src/fusion.rs`                                      | Fusion design archives: ZIP with Zstandard entries (display scene, preview image)                                                                                                                                                              |
+| `src/mesh.rs`, `src/preview.rs`                      | 3D readers and the preview cache; `src/simmesh.rs` + `src/simmesh/`: VTK/VTU/VTP/FRD results with fields                                                                                                                                       |
+| `src/shape.rs`                                       | shape signatures (extents, area, volume, D2 distribution) for the similar part search                                                                                                                                                          |
+| `src/webhooks.rs`                                    | event webhooks: outbox worker, HMAC-SHA256 signature, backoff, target (SSRF) guard                                                                                                                                                             |
+| `migrations/`                                        | PostgreSQL schema                                                                                                                                                                                                                              |
+| `tests/`                                             | end-to-end tests, each against its own temporary database                                                                                                                                                                                      |
+| `desktop/`                                           | the Tauri desktop client (separate Cargo project); its UI is plain ES modules in `desktop/ui/js` without a build step (e.g. `graph.js` for the *Graph* tab, checked in Chromium and WebKit by `scripts/desktop-graph-check.mjs`)               |
+| `vendor/`                                            | vendored third-party crates, unchanged, with their licences (`vendor/README.md`)                                                                                                                                                               |
+| `docs/`                                              | this documentation (mdBook)                                                                                                                                                                                                                    |
+| `platforms/`                                         | build and test guides for Linux, macOS and Windows                                                                                                                                                                                             |
 
 ## Pure Rust
 
@@ -137,15 +135,15 @@ PostgreSQL.
 * **Scale check**: `tests/scale.rs` (ignored) seeds ~100k items and ~1M BOM
   lines and times these paths with their query plans – see
   [Operations → Scale check](../admin/operations.md#scale-check).
-* **API requests**: the bearer token of a request is resolved in one query
-  (`services::users::actor_for_api_token`) – the user with the memberships,
+* **API requests**: the bearer token of a request is resolved in one query (`services::users::actor_for_api_token`) –
+  the user with the memberships,
   the groups that switched personal access tokens off and whether the use of
-  the token has to be recorded come from the same statement. The write
-  (`last_used_at`, the sliding expiry) follows at most once a minute per
+  the token has to be recorded come from the same statement. The write (`last_used_at`, the sliding expiry) follows at
+  most once a minute per
   token.
 * **Assembly previews** (`services::assemblies`): the distinct parts are
-  converted as many at a time as the preview queue runs
-  (`preview::MAX_PARALLEL`), each instance is placed straight into the
+  converted as many at a time as the preview queue runs (`preview::MAX_PARALLEL`), each instance is placed straight into
+  the
   assembly mesh (`Mesh::append_placed`, no copy of the part per instance) and
   a part's mesh is given up after its last placement.
 * **Thumbnails and compositions** (`Previews::render`): an image in the cache
