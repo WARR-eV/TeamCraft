@@ -1235,6 +1235,25 @@ impl Config {
             .is_some_and(|d| d.username.eq_ignore_ascii_case(username.trim()))
     }
 
+    /// Risky but valid settings, logged as warnings at every start.
+    pub fn warnings(&self) -> Vec<String> {
+        let mut warnings = Vec::new();
+        if let Some(oidc) = &self.oidc {
+            if oidc.viewer_group.is_none() {
+                // #311: with a large shared identity provider (a university
+                // or company SSO) every account there could read everything
+                // outside restricted project groups.
+                warnings.push(format!(
+                    "single sign-on without TEAMCRAFT_OIDC_VIEWER_GROUP: every account of the \
+                     identity provider {} can sign in and read as a viewer; set a viewer group \
+                     to admit only its members (docs: Users and roles)",
+                    oidc.issuer_url
+                ));
+            }
+        }
+        warnings
+    }
+
     /// Password-free summary for the startup log.
     pub fn summary(&self) -> String {
         format!(
@@ -1870,6 +1889,29 @@ mod tests {
             ("TEAMCRAFT_OIDC_CLIENT_ID", "client"),
         ])
         .is_err());
+    }
+
+    #[test]
+    fn sso_without_a_viewer_group_is_warned_about() {
+        let sso = [
+            ("TEAMCRAFT_DB_PASSWORD", "x"),
+            ("TEAMCRAFT_OIDC_ISSUER_URL", "https://auth.example.org/"),
+            ("TEAMCRAFT_OIDC_CLIENT_ID", "client"),
+            ("TEAMCRAFT_OIDC_CLIENT_SECRET", "s3cret"),
+        ];
+        let open = config_from(&sso).unwrap();
+        let warnings = open.warnings();
+        assert_eq!(warnings.len(), 1, "{warnings:?}");
+        assert!(warnings[0].contains("TEAMCRAFT_OIDC_VIEWER_GROUP"));
+        assert!(warnings[0].contains("auth.example.org"));
+        assert!(!warnings[0].contains("s3cret"));
+
+        let mut limited = sso.to_vec();
+        limited.push(("TEAMCRAFT_OIDC_VIEWER_GROUP", "teamcraft-viewers"));
+        assert!(config_from(&limited).unwrap().warnings().is_empty());
+        // without single sign-on nothing to warn about
+        let local = config_from(&[("TEAMCRAFT_DB_PASSWORD", "x")]).unwrap();
+        assert!(local.warnings().is_empty());
     }
 
     #[test]
