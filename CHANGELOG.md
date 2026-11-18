@@ -50,6 +50,17 @@ see the notices in the README.
 
 ### Added
 
+- **TeamCraft Desktop: several servers and accounts** (#322, #323).
+  *Settings → Connections* lists the saved connections (server, account,
+  working folder) with *Switch* and *Remove*; *Add another account…* signs in
+  a second account on the same server; *Switch server…* and the connect
+  screen change the server without signing out. The sign-in of the
+  connection left behind is parked in the keychain (`api-token@<id>`, or a
+  private `token-<id>` file without one) and returns on switching back.
+  Every connection after the first gets its own working folder next to the
+  default one (`TeamCraft-<server>`), so files of servers with the same item
+  numbers never mix; existing installations keep their folder. Before this,
+  changing the server signed out and threw the sign-in away.
 - **TeamCraft Desktop on the live demo** (#325): the public demo account may
   now confirm the desktop sign-in in the browser (it was refused as a
   write). Visitors share that account, so their computer name is replaced by

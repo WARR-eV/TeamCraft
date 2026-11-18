@@ -170,6 +170,10 @@ label.check input { width: auto; accent-color: var(--primary); }
   white-space: nowrap;
 }
 .badge img { display: none; }
+
+/* saved connections in Settings (#322, #323) */
+ul.connections { list-style: none; margin: 0; padding: 0; }
+ul.connections > li { justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border, transparent); }
 .badge::before { font-size: 12px; line-height: 1; }
 /* In work: a half-filled ring; in review: a ring; done: a check. Drawn in
    CSS, so they read the same in every system font. */
