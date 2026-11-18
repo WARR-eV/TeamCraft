@@ -553,6 +553,9 @@ async fn serve_with(
         env!("CARGO_PKG_VERSION"),
         config.summary()
     );
+    for warning in config.warnings() {
+        tracing::warn!("configuration: {warning}");
+    }
 
     let pool = db::connect(&config).await?;
     if no_migrate {

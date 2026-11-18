@@ -78,19 +78,19 @@ its author or an administrator; adding and removing are recorded in the
 revision's history (`annotation.add` / `annotation.remove`). The REST API
 has the same notes under `/api/v1/file-versions/{id}/annotations`.
 
-| Previewed           | Formats                                                                                                                       |
-|---------------------|-------------------------------------------------------------------------------------------------------------------------------|
-| B-rep (tessellated) | STEP (`.step`, `.stp`, `.p21`)                                                                                                |
+| Previewed           | Formats                                                                                                                                                |
+|---------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
+| B-rep (tessellated) | STEP (`.step`, `.stp`, `.p21`)                                                                                                                         |
 | Native CAD          | NX parts (`.prt`), SOLIDWORKS parts (`.sldprt`, 2015+), Inventor parts (`.ipt`) – the tessellation stored in the file; their assemblies from the parts |
-| Native CAD          | CATIA V5 parts (`.CATPart`) – the visualisation data stored in the file; products (`.CATProduct`) from the parts            |
-| Native CAD          | Rhino models (`.3dm`) – the meshes stored in the file, SubD objects refined from their control net                            |
-| Native CAD          | SketchUp models (`.skp`, SketchUp 3 to today) – their faces, components and groups in place                                   |
-| Native CAD          | Creo parts (`.prt.N`) – tessellated from the exact faces stored in the file; assemblies (`.asm.N`) from the parts            |
-|                     | Fusion designs (`.f3d`) – the display mesh Fusion stores                                                                      |
-| Visualisation       | JT (`.jt`): JT 10 parts and whole assemblies, placed; JT 9 as NX writes it                                                    |
-| Meshes              | STL, OBJ, PLY, OFF, 3MF (incl. components), AMF, glTF / GLB, 3DS                                                              |
-| Point clouds        | PTS, XYZ, LAS (uncompressed), PLY and OBJ without faces                                                                       |
-| Simulation results  | VTK (`.vtk`), VTU, VTP, CalculiX FRD – coloured by result fields                                                              |
+| Native CAD          | CATIA V5 parts (`.CATPart`) – the visualisation data stored in the file; products (`.CATProduct`) from the parts                                       |
+| Native CAD          | Rhino models (`.3dm`) – the meshes stored in the file, SubD objects refined from their control net                                                     |
+| Native CAD          | SketchUp models (`.skp`, SketchUp 3 to today) – their faces, components and groups in place                                                            |
+| Native CAD          | Creo parts (`.prt.N`) – tessellated from the exact faces stored in the file; assemblies (`.asm.N`) from the parts                                      |
+|                     | Fusion designs (`.f3d`) – the display mesh Fusion stores                                                                                               |
+| Visualisation       | JT (`.jt`): JT 10 parts and whole assemblies, placed; JT 9 as NX writes it                                                                             |
+| Meshes              | STL, OBJ, PLY, OFF, 3MF (incl. components), AMF, glTF / GLB, 3DS                                                                                       |
+| Point clouds        | PTS, XYZ, LAS (uncompressed), PLY and OBJ without faces                                                                                                |
+| Simulation results  | VTK (`.vtk`), VTU, VTP, CalculiX FRD – coloured by result fields                                                                                       |
 
 The server converts a file **once**, in a separate process with a time limit,
 and caches the result next to the vault; uploads start the conversion in the
@@ -106,8 +106,8 @@ the reason appears **on the canvas** (and in the line below it) – in the web
 UI and in the desktop app alike: the server's conversion error (for example a
 damaged or unsupported file), an empty, cut-off or invalid model, a graphics
 driver without WebGL 2 or one that could not compile the shaders, a model too
-large for the graphics memory, or a 3D view the graphics driver stopped
-(WebGL context lost). A preview never ends as a silently empty canvas.
+large for the graphics memory, or a 3D view the graphics driver stopped (WebGL context lost). A preview never ends as a
+silently empty canvas.
 
 When a STEP preview shows only part of the model, the line below the viewer
 says **partial preview: N of M faces** – the missing faces use geometry the
@@ -122,8 +122,8 @@ several fields, a selector – see [Simulations](simulation.md#results-in-3d).
 Native CAD files (Inventor, Solid Edge, SolidWorks, NX, Creo, CATIA, …) are
 proprietary; TeamCraft does not read their exact geometry (see
 [Research: previews of native CAD files](../research/cad-previews.md)).
-The exceptions are **NX**, **SOLIDWORKS**, **Inventor**, **CATIA V5** and
-**Creo**. The first four save a tessellation of every part into the file: NX
+The exceptions are **NX**, **SOLIDWORKS**, **Inventor**, **CATIA V5** and **Creo**. The first four save a tessellation
+of every part into the file: NX
 in a documented format (JT 9), SOLIDWORKS (2015 and later) as the display
 lists it draws the part with, Inventor as the triangle lists of its graphics
 segment, and CATIA as the visualisation data it draws on screen (see
@@ -172,8 +172,8 @@ extrusions, block instances in their places; SubD objects are refined
 from their control net. Hidden objects and hidden layers are left out. A
 model saved without render meshes (*Save Small*, or very old files) has
 no 3D preview and shows the picture Rhino stored instead (see
-[Research: 3D preview of Rhino models](../research/rhino-3dm-preview.md)).
-**Fusion** designs (`.f3d`) carry the triangles Fusion draws on screen;
+[Research: 3D preview of Rhino models](../research/rhino-3dm-preview.md)). **Fusion** designs (`.f3d`) carry the
+triangles Fusion draws on screen;
 TeamCraft shows them, refined the same way (see
 [Research: 3D preview of Fusion designs](../research/fusion-ogs-preview.md)).
 
@@ -198,7 +198,8 @@ For the rest TeamCraft shows what other PLM systems show:
   picture is drawn again when one of its parts changes. Drawings, and
   assemblies none of whose parts are in TeamCraft, keep the stored image.
 * **The preview image stored in the file.** Inventor drawings and
-  presentations (`.idw`, `.ipn`), Solid Edge (`.par`, `.psm`, `.asm`, `.pwd`, `.dft`), NX assemblies and drawings (`.prt`, a JPEG) and
+  presentations (`.idw`, `.ipn`), Solid Edge (`.par`, `.psm`, `.asm`, `.pwd`, `.dft`), NX assemblies and drawings
+  (`.prt`, a JPEG) and
   SolidWorks files (up to 2014 in their OLE container, from 2015 on in a
   compressed section that TeamCraft inflates) carry a picture the CAD program wrote when saving. It
   appears next to the file on the revision page and in the desktop app (`GET /api/v1/files/{id}/thumbnail`). Only the

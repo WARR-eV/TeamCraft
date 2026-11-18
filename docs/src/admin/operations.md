@@ -41,6 +41,16 @@ in time. A failed backup removes what it wrote – the directory, if it
 created it – and the manifest is written last, so an interrupted backup is
 never taken for a complete one.
 
+**Permissions.** The dump contains password, session and token hashes and
+the webhook secrets. On Linux and macOS the backup directory is set to
+`0700` before anything is written into it, and when the backup is complete
+every folder in it gets `0700` and every file `0600`, whatever the umask of
+the process (an existing empty target folder is narrowed too). Only the
+account that ran the backup – and root – can read it; run the backup as the
+account that will copy it to the backup medium, or copy it as root. On
+Windows the permissions of the target folder apply. Encrypt backups that
+leave the server (below).
+
 Restore with the server stopped:
 
 ```sh
@@ -205,14 +215,18 @@ thousands of dependencies (about 220 ms).
 * **The `pg_trgm` extension** (part of PostgreSQL, "trusted", so the owner
   of the database may create it) backs the substring search over item
   numbers, names, attribute values and file names with trigram indexes.
-  Migrations 0023 and 0031 create it when they can; otherwise the search
+  The migrations create it when they can; otherwise the search
   still works but reads the
-  tables – a few hundred milliseconds per search at 100,000 items. If the
-  database role may not create extensions, an administrator can run
+  tables – a few hundred milliseconds per search at 100,000 items, and the
+  server logs a warning at every start that names the missing indexes.
+  Only a missing or forbidden extension is tolerated: with pg_trgm present,
+  an index that cannot be built stops the migration
+  (`migrations/0072_trigram_indexes_strict.sql`). If the
+  database role may not create extensions, an administrator runs
   `CREATE EXTENSION pg_trgm;` in the TeamCraft database and then the
-  `CREATE INDEX … gin_trgm_ops` statements of
-  `migrations/0023_performance_indexes.sql` and
-  `migrations/0031_attribute_search_index.sql`.
+  `CREATE INDEX IF NOT EXISTS … gin_trgm_ops` statements of
+  `migrations/0072_trigram_indexes_strict.sql` (an applied migration does
+  not run again).
 * **JIT is off and every statement gets a custom plan** in TeamCraft's
   sessions (`jit=off` and `plan_cache_mode=force_custom_plan`, sent as
   startup options of every connection; the server's settings for other
@@ -297,7 +311,7 @@ expired sessions, staged uploads and unreferenced blobs (also `vault gc
 | Staged BOM imports and unfinished chunked uploads           | removed when expired, with their vault blobs unless something refers to them                                                                   |
 | Webhook deliveries, idle assistant conversations            | `TEAMCRAFT_WEBHOOK_RETENTION_DAYS`, `TEAMCRAFT_ASSISTANT_RETENTION_DAYS`                                                                       |
 | Audit log                                                   | `TEAMCRAFT_AUDIT_RETENTION_DAYS` (default: for ever); one `audit.purge` entry per removal                                                      |
-| Preview cache                                               | previews of blobs the database no longer refers to, files of old cache versions and leftovers; `TEAMCRAFT_PREVIEW_CACHE_MAX_MB` trims the rest |
+| Preview cache                                               | previews of blobs the database no longer refers to, files of old cache versions and leftovers; `TEAMCRAFT_PREVIEW_CACHE_MAX_MB` (10 GiB by default) trims the rest |
 | Old versions of files set to *keep only the latest version* | after `TEAMCRAFT_RETENTION_LATEST_GRACE_DAYS` (default 7), see below                                                                           |
 
 ### Keep only the latest version (large result files)
