@@ -17,6 +17,7 @@ vault.
 
 | Start here                                      |                                                                                |
 |-------------------------------------------------|--------------------------------------------------------------------------------|
+| **[Try the live demo](https://teamcraft-demo.tailc7ef5b.ts.net)** | read-only, sample data (NIST CAD models), sign in as `demo` / `try-teamcraft`, reset nightly |
 | [Getting started](guide/getting-started.md)     | build, run, first project group and item                                       |
 | [Vault, check-out and check-in](guide/vault.md) | the everyday workflow                                                          |
 | [Supported file formats](reference/formats.md)  | 160+ formats (200+ extensions) of CAD, BIM, DCC, mesh and point-cloud programs |

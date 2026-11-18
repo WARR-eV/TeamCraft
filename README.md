@@ -10,11 +10,15 @@
   Check your CAD data out and in, keep every version, release with reviews,
   follow changes through assemblies and see STEP, NX, mesh and point-cloud models
   in 3D – in the browser, in the desktop app or through the REST API.<br />
+  <strong><a href="https://teamcraft-demo.tailc7ef5b.ts.net">Try the live demo</a></strong>
+  – read-only sample data (openly licensed NIST CAD models), sign in as
+  <code>demo</code> / <code>try-teamcraft</code>, reset every night.<br />
   <em>Work in progress: there is no stable release yet.</em>
 </p>
 
 <div align="center">
 
+[![Live demo][badge-demo]][demo]
 [![Download][badge-download]][download]
 [![Linux][badge-linux]][linux]
 [![macOS][badge-macos]][macos]
@@ -553,6 +557,8 @@ SolidWorks, NX, Creo, CATIA, Inventor, Fusion,
 Revit and the other product names are trademarks of their respective
 owners; TeamCraft is not affiliated with them.
 
+[badge-demo]: https://img.shields.io/badge/Live_demo-Try_it-2563eb?style=for-the-badge
+[demo]: https://teamcraft-demo.tailc7ef5b.ts.net
 [badge-download]: https://img.shields.io/badge/Download-Releases-16a34a?style=for-the-badge&logo=github&logoColor=white
 [download]: https://github.com/WARR-eV/TeamCraft/releases
 [badge-linux]: https://img.shields.io/badge/Linux-Guide-E95420?style=for-the-badge&logo=linux&logoColor=white

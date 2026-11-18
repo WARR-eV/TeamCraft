@@ -24,6 +24,11 @@ see the notices in the README.
 
 ### Added
 
+- The **live demo** is online: <https://teamcraft-demo.tailc7ef5b.ts.net>
+  (sign in as `demo` / `try-teamcraft`, read-only, reset every night), linked
+  from the top of the README and the documentation's start page. The runbook
+  (*Admin guide → Live demo*) now also describes Tailscale Funnel as the TLS
+  front for a server behind NAT or without an own domain.
 - 3D preview of files saved by **Inventor 2027** (#271, on top of the
   Zstandard segments read since 0.2.8): typed arrays with the new element
   types (4, 8, 14, 16 for `u32` numbers, `invpart::is_u32`) are read, so
