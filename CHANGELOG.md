@@ -21,6 +21,13 @@ see the notices in the README.
   CR/LF in a display name, unbounded reply buffering). The unmaintained notice
   for `chrono` (RUSTSEC-2026-0543, not a vulnerability) is ignored in
   `deny.toml` until the move to `jiff` or `time` (`docs/OPEN_WORK.md`).
+- **Daily quota of the built-in assistant** per user (#306, F16): at most
+  `TEAMCRAFT_ASSISTANT_DAILY_RUNS` questions (default 200) and
+  `TEAMCRAFT_ASSISTANT_DAILY_TOKENS` model tokens (default 2 000 000) in the
+  last 24 hours, counted from the `assistant.run` audit entries; beyond that
+  a question answers 429 with `Retry-After` before anything is sent to the
+  provider. `0` turns a limit off. MCP requests cost no model tokens of the
+  server and stay unlimited.
 - Operations guide: **Data at rest** (#314) – TeamCraft does not encrypt the
   vault, the preview cache or the database; for sensitive data, disk
   encryption of the server is a requirement and backups that leave the

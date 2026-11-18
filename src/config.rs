@@ -73,6 +73,8 @@ pub const KNOWN_VARIABLES: &[&str] = &[
     "TEAMCRAFT_APPROVAL_REAUTH",
     "TEAMCRAFT_ASSISTANT_API_KEY",
     "TEAMCRAFT_ASSISTANT_BASE_URL",
+    "TEAMCRAFT_ASSISTANT_DAILY_RUNS",
+    "TEAMCRAFT_ASSISTANT_DAILY_TOKENS",
     "TEAMCRAFT_ASSISTANT_INTERNAL_URLS",
     "TEAMCRAFT_ASSISTANT_MAX_CONCURRENT",
     "TEAMCRAFT_ASSISTANT_MAX_STEPS",
@@ -328,6 +330,9 @@ pub struct Config {
     pub mattermost: Option<MattermostConfig>,
     /// The built-in assistant (Anthropic or an OpenAI-compatible API). `None` = disabled.
     pub assistant: Option<AssistantConfig>,
+    /// Daily quota of the built-in assistant per user (#306), counted over the
+    /// last 24 hours from the `assistant.run` audit entries; 0 = no limit.
+    pub assistant_quota: AssistantQuota,
     /// Whether users may connect their own local agents (the desktop app's
     /// *Agent* view, ACP) to TeamCraft's tools (`TEAMCRAFT_LOCAL_AGENTS`).
     /// `Off` leaves only the server-side assistant. See [`LocalAgents`].
@@ -473,6 +478,20 @@ pub const DEFAULT_ASSISTANT_RUN_TIMEOUT: u64 = 240;
 pub const DEFAULT_ASSISTANT_MAX_CONCURRENT: usize = 4;
 /// Default for how long an idle assistant conversation is kept (days).
 pub const DEFAULT_ASSISTANT_RETENTION_DAYS: u32 = 30;
+/// Default number of assistant runs per user in 24 hours (#306).
+pub const DEFAULT_ASSISTANT_DAILY_RUNS: u32 = 200;
+/// Default number of model tokens (input + output) per user in 24 hours (#306).
+pub const DEFAULT_ASSISTANT_DAILY_TOKENS: u64 = 2_000_000;
+
+/// Per-user limits of the built-in assistant over the last 24 hours
+/// (`TEAMCRAFT_ASSISTANT_DAILY_RUNS`, `TEAMCRAFT_ASSISTANT_DAILY_TOKENS`;
+/// 0 = no limit). They bound what one account can cost on the server's
+/// model key.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AssistantQuota {
+    pub runs: u32,
+    pub tokens: u64,
+}
 
 /// Which wire format the assistant speaks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1169,6 +1188,16 @@ impl Config {
             direct,
         });
         let assistant = assistant_config(&env)?;
+        let assistant_quota = AssistantQuota {
+            runs: env.parse_or(
+                "TEAMCRAFT_ASSISTANT_DAILY_RUNS",
+                DEFAULT_ASSISTANT_DAILY_RUNS,
+            )?,
+            tokens: env.parse_or(
+                "TEAMCRAFT_ASSISTANT_DAILY_TOKENS",
+                DEFAULT_ASSISTANT_DAILY_TOKENS,
+            )?,
+        };
         let local_agents = match env.get("TEAMCRAFT_LOCAL_AGENTS")? {
             Some(raw) => LocalAgents::parse(&raw)?,
             None => LocalAgents::Allowed,
@@ -1227,6 +1256,7 @@ impl Config {
             request_digest_hours,
             mattermost,
             assistant,
+            assistant_quota,
             local_agents,
             webhooks,
         })
