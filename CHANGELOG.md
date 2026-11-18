@@ -21,6 +21,15 @@ see the notices in the README.
   CR/LF in a display name, unbounded reply buffering). The unmaintained notice
   for `chrono` (RUSTSEC-2026-0543, not a vulnerability) is ignored in
   `deny.toml` until the move to `jiff` or `time` (`docs/OPEN_WORK.md`).
+- Operations guide: **Data at rest** (#314) – TeamCraft does not encrypt the
+  vault, the preview cache or the database; for sensitive data, disk
+  encryption of the server is a requirement and backups that leave the
+  server are written with `--encrypt`. `teamcraft backup` without
+  `--encrypt` now prints a note saying so. **Checking the vault
+  regularly** (#315) – downloads are not re-hashed, so a weekly
+  `teamcraft vault check --verify-hashes` (systemd timer and cron examples)
+  finds changed or damaged blobs. **When to run `vault gc --apply`** (#318) –
+  in a quiet period right after a backup, with the default grace period.
 
 ### Added
 
