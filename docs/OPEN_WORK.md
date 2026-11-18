@@ -248,6 +248,9 @@ half a state behind. Prefer tests that fail on a real regression over tests that
 - [x] `cargo deny` in CI (`deny.toml`, job *dependencies*): permissive licences only, security advisories, unknown
   registries and git sources; duplicate versions only warn. Three transitive "unmaintained" notices are ignored with
   reasons in `deny.toml` (cgmath, proc-macro-error, ttf-parser) – open: replace them when the parent crates move
+- [ ] Move from `chrono` to `jiff` or `time`: chrono is unmaintained (RUSTSEC-2026-0543, ignored in `deny.toml`
+  since 2026-11-18). TeamCraft uses it directly (timestamps in 40+ modules, `sqlx` feature `chrono`, `zip` feature
+  `chrono`); sqlx and pdf_oxide pull it in too, so the ignore stays until they move as well
 - [ ] Branch protection on `main` (**maintainer action**, needs admin rights): a ruleset with required checks – fmt and
   clippy, tests on PostgreSQL 16 and 18, build (windows-latest), cargo deny (Cargo.toml), local links and images.
   None exists today (the API answers 404 for the protection and `[]` for rulesets); that is how #65 and #137 were

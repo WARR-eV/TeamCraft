@@ -347,6 +347,22 @@ fn migrator_with_failing_migration(base: &Migrator, sql: &'static str) -> Migrat
     }
 }
 
+/// Runs `migrator` on one dedicated connection that is closed afterwards,
+/// as `db::migrate` does: sqlx returns early on a failed migration without
+/// releasing its session advisory lock, and a pooled connection would keep
+/// that lock – a later `db::migrate` on another connection of the pool would
+/// then wait for it for ever.
+async fn run_on_own_connection(
+    migrator: &Migrator,
+    pool: &sqlx::PgPool,
+) -> Result<(), sqlx::migrate::MigrateError> {
+    use sqlx::Connection as _;
+    let mut conn = pool.acquire().await.expect("a connection");
+    let result = migrator.run(&mut *conn).await;
+    let _ = conn.detach().close().await;
+    result
+}
+
 #[tokio::test]
 async fn a_migration_that_fails_rolls_back_and_leaves_the_data_alone() {
     let app = app_or_skip!();
@@ -368,7 +384,9 @@ async fn a_migration_that_fails_rolls_back_and_leaves_the_data_alone() {
     // first through the real start-up, then run it on top
     db::migrate(&other.pool).await.expect("upgrade to head");
     let head = applied(&other.pool).await;
-    let err = failing.run(&other.pool).await.unwrap_err();
+    let err = run_on_own_connection(&failing, &other.pool)
+        .await
+        .unwrap_err();
     assert!(
         err.to_string().to_lowercase().contains("division by zero"),
         "{err}"
@@ -399,7 +417,9 @@ async fn a_migration_that_fails_rolls_back_and_leaves_the_data_alone() {
     // the same failure on a database that is still behind: the real
     // migrations before it are applied, the failing one is not
     let behind = seeded_database_at(&app, "rollback2", previous).await;
-    let err = failing.run(&behind.pool).await.unwrap_err();
+    let err = run_on_own_connection(&failing, &behind.pool)
+        .await
+        .unwrap_err();
     assert!(err.to_string().to_lowercase().contains("division by zero"));
     let now = applied_versions(&behind.pool).await;
     assert!(
@@ -433,7 +453,9 @@ async fn an_older_server_refuses_a_database_with_newer_migrations() {
     let state = applied(&other.pool).await;
 
     // the migrations of the previous version, as an older binary embeds them
-    let err = migrator_upto(previous).run(&other.pool).await.unwrap_err();
+    let err = run_on_own_connection(&migrator_upto(previous), &other.pool)
+        .await
+        .unwrap_err();
     let text = err.to_string();
     assert!(
         text.contains("missing") && text.contains(&all.last().unwrap().to_string()),
