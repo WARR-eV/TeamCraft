@@ -42,7 +42,7 @@
     "category": "Productivity",
     "shortDescription": "TeamCraft PLM desktop client",
     "longDescription": "Desktop client of TeamCraft, the open-source product lifecycle management: browse project groups and items, check out into a local workspace, check in new file versions, review changes and preview STEP, mesh and point-cloud models.",
-    "homepage": "https://github.com/rudalabs/TeamCraft",
+    "homepage": "https://github.com/WARR-eV/TeamCraft",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

@@ -12,7 +12,7 @@ public specifications and openly licensed code under a compatible licence.
 They never use the program code of the CAD programs. Decompiling or
 disassembling proprietary software, and code rewritten from it, are not
 accepted in TeamCraft, from people or from AI agents
-([CONTRIBUTING.md](https://github.com/rudalabs/TeamCraft/blob/main/CONTRIBUTING.md#your-own-work-only--no-decompiled-code)).
+([CONTRIBUTING.md](https://github.com/WARR-eV/TeamCraft/blob/main/CONTRIBUTING.md#your-own-work-only--no-decompiled-code)).
 
 | Topic                                                                     | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Date       |
 |---------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------|

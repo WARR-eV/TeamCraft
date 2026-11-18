@@ -6,7 +6,7 @@ silicon or Intel). Releases contain the desktop app for Apple silicon
 or run the Docker image.
 
 **Just try it:** `TeamCraft-with-local-server_<version>_aarch64.dmg` from the
-[Releases page](https://github.com/rudalabs/TeamCraft/releases) (Apple
+[Releases page](https://github.com/WARR-eV/TeamCraft/releases) (Apple
 silicon) installs *TeamCraft Local*, an app of its own next to the desktop
 app, with the server and PostgreSQL: open it with *right-click → Open* the
 first time; it starts its local server by itself. If macOS still blocks the
@@ -14,7 +14,7 @@ bundled server, run
 `xattr -dr com.apple.quarantine "/Applications/TeamCraft Local.app"` once.
 With Homebrew's PostgreSQL (`brew install postgresql@18`), a server built as
 below runs the same test installation with `teamcraft local`. See
-[Try it on your computer](https://rudalabs.github.io/TeamCraft/guide/local-server.html).
+[Try it on your computer](https://warr-ev.github.io/TeamCraft/guide/local-server.html).
 
 ## 1. Prerequisites
 
@@ -35,7 +35,7 @@ export TEAMCRAFT_DATABASE_URL=postgres://teamcraft@localhost/teamcraft
 ## 2. Run
 
 ```sh
-git clone https://github.com/rudalabs/TeamCraft.git && cd TeamCraft
+git clone https://github.com/WARR-eV/TeamCraft.git && cd TeamCraft
 docker compose up -d db     # skip when you use Homebrew's PostgreSQL
 cargo run --release         # first build takes a few minutes
 ```
@@ -52,7 +52,7 @@ curl -s http://localhost:8080/readyz         # {"status":"ok",…}
 ```
 
 A guided tour through every feature is in the documentation:
-[Manual test tour](https://rudalabs.github.io/TeamCraft/guide/tour.html).
+[Manual test tour](https://warr-ev.github.io/TeamCraft/guide/tour.html).
 
 ## 4. Desktop app (optional)
 

@@ -19,7 +19,7 @@
 # real failures (#275). A nightly build is never cancelled, needs one run per
 # day instead of one per merge, and a failure in it is a real one.
 #
-# Container image ghcr.io/rudalabs/teamcraft (Dockerfile, built natively on
+# Container image ghcr.io/warr-ev/teamcraft (Dockerfile, built natively on
 # an amd64 and an arm64 runner, merged into one multi-platform image):
 # * main (nightly or "Run workflow" on main) → :edge;
 # * tag v<version> → :<version> and :<major>.<minor>, plus :latest for every
@@ -69,7 +69,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
-  IMAGE: ghcr.io/rudalabs/teamcraft
+  IMAGE: ghcr.io/warr-ev/teamcraft
   # docker/metadata-action tags (see the header).
   IMAGE_TAGS: |
     type=edge,branch=main
@@ -128,7 +128,7 @@ jobs:
           # :edge from main (nightly or "Run workflow"), versions from tags;
           # never from pull requests, forks or other branches
           publish=false
-          if [ "$GITHUB_REPOSITORY" = "rudalabs/TeamCraft" ]; then
+          if [ "$GITHUB_REPOSITORY" = "WARR-eV/TeamCraft" ]; then
             case "$GITHUB_EVENT_NAME/$GITHUB_REF" in
               push/refs/tags/v*|schedule/refs/heads/main|workflow_dispatch/refs/heads/main) publish=true ;;
             esac
@@ -291,7 +291,7 @@ jobs:
             "https://developer.microsoft.com/microsoft-edge/webview2/",
             "",
             "Settings are stored in your user profile like with the installers.",
-            "Source code and documentation: https://github.com/rudalabs/TeamCraft",
+            "Source code and documentation: https://github.com/WARR-eV/TeamCraft",
             "Licensed under the Mozilla Public License 2.0 (LICENSE.txt)."
           ) | Set-Content -Encoding utf8 "$dir\README.txt"
           Compress-Archive -Path $dir -DestinationPath "dist\$name.zip"

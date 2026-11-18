@@ -8,7 +8,7 @@ Closes #
       knowledge), or openly licensed material under a compatible licence
       that is credited. It contains **no code decompiled, disassembled or
       rewritten from proprietary software** and no leaked code
-      ([CONTRIBUTING.md](https://github.com/rudalabs/TeamCraft/blob/main/CONTRIBUTING.md#your-own-work-only--no-decompiled-code)).
+      ([CONTRIBUTING.md](https://github.com/WARR-eV/TeamCraft/blob/main/CONTRIBUTING.md#your-own-work-only--no-decompiled-code)).
 - [ ] Reading a file format: the research page in `docs/src/research/` names
       the sample files and specifications each finding came from.
 - [ ] The documentation is updated in this pull request (`CHANGELOG.md`,

@@ -6,7 +6,7 @@ starting the server; `teamcraft serve --no-migrate` skips it). There is no
 downgrade migration. The way back is a **restore of a backup taken before the
 upgrade**. Take that backup every time – while TeamCraft is 0.x any release
 may contain breaking changes ([Contributing → Releases and
-versions](https://github.com/rudalabs/TeamCraft/blob/main/CONTRIBUTING.md)).
+versions](https://github.com/WARR-eV/TeamCraft/blob/main/CONTRIBUTING.md)).
 
 ## Before the upgrade
 
@@ -150,7 +150,7 @@ with a reason instead of a post that vanishes. No database change is needed.
 ## Breaking changes per version
 
 What changed in each version is in
-[`CHANGELOG.md`](https://github.com/rudalabs/TeamCraft/blob/main/CHANGELOG.md)
+[`CHANGELOG.md`](https://github.com/WARR-eV/TeamCraft/blob/main/CHANGELOG.md)
 and the notes of its GitHub Release. What the database upgrade itself does,
 per released version (a migration is additive unless it says otherwise; the
 last row is `main`, not yet released):

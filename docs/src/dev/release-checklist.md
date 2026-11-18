@@ -1,9 +1,9 @@
 # Release checklist
 
 This is the list a maintainer follows to cut a release. The rules behind it are
-in [CONTRIBUTING.md](https://github.com/rudalabs/TeamCraft/blob/main/CONTRIBUTING.md#releases-and-versions)
+in [CONTRIBUTING.md](https://github.com/WARR-eV/TeamCraft/blob/main/CONTRIBUTING.md#releases-and-versions)
 (*Releases and versions*) and in the release rules of
-[CLAUDE.md](https://github.com/rudalabs/TeamCraft/blob/main/CLAUDE.md). The
+[CLAUDE.md](https://github.com/WARR-eV/TeamCraft/blob/main/CLAUDE.md). The
 workflow is `.github/workflows/release.yml`. Nothing is published before the
 maintainer pushes the tag.
 
@@ -89,7 +89,7 @@ mismatch.
 
 ## 6. Container image tags
 
-The image `ghcr.io/rudalabs/teamcraft` is published by CI only.
+The image `ghcr.io/warr-ev/teamcraft` is published by CI only.
 
 - [ ] The workflow sets `:<version>`, `:<major>.<minor>` and, for a version
   without a suffix, `:latest` (also for `0.x`). For `v1.0.0` that is `1.0.0`,
@@ -111,7 +111,7 @@ The image `ghcr.io/rudalabs/teamcraft` is published by CI only.
   section. Say what changed for operators first: configuration, migrations
   and the upgrade path.
 - [ ] Report security fixes in the release through the advisory that was
-  prepared under [SECURITY.md](https://github.com/rudalabs/TeamCraft/blob/main/SECURITY.md),
+  prepared under [SECURITY.md](https://github.com/WARR-eV/TeamCraft/blob/main/SECURITY.md),
   and publish it on the release day.
 
 ## What is not part of a release

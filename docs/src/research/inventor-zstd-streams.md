@@ -6,7 +6,7 @@
 
 The 3D preview of Inventor parts and assemblies ([3D preview of Inventor files](inventor-display-preview.md)) fails for
 files of current Inventor releases with *Inventor file: damaged compressed
-data* ([#271](https://github.com/rudalabs/TeamCraft/issues/271)). The
+data* ([#271](https://github.com/WARR-eV/TeamCraft/issues/271)). The
 report found Zstandard frames (`28 b5 2f fd`) where the reader expects
 zlib. Is the compression the only change, and what does the reader need
 to show such files?

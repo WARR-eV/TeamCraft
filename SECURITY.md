@@ -22,7 +22,7 @@ stable release:
 
 Please **do not open a public issue** for security problems. Report them
 privately on GitHub:
-**[Report a vulnerability](https://github.com/rudalabs/TeamCraft/security/advisories/new)**
+**[Report a vulnerability](https://github.com/WARR-eV/TeamCraft/security/advisories/new)**
 (*Security* tab → *Advisories* → *Report a vulnerability*).
 
 Please include:
@@ -47,7 +47,7 @@ In scope:
   a back-channel logout token that TeamCraft accepts without the provider's
   signature, or that ends another user's sessions;
 * permission checks: roles, project groups, check-out locks, released data;
-* read visibility of [restricted project groups](https://rudalabs.github.io/TeamCraft/admin/permissions.html):
+* read visibility of [restricted project groups](https://warr-ev.github.io/TeamCraft/admin/permissions.html):
   any way for a non-member to read an item, file, preview, BOM line,
   change, request, notification, webhook payload or assistant answer of a
   restricted group, or to tell a hidden object from a missing one beyond the
@@ -59,7 +59,7 @@ In scope:
   time limit of the preview process;
 * path traversal in the vault or in the desktop workspace;
 * event webhooks that reach a target the
-  [target guard](https://rudalabs.github.io/TeamCraft/admin/webhooks.html#where-webhooks-may-send-to)
+  [target guard](https://warr-ev.github.io/TeamCraft/admin/webhooks.html#where-webhooks-may-send-to)
   should refuse, or signatures that can be forged without the secret.
 
 Out of scope:
@@ -81,7 +81,7 @@ Out of scope:
   server-side assistant, so only that remains; the REST API stays reachable
   with a user's own token; an `mcp_only` token cannot reach it and a `read_only`
   token can only read through it (see
-  [Local agents](https://rudalabs.github.io/TeamCraft/admin/configuration.html#local-agents)).
+  [Local agents](https://warr-ev.github.io/TeamCraft/admin/configuration.html#local-agents)).
   A call to `POST /api/v1/mcp` that gets through while the setting is
   `off` is in scope. The desktop app answers a local agent's permission
   requests for TeamCraft's read-only MCP tools without a prompt (the

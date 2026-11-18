@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# Container image of the TeamCraft server: ghcr.io/rudalabs/teamcraft.
+# Container image of the TeamCraft server: ghcr.io/warr-ev/teamcraft.
 #
 # Built and published by GitHub Actions only (.github/workflows/release.yml),
 # natively on an amd64 and an arm64 runner. Run it with deploy/docker-compose.yml
@@ -42,9 +42,9 @@ FROM gcr.io/distroless/cc-debian12:nonroot
 ARG VERSION=dev
 LABEL org.opencontainers.image.title="TeamCraft" \
       org.opencontainers.image.description="Open-source PDM/PLM server: items, revisions, files, BOMs, change orders" \
-      org.opencontainers.image.source="https://github.com/rudalabs/TeamCraft" \
-      org.opencontainers.image.url="https://rudalabs.github.io/TeamCraft/" \
-      org.opencontainers.image.documentation="https://rudalabs.github.io/TeamCraft/admin/docker.html" \
+      org.opencontainers.image.source="https://github.com/WARR-eV/TeamCraft" \
+      org.opencontainers.image.url="https://warr-ev.github.io/TeamCraft/" \
+      org.opencontainers.image.documentation="https://warr-ev.github.io/TeamCraft/admin/docker.html" \
       org.opencontainers.image.licenses="MPL-2.0" \
       org.opencontainers.image.version="${VERSION}"
 

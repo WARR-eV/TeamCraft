@@ -1,23 +1,26 @@
 #!/usr/bin/env bash
 # TeamCraft – install, upgrade or remove the Docker installation on Linux.
 #
-#   curl -fsSL https://raw.githubusercontent.com/rudalabs/TeamCraft/main/deploy/install.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/rudalabs/TeamCraft/main/deploy/install.sh | bash -s -- --user
+#   curl -fsSL https://raw.githubusercontent.com/WARR-eV/TeamCraft/main/deploy/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/WARR-eV/TeamCraft/main/deploy/install.sh | bash -s -- --user
 #   ./deploy/install.sh --dry-run           (from a checkout)
 #
 # Runs TeamCraft and PostgreSQL with deploy/docker-compose.yml in
 # /opt/teamcraft (or ~/teamcraft with --user). Running it again upgrades;
 # configuration, the database password and all data are kept.
-# Guide: https://rudalabs.github.io/TeamCraft/admin/docker.html
+# Guide: https://warr-ev.github.io/TeamCraft/admin/docker.html
 #
 # SPDX-License-Identifier: MPL-2.0
 
 set -euo pipefail
 
-REPO="rudalabs/TeamCraft"
+REPO="WARR-eV/TeamCraft"
 RAW="https://raw.githubusercontent.com/${REPO}"
 API="https://api.github.com/repos/${REPO}"
-IMAGE="ghcr.io/rudalabs/teamcraft"
+IMAGE="ghcr.io/warr-ev/teamcraft"
+# The image name before the repository moved to WARR-eV: installations made
+# then and the deploy files of release tags up to v0.2.9 still name it.
+OLD_IMAGE="ghcr.io/rudalabs/teamcraft"
 # Compose project "teamcraft-server" (docker-compose.yml) → volume names.
 VOLUME_DB="teamcraft-server_db"
 
@@ -208,7 +211,7 @@ gen_password() {
 
 # ---- checks ----------------------------------------------------------------
 
-[ "$(uname -s)" = "Linux" ] || die "this installer is for Linux (see https://rudalabs.github.io/TeamCraft/ for other systems)"
+[ "$(uname -s)" = "Linux" ] || die "this installer is for Linux (see https://warr-ev.github.io/TeamCraft/ for other systems)"
 [ "$DRY_RUN" -eq 1 ] && say "Dry run: nothing is changed."
 
 if [ -z "$DIR" ]; then
@@ -305,12 +308,18 @@ EOF
   esac
 }
 
+# Whether a compose file is TeamCraft's: it names the image under the current
+# or the old (pre-move) name.
+is_teamcraft_compose() {
+  grep -qF -e "image: $IMAGE:" -e "image: $OLD_IMAGE:" "$1"
+}
+
 # ---- uninstall ---------------------------------------------------------------
 
 uninstall() {
   [ -f "$DIR/docker-compose.yml" ] || die "no installation in $DIR (use --dir)"
   # Only a directory written by this script is stopped or deleted.
-  if ! grep -q "image: $IMAGE:" "$DIR/docker-compose.yml" || ! as_root test -f "$DIR/.env"; then
+  if ! is_teamcraft_compose "$DIR/docker-compose.yml" || ! as_root test -f "$DIR/.env"; then
     die "$DIR does not look like a TeamCraft installation made by install.sh – nothing changed"
   fi
   check_docker
@@ -395,7 +404,7 @@ else
   http_get "$RAW/$REF/deploy/teamcraft.env.example" "$TMP/teamcraft.env.example" \
     || die "cannot download teamcraft.env.example for $REF"
 fi
-grep -q "image: $IMAGE:" "$TMP/docker-compose.yml" || die "the downloaded docker-compose.yml is not TeamCraft's"
+is_teamcraft_compose "$TMP/docker-compose.yml" || die "the downloaded docker-compose.yml is not TeamCraft's"
 
 run_root mkdir -p "$DIR"
 write_file "$DIR/docker-compose.yml" 644 <"$TMP/docker-compose.yml"
@@ -535,7 +544,7 @@ case "$BIND_HOST" in
     esac
     ;;
 esac
-note "guide:      https://rudalabs.github.io/TeamCraft/admin/docker.html"
+note "guide:      https://warr-ev.github.io/TeamCraft/admin/docker.html"
 }
 
 main "$@"

@@ -35,7 +35,7 @@ pub const HEARTBEAT: Duration = Duration::from_secs(10);
 /// A marker older than this belongs to a session that is not running any more.
 pub const STALE_AFTER: Duration = Duration::from_secs(30);
 /// Where a report is filed: a new issue, prefilled, that the user submits.
-pub const ISSUE_URL: &str = "https://github.com/rudalabs/TeamCraft/issues/new";
+pub const ISSUE_URL: &str = "https://github.com/WARR-eV/TeamCraft/issues/new";
 /// Browsers and GitHub cut long URLs; the full text goes to the clipboard.
 const MAX_ISSUE_URL: usize = 7000;
 const MARKER_PREFIX: &str = "session-";

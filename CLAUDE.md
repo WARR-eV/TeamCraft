@@ -33,7 +33,7 @@
 * Releases: `.github/workflows/release.yml` builds the server binaries and
   desktop installers as artifacts from `main` every night (when it changed) and on
   *Run workflow*, not per push, publishes the
-  container image `ghcr.io/rudalabs/teamcraft` (`:edge` from `main`,
+  container image `ghcr.io/warr-ev/teamcraft` (`:edge` from `main`,
   `:<version>`/`:latest` from tags) and a GitHub Release for a `v*` tag (CONTRIBUTING.md, "Releases and versions").
   Never push a tag, bump the
   version or publish anything else (package registries) unless the user asks

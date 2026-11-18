@@ -5,13 +5,13 @@ was tried in a Parallels VM on an Apple M1 – server and desktop app build and
 run natively; the extra steps are marked **ARM64**.
 
 **Just try it:** `TeamCraft-with-local-server_<version>_x64-setup.exe` from the
-[Releases page](https://github.com/rudalabs/TeamCraft/releases) installs
+[Releases page](https://github.com/WARR-eV/TeamCraft/releases) installs
 *TeamCraft Local* for your user – the desktop app with the server and
 PostgreSQL, as an app of its own next to an installed TeamCraft (no
 administrator rights; SmartScreen: *More info → Run anyway*). Start
 *TeamCraft Local*; it starts its local server by itself. On ARM64 the x64 installer runs under
 emulation. See
-[Try it on your computer](https://rudalabs.github.io/TeamCraft/guide/local-server.html).
+[Try it on your computer](https://warr-ev.github.io/TeamCraft/guide/local-server.html).
 
 ## 1. Prerequisites
 
@@ -78,7 +78,7 @@ Notepad could not create new files there in one test.
 ## 2. Run
 
 ```powershell
-git clone https://github.com/rudalabs/TeamCraft.git C:\src\TeamCraft; cd C:\src\TeamCraft
+git clone https://github.com/WARR-eV/TeamCraft.git C:\src\TeamCraft; cd C:\src\TeamCraft
 docker compose up -d db     # skip when you use the native PostgreSQL
 cargo run --release         # first build takes a few minutes
 ```
@@ -102,7 +102,7 @@ installer they are in `C:\Program Files\PostgreSQL\17\bin` – put that on
 test is skipped. `teamcraft backup` / `restore` need them the same way.
 
 A guided tour through every feature is in the documentation:
-[Manual test tour](https://rudalabs.github.io/TeamCraft/guide/tour.html).
+[Manual test tour](https://warr-ev.github.io/TeamCraft/guide/tour.html).
 
 ## 4. Desktop app (optional)
 

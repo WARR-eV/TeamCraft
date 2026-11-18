@@ -24,33 +24,33 @@
 </div>
 
 <p align="center">
-  <strong><a href="https://github.com/rudalabs/TeamCraft/releases">Download TeamCraft</a></strong>
+  <strong><a href="https://github.com/WARR-eV/TeamCraft/releases">Download TeamCraft</a></strong>
   for Windows, macOS and Linux.<br />
   To try it, pick the desktop app <em>with local server</em>: app, server and
   database in one installer, nothing to set up (<a href="#download">which file?</a>).
 </p>
 
 <p align="center">
-  <a href="https://github.com/rudalabs/TeamCraft/actions/workflows/ci.yml"><img src="https://github.com/rudalabs/TeamCraft/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" /></a>
-  <a href="https://github.com/rudalabs/TeamCraft/actions/workflows/desktop.yml"><img src="https://github.com/rudalabs/TeamCraft/actions/workflows/desktop.yml/badge.svg?branch=main" alt="Desktop app" /></a>
-  <a href="https://github.com/rudalabs/TeamCraft/actions/workflows/docs.yml"><img src="https://github.com/rudalabs/TeamCraft/actions/workflows/docs.yml/badge.svg?branch=main" alt="Docs" /></a>
+  <a href="https://github.com/WARR-eV/TeamCraft/actions/workflows/ci.yml"><img src="https://github.com/WARR-eV/TeamCraft/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" /></a>
+  <a href="https://github.com/WARR-eV/TeamCraft/actions/workflows/desktop.yml"><img src="https://github.com/WARR-eV/TeamCraft/actions/workflows/desktop.yml/badge.svg?branch=main" alt="Desktop app" /></a>
+  <a href="https://github.com/WARR-eV/TeamCraft/actions/workflows/docs.yml"><img src="https://github.com/WARR-eV/TeamCraft/actions/workflows/docs.yml/badge.svg?branch=main" alt="Docs" /></a>
   <a href="https://www.repostatus.org/#wip"><img src="https://www.repostatus.org/badges/latest/wip.svg" alt="Project status: WIP – initial development is in progress, but there has not yet been a stable, usable release suitable for the public." /></a>
-  <a href="https://github.com/rudalabs/TeamCraft/releases"><img src="https://img.shields.io/github/v/release/rudalabs/TeamCraft?include_prereleases&label=release" alt="Latest release" /></a>
+  <a href="https://github.com/WARR-eV/TeamCraft/releases"><img src="https://img.shields.io/github/v/release/WARR-eV/TeamCraft?include_prereleases&label=release" alt="Latest release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MPL--2.0-blue" alt="Licence: MPL-2.0" /></a>
   <img src="https://img.shields.io/badge/built%20with-Rust-dea584?logo=rust&logoColor=white" alt="Built with Rust" />
   <img src="https://img.shields.io/badge/database-PostgreSQL-336791?logo=postgresql&logoColor=white" alt="PostgreSQL" />
 </p>
 
 <p align="center">
-  <a href="https://rudalabs.github.io/TeamCraft/">Documentation</a> ·
+  <a href="https://warr-ev.github.io/TeamCraft/">Documentation</a> ·
   <a href="#download">Download</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="#features">Features</a> ·
   <a href="#enterprise-management">Enterprise management</a> ·
-  <a href="https://rudalabs.github.io/TeamCraft/guide/tour.html">Feature tour</a> ·
-  <a href="https://rudalabs.github.io/TeamCraft/reference/formats.html">File formats</a> ·
-  <a href="https://rudalabs.github.io/TeamCraft/reference/api.html">REST API</a> ·
-  <a href="https://rudalabs.github.io/TeamCraft/api/teamcraft/index.html">Rust API</a> ·
+  <a href="https://warr-ev.github.io/TeamCraft/guide/tour.html">Feature tour</a> ·
+  <a href="https://warr-ev.github.io/TeamCraft/reference/formats.html">File formats</a> ·
+  <a href="https://warr-ev.github.io/TeamCraft/reference/api.html">REST API</a> ·
+  <a href="https://warr-ev.github.io/TeamCraft/api/teamcraft/index.html">Rust API</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
@@ -63,7 +63,7 @@
 > active development (version 0.x). Features, the REST API, the configuration
 > and the database schema can still change at any time. You are welcome to
 > try it out and test it, and please
-> [report what you find](https://github.com/rudalabs/TeamCraft/issues).
+> [report what you find](https://github.com/WARR-eV/TeamCraft/issues).
 > Don't use it for production data yet, and keep backups of the database and
 > the vault.
 >
@@ -75,7 +75,7 @@
 ## Download
 
 **Every download is on the
-[Releases page](https://github.com/rudalabs/TeamCraft/releases)** – 0.x
+[Releases page](https://github.com/WARR-eV/TeamCraft/releases)** – 0.x
 versions are pre-releases (see the warning above). Which one you need:
 
 - **Just try TeamCraft on your laptop** – the desktop app **with local
@@ -100,7 +100,7 @@ versions are pre-releases (see the warning above). Which one you need:
   desktop app – with its own settings and sign-in, so an existing desktop app
   stays connected to your team's server. The local server listens only on
   this computer and stops with the app; see
-  [Try it on your computer](https://rudalabs.github.io/TeamCraft/guide/local-server.html).
+  [Try it on your computer](https://warr-ev.github.io/TeamCraft/guide/local-server.html).
 - **Server:** runs on Linux in production, or as the
   [Docker image](docs/src/admin/docker.md) on any platform. On macOS, build it
   from source ([platforms/macos.md](platforms/macos.md)). With PostgreSQL
@@ -115,7 +115,7 @@ versions are pre-releases (see the warning above). Which one you need:
 - **Not code-signed yet:** macOS asks to confirm the first start
   (*right-click → Open*); Windows SmartScreen shows *More info → Run anyway*.
 - **Newest `main` build:** built every night; attached as artifacts to the latest run of the
-  [Release workflow](https://github.com/rudalabs/TeamCraft/actions/workflows/release.yml)
+  [Release workflow](https://github.com/WARR-eV/TeamCraft/actions/workflows/release.yml)
   (kept 14 days, for signed-in GitHub users).
 
 ## Who it is for
@@ -143,7 +143,7 @@ onboarding where new members sign in with the accounts they already have.
 ## Quick start
 
 **Try it on your laptop** – install the desktop app *with local server* from
-the [Releases page](https://github.com/rudalabs/TeamCraft/releases) and start
+the [Releases page](https://github.com/WARR-eV/TeamCraft/releases) and start
 *TeamCraft Local* – it starts its own server ([Download](#download)). With
 PostgreSQL already installed, the server alone does the same on the command
 line – a private database and the server on <http://127.0.0.1:8080>:
@@ -156,19 +156,19 @@ teamcraft local
 data in Docker volumes, nothing to build:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/rudalabs/TeamCraft/main/deploy/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/WARR-eV/TeamCraft/main/deploy/install.sh | bash
 ```
 
 The script installs into `/opt/teamcraft` (`--user`: `~/teamcraft`), generates
 the database password, starts everything on <http://localhost:8080> and offers
 to create the first administrator. Run it again to upgrade; `--dry-run` shows
 every step first. Details, backups and TLS:
-[Install with Docker](https://rudalabs.github.io/TeamCraft/admin/docker.html).
+[Install with Docker](https://warr-ev.github.io/TeamCraft/admin/docker.html).
 
 **From source** (development, macOS, Windows):
 
 ```sh
-git clone https://github.com/rudalabs/TeamCraft.git && cd TeamCraft
+git clone https://github.com/WARR-eV/TeamCraft.git && cd TeamCraft
 docker compose up -d db     # PostgreSQL on 127.0.0.1, no password needed
 cargo run --release         # applies the migrations, serves http://localhost:8080
 ```
@@ -315,7 +315,7 @@ end-to-end tests against a real PostgreSQL.
   [FieldCraft](https://github.com/tangency-labs/fieldcraft) models
   (`.fieldcraft`) are recognised and their STEP and 3MF exports previewed –
   design, export and analysis in one revision
-  ([more](https://rudalabs.github.io/TeamCraft/reference/interop.html)).
+  ([more](https://warr-ev.github.io/TeamCraft/reference/interop.html)).
 
 ## Enterprise management
 
@@ -327,25 +327,25 @@ there is no separate enterprise edition.
   - Single sign-on with any OpenID Connect provider (Keycloak, Entra ID,
     Google, Authentik …); IdP groups mapped to roles and project groups.
   - Viewer / editor / admin roles, and
-    [restricted project groups](https://rudalabs.github.io/TeamCraft/admin/permissions.html)
+    [restricted project groups](https://warr-ev.github.io/TeamCraft/admin/permissions.html)
     that stay invisible to outsiders – even inside BOMs, search,
     notifications and the AI assistant.
   - Per group, administrators can be limited to audited, time-limited access
     with a written reason, or to managing without reading.
-  - [Need-to-know groups](https://rudalabs.github.io/TeamCraft/admin/permissions.html):
+  - [Need-to-know groups](https://warr-ev.github.io/TeamCraft/admin/permissions.html):
     membership conditions (IdP claims, networks, maximum sign-in age), a
     read and download log, and periodic access reviews with an evidence
     report.
   - Personal access tokens can be scoped: full, write without approving,
     read-only or MCP-only; SSO users' tokens can expire after a number of
     idle days.
-  - [Offboarding](https://rudalabs.github.io/TeamCraft/admin/users.html#when-someone-leaves)
+  - [Offboarding](https://warr-ev.github.io/TeamCraft/admin/users.html#when-someone-leaves)
     for high-turnover teams: a holdings report per user, *Offboard and
     deactivate*, season handover per group, groups without an active
     manager, OpenID Connect back-channel logout and a report of SSO users
     who stopped signing in.
 - **Traceability**
-  - An [audit log](https://rudalabs.github.io/TeamCraft/admin/operations.html)
+  - An [audit log](https://warr-ev.github.io/TeamCraft/admin/operations.html)
     of every change and every sign-in, failed attempts included, exportable
     as CSV or JSON.
   - Four-eyes change orders: nobody who wrote, prepared or changed the data
@@ -362,36 +362,36 @@ there is no separate enterprise edition.
     app's Agent then runs on the company AI only. *Admin → AI* shows the
     setup.
 - **Operations**
-  - [Docker install](https://rudalabs.github.io/TeamCraft/admin/docker.html)
+  - [Docker install](https://warr-ev.github.io/TeamCraft/admin/docker.html)
     with one script.
   - Evaluations without a server: the desktop download *with local server*,
     or `teamcraft local` – a private PostgreSQL and the server, both only on
-    127.0.0.1 ([details](https://rudalabs.github.io/TeamCraft/guide/local-server.html)).
-  - [Backup and restore](https://rudalabs.github.io/TeamCraft/admin/operations.html#backups)
+    127.0.0.1 ([details](https://warr-ev.github.io/TeamCraft/guide/local-server.html)).
+  - [Backup and restore](https://warr-ev.github.io/TeamCraft/admin/operations.html#backups)
     of database and vault in one command.
   - `/healthz` and `/readyz` probes and
-    [Prometheus metrics](https://rudalabs.github.io/TeamCraft/admin/operations.html#metrics-for-prometheus).
-  - Documented [upgrades](https://rudalabs.github.io/TeamCraft/admin/upgrade.html)
-    and a [support policy](https://rudalabs.github.io/TeamCraft/admin/support-policy.html).
+    [Prometheus metrics](https://warr-ev.github.io/TeamCraft/admin/operations.html#metrics-for-prometheus).
+  - Documented [upgrades](https://warr-ev.github.io/TeamCraft/admin/upgrade.html)
+    and a [support policy](https://warr-ev.github.io/TeamCraft/admin/support-policy.html).
 - **Integration** – REST API, an MCP server for AI tools, signed
-  [event webhooks](https://rudalabs.github.io/TeamCraft/admin/webhooks.html),
+  [event webhooks](https://warr-ev.github.io/TeamCraft/admin/webhooks.html),
   e-mail and Mattermost notifications.
 - **Your look** – your own logos and header name under *Admin → Branding*, in
   the web UI and the desktop app.
 - **Configuration** – everything through environment variables, each also as
   `*_FILE` for Docker or Kubernetes secrets; see the
-  [configuration reference](https://rudalabs.github.io/TeamCraft/admin/configuration.html).
+  [configuration reference](https://warr-ev.github.io/TeamCraft/admin/configuration.html).
 
 **Planned** – what is left of the issues above (all their steps are built):
 
-- **Need-to-know projects** ([#151](https://github.com/rudalabs/TeamCraft/issues/151))
+- **Need-to-know projects** ([#151](https://github.com/WARR-eV/TeamCraft/issues/151))
   – optional: a watermark on downloads, claims for local accounts.
-- **Ownership and approval rules** ([#152](https://github.com/rudalabs/TeamCraft/issues/152))
+- **Ownership and approval rules** ([#152](https://github.com/WARR-eV/TeamCraft/issues/152))
   – substitutes per user, the review policy shown on the change page.
-- **Offboarding for high-turnover teams** ([#173](https://github.com/rudalabs/TeamCraft/issues/173))
+- **Offboarding for high-turnover teams** ([#173](https://github.com/WARR-eV/TeamCraft/issues/173))
   – a timed stale-lock rule, the access review page for groups that are not
   need-to-know; automatic deprovisioning through SCIM is not planned for now
-  ([research](https://rudalabs.github.io/TeamCraft/research/scim-deprovisioning.html)).
+  ([research](https://warr-ev.github.io/TeamCraft/research/scim-deprovisioning.html)).
 
 TeamCraft is a community project without commercial support or a service
 level agreement.
@@ -449,7 +449,7 @@ the web UI with headless Chrome, TeamCraft Desktop on a virtual X display.
 
 Everything is built by `cargo` – no Node.js, no downloaded browser engines,
 no C++ CAD kernel. Details:
-[Architecture](https://rudalabs.github.io/TeamCraft/reference/architecture.html).
+[Architecture](https://warr-ev.github.io/TeamCraft/reference/architecture.html).
 
 ## Command line and API
 
@@ -474,19 +474,19 @@ Both commands need the PostgreSQL client tools (`pg_dump`, `pg_restore`). The
 backup directory must not exist or must be empty. A restore refuses a database
 that already contains tables unless you pass `--force`, and the server should
 be stopped while it runs. Configuration and secrets are not part of a backup;
-see [Operations](https://rudalabs.github.io/TeamCraft/admin/operations.html).
+see [Operations](https://warr-ev.github.io/TeamCraft/admin/operations.html).
 
 ## Documentation
 
-Published at **<https://rudalabs.github.io/TeamCraft/>**, built from
+Published at **<https://warr-ev.github.io/TeamCraft/>**, built from
 [`docs/src`](docs/src/SUMMARY.md) with mdBook, plus the
-[rustdoc API reference](https://rudalabs.github.io/TeamCraft/api/teamcraft/index.html):
+[rustdoc API reference](https://warr-ev.github.io/TeamCraft/api/teamcraft/index.html):
 
-- **User guide** – a [feature tour](https://rudalabs.github.io/TeamCraft/guide/tour.html)
+- **User guide** – a [feature tour](https://warr-ev.github.io/TeamCraft/guide/tour.html)
   and every workflow.
 - **Administration** – configuration, SSO, permissions, operations.
-- **Reference** – [file formats](https://rudalabs.github.io/TeamCraft/reference/formats.html),
-  [REST API](https://rudalabs.github.io/TeamCraft/reference/api.html),
+- **Reference** – [file formats](https://warr-ev.github.io/TeamCraft/reference/formats.html),
+  [REST API](https://warr-ev.github.io/TeamCraft/reference/api.html),
   architecture.
 
 A running server lists its API at `GET /api/v1` and its formats at `/formats`.
@@ -554,7 +554,7 @@ Revit and the other product names are trademarks of their respective
 owners; TeamCraft is not affiliated with them.
 
 [badge-download]: https://img.shields.io/badge/Download-Releases-16a34a?style=for-the-badge&logo=github&logoColor=white
-[download]: https://github.com/rudalabs/TeamCraft/releases
+[download]: https://github.com/WARR-eV/TeamCraft/releases
 [badge-linux]: https://img.shields.io/badge/Linux-Guide-E95420?style=for-the-badge&logo=linux&logoColor=white
 [badge-macos]: https://img.shields.io/badge/macOS-Guide-333333?style=for-the-badge&logo=apple&logoColor=white
 [badge-windows]: https://img.shields.io/badge/Windows-Guide-0078D6?style=for-the-badge
@@ -562,4 +562,4 @@ owners; TeamCraft is not affiliated with them.
 [linux]: platforms/linux.md
 [macos]: platforms/macos.md
 [windows]: platforms/windows.md
-[docs]: https://rudalabs.github.io/TeamCraft/
+[docs]: https://warr-ev.github.io/TeamCraft/

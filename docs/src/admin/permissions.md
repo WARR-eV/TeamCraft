@@ -79,7 +79,7 @@ deleting the group deletes its history (the audit log keeps the records). The ru
 is part of the actor's hidden groups (`access::hidden_of_user`), so every
 guard, the audit feed, change orders, notifications and the assistant honour
 it without a check of their own. This is step 1 of
-[#151](https://github.com/rudalabs/TeamCraft/issues/151); the conditions on
+[#151](https://github.com/WARR-eV/TeamCraft/issues/151); the conditions on
 membership (step 2), the interface switches and the read log (steps 3 and 4)
 and the access review (step 5) follow below.
 
@@ -275,7 +275,7 @@ people below the editor role do not count. Items without a project group count
 like a group without a policy: all reviewers must approve. A role group the
 reader cannot see is never named: the policy shows it as hidden and the submit
 message says "a required role group". Changes are audited (`project.review_policy`, with the previous values). Step 2 of
-[#152](https://github.com/rudalabs/TeamCraft/issues/152).
+[#152](https://github.com/WARR-eV/TeamCraft/issues/152).
 
 ### Obsolete and supersede only through a change order
 
@@ -311,7 +311,7 @@ that moves both through review:
   not see the successor get the text without its number; the change page shows
   such a successor as *restricted*.
 
-Step 3 of [#152](https://github.com/rudalabs/TeamCraft/issues/152).
+Step 3 of [#152](https://github.com/WARR-eV/TeamCraft/issues/152).
 
 ### Requesters do not decide, concessions are confirmed
 
@@ -331,7 +331,7 @@ Two more checkboxes of the same form, both off by default (`requester_cannot_dec
   deviation clears its confirmation, and *Revise* copies deviations unconfirmed.
   The audit log records `as_built.concession_confirm`.
 
-Step 9 of [#152](https://github.com/rudalabs/TeamCraft/issues/152).
+Step 9 of [#152](https://github.com/WARR-eV/TeamCraft/issues/152).
 
 ## What outsiders see of links
 

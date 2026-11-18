@@ -8,9 +8,9 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// The latest published release (drafts and pre-releases are never "latest").
-const LATEST_RELEASE_API: &str = "https://api.github.com/repos/rudalabs/TeamCraft/releases/latest";
+const LATEST_RELEASE_API: &str = "https://api.github.com/repos/WARR-eV/TeamCraft/releases/latest";
 /// What the notice links to.
-pub const RELEASES_PAGE: &str = "https://github.com/rudalabs/TeamCraft/releases/latest";
+pub const RELEASES_PAGE: &str = "https://github.com/WARR-eV/TeamCraft/releases/latest";
 /// Time between two checks.
 pub const CHECK_INTERVAL_SECS: u64 = 24 * 60 * 60;
 const TIMEOUT: Duration = Duration::from_secs(10);

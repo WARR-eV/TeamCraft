@@ -36,7 +36,7 @@ account public.
 ## 1. Install TeamCraft
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/rudalabs/TeamCraft/main/deploy/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/WARR-eV/TeamCraft/main/deploy/install.sh | bash
 ```
 
 When the installer offers to create the first administrator, name it
@@ -85,7 +85,7 @@ the page names the demo account.
 Once, against the still empty server (only `admin` exists):
 
 ```sh
-git clone --depth 1 https://github.com/rudalabs/TeamCraft.git ~/teamcraft-src
+git clone --depth 1 https://github.com/WARR-eV/TeamCraft.git ~/teamcraft-src
 cd ~/teamcraft-src
 sudo BASE_URL=http://127.0.0.1:8080 \
      ADMIN_PASSWORD_FILE=/opt/teamcraft/secrets/admin_password \

@@ -28,7 +28,7 @@ files** (see *Open questions*).
   (`src/simmesh.rs`). Not one of the three programs' native formats is
   previewed, and that will not change (see below).
 * HTML reports are indexed as raw markup, and their decimal numbers are lost
-  ([#141](https://github.com/rudalabs/TeamCraft/issues/141)). Plain-text files
+  ([#141](https://github.com/WARR-eV/TeamCraft/issues/141)). Plain-text files
   lose their decimal numbers in the search text as well, and that search text
   is what `read_file_text` returns.
 

@@ -12,7 +12,7 @@ a team, use the [Docker install](../admin/docker.md).
 ## With the desktop app (no set-up)
 
 1. Download the desktop app **with local server** from the
-   [Releases page](https://github.com/rudalabs/TeamCraft/releases):
+   [Releases page](https://github.com/WARR-eV/TeamCraft/releases):
 
    | System                         | File                                              |
    |--------------------------------|---------------------------------------------------|
@@ -147,9 +147,9 @@ the [Docker install](../admin/docker.md) with its backups.
 - **The browser or Windows Defender reports a virus** – the installers are
   not code-signed yet, and an unsigned installer full of programs is what
   heuristic scanners distrust. Download only from the
-  [Releases page](https://github.com/rudalabs/TeamCraft/releases) and compare
+  [Releases page](https://github.com/WARR-eV/TeamCraft/releases) and compare
   the file with `SHA256SUMS.txt` of the same release (PowerShell:
   `Get-FileHash <file>`). Please
-  [open an issue](https://github.com/rudalabs/TeamCraft/issues) with the name
+  [open an issue](https://github.com/WARR-eV/TeamCraft/issues) with the name
   of the detection, so that it can be reported to the scanner's vendor as a
   false positive. Do not turn off your virus scanner.

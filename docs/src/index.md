@@ -11,7 +11,7 @@ vault.
 > active development (version 0.x). Features, the REST API, the configuration
 > and the database schema can still change. You are welcome to try it out
 > and test it, and please report what you find on
-> [GitHub](https://github.com/rudalabs/TeamCraft/issues). It is provided
+> [GitHub](https://github.com/WARR-eV/TeamCraft/issues). It is provided
 > **"as is", without warranty of any kind** (MPL-2.0, sections 6 and 7).
 > Don't use it for production data yet, and keep backups.
 
@@ -40,15 +40,15 @@ vault.
 
 TeamCraft builds with `cargo` alone on Linux, macOS and Windows; the only
 service it needs is PostgreSQL. Step-by-step guides:
-[Linux](https://github.com/rudalabs/TeamCraft/blob/main/platforms/linux.md) ·
-[macOS](https://github.com/rudalabs/TeamCraft/blob/main/platforms/macos.md) ·
-[Windows](https://github.com/rudalabs/TeamCraft/blob/main/platforms/windows.md).
+[Linux](https://github.com/WARR-eV/TeamCraft/blob/main/platforms/linux.md) ·
+[macOS](https://github.com/WARR-eV/TeamCraft/blob/main/platforms/macos.md) ·
+[Windows](https://github.com/WARR-eV/TeamCraft/blob/main/platforms/windows.md).
 
 TeamCraft is free software under the Mozilla Public License 2.0.
 Contributions are welcome; see
-[CONTRIBUTING.md](https://github.com/rudalabs/TeamCraft/blob/main/CONTRIBUTING.md).
+[CONTRIBUTING.md](https://github.com/WARR-eV/TeamCraft/blob/main/CONTRIBUTING.md).
 They must be the contributor's own work (or their AI agent's own work):
 code decompiled, disassembled or rewritten from proprietary software is
 never accepted ([ADR 0005](dev/adr/0005-no-decompiled-code.md)).
 Report security problems privately, as described in
-[SECURITY.md](https://github.com/rudalabs/TeamCraft/blob/main/SECURITY.md).
+[SECURITY.md](https://github.com/WARR-eV/TeamCraft/blob/main/SECURITY.md).
