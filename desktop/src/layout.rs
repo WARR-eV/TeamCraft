@@ -1014,13 +1014,13 @@ mod tests {
             "Radkonstruktion/Z\u{e4}hne"
         );
         assert_eq!(
-            local_rel(Some("GRAKSLER"), "Ra\u{308}der", "Hu\u{308}lse.ipt"),
-            "GRAKSLER/R\u{e4}der/H\u{fc}lse.ipt"
+            local_rel(Some("ROVER"), "Ra\u{308}der", "Hu\u{308}lse.ipt"),
+            "ROVER/R\u{e4}der/H\u{fc}lse.ipt"
         );
         // one key for both forms and any case
         assert_eq!(
-            key_of("GRAKSLER/Design/Hu\u{308}lse.IPT"),
-            key_of("graksler/design/H\u{fc}lse.ipt")
+            key_of("ROVER/Design/Hu\u{308}lse.IPT"),
+            key_of("rover/design/H\u{fc}lse.ipt")
         );
     }
 
@@ -1029,7 +1029,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut decomposed =
             server("PRT-000250", "A", "Hu\u{308}lse.ipt", "Design", "s1").entry("s1", 10, 99);
-        decomposed.path = "GRAKSLER/Design/Hu\u{308}lse.ipt".into();
+        decomposed.path = "ROVER/Design/Hu\u{308}lse.ipt".into();
         let other = server("PRT-000001", "A", "bracket.prt", "Design", "s2").entry("s2", 10, 99);
         // keys as older versions wrote them: lower case only
         let mut files = BTreeMap::new();
@@ -1039,14 +1039,14 @@ mod tests {
         let loaded = State::load(dir.path());
         assert_eq!(loaded.files.len(), 2);
         assert_eq!(
-            loaded.get("GRAKSLER/Design/H\u{fc}lse.ipt"),
+            loaded.get("ROVER/Design/H\u{fc}lse.ipt"),
             Some(&decomposed),
             "found under the composed name the server sends"
         );
         assert_eq!(loaded.get(&other.path), Some(&other));
         // both forms of one file: the entry with the composed path wins
         let mut composed = decomposed.clone();
-        composed.path = "GRAKSLER/Design/H\u{fc}lse.ipt".into();
+        composed.path = "ROVER/Design/H\u{fc}lse.ipt".into();
         composed.version = 2;
         let mut files = BTreeMap::new();
         files.insert(composed.path.to_lowercase(), composed.clone());

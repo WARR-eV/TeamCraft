@@ -769,7 +769,7 @@ mod tests {
     fn decomposed_names_are_found_composed() {
         // An assembly saved on Windows after its parts came through a Mac:
         // the references are decomposed (NFD), the stored files composed (NFC).
-        let mut content = prefixed("C:\\GRAKSLER\\Design\\Rad Mitte\\Planetentra\u{308}ger2.ipt");
+        let mut content = prefixed("C:\\ROVER\\Design\\Rad Mitte\\Planetentra\u{308}ger2.ipt");
         content.extend([0x43, 0x00, 0x00, 0x00]);
         content.extend(utf16("Gearbox\\Motor_shaft_hu\u{308}lse.ipt"));
         content.extend([0x00, 0x00]);

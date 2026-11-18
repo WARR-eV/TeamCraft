@@ -2103,12 +2103,12 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         // written by an older app from names that came from a Mac
-        let old_dir = root.join("GRAKSLER").join("Za\u{308}hne");
+        let old_dir = root.join("ROVER").join("Za\u{308}hne");
         std::fs::create_dir_all(&old_dir).unwrap();
         let old = old_dir.join("Planetentra\u{308}ger2.ipt");
         std::fs::write(&old, b"part").unwrap();
         set_read_only(&old, true).unwrap();
-        let rel = "GRAKSLER/Z\u{e4}hne/Planetentr\u{e4}ger2.ipt";
+        let rel = "ROVER/Z\u{e4}hne/Planetentr\u{e4}ger2.ipt";
         let target = layout::join_rel(root, rel);
         if old == target || target.exists() {
             // a file system that treats both forms as one name (APFS):
@@ -2118,7 +2118,7 @@ mod tests {
         }
         let mut state = State::default();
         let mut entry = layout::ServerFile {
-            project: Some("GRAKSLER".into()),
+            project: Some("ROVER".into()),
             item: "PRT-000243".into(),
             revision: "A".into(),
             file_id: "f1".into(),
@@ -2130,7 +2130,7 @@ mod tests {
             locked_by_me: false,
         }
         .entry("s1", 4, 1);
-        entry.path = "GRAKSLER/Za\u{308}hne/Planetentra\u{308}ger2.ipt".into();
+        entry.path = "ROVER/Za\u{308}hne/Planetentra\u{308}ger2.ipt".into();
         state.insert(entry);
         assert!(adopt_into_state(&mut state, root, rel));
         assert_eq!(std::fs::read(&target).unwrap(), b"part");
@@ -2143,13 +2143,13 @@ mod tests {
         // done once: nothing left to rename
         assert!(!adopt_decomposed(root, rel));
         // a composed file that exists already is never replaced
-        let other = root.join("GRAKSLER").join("Hu\u{308}lse.ipt");
+        let other = root.join("ROVER").join("Hu\u{308}lse.ipt");
         std::fs::write(&other, b"old").unwrap();
-        std::fs::write(root.join("GRAKSLER").join("H\u{fc}lse.ipt"), b"new").unwrap();
-        assert!(!adopt_decomposed(root, "GRAKSLER/H\u{fc}lse.ipt"));
+        std::fs::write(root.join("ROVER").join("H\u{fc}lse.ipt"), b"new").unwrap();
+        assert!(!adopt_decomposed(root, "ROVER/H\u{fc}lse.ipt"));
         assert_eq!(std::fs::read(&other).unwrap(), b"old");
         // plain names and missing files: nothing happens
-        assert!(!adopt_decomposed(root, "GRAKSLER/bracket.prt"));
-        assert!(!adopt_decomposed(root, "GRAKSLER/Gr\u{f6}\u{df}e.ipt"));
+        assert!(!adopt_decomposed(root, "ROVER/bracket.prt"));
+        assert!(!adopt_decomposed(root, "ROVER/Gr\u{f6}\u{df}e.ipt"));
     }
 }

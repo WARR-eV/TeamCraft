@@ -154,7 +154,7 @@ mod tests {
     #[test]
     fn names_from_a_mac_are_composed() {
         let dir = tempfile::tempdir().unwrap();
-        let root = dir.path().join("GRAKSLER");
+        let root = dir.path().join("ROVER");
         // as macOS hands them out: decomposed (NFD)
         let disk = root.join("Rad Mitte").join("Planetentra\u{308}ger2.ipt");
         std::fs::create_dir_all(disk.parent().unwrap()).unwrap();
