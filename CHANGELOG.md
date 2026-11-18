@@ -68,7 +68,7 @@ see the notices in the README.
   program and version, e.g. Autodesk Inventor 2026 or SolidWorks 2025, that
   *Check out and open* uses. Audited as `project.default_cad`; the group's JSON carries
   `default_cad` and `default_cad_version`; `GET /api/v1/formats` names each
-  format's `family`. Migration 0073.
+  format's `family`. Migration 0074.
 - **TeamCraft Desktop: several servers and accounts** (#322, #323).
   *Settings → Connections* lists the saved connections (server, account,
   working folder) with *Switch* and *Remove*; *Add another account…* signs in
