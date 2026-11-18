@@ -115,8 +115,18 @@ export function importLogKey(project, folder) {
   return "teamcraft.import-log:" + JSON.stringify([state.session.server_url, project, folder]);
 }
 export function importLog(project, folder) {
-  try { return JSON.parse(window.localStorage.getItem(importLogKey(project, folder))) || {}; }
+  var log;
+  try { log = JSON.parse(window.localStorage.getItem(importLogKey(project, folder))) || {}; }
   catch (e) { return {}; }
+  // The scan names files composed (NFC); a log an older version wrote for an
+  // import on a Mac has decomposed keys – composed here, so those items are
+  // not imported a second time.
+  var out = {};
+  Object.keys(log).forEach(function (k) {
+    var nfc = k.normalize("NFC");
+    if (!(nfc in out) || nfc === k) out[nfc] = log[k];
+  });
+  return out;
 }
 export function saveImportLog(project, folder, log) {
   try { window.localStorage.setItem(importLogKey(project, folder), JSON.stringify(log)); }

@@ -24,6 +24,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
+use unicode_normalization::{is_nfc_quick, IsNormalized, UnicodeNormalization};
 
 /// Hidden folder of the workspace for the app's own files.
 pub const STATE_DIR: &str = ".teamcraft";
@@ -36,9 +37,34 @@ pub const OLD_BASE_FILE: &str = ".teamcraft-base.json";
 // Names and folders
 // ---------------------------------------------------------------------------
 
-/// A file or folder name that is valid on Windows, macOS and Linux.
+/// A name in Unicode normal form C (composed): `a` + U+0308 becomes `ä`.
+///
+/// macOS hands out decomposed names (NFD); Windows, its CAD programs and the
+/// server (`util::nfc`) use the composed form. On NTFS and ext4 the two are
+/// different files, so a part that went through a Mac is not found by an
+/// assembly saved on Windows. Every name the app writes, sends or compares
+/// goes through this (only APFS on the Mac treats both forms as one name).
+pub fn nfc(name: &str) -> String {
+    if is_nfc_quick(name.chars()) == IsNormalized::Yes {
+        name.to_string()
+    } else {
+        name.nfc().collect()
+    }
+}
+
+/// Whether `name` is already composed (NFC).
+pub fn is_nfc(name: &str) -> bool {
+    match is_nfc_quick(name.chars()) {
+        IsNormalized::Yes => true,
+        IsNormalized::No => false,
+        IsNormalized::Maybe => name.nfc().eq(name.chars()),
+    }
+}
+
+/// A file or folder name that is valid on Windows, macOS and Linux, in
+/// Unicode NFC ([`nfc`]).
 pub fn safe_name(name: &str) -> String {
-    let cleaned: String = name
+    let cleaned: String = nfc(name)
         .trim()
         .chars()
         .map(|c| {
@@ -120,10 +146,12 @@ pub fn stem_of(name: &str) -> String {
 
 /// Normalises a folder inside a project group: the same rule as
 /// `domain::normalize_folder` on the server (`\` → `/`, no `..`, no
-/// leading or trailing `/`, names valid on Windows, macOS and Linux).
+/// leading or trailing `/`, names valid on Windows, macOS and Linux, Unicode
+/// NFC).
 pub fn normalize_folder(raw: &str) -> Result<String, String> {
+    let composed = nfc(raw);
     let mut segments = Vec::new();
-    for segment in raw.trim().split(['/', '\\']) {
+    for segment in composed.trim().split(['/', '\\']) {
         let segment = segment.trim_start();
         if segment.is_empty() || segment == "." {
             continue;
@@ -210,9 +238,11 @@ pub fn local_dir_rel(group: Option<&str>, folder: &str) -> String {
 }
 
 /// The key of a relative path in the state: file systems on Windows and
-/// macOS ignore case, so `Bracket.PRT` and `bracket.prt` are one file.
+/// macOS ignore case, so `Bracket.PRT` and `bracket.prt` are one file; and a
+/// decomposed name (from macOS) is the same file as the composed one the
+/// server sends ([`nfc`]).
 pub fn key_of(rel: &str) -> String {
-    rel.replace('\\', "/").to_lowercase()
+    nfc(&rel.replace('\\', "/")).to_lowercase()
 }
 
 /// A relative path (`/` separated) below the workspace root.
@@ -288,13 +318,29 @@ impl State {
     /// disk are never touched because of it).
     pub fn load(root: &Path) -> State {
         let path = State::path(root);
-        match std::fs::read(&path) {
+        let mut state: State = match std::fs::read(&path) {
             Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_else(|_| {
                 let _ = std::fs::rename(&path, path.with_extension("json.damaged"));
                 State::default()
             }),
             Err(_) => State::default(),
+        };
+        // keys written by older versions were not composed (NFC); of two
+        // entries for one file, the one with the composed path is kept
+        if state.files.keys().any(|k| !is_nfc(k)) {
+            let mut files = BTreeMap::new();
+            for entry in std::mem::take(&mut state.files).into_values() {
+                let key = key_of(&entry.path);
+                let keep_old = files
+                    .get(&key)
+                    .is_some_and(|old: &Entry| is_nfc(&old.path) && !is_nfc(&entry.path));
+                if !keep_old {
+                    files.insert(key, entry);
+                }
+            }
+            state.files = files;
         }
+        state
     }
 
     /// Writes the state atomically (temporary file, then rename).
@@ -951,6 +997,64 @@ mod tests {
         std::fs::write(State::path(dir.path()), b"{ damaged").unwrap();
         assert_eq!(State::load(dir.path()), State::default());
         assert!(dir.path().join(".teamcraft/state.json.damaged").is_file());
+    }
+
+    #[test]
+    fn names_are_composed() {
+        // what macOS hands out: decomposed (NFD); the server stores NFC
+        assert_eq!(
+            nfc("Planetentra\u{308}ger2.ipt"),
+            "Planetentr\u{e4}ger2.ipt"
+        );
+        assert!(is_nfc("Planetentr\u{e4}ger2.ipt") && is_nfc("bracket.prt"));
+        assert!(!is_nfc("Hu\u{308}lse.ipt"));
+        assert_eq!(safe_name("Hu\u{308}lse.ipt"), "H\u{fc}lse.ipt");
+        assert_eq!(
+            normalize_folder("Radkonstruktion/Za\u{308}hne").unwrap(),
+            "Radkonstruktion/Z\u{e4}hne"
+        );
+        assert_eq!(
+            local_rel(Some("GRAKSLER"), "Ra\u{308}der", "Hu\u{308}lse.ipt"),
+            "GRAKSLER/R\u{e4}der/H\u{fc}lse.ipt"
+        );
+        // one key for both forms and any case
+        assert_eq!(
+            key_of("GRAKSLER/Design/Hu\u{308}lse.IPT"),
+            key_of("graksler/design/H\u{fc}lse.ipt")
+        );
+    }
+
+    #[test]
+    fn a_state_from_an_older_version_is_keyed_composed() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut decomposed =
+            server("PRT-000250", "A", "Hu\u{308}lse.ipt", "Design", "s1").entry("s1", 10, 99);
+        decomposed.path = "GRAKSLER/Design/Hu\u{308}lse.ipt".into();
+        let other = server("PRT-000001", "A", "bracket.prt", "Design", "s2").entry("s2", 10, 99);
+        // keys as older versions wrote them: lower case only
+        let mut files = BTreeMap::new();
+        files.insert(decomposed.path.to_lowercase(), decomposed.clone());
+        files.insert(other.path.to_lowercase(), other.clone());
+        State { version: 1, files }.save(dir.path()).unwrap();
+        let loaded = State::load(dir.path());
+        assert_eq!(loaded.files.len(), 2);
+        assert_eq!(
+            loaded.get("GRAKSLER/Design/H\u{fc}lse.ipt"),
+            Some(&decomposed),
+            "found under the composed name the server sends"
+        );
+        assert_eq!(loaded.get(&other.path), Some(&other));
+        // both forms of one file: the entry with the composed path wins
+        let mut composed = decomposed.clone();
+        composed.path = "GRAKSLER/Design/H\u{fc}lse.ipt".into();
+        composed.version = 2;
+        let mut files = BTreeMap::new();
+        files.insert(composed.path.to_lowercase(), composed.clone());
+        files.insert(decomposed.path.to_lowercase(), decomposed.clone());
+        State { version: 1, files }.save(dir.path()).unwrap();
+        let loaded = State::load(dir.path());
+        assert_eq!(loaded.files.len(), 1);
+        assert_eq!(loaded.get(&decomposed.path), Some(&composed));
     }
 
     #[test]

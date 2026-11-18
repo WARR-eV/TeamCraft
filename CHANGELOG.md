@@ -166,6 +166,17 @@ see the notices in the README.
 
 ### Fixed
 
+- **Umlauts from a Mac broke Inventor assemblies on Windows.** macOS hands
+  out file names decomposed (Unicode NFD, `a` + U+0308 for `ä`), Windows and
+  its CAD programs write them composed (NFC); NTFS and ext4 see two different
+  names. A CAD folder imported from a Mac was stored decomposed, the desktop
+  app on Windows wrote the parts under those names, and an assembly asked for
+  every part with an umlaut. Now every file and folder name is composed: on
+  upload and check-in (server), in the folder import, the working folder and
+  its state (desktop); CAD references stored decomposed are recognised too.
+  Migration 0073 composes the names stored before. A Get or the Workspace tab
+  gives a file the app wrote under a decomposed name its composed name, and the
+  import log of an earlier Mac import still skips the items it created.
 - Trigram indexes of the item search could be missing without anyone
   noticing (#308): migrations 0023 and 0031 swallowed *every* error while
   creating them. Migration 0072 creates the six indexes again where they are

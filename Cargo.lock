@@ -3591,6 +3591,7 @@ dependencies = [
  "tracing-subscriber",
  "truck-meshalgo",
  "truck-stepio",
+ "unicode-normalization",
  "uuid",
  "zip",
 ]
