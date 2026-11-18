@@ -258,7 +258,11 @@ code base. These are the most important rules:
   the sources and fail when a rule is broken: `sqlx` in `src/web`, `src/api`
   or `src/mcp`; a public service function that writes without an audit entry (itself or through the services it calls –
   personal data, caches and
-  housekeeping go on its `NOT_AUDITED` list with a reason); a template that
+  housekeeping go on its `NOT_AUDITED` list with a reason); a service function
+  that takes an actor and queries items, revisions or files without a
+  visibility guard in its body (an `access::*` fragment, `ensure_visible`,
+  `ensure_editable` or a guarded getter such as `revisions::get` – the
+  reviewed exceptions are on `NOT_GUARDED` with a reason); a template that
   is not in `TEMPLATES` or not rendered by `every_template_renders`; a
   `TEAMCRAFT_*` variable missing from `docs/src/admin/configuration.md`.
 * **Multi-row mutations** run in one transaction. `tests/atomic_processes.rs`

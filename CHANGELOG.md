@@ -24,6 +24,15 @@ see the notices in the README.
 
 ### Added
 
+- Guard test for read permissions (#312): `tests/architecture_guards.rs`
+  fails when a service function takes an actor and queries items, revisions
+  or files without a visibility guard in its body – an `access::*` SQL
+  fragment, `ensure_visible`, `ensure_editable` or a guarded getter. The
+  twelve functions that do so on purpose (writes inside an already checked
+  transaction, change propagation, notifications filtered by recipient,
+  management counts) were reviewed and are listed with their reasons on
+  `NOT_GUARDED`; none leaked. Row-level security in PostgreSQL as a second
+  layer is not part of this.
 - 3D preview of files saved by **Inventor 2027** (#271, on top of the
   Zstandard segments read since 0.2.8): typed arrays with the new element
   types (4, 8, 14, 16 for `u32` numbers, `invpart::is_u32`) are read, so

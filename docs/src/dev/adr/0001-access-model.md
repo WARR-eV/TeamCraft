@@ -88,3 +88,4 @@ From the research note:
 | Handlers never call `*_unchecked`; nobody but `access` writes a guard | `tests/no_unchecked_in_handlers.rs`                                 |
 | Every web route, REST route and MCP tool leaks nothing to an outsider | `tests/read_permissions.rs` (routes read from the router sources)   |
 | Handlers never touch SQL themselves                                   | proposed in #96 (`tests/architecture_guards.rs`)                    |
+| Every service read of items, revisions and files for an actor is guarded | `tests/architecture_guards.rs` `every_read_for_an_actor_applies_the_visibility_guard` (#312; exceptions on `NOT_GUARDED`) |

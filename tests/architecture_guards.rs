@@ -418,6 +418,161 @@ fn the_audit_guard_follows_calls_between_services() {
 }
 
 // ---------------------------------------------------------------------------
+// (b2) every read of items, revisions and files for an actor is guarded (#312)
+// ---------------------------------------------------------------------------
+
+/// Service functions that query items, revisions or files for an actor
+/// without a visibility guard in their own body, on purpose. Each entry names
+/// why it cannot leak what the actor may not read. Reviewed for #312.
+const NOT_GUARDED: &[(&str, &str)] = &[
+    (
+        "access_log::record_structure",
+        "writes the read log for revision ids its callers have already read through guarded queries",
+    ),
+    (
+        "changes::stands_in_for_author",
+        "returns only whether the actor manages every group of a change the caller has loaded \
+         visibly; nothing of the items leaves the function",
+    ),
+    (
+        "files::store_uploads",
+        "runs inside the caller's transaction on a revision the caller locked and checked with \
+         revisions::ensure_editable",
+    ),
+    (
+        "impacts::record_flags",
+        "change propagation inside a release: writes one audit entry per project group, each \
+         naming only that group's items",
+    ),
+    (
+        "impacts::notify_flagged",
+        "notifications::notify filters the recipients with access::user_sees_project and \
+         sends the redacted text to those who may not see the source",
+    ),
+    (
+        "impacts::on_release",
+        "change propagation inside the releasing transaction; returns nothing to the actor",
+    ),
+    (
+        "impacts::on_obsolete",
+        "change propagation inside the transaction that made the revision obsolete; returns \
+         nothing to the actor",
+    ),
+    (
+        "interchange::tell_supersession_watchers",
+        "notifications::notify filters the watchers with access::user_sees_project",
+    ),
+    (
+        "offboarding::idle_sso_users",
+        "administrators only; returns counts per user (management data), no item content",
+    ),
+    (
+        "projects::former_holders",
+        "managers of the group only (require_manager); returns people and check-out counts, \
+         no item content",
+    ),
+    (
+        "season::members",
+        "managers of the group only (require_manager); returns members and check-out counts, \
+         no item content",
+    ),
+    (
+        "simulations::insert_basis_tx",
+        "the caller passes a basis revision it read through a guarded query; the function \
+         only locks that item and its files",
+    ),
+];
+
+/// Service functions that take an actor, query items, revisions or files
+/// and contain no guard in their own body (`module::function`, sorted).
+///
+/// Guards are the SQL fragments of `services::access`, the Rust checks
+/// (`ensure_visible`, `can_see_project`, `ensure_editable`) and the guarded
+/// getters that load the object for the actor (`revisions::get`,
+/// `get(pool, actor, …)`, `lock_visible`, …). Calls are not followed: a
+/// function that only hands data to a guarded one is listed, so each such
+/// case is looked at once and named in [`NOT_GUARDED`].
+fn unguarded_reads() -> Vec<String> {
+    let item = Regex::new(r"(?m)^(pub(?:\([a-z]+\))? )?(?:async )?fn (\w+)").unwrap();
+    let actor = Regex::new(r"(actor|me|viewer): &Actor").unwrap();
+    let touches =
+        Regex::new(r"(?m)(FROM|JOIN) (items|revisions|files|file_versions)( |$|\))").unwrap();
+    let guard = Regex::new(
+        r"item_visible|project_visible|ensure_visible|hidden_projects|change_visible|request_visible|user_sees_project|can_see_project|ensure_editable|revisions::get\(|items::get\(|files::get\(| get\(pool, actor|ensure_revision_visible|lock_visible| list\(pool, actor|bom::tree\(pool, actor",
+    )
+    .unwrap();
+    let mut found = Vec::new();
+    for file in rust_files("src/services") {
+        if file.ends_with("access.rs") {
+            continue; // writes the guards
+        }
+        let module = service_module(&file);
+        let text = read(&file);
+        let text = without_tests(&text);
+        let starts: Vec<(usize, String)> = item
+            .captures_iter(text)
+            .map(|c| (c.get(0).unwrap().start(), c[2].to_string()))
+            .collect();
+        for (i, (start, name)) in starts.iter().enumerate() {
+            let end = starts.get(i + 1).map_or(text.len(), |s| s.0);
+            let body = &text[*start..end];
+            if actor.is_match(body) && touches.is_match(body) && !guard.is_match(body) {
+                found.push(format!("{module}::{name}"));
+            }
+        }
+    }
+    found.sort();
+    found
+}
+
+#[test]
+fn every_read_for_an_actor_applies_the_visibility_guard() {
+    let found = unguarded_reads();
+    let exempt: BTreeMap<&str, &str> = NOT_GUARDED.iter().copied().collect();
+    let missing: Vec<&String> = found
+        .iter()
+        .filter(|name| !exempt.contains_key(name.as_str()))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "these service functions query items, revisions or files for an actor without a \
+         visibility guard – add access::item_visible / project_visible to the SQL, check the \
+         loaded row with access::ensure_visible, load it through a guarded getter, or, when \
+         nothing of a hidden group can reach the actor, add them to NOT_GUARDED with the \
+         reason:\n{}",
+        missing
+            .iter()
+            .map(|m| format!("  {m}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+    // the exceptions are still exceptions (no stale entries)
+    for (name, why) in NOT_GUARDED {
+        assert!(
+            found.iter().any(|f| f == name),
+            "NOT_GUARDED names {name} ({why}), which is gone or guarded now – remove it from \
+             the list"
+        );
+    }
+}
+
+#[test]
+fn the_visibility_guard_scanner_sees_reads_and_guards() {
+    let found = unguarded_reads();
+    // a guarded read is not listed (read_text checks through files::list)
+    assert!(
+        !found.contains(&"files::read_text".to_string()),
+        "{found:?}"
+    );
+    // the exceptions are found by the scanner, so it parses the services
+    assert!(
+        found.contains(&"impacts::notify_flagged".to_string()),
+        "{found:?}"
+    );
+    assert!(found.contains(&"season::members".to_string()), "{found:?}");
+}
+
+// ---------------------------------------------------------------------------
 // (c) every template registered and rendered
 // ---------------------------------------------------------------------------
 
