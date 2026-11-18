@@ -56,6 +56,11 @@ see the notices in the README.
 
 ### Changed
 
+- CI: the macOS build (`build (macos-latest)`, on `main` only) is advisory
+  and no longer part of **CI result**. GitHub's hosted macOS arm64 runners
+  often stay unavailable ("The job was not acquired by Runner of type hosted
+  even after multiple attempts"); the cancelled job had turned every commit
+  on `main` red since 2026-11-18 although the code was fine.
 - The repository moved from `rudalabs/TeamCraft` to **`WARR-eV/TeamCraft`**:
   every link, the install command, the documentation at
   <https://warr-ev.github.io/TeamCraft/> and the container image

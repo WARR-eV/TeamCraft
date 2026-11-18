@@ -449,7 +449,10 @@ another pull request changed, formatting after a conflict resolution.
 * **CI result** is the one check that sums up the CI workflow: it is green
   when every job passed or was skipped on purpose (a pull request that only
   changes `*.md`, `docs/` or `platforms/` skips the Rust jobs), red when
-  one failed or was cancelled. CI also runs on `merge_group`, so a merge
+  one failed or was cancelled. The macOS build (`build (macos-latest)`, on
+  `main` only) is advisory and not part of it: GitHub's hosted macOS
+  runners are often unavailable, and a job that never got a runner is
+  cancelled – that is no fault of the code. CI also runs on `merge_group`, so a merge
   queue (Settings → Rules) tests each pull request against the `main` it
   lands on.
 * Release builds do not run per push to `main` (see "Releases and
