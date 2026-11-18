@@ -50,10 +50,20 @@ const MAX_ZSTD_WINDOW: u64 = 32 * 1024 * 1024;
 const MAX_ZSTD_FRAMES: usize = 64;
 /// Marker of a typed array.
 pub const ARRAY: u32 = 0x3000_0002;
-/// Element type of `u32` arrays.
+/// Element type of plain `u32` arrays in files up to Inventor 2025.
 pub const ELEM_U32: u32 = 0;
+/// Element types of `u32` arrays in files of Inventor 2027, which name the
+/// kind of number where older files have 0: three kinds of integers (8 for
+/// triangle indices and occurrence ids) and 16 for refs to sections
+/// (`docs/src/research/inventor-zstd-streams.md`).
+const U32_2027: [u32; 4] = [4, 8, 0xE, 0x10];
 /// Element type of key arrays (`u32` too).
 pub const ELEM_KEYS: u32 = 0x1000_0000;
+
+/// Whether an array element type is a plain `u32` (no key array).
+pub fn is_u32(elem: u32) -> bool {
+    elem == ELEM_U32 || U32_2027.contains(&elem)
+}
 
 fn bad(what: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, format!("Inventor file: {what}"))
@@ -115,7 +125,8 @@ impl Segment {
     /// Element size of an array element type (`None`: unknown class).
     pub fn element_size(&self, elem: u32) -> Option<usize> {
         match elem {
-            ELEM_U32 | ELEM_KEYS => Some(4),
+            ELEM_KEYS => Some(4),
+            e if is_u32(e) => Some(4),
             e if e & 0xFFFF_FF00 == 0x100 => {
                 let class = *self.classes.get(usize::try_from(e & 0xFF).ok()?)?;
                 match class {
@@ -128,7 +139,7 @@ impl Segment {
         }
     }
 
-    /// The class of an array element type (`ELEM_U32`/`ELEM_KEYS` as is).
+    /// The class of an array element type (the `u32` types as they are).
     pub fn element_class(&self, elem: u32) -> Option<u32> {
         if elem & 0xFFFF_FF00 == 0x100 {
             self.classes
@@ -774,5 +785,31 @@ pub(crate) mod tests {
         let mut c = Cursor::new(&empty, 0);
         assert_eq!(c.array(&seg).unwrap().count, 0);
         assert_eq!(c.at, 8);
+    }
+
+    #[test]
+    fn the_array_types_of_inventor_2027_are_u32() {
+        let seg = Segment {
+            lengths: vec![],
+            classes: vec![POINT3F],
+            data: vec![],
+        };
+        for elem in [ELEM_U32, 4, 8, 0xE, 0x10] {
+            assert!(is_u32(elem), "{elem}");
+            let a = array(elem, 3, &[0; 12]);
+            let read = Cursor::new(&a, 0).array(&seg).unwrap();
+            assert_eq!((read.count, read.bytes.len(), read.elem), (3, 12, elem));
+            assert_eq!(seg.element_class(elem), Some(elem));
+        }
+        // keys are four bytes too, but no plain numbers
+        assert!(!is_u32(ELEM_KEYS));
+        assert_eq!(seg.element_size(ELEM_KEYS), Some(4));
+        // bytes (6) and unknown types end the read
+        for elem in [6, 5, 0x20, 0x11] {
+            assert!(!is_u32(elem), "{elem}");
+            assert!(Cursor::new(&array(elem, 3, &[0; 12]), 0)
+                .array(&seg)
+                .is_none());
+        }
     }
 }

@@ -6,8 +6,13 @@
 //!
 //!   ```text
 //!   u32 0 | u32 file id | u32 occurrence id | u32 number | u32 instance
-//!   | u32 n, n × UTF-16 title | 6 × 00, 0x80 | flags (0x40: not visible) | …
+//!   | u32 n, n × UTF-16 title | 6 × 00, 0x80 | flags | …
 //!   ```
+//!
+//!   Up to Inventor 2022 the record carries its title and flag `0x40` means
+//!   *not visible*. Inventor 2027 leaves the title empty (`n` = 0) and uses
+//!   the flag for components with the BOM structure *Reference*, which are
+//!   visible; what is hidden is listed by the active design view (below).
 //!
 //!   The records are followed by property blocks whose layout is not known,
 //!   so they are found by scanning for exactly this shape with known ids.
@@ -32,6 +37,13 @@
 //!   [u32 0x203]`, a packed matrix, 120 bytes): kind 2 replaces the local
 //!   placement of the child with that key. Kind 1 (positional
 //!   representations, empty path) is not applied.
+//!
+//! * Files of Inventor 2027: the segment `DesignViewSegment` lists the views
+//!   (class `328FC2EA`: `u32 0, u16`, an array of refs to the views, the name
+//!   of the active view). A view (class `9DC2A241`: `u32 0, u16`, its name,
+//!   an array of refs) points to its camera and, when it hides components,
+//!   to a section of class `71C22321` (`u32 0, u16`, an array of the hidden
+//!   occurrence ids). The preview leaves out what the active view hides.
 //!
 //! Sub-assemblies are files of their own; `services::assemblies` resolves
 //! them and composes the placements, applying the overrides on the way down
@@ -61,6 +73,16 @@ const OVERRIDE_SET: u32 = 0xF17A_4562;
 const OVERRIDE: u32 = 0x2238_DCC5;
 /// The override kind that re-poses a child of a flexible sub-assembly.
 const REPOSE: u32 = 2;
+/// The segment with the design views (view representations).
+const DESIGN_VIEWS: &str = "DesignViewSegment";
+/// The list of design views, with the name of the active one.
+const VIEW_LIST: u32 = 0x328F_C2EA;
+/// One design view: its name and refs to its camera and hidden list.
+const VIEW: u32 = 0x9DC2_A241;
+/// The occurrence ids a design view hides.
+const VIEW_HIDDEN: u32 = 0x71C2_2321;
+/// Hidden occurrences read per view at most.
+const MAX_HIDDEN: usize = 1_000_000;
 /// The name record and the suppression record of an occurrence's block.
 const NAME_RECORD: [u8; 7] = [1, 5, 1, 0, 0, 0, 5];
 const SUPPRESSION_RECORD: [u8; 7] = [1, 7, 1, 0, 0, 0, 7];
@@ -93,7 +115,10 @@ struct FileRef {
 struct Record {
     file: u32,
     id: u32,
-    visible: bool,
+    /// Flag `0x40` is not set.
+    flag: bool,
+    /// The record carries its title (files up to Inventor 2022).
+    titled: bool,
     suppressed: bool,
     /// Where the record starts and where its header ends.
     start: usize,
@@ -202,13 +227,29 @@ fn components_in<F: Read + Seek>(
     };
     let known: HashSet<u32> = placements.keys().copied().collect();
     let occurrences = occurrences(&doc, end, &files, &known);
+    // the record form of Inventor 2027 (no titles): the active design view
+    // says what is hidden, and flag 0x40 means something else
+    let untitled = !occurrences.is_empty() && occurrences.iter().all(|o| !o.titled);
+    let hidden = if untitled {
+        match invpart::segment(ole, DESIGN_VIEWS, MAX_SEGMENT) {
+            Ok(Some(views)) => hidden_in_active_view(&views),
+            _ => HashSet::new(),
+        }
+    } else {
+        HashSet::new()
+    };
     let names: HashMap<u32, &str> = files.iter().map(|f| (f.id, file_name(&f.path))).collect();
     let mut out = Vec::new();
     for o in occurrences {
         let (Some(name), Some(p)) = (names.get(&o.file), placements.get(&o.id)) else {
             continue;
         };
-        if !o.visible || o.suppressed || name.is_empty() {
+        let visible = if untitled {
+            !hidden.contains(&o.id)
+        } else {
+            o.flag
+        };
+        if !visible || o.suppressed || name.is_empty() {
             continue;
         }
         let mut c = component(name, &p.matrix);
@@ -227,6 +268,56 @@ fn components_in<F: Read + Seek>(
         out.push(c);
     }
     Ok(Some(out))
+}
+
+/// The `u32` values of an array.
+fn words(a: invpart::Array) -> Vec<u32> {
+    a.bytes
+        .chunks_exact(4)
+        .filter_map(|w| w.try_into().ok().map(u32::from_le_bytes))
+        .collect()
+}
+
+/// The occurrence ids the active design view hides (Inventor 2027); empty
+/// when the segment does not have the known shape.
+fn hidden_in_active_view(segment: &invpart::Segment) -> HashSet<u32> {
+    let sections: Vec<invpart::Section> = segment.sections().map_while(Result::ok).collect();
+    // the list of views: refs to the views, then the name of the active one
+    let active = sections
+        .iter()
+        .find(|s| s.class == VIEW_LIST)
+        .and_then(|s| {
+            let mut c = invpart::Cursor::new(s.payload, 6);
+            c.array(segment)?;
+            text(s.payload, c.at, MAX_TEXT).map(|(name, _)| name)
+        });
+    let mut hidden = HashSet::new();
+    let Some(active) = active else {
+        return hidden;
+    };
+    for view in sections.iter().filter(|s| s.class == VIEW) {
+        let Some((name, at)) = text(view.payload, 6, MAX_TEXT) else {
+            continue;
+        };
+        if name != active {
+            continue;
+        }
+        let Some(refs) = invpart::Cursor::new(view.payload, at).array(segment) else {
+            continue;
+        };
+        for r in words(refs) {
+            let list = usize::try_from(r & 0x7FFF_FFFF)
+                .ok()
+                .and_then(|i| i.checked_sub(1))
+                .and_then(|i| sections.get(i))
+                .filter(|s| s.class == VIEW_HIDDEN);
+            let ids = list.and_then(|s| invpart::Cursor::new(s.payload, 6).array(segment));
+            if let Some(ids) = ids.filter(|a| invpart::is_u32(a.elem) && a.count <= MAX_HIDDEN) {
+                hidden.extend(words(ids));
+            }
+        }
+    }
+    hidden
 }
 
 /// The file name of a stored (Windows or Unix) path.
@@ -291,12 +382,6 @@ fn placements(segment: &invpart::Segment) -> io::Result<Placements> {
             let mut c = invpart::Cursor::new(p, 6);
             let (Some(path), Some(refs)) = (c.array(segment), c.array(segment)) else {
                 continue;
-            };
-            let words = |a: invpart::Array| -> Vec<u32> {
-                a.bytes
-                    .chunks_exact(4)
-                    .filter_map(|w| w.try_into().ok().map(u32::from_le_bytes))
-                    .collect()
             };
             sets.push((words(path), words(refs)));
             continue;
@@ -538,11 +623,12 @@ fn occurrence_at(
     if flags.get(..6)? != [0; 6] || flags.get(6)? & 0x80 == 0 {
         return None;
     }
-    let visible = flags.get(7)? & 0x40 == 0;
+    let flag = flags.get(7)? & 0x40 == 0;
     Some(Record {
         file,
         id,
-        visible,
+        flag,
+        titled: !title.is_empty(),
         suppressed: false,
         start: at,
         end: end + 8,
@@ -817,6 +903,120 @@ mod tests {
             (p[0] - 10.0).abs() < 1e-9 && (p[1] - 21.0).abs() < 1e-9 && (p[2] - 30.0).abs() < 1e-9,
             "{p:?}"
         );
+    }
+
+    /// `DesignViewSegment` with the views "Default" (hides `default_hides`)
+    /// and "Front" (hides `front_hides`), "Front" active.
+    fn design_views(default_hides: &[u32], front_hides: &[u32]) -> Vec<(u8, Vec<u8>)> {
+        let words = |v: &[u32]| v.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>();
+        let refs = |sections: &[u32]| -> Vec<u8> {
+            let r: Vec<u32> = sections.iter().map(|&i| (i + 1) | 0x8000_0000).collect();
+            array(0, r.len(), &words(&r))
+        };
+        // 0 list of views, 1 and 2 views, 3 and 4 their hidden lists
+        let mut list = vec![0u8; 6];
+        list.extend(refs(&[1, 2]));
+        list.extend(text16("Front"));
+        let view = |name: &str, hidden: u32| {
+            let mut v = vec![0u8; 6];
+            v.extend(text16(name));
+            v.extend(refs(&[hidden]));
+            v
+        };
+        let hidden = |ids: &[u32]| {
+            let mut h = vec![0u8; 6];
+            // element type 8: the occurrence ids of Inventor 2027
+            h.extend(array(8, ids.len(), &words(ids)));
+            h
+        };
+        vec![
+            (0, list),
+            (1, view("Default", 3)),
+            (1, view("Front", 4)),
+            (2, hidden(default_hides)),
+            (2, hidden(front_hides)),
+        ]
+    }
+
+    fn assembly_2027(views: Option<Vec<(u8, Vec<u8>)>>) -> Vec<u8> {
+        let placements = vec![
+            (0, placement(1, [0.0; 3], true)),
+            (0, placement(2, [1.0, 0.0, 0.0], false)),
+            (0, placement(3, [2.0, 0.0, 0.0], false)),
+        ];
+        // Inventor 2027: no titles; flag 0x40 marks the Reference component 2
+        let doc = doc(
+            &[(1, r"C:\A\Shaft.ipt"), (2, r"C:\A\Bolt.ipt")],
+            &[(1, 1, "", true), (1, 2, "", false), (2, 3, "", true)],
+        );
+        let classes = [OCCURRENCE, 0xFDCD_32FE, OVERRIDE_SET, OVERRIDE];
+        let view_classes = [VIEW_LIST, VIEW, VIEW_HIDDEN];
+        let mut segments: Vec<crate::invpart::tests::SegmentSpec> =
+            vec![(PLACEMENTS, &classes, placements)];
+        if let Some(views) = views {
+            segments.push((DESIGN_VIEWS, &view_classes, views));
+        }
+        file(&segments, &[("/UFRxDoc", doc)])
+    }
+
+    fn ids(c: &[Component]) -> Vec<u32> {
+        c.iter()
+            .map(|c| c.occurrence.as_ref().unwrap().id)
+            .collect()
+    }
+
+    #[test]
+    fn inventor_2027_takes_the_hidden_components_from_the_active_design_view() {
+        // "Front" is active and hides the Bolt (3); "Default" would hide 1
+        let c = components(&assembly_2027(Some(design_views(&[1], &[3])))).unwrap();
+        assert_eq!(
+            ids(&c),
+            [1, 2],
+            "flag 0x40 (Reference) does not hide 2, the active view hides 3"
+        );
+        // nothing hidden in the active view: everything is shown
+        let c = components(&assembly_2027(Some(design_views(&[1, 2, 3], &[])))).unwrap();
+        assert_eq!(ids(&c), [1, 2, 3]);
+        // no design views: nothing is hidden either
+        let c = components(&assembly_2027(None)).unwrap();
+        assert_eq!(ids(&c), [1, 2, 3]);
+        // a damaged view segment never panics and hides nothing
+        let mut views = design_views(&[], &[3]);
+        views[0].1.truncate(9);
+        let c = components(&assembly_2027(Some(views))).unwrap();
+        assert_eq!(ids(&c), [1, 2, 3]);
+    }
+
+    #[test]
+    fn titled_records_keep_flag_0x40_as_hidden() {
+        // records with titles (up to Inventor 2022): the flag decides, the
+        // design views are not read
+        let doc = doc(
+            &[(1, r"C:\A\Shaft.ipt"), (2, r"C:\A\Bolt.ipt")],
+            &[
+                (1, 1, "Shaft:1", true),
+                (1, 2, "Shaft:2", false),
+                (2, 3, "Bolt:1", true),
+            ],
+        );
+        let classes = [OCCURRENCE, 0xFDCD_32FE, OVERRIDE_SET, OVERRIDE];
+        let view_classes = [VIEW_LIST, VIEW, VIEW_HIDDEN];
+        let bytes = file(
+            &[
+                (
+                    PLACEMENTS,
+                    &classes,
+                    vec![
+                        (0, placement(1, [0.0; 3], true)),
+                        (0, placement(2, [1.0, 0.0, 0.0], false)),
+                        (0, placement(3, [2.0, 0.0, 0.0], false)),
+                    ],
+                ),
+                (DESIGN_VIEWS, &view_classes, design_views(&[], &[3])),
+            ],
+            &[("/UFRxDoc", doc)],
+        );
+        assert_eq!(ids(&components(&bytes).unwrap()), [1, 3]);
     }
 
     #[test]

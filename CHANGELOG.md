@@ -24,6 +24,16 @@ see the notices in the README.
 
 ### Added
 
+- 3D preview of files saved by **Inventor 2027** (#271, on top of the
+  Zstandard segments read since 0.2.8): typed arrays with the new element
+  types (4, 8, 14, 16 for `u32` numbers, `invpart::is_u32`) are read, so
+  parts give their meshes; in assemblies without occurrence titles the
+  hidden components come from the active design view
+  (`DesignViewSegment`), and flag `0x40`, which marks *Reference*
+  components there, no longer hides them. Older files read as before.
+  Checked by hand against 229 files saved by Inventor 2027 (137 of 137 parts
+  with a body, 33 of 33 assemblies), see the research page *Inventor 2026
+  and later: Zstandard streams*.
 - Contribution rule **own work only – no decompiled code**: code
   decompiled, disassembled or rewritten from proprietary software, a "clean
   room" through decompilation, and leaked or incompatibly licensed code are not accepted,

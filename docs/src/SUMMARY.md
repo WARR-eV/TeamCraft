@@ -70,6 +70,7 @@
     - [Mass properties from exported meshes](research/mass-properties.md)
     - [3D preview of Fusion designs](research/fusion-ogs-preview.md)
     - [3D preview of Inventor files](research/inventor-display-preview.md)
+    - [Inventor 2026 and later: Zstandard streams](research/inventor-zstd-streams.md)
     - [3D preview of Creo parts](research/creo-brep-preview.md)
     - [3D preview of Creo assemblies](research/creo-assembly-preview.md)
     - [3D preview of SOLIDWORKS files](research/solidworks-display-preview.md)

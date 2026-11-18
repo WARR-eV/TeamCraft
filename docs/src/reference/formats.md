@@ -163,6 +163,12 @@ visibility of each occurrence come from the stream `UFRxDoc`, the
 placements from `AmRxSegment`, including the poses a parent gives the
 children of flexible sub-assemblies. Hidden and suppressed components are
 left out, and components are found by the file name of their stored path.
+Files of Inventor 2027 store no occurrence titles and keep what is hidden
+with the design views: for them the hidden components are those the active
+design view (`DesignViewSegment`) lists, and flag `0x40` (there: BOM
+structure *Reference*) is ignored. Their typed arrays name the kind of
+number (element types 4, 8, 14, 16 instead of 0); see
+[Research: Inventor 2026 and later](../research/inventor-zstd-streams.md).
 Not covered: design views other than the saved one, weld beads, drawings
 and presentations.
 
