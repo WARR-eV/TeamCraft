@@ -71,13 +71,17 @@ export function openPlan(rev, file) {
   return call("cad_open_plan", { wish: cadWish(rev, file) });
 }
 
-/** Opens a file of the working folder with the chosen program and says with which. */
+/** Opens a file of the working folder with the chosen program (an Inventor
+ * that already runs with the working folder's project, #350) and says with which. */
 export function openWithCad(rev, file) {
   return call("workspace_open_cad", {
     project: rev.project_code, item: rev.item_number, code: rev.code, file: file.filename, wish: cadWish(rev, file)
   }).then(function (plan) {
+    // reused: the running Inventor with the working folder's project opened
+    // it (#350); note: why a running one was not used
     toast("Opened " + file.filename + " in " + (plan.program ? plan.label : "the default application") +
-      (plan.fallback ? " – " + plan.reason : ""));
+      (plan.reused ? " (the instance that was already running)" : "") +
+      (plan.fallback ? " – " + plan.reason : "") + (plan.note ? " – " + plan.note : ""), plan.note ? "info" : null);
     return plan;
   });
 }

@@ -1405,7 +1405,8 @@ pub async fn cad_open_plan(wish: cadlaunch::Wish) -> cadlaunch::OpenPlan {
 /// Opens a workspace file of a revision with the CAD program chosen for it
 /// (the project group's default, else the newest installed program that
 /// fits the file, else the operating system's default application).
-/// Returns how it was opened.
+/// An Inventor that already runs with the working folder's project opens it
+/// as a new window (#350). Returns how it was opened.
 #[tauri::command]
 pub async fn workspace_open_cad(
     app: AppHandle,
@@ -1417,15 +1418,9 @@ pub async fn workspace_open_cad(
     wish: cadlaunch::Wish,
 ) -> CmdResult<cadlaunch::OpenPlan> {
     let api = signed_in_api(&state)?;
-    let (_, found) = workspace::locate(
-        &api,
-        &workspace_root(&app, &state),
-        project.as_deref(),
-        &item,
-        &code,
-        &file,
-    )
-    .await?;
+    let root = workspace_root(&app, &state);
+    let (_, found) =
+        workspace::locate(&api, &root, project.as_deref(), &item, &code, &file).await?;
     let Some(path) = found.filter(|p| p.is_file()) else {
         return Err(ApiError::local(format!(
             "{file} is not in the working folder – check out or use “Get files” first."
@@ -1436,6 +1431,21 @@ pub async fn workspace_open_cad(
             .await
             .map_err(|e| ApiError::local(format!("The program could not be chosen: {e}")))?;
     if let Some(program) = plan.program.clone() {
+        // an Inventor that already runs with this working folder's project
+        // opens the file as a new window instead of a second instance (#350)
+        let (asked, file_path) = (program.clone(), path.clone());
+        let reuse = tokio::task::spawn_blocking(move || {
+            cadlaunch::open_in_running(&asked, &file_path, &root)
+        })
+        .await
+        .unwrap_or(cadlaunch::Reuse::NewInstance(String::new()));
+        match reuse {
+            cadlaunch::Reuse::Opened => {
+                plan.reused = true;
+                return Ok(plan);
+            }
+            cadlaunch::Reuse::NewInstance(note) => plan.note = note,
+        }
         match cadlaunch::launch(&program, &path) {
             Ok(()) => return Ok(plan),
             Err(e) => {

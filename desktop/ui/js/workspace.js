@@ -12,6 +12,7 @@ import { reviewerProblem } from "./release-rules.js";
 import { requestChangeDialog } from "./requests.js";
 import { refreshStructure } from "./navigator.js";
 import { fileFamily, openWithCad } from "./cad-open.js";
+import { incompleteGet, notOpenedText } from "./get-rules.js";
 
 // ---------------------------------------------------------------- 3D viewer
 
@@ -326,7 +327,7 @@ export function foreignLockText(rev) {
 export function openLocalFile(tab, f) {
   var rev = tab.data.rev;
   var lockText = foreignLockText(rev);
-  function open() { openFile(tab, f.name, true, true); }
+  function open(got) { openFile(tab, f.name, true, true, got); }
   if (f.state === "outdated") {
     dialog("Newer version on the server", h("div.stack", null, [
       h("p", { text: f.name + " in your workspace is v" + (f.base_version || "?") + "; the server has " +
@@ -338,7 +339,7 @@ export function openLocalFile(tab, f) {
       { label: "Get latest and open", primary: true, submit: true, onClick: function (d) {
         d.close();
         getting(call("workspace_download", { project: rev.project_code, item: rev.item_number, code: rev.code }))
-          .then(function (r) { reportDownload(r); open(); renderActive(); }, function (e) { toast(errorText(e), "error"); });
+          .then(function (r) { reportDownload(r); open(r); renderActive(); }, function (e) { toast(errorText(e), "error"); });
       } }
     ]);
     return;
@@ -355,18 +356,26 @@ export function openLocalFile(tab, f) {
     ]);
 }
 
-export function openFile(tab, filename, local, warned) {
+/** Opens a file of a revision: `local` = it is in the working folder already
+ * (`got`: the Get that just brought it, if any), else it is fetched first. */
+export function openFile(tab, filename, local, warned, got) {
   var rev = tab.data.rev;
   var lockText = warned ? null : foreignLockText(rev);
   var asked = lockText ? confirmDialog("Checked out by " + rev.checked_out_by_name, lockText, "Open anyway") : Promise.resolve(true);
   asked.then(function (ok) {
     if (!ok) return;
-    var ready = local ? Promise.resolve() :
+    var ready = local ? Promise.resolve(got) :
       getting(call("workspace_download", { project: rev.project_code, item: rev.item_number, code: rev.code }));
-    return ready.then(function () {
-      // a native CAD file: in the CAD program chosen for it (cad-open.js)
+    return ready.then(function (r) {
+      // a native CAD file: in the CAD program chosen for it (cad-open.js) –
+      // not after a stopped or failed Get, an assembly would open without
+      // its parts (#348)
       var file = (tab.data.files || []).filter(function (f) { return f.filename === filename; })[0];
-      if (fileFamily(file)) return openWithCad(rev, file);
+      if (fileFamily(file)) {
+        var why = incompleteGet(r);
+        if (why) { toast(notOpenedText(filename, why), "info"); return; }
+        return openWithCad(rev, file);
+      }
       return call("workspace_open", { project: rev.project_code, item: rev.item_number, code: rev.code, file: filename });
     });
   }).catch(function (e) { if (e) toast(errorText(e), "error"); });

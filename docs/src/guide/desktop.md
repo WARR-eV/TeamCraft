@@ -101,6 +101,9 @@ check-outs and reviews, and a **local working folder**:
   stays checked out to you and your local files are untouched. Once every
   byte is sent the server finishes the check-in on its own; the dialog says
   so (*too late to cancel*);
+* the worklist in the navigator follows what you do in the tabs: checking
+  out, cancelling a check-out, checking in or acknowledging a dependent
+  updates it at once, while it stays open on the left;
 * *Check in all* in the worklist first lists the check-outs with local
   changes (modified or new files) and offers to **check them in first**
   with their files; *Only the others* checks in just the check-outs without
@@ -346,6 +349,25 @@ setting in the web UI.
   versions its installer registers; on macOS the apps in `/Applications`
   (FreeCAD, Rhino, SketchUp, Fusion); on Linux FreeCAD on the `PATH`. The
   app looks once per start – restart it after installing a CAD program.
+* **A running Inventor is reused** (Windows): when Inventor is already
+  running – the installation chosen above, with the working folder's
+  Inventor project active – the file opens there as a new document window,
+  and Inventor comes to the front, instead of starting a second instance.
+  The working folder's project is the Inventor project file (`.ipj`) in the
+  nearest folder from the file's own up to the working folder root; a folder
+  with several `.ipj` files makes it unknown. A new instance starts when no
+  Inventor runs, when another version runs, or when the running one has
+  another project active (or the working folder has no `.ipj`); the message
+  after opening says which (*Inventor is running with the project Default,
+  not Graksler 4.3 – opened in a new instance*). Inventor is asked through
+  its COM interface by a short Windows PowerShell script, as for the STEP
+  export.
+* **Only a complete Get opens:** if you press *Cancel* next to the progress
+  bar while the files are copied, or files could not be copied, the file is
+  not opened – an assembly would open without the parts that were still to
+  come. The check-out stays; use *Get…* and then *Open in CAD*. The same
+  applies to *Open* in the Files tab and *Get latest and open* for CAD files
+  (other files, such as a PDF, still open).
 * *Open* in the Files tab uses the same choice for CAD files.
 
 *Import CAD folder* shows the CAD program the folder belongs to – for
