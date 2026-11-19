@@ -11,17 +11,20 @@
 #
 name: "CodeQL Advanced"
 
+# Each language is analysed only when a file of it changed
+# (scripts/ci-changes.sh, the one table from files to jobs): Rust for *.rs
+# and the Cargo files, JavaScript for scripts and HTML, Actions for the
+# workflows; all three for a change of this file or .github/codeql/. The
+# weekly run analyses everything. A pull request that leaves a language out
+# keeps that language's analysis from main.
 on:
   push:
     branches: [ "main" ]
-    paths-ignore: [ "**.md", "docs/**", "platforms/**", "media/screenshots/**" ]
-  # docs-only pull requests have nothing to analyse; the weekly run still
-  # covers everything
   pull_request:
     branches: [ "main" ]
-    paths-ignore: [ "**.md", "docs/**", "platforms/**", "media/screenshots/**" ]
   schedule:
     - cron: '34 0 * * 6'
+  workflow_dispatch:
 
 # a newer push to a pull request replaces its running analysis; each commit on
 # main keeps its own run – with one group for main, a third push cancelled the
@@ -31,8 +34,31 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # The languages whose files changed, as a JSON list for the matrix below.
+  changes:
+    name: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      languages: ${{ steps.c.outputs.codeql }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Self-test of the change table
+        run: bash scripts/ci-changes.sh --self-test
+      - id: c
+        env:
+          CI_PUSH_BEFORE: ${{ github.event.before }}
+          CI_MERGE_BASE: ${{ github.event.merge_group.base_sha }}
+        run: bash scripts/ci-changes.sh
+
   analyze:
     name: Analyze (${{ matrix.language }})
+    needs: changes
+    if: needs.changes.outputs.languages != '[]'
     # Runner size impacts CodeQL analysis time. To learn more, please see:
     #   - https://gh.io/recommended-hardware-resources-for-running-codeql
     #   - https://gh.io/supported-runners-and-hardware-resources
@@ -53,21 +79,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-        - language: actions
-          build-mode: none
-        - language: javascript-typescript
-          build-mode: none
-        - language: rust
-          build-mode: none
-        # CodeQL supports the following values keywords for 'language': 'actions', 'c-cpp', 'csharp', 'go', 'java-kotlin', 'javascript-typescript', 'python', 'ruby', 'rust', 'swift'
-        # Use `c-cpp` to analyze code written in C, C++ or both
-        # Use 'java-kotlin' to analyze code written in Java, Kotlin or both
-        # Use 'javascript-typescript' to analyze code written in JavaScript, TypeScript or both
-        # To learn more about changing the languages that are analyzed or customizing the build mode for your analysis,
-        # see https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/customizing-your-advanced-setup-for-code-scanning.
-        # If you are analyzing a compiled language, you can modify the 'build-mode' for that language to customize how
-        # your codebase is analyzed, see https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/codeql-code-scanning-for-compiled-languages
+        # actions, javascript-typescript, rust – each with build-mode none
+        language: ${{ fromJSON(needs.changes.outputs.languages) }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v7
@@ -83,7 +96,7 @@ jobs:
       uses: github/codeql-action/init@v4
       with:
         languages: ${{ matrix.language }}
-        build-mode: ${{ matrix.build-mode }}
+        build-mode: none
         # leaves test-only code (tests/, src/**/tests.rs) out of the analysis;
         # the reasons are in the file
         config-file: ./.github/codeql/codeql-config.yml
@@ -93,23 +106,6 @@ jobs:
 
         # For more details on CodeQL's query packs, refer to: https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#using-queries-in-ql-packs
         # queries: security-extended,security-and-quality
-
-    # If the analyze step fails for one of the languages you are analyzing with
-    # "We were unable to automatically build your code", modify the matrix above
-    # to set the build mode to "manual" for that language. Then modify this step
-    # to build your code.
-    # ℹ️ Command-line programs to run using the OS shell.
-    # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
-    - name: Run manual build steps
-      if: matrix.build-mode == 'manual'
-      shell: bash
-      run: |
-        echo 'If you are using a "manual" build mode for one or more of the' \
-          'languages you are analyzing, replace this with the commands to build' \
-          'your code, for example:'
-        echo '  make bootstrap'
-        echo '  make release'
-        exit 1
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4

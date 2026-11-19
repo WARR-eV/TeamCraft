@@ -3,7 +3,10 @@
 # Enable it once under Settings → Pages → Source: GitHub Actions.
 # The "links" job checks that every local image and link target in README.md,
 # the other top-level Markdown files and the book exists
-# (scripts/check-doc-links.sh), also for README-only pull requests.
+# (scripts/check-doc-links.sh), also for README-only pull requests. The book
+# and the API reference are built (and on main deployed) only when their
+# sources changed – docs/, src/, the Cargo files or this workflow
+# (scripts/ci-changes.sh, `docs_site`); "Run workflow" always builds.
 name: Docs
 
 on:
@@ -56,7 +59,29 @@ jobs:
       - name: Check that every local link and image target exists
         run: scripts/check-doc-links.sh
 
+  # Whether the site's sources changed (scripts/ci-changes.sh, `docs_site`):
+  # a README, media or scripts change only needs the links check.
+  changes:
+    name: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      site: ${{ steps.c.outputs.docs_site }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Self-test of the change table
+        run: bash scripts/ci-changes.sh --self-test
+      - id: c
+        env:
+          CI_PUSH_BEFORE: ${{ github.event.before }}
+          CI_MERGE_BASE: ${{ github.event.merge_group.base_sha }}
+        run: bash scripts/ci-changes.sh
+
   build:
+    needs: changes
+    if: needs.changes.outputs.site == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

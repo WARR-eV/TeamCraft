@@ -2,40 +2,20 @@
 # Linux (x86_64, ARM64), macOS (ARM64) and Windows (x86_64, ARM64 preview),
 # plus a syntax check of the user interfaces (desktop/ui, static, shared).
 # Installers are not built or published.
+#
+# Each job runs only when a file it checks changed (scripts/ci-changes.sh,
+# the one table from files to jobs): the UI job for the scripts and styles,
+# the platform matrix for the app's Rust code, configuration, icons and the
+# shared/ mirror – a change of desktop/ui/js alone no longer builds the app
+# on six platforms. The weekly run and "Run workflow" run everything.
 name: Desktop app
 
 on:
   push:
     branches: [main]
-    paths:
-      - "desktop/**"
-      - "scripts/check-desktop-modules.mjs"
-      - "scripts/desktop-tab-order.test.mjs"
-      - "scripts/desktop-files-view.test.mjs"
-      - "scripts/desktop-release-rules.test.mjs"
-      - "scripts/viewer-mesh.test.mjs"
-      - "scripts/shared-vectors.test.mjs"
-      - "static/**"
-      - "shared/**"
-      - "media/logos/**"
-      - "media/icons/**"
-      - ".github/workflows/desktop.yml"
+  pull_request:
   schedule:
     - cron: "41 4 * * 1"
-  pull_request:
-    paths:
-      - "desktop/**"
-      - "scripts/check-desktop-modules.mjs"
-      - "scripts/desktop-tab-order.test.mjs"
-      - "scripts/desktop-files-view.test.mjs"
-      - "scripts/desktop-release-rules.test.mjs"
-      - "scripts/viewer-mesh.test.mjs"
-      - "scripts/shared-vectors.test.mjs"
-      - "static/**"
-      - "shared/**"
-      - "media/logos/**"
-      - "media/icons/**"
-      - ".github/workflows/desktop.yml"
   workflow_dispatch:
 
 permissions:
@@ -53,8 +33,31 @@ env:
   CARGO_INCREMENTAL: 0
 
 jobs:
+  # Which jobs the change needs (scripts/ci-changes.sh): `desktop_ui` for the
+  # UI job, `desktop_rust` for the platform matrix.
+  changes:
+    name: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      ui: ${{ steps.c.outputs.desktop_ui }}
+      rust: ${{ steps.c.outputs.desktop_rust }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Self-test of the change table
+        run: bash scripts/ci-changes.sh --self-test
+      - id: c
+        env:
+          CI_PUSH_BEFORE: ${{ github.event.before }}
+          CI_MERGE_BASE: ${{ github.event.merge_group.base_sha }}
+        run: bash scripts/ci-changes.sh
+
   ui:
     name: desktop UI (JavaScript syntax)
+    needs: changes
+    if: needs.changes.outputs.ui == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -101,6 +104,8 @@ jobs:
 
   test:
     name: desktop (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     # ARM64 Windows runners are still a preview: report, but never block.
@@ -136,8 +141,6 @@ jobs:
         working-directory: desktop
         shell: bash
         run: |
-          cargo clippy|
-          cargo fmt --all -- --check
           cargo clippy --all-targets --locked -- -D warnings
           cargo test --locked
       - name: Build the app

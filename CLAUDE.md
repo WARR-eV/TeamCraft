@@ -197,7 +197,9 @@ deploy/            production Docker install: docker-compose.yml (teamcraft + po
                    public account, auth::refuse_demo_write; data from scripts/seed-demo.sh over screenshots.sh seed_*)
 .github/workflows/ ci.yml (fmt, clippy, tests on PostgreSQL 16/18, macOS/Windows builds), docs.yml, desktop.yml, scale.yml (manual/weekly scale check, tests/scale.rs),
                    mutants.yml (cargo-mutants: PR diff report-only, weekly sharded full run; .cargo/mutants.toml),
-                   release.yml (binaries, installers, *with local server* installers with PostgreSQL, image + Docker install smoke test)
+                   release.yml (binaries, installers, *with local server* installers with PostgreSQL, image + Docker install smoke test);
+                   scripts/ci-changes.sh = the one table from changed files to the jobs of ci/desktop/codeql/docs.yml
+                   (self-test in every `changes` job) – a test that reads a new file outside its area adds it there
 desktop/           TeamCraft Desktop (Tauri 2, own Cargo project – never part of the server build); UI in desktop/ui/js
                    (plain ES modules, no build step): graph.js = the *Graph* tab (navigable BOM/reference graph, SVG +
                    HTML card layer, checked by scripts/desktop-graph-check.mjs), files-view.js = Home *Files* view,

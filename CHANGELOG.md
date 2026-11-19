@@ -13,6 +13,23 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Changed
+
+- **CI runs only the jobs a change needs.** One table,
+  `scripts/ci-changes.sh`, maps the changed files to the jobs of the CI,
+  Desktop app, CodeQL and Docs workflows (CONTRIBUTING.md, *What CI runs for
+  a change*); pushes to `main` and merge-queue entries are compared with
+  their base like pull requests. A desktop UI change no longer runs the
+  server test suite or the six-platform desktop build, a change without Rust
+  skips the CodeQL Rust analysis, `cargo deny` checks only the lock file that
+  changed, and the book and API reference are rebuilt only when their
+  sources changed. A documentation change now runs the new *docs and config
+  guards* job (the configuration and documentation tests, no database),
+  which docs-only pull requests used to skip. CI and the desktop workflow run
+  everything once a week, so a file the table misses is caught within a
+  week. Also removed: a stray line in the desktop workflow that ran an extra
+  clippy pass and format check on every platform.
+
 ## [0.2.10] - 2026-11-19
 
 ### Security
