@@ -49,6 +49,15 @@ Keycloak, Entra ID, Google, …). Register the redirect URI
 | `TEAMCRAFT_OIDC_VIEWER_GROUP`                 | –                      | if set, required to sign in at all |
 | `TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS`              | `90` (`0` = off)       | idle lifetime of SSO users' tokens |
 
+**Set a viewer group with a shared identity provider.** Without
+`TEAMCRAFT_OIDC_VIEWER_GROUP`, every account the identity provider
+authenticates for the TeamCraft application signs in as a viewer and reads
+everything outside restricted project groups. That suits a provider used only
+by the team; with a large shared one (a university or company SSO), set a
+viewer group, or restrict the application to the team at the provider. The
+server logs a warning at every start while single sign-on runs without a
+viewer group, and *Admin → Users* says so.
+
 `TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS` (default 90, 1 to 3650, `0` = off) caps the API and desktop
 tokens that single sign-on users create from then on: a token without an
 expiry, or with a longer one, expires after that many days without use

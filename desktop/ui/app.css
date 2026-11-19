@@ -170,6 +170,10 @@ label.check input { width: auto; accent-color: var(--primary); }
   white-space: nowrap;
 }
 .badge img { display: none; }
+
+/* saved connections in Settings (#322, #323) */
+ul.connections { list-style: none; margin: 0; padding: 0; }
+ul.connections > li { justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border, transparent); }
 .badge::before { font-size: 12px; line-height: 1; }
 /* In work: a half-filled ring; in review: a ring; done: a check. Drawn in
    CSS, so they read the same in every system font. */
@@ -240,6 +244,21 @@ tr.row-conflict td:first-child, tr.row-clash td:first-child { box-shadow: inset 
   background: var(--surface-2);
   border-radius: var(--radius-xs);
 }
+
+/* The CAD program next to "Check out and open" (js/cad-open.js). */
+.cad-target {
+  margin-left: 2px;
+  padding: 0 8px;
+  font-size: 12px; line-height: 22px; font-weight: 500;
+  white-space: nowrap;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+.cad-target:disabled { cursor: default; color: var(--text-dim); }
+.cad-target.is-fallback { border-style: dashed; }
 
 /* ---------------------------------------------------------------- connect */
 

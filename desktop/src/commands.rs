@@ -20,7 +20,7 @@ use tokio::sync::Notify;
 use crate::{
     acp, addfiles,
     api::{self, Api, ApiError, Transfer},
-    bomimport, cadexport, folderimport, layout, localserver,
+    bomimport, cadexport, cadlaunch, folderimport, layout, localserver, profiles,
     settings::{self, Settings, TokenStorage},
     signin, update, workspace, AppState,
 };
@@ -55,14 +55,20 @@ fn signed_in_api(state: &State<'_, AppState>) -> CmdResult<Api> {
     Ok(api)
 }
 
+/// The default working folder (`Documents/TeamCraft`); connections after the
+/// first get theirs next to it (src/profiles.rs).
+fn default_workspace(app: &AppHandle) -> PathBuf {
+    app.path()
+        .document_dir()
+        .or_else(|_| app.path().home_dir())
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("TeamCraft")
+}
+
 fn workspace_root(app: &AppHandle, state: &State<'_, AppState>) -> PathBuf {
-    snapshot(state).workspace_dir.unwrap_or_else(|| {
-        app.path()
-            .document_dir()
-            .or_else(|_| app.path().home_dir())
-            .unwrap_or_else(|_| PathBuf::from("."))
-            .join("TeamCraft")
-    })
+    snapshot(state)
+        .workspace_dir
+        .unwrap_or_else(|| default_workspace(app))
 }
 
 fn update_settings(
@@ -191,9 +197,16 @@ pub fn server_url_insecure(url: String) -> bool {
     settings::normalize_server_url(&url).is_ok_and(|base| settings::insecure_http(&base))
 }
 
-/// Checks that the address is a TeamCraft server and stores it.
+/// Checks that the address is a TeamCraft server and makes it the active
+/// connection: a saved connection to it comes back with its sign-in, a new
+/// server gets a connection – and a working folder – of its own; the sign-in
+/// of the server left behind is kept for switching back (#323).
 #[tauri::command]
-pub async fn set_server(state: State<'_, AppState>, url: String) -> CmdResult<String> {
+pub async fn set_server(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    url: String,
+) -> CmdResult<String> {
     let base = settings::normalize_server_url(&url).map_err(ApiError::local)?;
     let api = Api {
         client: state.client.clone(),
@@ -212,15 +225,80 @@ pub async fn set_server(state: State<'_, AppState>, url: String) -> CmdResult<St
             "{base} is not a TeamCraft server."
         )));
     }
-    let changed = snapshot(&state).server_url.as_deref() != Some(base.as_str());
-    let mut s = update_settings(&state, |s| s.server_url = Some(base.clone()))?;
-    if changed {
-        // a token belongs to its server
-        s.save_token(&state.config_dir, None)
-            .map_err(|e| ApiError::local(e.to_string()))?;
-        state.settings.lock().expect("settings lock").token = None;
+    if snapshot(&state).server_url.as_deref() != Some(base.as_str()) {
+        // the agent works with the token of the server left behind
+        stop_agent(&state);
     }
+    let root = default_workspace(&app);
+    change_connection(&state, |s, dir, parking| {
+        profiles::connect(s, dir, &settings::OsKeychain, parking, &base, &root)
+    })?;
     Ok(base)
+}
+
+/// Changes the saved connections under the settings lock and saves them.
+fn change_connection(
+    state: &State<'_, AppState>,
+    change: impl FnOnce(&mut Settings, &std::path::Path, &profiles::OsParking<'_>) -> anyhow::Result<()>,
+) -> CmdResult<()> {
+    let dir = state.config_dir.clone();
+    let parking = profiles::OsParking { dir: &dir };
+    let mut s = state.settings.lock().expect("settings lock");
+    change(&mut s, &dir, &parking).map_err(|e| ApiError::local(e.to_string()))?;
+    s.save(&dir)
+        .map_err(|e| ApiError::local(format!("Settings could not be saved: {e}")))
+}
+
+/// The saved connections (#322, #323), the active one first.
+#[tauri::command]
+pub fn connections(state: State<'_, AppState>) -> Vec<profiles::ProfileView> {
+    let mut s = state.settings.lock().expect("settings lock");
+    if profiles::ensure_active(&mut s).is_some() {
+        let _ = s.save(&state.config_dir);
+    }
+    profiles::list(&s)
+}
+
+/// Switches to a saved connection; the UI reloads afterwards.
+#[tauri::command]
+pub fn switch_connection(state: State<'_, AppState>, id: String) -> CmdResult<()> {
+    stop_agent(&state);
+    change_connection(&state, |s, dir, parking| {
+        profiles::switch(s, dir, &settings::OsKeychain, parking, &id)
+    })
+}
+
+/// Another account on the active server: the current sign-in is kept for
+/// switching back, the new connection starts signed out with a working folder
+/// of its own.
+#[tauri::command]
+pub fn add_account(app: AppHandle, state: State<'_, AppState>) -> CmdResult<()> {
+    let server = snapshot(&state)
+        .server_url
+        .ok_or_else(|| ApiError::local("No TeamCraft server configured."))?;
+    stop_agent(&state);
+    let root = default_workspace(&app);
+    change_connection(&state, |s, dir, parking| {
+        profiles::add(s, dir, &settings::OsKeychain, parking, &server, &root).map(|_| ())
+    })
+}
+
+/// Forgets a saved connection that is not active (and its sign-in); its
+/// working folder stays on disk.
+#[tauri::command]
+pub fn remove_connection(state: State<'_, AppState>, id: String) -> CmdResult<()> {
+    change_connection(&state, |s, _, parking| profiles::remove(s, parking, &id))
+}
+
+/// Notes the signed-in account on the active connection.
+fn remember_user(state: &State<'_, AppState>, user: &Value) {
+    let (Some(username), display) = (user["username"].as_str(), user["display_name"].as_str())
+    else {
+        return;
+    };
+    let mut s = state.settings.lock().expect("settings lock");
+    profiles::record_user(&mut s, username, display.unwrap_or(username));
+    let _ = s.save(&state.config_dir);
 }
 
 /// Whether this app fits the server version (`compat::notice`): a message for
@@ -278,6 +356,7 @@ pub async fn sign_in_browser(app: AppHandle, state: State<'_, AppState>) -> CmdR
     state.sign_in_cancel.lock().expect("sign-in lock").take();
     let (token, user) = outcome?;
     store_token(&state, token)?;
+    remember_user(&state, &user);
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.set_focus();
     }
@@ -307,6 +386,7 @@ pub async fn sign_in_token(state: State<'_, AppState>, token: String) -> CmdResu
     api.token = Some(token.clone());
     let me = api.json(Method::GET, "/me", None).await?;
     store_token(&state, token)?;
+    remember_user(&state, &me);
     Ok(me)
 }
 
@@ -1304,6 +1384,73 @@ pub async fn cad_export_step(
         .and_then(|n| n.to_str())
         .unwrap_or_default()
         .to_string())
+}
+
+/// The CAD programs found on this computer (for *Check out and open*).
+#[tauri::command]
+pub async fn cad_installed() -> Vec<cadlaunch::Installed> {
+    tokio::task::spawn_blocking(|| cadlaunch::installed().to_vec())
+        .await
+        .unwrap_or_default()
+}
+
+/// Which program would open a file (shown next to *Check out and open*).
+#[tauri::command]
+pub async fn cad_open_plan(wish: cadlaunch::Wish) -> cadlaunch::OpenPlan {
+    tokio::task::spawn_blocking(move || cadlaunch::plan(cadlaunch::installed(), &wish))
+        .await
+        .unwrap_or_else(|_| cadlaunch::plan(&[], &cadlaunch::Wish::default()))
+}
+
+/// Opens a workspace file of a revision with the CAD program chosen for it
+/// (the project group's default, else the newest installed program that
+/// fits the file, else the operating system's default application).
+/// Returns how it was opened.
+#[tauri::command]
+pub async fn workspace_open_cad(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    project: Option<String>,
+    item: String,
+    code: String,
+    file: String,
+    wish: cadlaunch::Wish,
+) -> CmdResult<cadlaunch::OpenPlan> {
+    let api = signed_in_api(&state)?;
+    let (_, found) = workspace::locate(
+        &api,
+        &workspace_root(&app, &state),
+        project.as_deref(),
+        &item,
+        &code,
+        &file,
+    )
+    .await?;
+    let Some(path) = found.filter(|p| p.is_file()) else {
+        return Err(ApiError::local(format!(
+            "{file} is not in the working folder – check out or use “Get files” first."
+        )));
+    };
+    let mut plan =
+        tokio::task::spawn_blocking(move || cadlaunch::plan(cadlaunch::installed(), &wish))
+            .await
+            .map_err(|e| ApiError::local(format!("The program could not be chosen: {e}")))?;
+    if let Some(program) = plan.program.clone() {
+        match cadlaunch::launch(&program, &path) {
+            Ok(()) => return Ok(plan),
+            Err(e) => {
+                // the system's program as a last resort
+                plan.reason = format!("{e} – opened with the default application instead.");
+                plan.label = "Default app".into();
+                plan.program = None;
+                plan.fallback = true;
+            }
+        }
+    }
+    app.opener()
+        .open_path(path.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|e| ApiError::local(format!("Could not open {}: {e}", path.display())))?;
+    Ok(plan)
 }
 
 /// Scans a CAD folder for the import wizard (nothing is uploaded).

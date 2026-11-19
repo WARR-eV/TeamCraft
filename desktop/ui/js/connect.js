@@ -73,9 +73,13 @@ export function initConnect() {
     e.preventDefault();
     var url = $("server-url").value;
     $("connect-error").classList.add("hidden");
-    call("set_server", { url: url }).then(function (base) {
-      state.session.server_url = base;
-      state.session.signed_in = false;
+    // a saved connection to that server comes back signed in, with its own
+    // working folder (src/profiles.rs)
+    call("set_server", { url: url }).then(function () {
+      return call("session");
+    }).then(function (s) {
+      state.session = s;
+      if (s.signed_in) { enterShell(); return; }
       showConnect("signin");
       checkServerVersion();
     }, function (err) { showConnect("server", errorText(err)); });

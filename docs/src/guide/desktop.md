@@ -129,7 +129,7 @@ check-outs and reviews, and a **local working folder**:
   revision and file name filled in and an optional screenshot or PDF; the
   worklist lists the requests assigned to you and your open ones;
 * on Windows with Inventor or Solid Edge installed, *STEP* (workspace) and
-  the check-in option create STEP exports for the 3D preview with that
+  the check-in option (off by default) create STEP exports for the 3D preview with that
   program; the Files tab shows the preview image stored in native files.
 * with a *Preferred CAD program* set on your account page in the web UI, the
   Files tab of a revision collapses the native files of other CAD programs
@@ -177,7 +177,9 @@ or KWallet on Linux). Where there is none, it uses a file only your user
 account can read and says so at the start and in *Settings*. An address with
 plain `http://` to another computer gets a warning when you connect: the token
 and all data would cross the network unencrypted – use the `https://` address
-of the server. The app uses the same skins
+of the server. On a hosted live demo the app signs in to the public
+account under a random computer name and can look at everything but change
+nothing. of the server. The app uses the same skins
 and 3D viewer as the web interface; the models are converted by the server,
 and *Loading* or the reason a model cannot be shown appears on the canvas of
 the *3D viewer* tab (see [Files](files.md)). *Settings → Appearance*: *TeamCraft* (the
@@ -187,6 +189,20 @@ and *TeamCraft Dark* stay fixed, the distribution skins are dark. *Settings → 
 a local account (it
 asks for the current one; wrong ones count like failed sign-ins, and your web
 sessions end); single-sign-on accounts do not see it.
+
+**Several servers and accounts.** *Settings → Connections* lists every
+server and account the app keeps a sign-in for, with its working folder.
+*Switch* changes to another one, and the window reloads; *Add another
+account…* signs in a second account on the same server; *Switch server…*
+(also the connect screen) goes to another server **without signing you
+out** – the sign-in you leave stays in the keychain and is back when you
+switch again. Each connection after the first gets a **working folder of its
+own** next to the default one (`TeamCraft-plm.example.org`, numbered for a
+second account there), never inside another one, because two servers can use
+the same item numbers and project codes; the first connection keeps the
+folder it had. *Remove* forgets a connection and its sign-in; its working
+folder stays on your disk. Check-outs belong to the connection they were made
+in – switch back to check them in.
 
 The window is built for daily work: object tabs on top, under them the
 toolbar of the open object with its one next step filled (see
@@ -212,7 +228,7 @@ CHG-000002*). The **one highlighted button is the most likely next step**:
 
 | Revision                                                                    | Highlighted                                                 |
 |-----------------------------------------------------------------------------|-------------------------------------------------------------|
-| in work, not checked out                                                    | *Check out*                                                 |
+| in work, not checked out                                                    | *Check out and open*                                        |
 | checked out by you, with local changes (or the workspace could not be read) | *Check in…*                                                 |
 | checked out by you, no local changes                                        | *Release…* (when it can be released, otherwise *Check in…*) |
 | in review, obsolete, or checked out by somebody else                        | nothing                                                     |
@@ -223,7 +239,9 @@ shown or the app window gets the focus back – save in the CAD program, switch
 back, and *Check in…* is highlighted.
 
 * revision tab: **Lock** (*Check out*, or *Check in…* and *Cancel check-out*
-  / *Force unlock* while checked out) · **Work** (*Edit*, *Get…*, *Open
+  / *Force unlock* while checked out) · **Open** (*Check out and open*, or *Open in CAD* for your own
+  check-out, with the CAD program that will open the file next to it – see
+  [Check out and open](#check-out-and-open)) · **Work** (*Edit*, *Get…*, *Open
   folder*) · **Lifecycle** (*Release…*, *Revise*) · **Collaborate**
   (*Request change…*, *Watch*, *Agent*);
 * change tab: **Review** (*Approve change* highlighted, *Reject* – the comment field
@@ -271,14 +289,14 @@ this computer.
 
 **Home** is a file browser of the active group, in three views:
 
-* *Files* (the view Home starts with): the **folders** of the group and the
-  **files** in them, as in its working folder – folders first, then the files
+* *Files* (the view Home starts with): the **folders** of the group and the **files** in them, as in its working
+  folder – folders first, then the files
   by name the way a file manager orders them (without regard to case, `Part2`
   before `Part10`), each with the state and the lock of its item. The file
   name comes first and the number and revision after it, so a narrow navigator
   cuts the number, not the name. A folder opens its own level – a large group
-  is never loaded as a whole, and a folder with more than 500 files offers
-  *show … more*. The files are those of the latest revision of every item;
+  is never loaded as a whole, and a folder with more than 500 files offers *show … more*. The files are those of the
+  latest revision of every item;
   items without files are listed below the files at the top of the group.
   The number next to the order is the rows of the whole group. A click on a
   file opens its item;
@@ -299,6 +317,42 @@ shows without restarting the app.
 Keyboard: `Ctrl/Cmd+N` new item, `Ctrl/Cmd+F` search, `F5` refresh,
 `Ctrl/Cmd+1/2/3/4/5` Home, Worklist, Changes, Agent, Projects, `Ctrl/Cmd+W` close the tab,
 `Ctrl/Cmd` + `+` / `-` / `0` (or `Ctrl` + mouse wheel) zoom.
+
+## Check out and open
+
+*Check out and open* (revision toolbar, group **Open**) takes the lock,
+copies the files into your working folder and opens the main CAD file in the
+CAD program – in one click. For your own check-out the button is *Open in
+CAD*. The chip right next to the button names the program, for example
+*Inventor 2026*; its tooltip says why, and a click shows the project group's
+setting in the web UI.
+
+* **Which file:** a native CAD file of the revision (one CAD program's
+  part, assembly or drawing), of the group's default program when there is
+  one – the assembly before the part before the drawing.
+* **Which program:** the project group's **default CAD program** (set by
+  its managers on the group page in the web UI, see
+  [Concepts](concepts.md#default-cad-program)) in its version; is that
+  version not installed, the newest installed version of the program. A
+  group without a default, and a file of another program, open in the
+  **newest installed version of the program that fits the file type**.
+  Without such a program – and for neutral files such as STEP or PDF – the
+  operating system opens the file with its default application. A dashed
+  chip means the program asked for is not the one used.
+* **Where the programs are looked for:** on Windows the install folders
+  below *Program Files* (`Autodesk\Inventor 2026`, `Siemens\Solid Edge
+  2025`, `Siemens\NX2312`, `PTC\Creo 10.0.0.0`, `Dassault Systemes\B33`,
+  `FreeCAD 1.0`, `Rhino 8`, `SketchUp\SketchUp 2024`) and for SOLIDWORKS the
+  versions its installer registers; on macOS the apps in `/Applications`
+  (FreeCAD, Rhino, SketchUp, Fusion); on Linux FreeCAD on the `PATH`. The
+  app looks once per start – restart it after installing a CAD program.
+* *Open* in the Files tab uses the same choice for CAD files.
+
+*Import CAD folder* shows the CAD program the folder belongs to – for
+Inventor with the version read from the files (*Detected CAD program:
+Autodesk Inventor 2021*) – and offers to make it the group's default
+program (managers of the group and administrators; the import report says
+whether it was set).
 
 ## How files appear on your computer
 
@@ -330,6 +384,16 @@ scanned tree; uploads without a folder put new files at the top of the
 group, and a file keeps its folder when new versions arrive. While a
 revision is checked out, the revision page can move a file to another
 folder.
+
+**Umlauts and accents.** macOS hands out file names *decomposed* (Unicode
+NFD: `a` followed by a combining diaeresis for `ä`), Windows and the CAD
+programs there write them *composed* (NFC). The two look the same, but on
+Windows and Linux they are different files, and an assembly saved on Windows
+does not find a part whose name came through a Mac. TeamCraft therefore keeps
+every file and folder name composed: the server composes what it receives,
+the folder import and the working folder use composed names on every system,
+and a file an older app version wrote under a decomposed name is renamed at
+the next Get or when the Workspace tab looks at it.
 
 **Read-only rule.** Files you have **not** checked out are read-only on disk (the read-only attribute on Windows, no
 write permission on Linux and macOS).
@@ -408,8 +472,8 @@ too, and every step is written to `.teamcraft/migration.log`.
 ## Install or run it
 
 The installers of every version are on the
-[Releases page](https://github.com/WARR-eV/TeamCraft/releases) (see
-*Download* in the README for the file of each system). From source:
+[Releases page](https://github.com/WARR-eV/TeamCraft/releases) (see *Download* in the README for the file of each
+system). From source:
 
 ```sh
 cd desktop
@@ -422,8 +486,8 @@ The platform guides list the system packages.
 
 The downloads **with local server** (Windows x64 `-setup.exe`, macOS `.dmg`,
 Linux `.AppImage`, named `TeamCraft-with-local-server_…`) also contain the
-server, as `teamcraft-server`, and PostgreSQL's programs. They install
-**TeamCraft Local**, an app of its own (identifier
+server, as `teamcraft-server`, and PostgreSQL's programs. They install **TeamCraft Local**, an app of its own
+(identifier
 `io.github.rudalabs.teamcraft.local`, own settings folder and keychain entry)
 next to the desktop app, which keeps its own server and sign-in. With no
 server configured – its first start – TeamCraft Local starts the local server
@@ -434,8 +498,8 @@ computer** below the server address:
    the server, both only on `127.0.0.1` – and waits until it is ready (the
    first start creates the database).
 2. The server's address `http://127.0.0.1:<port>` becomes the app's server,
-   and the browser sign-in opens. On the first start the browser shows
-   *Create the administrator*; afterwards it continues to the confirmation of
+   and the browser sign-in opens. On the first start the browser shows *Create the administrator*; afterwards it
+   continues to the confirmation of
    the app's sign-in.
 3. While the local server is the configured server, the app starts it again
    at every launch (the splash says *Starting the local TeamCraft server …*).

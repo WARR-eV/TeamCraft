@@ -312,14 +312,14 @@ mod tests {
     /// skins.css): an undefined `var(--x)` silently drops the declaration.
     #[test]
     fn css_tokens_are_defined() {
-        let sheets = [
-            (
-                "shared/css/skins.css",
-                include_str!("../shared/css/skins.css"),
-            ),
-            ("static/style.css", include_str!("../static/style.css")),
-            ("desktop/ui/app.css", include_str!("../desktop/ui/app.css")),
-        ];
+        let sheets: Vec<(String, String)> = shared_sheets()
+            .into_iter()
+            .chain([
+                ("static/style.css".into(), STYLE_CSS.into()),
+                ("desktop/ui/app.css".into(), APP_CSS.into()),
+            ])
+            .collect();
+        assert!(sheets.iter().any(|(f, _)| f == "shared/css/assistant.css"));
         let declared: std::collections::HashSet<&str> = sheets
             .iter()
             .flat_map(|(_, css)| css.match_indices("--").map(|(start, _)| &css[start..]))
@@ -329,7 +329,7 @@ mod tests {
             })
             .collect();
         assert!(declared.contains("--radius-sm") && declared.contains("--primary-from"));
-        for (file, css) in sheets {
+        for (file, css) in &sheets {
             for (start, _) in css.match_indices("var(") {
                 let after = &css[start + 4..];
                 let Some((name, rest)) = custom_property(after) else {
@@ -339,6 +339,288 @@ mod tests {
                     continue; // has a fallback
                 }
                 assert!(declared.contains(name), "{file}: {name} is not declared");
+            }
+        }
+    }
+
+    const STYLE_CSS: &str = include_str!("../static/style.css");
+    const APP_CSS: &str = include_str!("../desktop/ui/app.css");
+
+    /// Every stylesheet of `shared/css/` as (path, text).
+    fn shared_sheets() -> Vec<(String, String)> {
+        files_below("shared")
+            .into_iter()
+            .filter(|rel| rel.starts_with("css/") && rel.ends_with(".css"))
+            .map(|rel| {
+                let text =
+                    std::fs::read_to_string(format!("{}/shared/{rel}", env!("CARGO_MANIFEST_DIR")))
+                        .unwrap();
+                (format!("shared/{rel}"), text)
+            })
+            .collect()
+    }
+
+    /// The classes that *start* a rule of `css`: the first class of the
+    /// first compound selector (`.badge`, `span.badge-x::before`,
+    /// `.menu-pop > a`), for every selector of every rule, also inside
+    /// `@media`. A class that only appears in a context (`.toolbar .badge`)
+    /// is not counted: an app may adjust a shared component in its own
+    /// context.
+    fn leading_classes(css: &str) -> std::collections::BTreeSet<String> {
+        let mut text = String::with_capacity(css.len());
+        let mut rest = css;
+        while let Some(start) = rest.find("/*") {
+            text.push_str(&rest[..start]);
+            rest = rest[start..]
+                .find("*/")
+                .map_or("", |end| &rest[start + end + 2..]);
+        }
+        text.push_str(rest);
+        let mut out = std::collections::BTreeSet::new();
+        let mut start = 0;
+        for (i, c) in text.char_indices() {
+            match c {
+                '{' => {
+                    let prelude = text[start..i].trim();
+                    if !prelude.is_empty() && !prelude.starts_with('@') {
+                        let mut depth = 0;
+                        let mut selector = String::new();
+                        let mut selectors = Vec::new();
+                        for ch in prelude.chars() {
+                            match ch {
+                                '(' => depth += 1,
+                                ')' => depth -= 1,
+                                _ => {}
+                            }
+                            if ch == ',' && depth == 0 {
+                                selectors.push(std::mem::take(&mut selector));
+                            } else {
+                                selector.push(ch);
+                            }
+                        }
+                        selectors.push(selector);
+                        for s in selectors {
+                            let compound = s
+                                .trim()
+                                .split(|ch: char| ch.is_whitespace() || "+>~".contains(ch))
+                                .next()
+                                .unwrap_or("");
+                            let element = compound
+                                .find(|ch: char| !ch.is_ascii_lowercase())
+                                .unwrap_or(compound.len());
+                            if let Some(class) = compound[element..].strip_prefix('.') {
+                                let len = class
+                                    .find(|ch: char| {
+                                        !(ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
+                                    })
+                                    .unwrap_or(class.len());
+                                out.insert(class[..len].to_string());
+                            }
+                        }
+                    }
+                    start = i + 1;
+                }
+                '}' | ';' => start = i + 1,
+                _ => {}
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn leading_classes_of_a_stylesheet() {
+        let css = "/* .commented { } */ .badge, span.badge-x::before { a: b; }\n\
+                   @media (hover: hover) { .menu-pop > a:hover { c: d; } }\n\
+                   .toolbar .in-context { e: f; } :is(.x, .y) .z { } button { }";
+        let classes: Vec<String> = leading_classes(css).into_iter().collect();
+        // .in-context only appears in a context: not counted
+        assert_eq!(classes, ["badge", "badge-x", "menu-pop", "toolbar"]);
+    }
+
+    /// shared/ owns the components it styles: the app stylesheets may adjust
+    /// a shared class in their own context (`.toolbar .badge`) but never
+    /// start a rule with it – that is a second copy that drifts
+    /// (shared/README.md, "One source per rule").
+    #[test]
+    fn shared_css_classes_are_not_redefined() {
+        let mut owned = std::collections::BTreeMap::new();
+        for (file, css) in shared_sheets() {
+            if file.ends_with("/skins.css") {
+                continue; // tokens and skins, no components
+            }
+            for class in leading_classes(&css) {
+                owned.insert(class, file.clone());
+            }
+        }
+        assert!(owned.contains_key("tc-md"), "assistant.css is checked");
+        let mut problems = Vec::new();
+        for (app, css) in [
+            ("static/style.css", STYLE_CSS),
+            ("desktop/ui/app.css", APP_CSS),
+        ] {
+            for class in leading_classes(css) {
+                if let Some(file) = owned.get(&class) {
+                    problems.push(format!("{app}: .{class} is styled by {file}"));
+                }
+            }
+        }
+        assert!(problems.is_empty(), "{}", problems.join("\n"));
+    }
+
+    /// Classes both app stylesheets style today – each one a component
+    /// written twice. The list may only shrink: a class moves into
+    /// `shared/css/` (and out of this list) with its migration step
+    /// (docs/src/research/shared-ui.md, step 3), and a new class styled in
+    /// both apps belongs into `shared/css/` from the start.
+    const STYLED_TWICE: &[&str] = &[
+        // badges and state glyphs
+        "badge",
+        "badge-accepted",
+        "badge-approved",
+        "badge-cancelled",
+        "badge-deferred",
+        "badge-implemented",
+        "badge-in_review",
+        "badge-in_triage",
+        "badge-obsolete",
+        "badge-pending",
+        "badge-rejected",
+        "badge-released",
+        "badge-up_to_date",
+        "badge-withdrawn",
+        // tables and trees
+        "grid",
+        "table-wrap",
+        "tree",
+        "num",
+        "props",
+        // cards, stats, empty states, notices
+        "stat",
+        "empty",
+        "notice",
+        "flash",
+        "flash-error",
+        "hint",
+        "warn-text",
+        // menus
+        "menu",
+        "menu-sep",
+        // lifecycle track
+        "lifecycle-track",
+        // threads, impacts, notifications, assistant text
+        "thread",
+        "thread-entry",
+        "thread-meta",
+        "impact-count",
+        "impact-detail",
+        "impact-event",
+        "impact-group",
+        "impact-group-head",
+        "impact-group-name",
+        "impact-relation",
+        "impact-rows",
+        "impact-source",
+        "impact-source-name",
+        "n-body",
+        "n-meta",
+        "n-title",
+        "assistant-text",
+        "attachment-thumbs",
+        "file-thumb",
+        "suggestion",
+        "suggestions",
+        "other-formats",
+        // 3D viewer bar and legend
+        "viewer-bar",
+        "viewer-canvas",
+        "viewer-legend",
+        "viewer-legend-bar",
+        "viewer-legend-value",
+        "viewer-measuring",
+        "viewer-notes",
+        "viewer-overlay",
+        "viewer-section",
+        "viewer-stage",
+        // controls and text utilities
+        "button",
+        "primary",
+        "danger",
+        "ghost",
+        "link",
+        "icon",
+        "check",
+        "small",
+        "muted",
+        "dim",
+        "mono",
+        "pre",
+        "plain",
+        "right",
+        "stack",
+        "grid-2",
+        "hidden",
+        "fmt",
+        // the apps' own frames: same names, different places (top bar, rail)
+        "app-glow",
+        "bell",
+        "bell-count",
+        "brand",
+        "brand-name",
+        "brand-sub",
+        "rail",
+        "skin-card",
+        "skin-swatch",
+        "user-name",
+    ];
+
+    #[test]
+    fn no_new_component_styled_in_both_apps() {
+        let web = leading_classes(STYLE_CSS);
+        let desktop = leading_classes(APP_CSS);
+        let twice: Vec<&String> = web.intersection(&desktop).collect();
+        let new: Vec<&&String> = twice
+            .iter()
+            .filter(|c| !STYLED_TWICE.contains(&c.as_str()))
+            .collect();
+        assert!(
+            new.is_empty(),
+            "styled in both static/style.css and desktop/ui/app.css: {new:?} – \
+             move the component into shared/css/ (shared/README.md)"
+        );
+        let gone: Vec<&&str> = STYLED_TWICE
+            .iter()
+            .filter(|c| !twice.iter().any(|t| t == *c))
+            .collect();
+        assert!(
+            gone.is_empty(),
+            "no longer styled in both apps – remove from STYLED_TWICE: {gone:?}"
+        );
+    }
+
+    /// Colours exist only as tokens in skins.css; shared components read
+    /// them, so every skin and both schemes apply.
+    #[test]
+    fn shared_components_use_no_literal_colours() {
+        for (file, css) in shared_sheets() {
+            if file.ends_with("/skins.css") {
+                continue;
+            }
+            let lower = css.to_ascii_lowercase();
+            for literal in ["rgb(", "rgba(", "hsl(", "hsla(", "oklch("] {
+                assert!(!lower.contains(literal), "{file}: {literal} – use a token");
+            }
+            for (i, _) in css.match_indices('#') {
+                let hex = css[i + 1..]
+                    .chars()
+                    .take_while(char::is_ascii_hexdigit)
+                    .count();
+                let next = css[i + 1 + hex..].chars().next().unwrap_or(' ');
+                assert!(
+                    !(matches!(hex, 3 | 4 | 6 | 8)
+                        && !(next.is_ascii_alphanumeric() || next == '-' || next == '_')),
+                    "{file}: literal colour #{} – use a token",
+                    &css[i + 1..i + 1 + hex]
+                );
             }
         }
     }

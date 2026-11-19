@@ -62,6 +62,8 @@ pub mod swpart;
 pub mod templates;
 pub mod textindex;
 pub mod thumbnail;
+#[cfg(test)]
+mod ui_vectors;
 pub mod util;
 pub mod vault;
 pub mod web;

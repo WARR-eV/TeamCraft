@@ -30,7 +30,7 @@ export function pathKey(parentKey, number) {
 
 /** What a line of the structure shows: label, whether it can be opened and
  *  expanded, the placeholder text for lines without a visible revision. */
-export function describe(node, rule) {
+export function describeNode(node, rule) {
   if (node.restricted) {
     return { kind: "restricted", label: "restricted item", placeholder: "Restricted item – in a project group you are not a member of",
       openable: false, expandable: false };

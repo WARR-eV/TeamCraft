@@ -2,7 +2,8 @@
 // TeamCraft Desktop – Import BOM.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { api, badge, call, clear, dialog, enc, field, fmtNum, h, label, setStatus, state, toast } from "./core.js";
+import { api, badge, call, clear, dialog, enc, field, h, setStatus, state, toast } from "./core.js";
+import { fmtNum, label } from "/static/shared/js/format.js";
 import { canEdit, canEditProject, freshProjects, refreshWorklistCount } from "./shell.js";
 import { selectView } from "./navigator.js";
 import { activeTab, reloadActive, stat, table } from "./tabs.js";

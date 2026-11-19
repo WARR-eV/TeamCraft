@@ -1,20 +1,19 @@
 // SPDX-License-Identifier: MPL-2.0
 // TeamCraft Desktop – the company AI: the Agent view's server backend (the
 // shared assistant of the web UI's "Ask TeamCraft" sidebar, inline), and the
-// markdown-lite the local agent's answers are rendered with.
+// links in answers (item numbers, "Open 3D preview").
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
 // (`$` only for scripts/check-desktop-modules.mjs, which reads the `$` of the
 // regular expressions below as a use)
-import { $, api, append, call, errorText, h, toast } from "./core.js";
+import { $, api, call, errorText, h, toast } from "./core.js";
 import { canEdit, refreshWorklistCount } from "./shell.js";
 import { openRevision } from "./revision.js";
 
 // ======================================================================
-// Answers as DOM nodes (never as HTML), item numbers as links
+// Item numbers and preview links in answers (the answers themselves are
+// markdown-lite built by shared/js/markdown.js)
 // ======================================================================
-
-export var ITEM_NUMBER_IN_TEXT = /\b(?:PRT|ASM|DOC|SW|SIM)-\d{3,}\b/g;
 
 /** Text with generated item numbers as links that open the item. */
 export function itemLink(number) {
@@ -38,99 +37,6 @@ export function previewLink(link) {
     return h("span.tc-a-open", { text: link.label });
   }
   return h("button.tc-a-open", { type: "button", title: "Open " + link.item + "/" + link.revision + " in the 3D viewer", on: { click: function () { openRevision(link.item, link.revision, "viewer", m[1]); } } }, link.label);
-}
-
-export function itemLinks(text) {
-  var nodes = [], last = 0, m;
-  ITEM_NUMBER_IN_TEXT.lastIndex = 0;
-  while ((m = ITEM_NUMBER_IN_TEXT.exec(text)) !== null) {
-    if (m.index > last) nodes.push(text.slice(last, m.index));
-    nodes.push(itemLink(m[0]));
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) nodes.push(text.slice(last));
-  return nodes;
-}
-
-/** Inline markdown-lite: `code` and **bold**; everything else is text. */
-export function inlineNodes(text) {
-  var out = [];
-  var parts = text.split("`");
-  var ticks = parts.length - 1;
-  var paired = ticks - (ticks % 2);
-  parts.forEach(function (part, k) {
-    if (k % 2 === 1 && k < paired) { out.push(h("code", { text: part })); return; }
-    if (k % 2 === 1) out.push("`");
-    var pieces = part.split("**"), markers = pieces.length - 1, strong = null;
-    pieces.forEach(function (piece, n) {
-      if (n > 0) {
-        if (markers % 2 === 1 && n === markers) out.push("**");
-        else if (strong) { out.push(strong); strong = null; }
-        else strong = h("strong");
-      }
-      if (strong) append(strong, itemLinks(piece));
-      else out.push.apply(out, itemLinks(piece));
-    });
-    if (strong) out.push(strong);
-  });
-  return out;
-}
-
-export function tableCells(line) {
-  return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(function (c) { return c.trim(); });
-}
-
-export function isSeparatorRow(line) {
-  var cells = tableCells(line);
-  return cells.length > 0 && cells.every(function (c) { return /^[\s:]*-[-\s:]*$/.test(c); });
-}
-
-/** The assistant's markdown-lite as DOM nodes (never as HTML). */
-export function markdownLite(text) {
-  var root = h("div.assistant-text");
-  var lines = String(text || "").split(/\r?\n/);
-  var para = null, list = null;
-  function endBlocks() { para = null; list = null; }
-  for (var i = 0; i < lines.length; i++) {
-    var line = lines[i], t = line.trim(), m;
-    if (t.indexOf("```") === 0) {
-      endBlocks();
-      var code = [];
-      for (i++; i < lines.length && lines[i].trim().indexOf("```") !== 0; i++) code.push(lines[i]);
-      root.appendChild(h("pre", null, h("code", { text: code.join("\n") })));
-      continue;
-    }
-    if (!t) { endBlocks(); continue; }
-    if ((m = /^(#{1,6})\s+(.*)$/.exec(t))) {
-      endBlocks();
-      root.appendChild(h(m[1].length <= 2 ? "h3" : "h4", null, inlineNodes(m[2])));
-      continue;
-    }
-    if (t.charAt(0) === "|" && i + 1 < lines.length && isSeparatorRow(lines[i + 1])) {
-      endBlocks();
-      var head = h("tr", null, tableCells(t).map(function (c) { return h("th", null, inlineNodes(c)); }));
-      var rows = [];
-      for (i += 2; i < lines.length && lines[i].trim().charAt(0) === "|"; i++) {
-        rows.push(h("tr", null, tableCells(lines[i]).map(function (c) { return h("td", null, inlineNodes(c)); })));
-      }
-      i--;
-      root.appendChild(h("div.table-wrap", null, h("table.grid", null, [h("thead", null, head), h("tbody", null, rows)])));
-      continue;
-    }
-    if (/^[-*_]{3,}$/.test(t)) { endBlocks(); root.appendChild(h("hr")); continue; }
-    var bullet = /^(?:[-*•])\s+(.*)$/.exec(t), numbered = /^\d{1,3}[.)]\s+(.*)$/.exec(t);
-    if (bullet || numbered) {
-      para = null;
-      var tag = bullet ? "ul" : "ol";
-      if (!list || list.tagName.toLowerCase() !== tag) { list = h(tag); root.appendChild(list); }
-      list.appendChild(h("li", null, inlineNodes((bullet || numbered)[1])));
-      continue;
-    }
-    list = null;
-    if (!para) { para = h("p"); root.appendChild(para); } else para.appendChild(h("br"));
-    append(para, inlineNodes(t.replace(/^>\s/, "")));
-  }
-  return root;
 }
 
 // ----------------------------------------------------------------------

@@ -73,6 +73,8 @@ pub const KNOWN_VARIABLES: &[&str] = &[
     "TEAMCRAFT_APPROVAL_REAUTH",
     "TEAMCRAFT_ASSISTANT_API_KEY",
     "TEAMCRAFT_ASSISTANT_BASE_URL",
+    "TEAMCRAFT_ASSISTANT_DAILY_RUNS",
+    "TEAMCRAFT_ASSISTANT_DAILY_TOKENS",
     "TEAMCRAFT_ASSISTANT_INTERNAL_URLS",
     "TEAMCRAFT_ASSISTANT_MAX_CONCURRENT",
     "TEAMCRAFT_ASSISTANT_MAX_STEPS",
@@ -267,7 +269,7 @@ pub struct Config {
     pub preview: crate::preview::PreviewLimits,
     /// Size the preview cache (`<vault>/previews`) is trimmed to by the
     /// hourly housekeeping, least recently used first
-    /// (`TEAMCRAFT_PREVIEW_CACHE_MAX_MB`; 0 = no limit).
+    /// (`TEAMCRAFT_PREVIEW_CACHE_MAX_MB`; default 10 GiB, 0 = no limit, #309).
     pub preview_cache_max_bytes: u64,
     /// Largest chunk of a chunked, resumable upload (`PATCH /api/v1/uploads/{id}`).
     pub upload_chunk_bytes: u64,
@@ -333,6 +335,9 @@ pub struct Config {
     pub mattermost: Option<MattermostConfig>,
     /// The built-in assistant (Anthropic or an OpenAI-compatible API). `None` = disabled.
     pub assistant: Option<AssistantConfig>,
+    /// Daily quota of the built-in assistant per user (#306), counted over the
+    /// last 24 hours from the `assistant.run` audit entries; 0 = no limit.
+    pub assistant_quota: AssistantQuota,
     /// Whether users may connect their own local agents (the desktop app's
     /// *Agent* view, ACP) to TeamCraft's tools (`TEAMCRAFT_LOCAL_AGENTS`).
     /// `Off` leaves only the server-side assistant. See [`LocalAgents`].
@@ -345,6 +350,9 @@ pub struct Config {
 /// must not empty the audit trail.
 pub const MIN_AUDIT_RETENTION_DAYS: u32 = 30;
 
+/// Default preview cache limit in MiB (10 GiB, #309): without one the cache
+/// grew until the disk was full.
+pub const DEFAULT_PREVIEW_CACHE_MB: u64 = 10 * 1024;
 /// Largest preview cache limit in MiB (`TEAMCRAFT_PREVIEW_CACHE_MAX_MB`, 16 TiB).
 const MAX_PREVIEW_CACHE_MB: u64 = 16 * 1024 * 1024;
 
@@ -475,6 +483,20 @@ pub const DEFAULT_ASSISTANT_RUN_TIMEOUT: u64 = 240;
 pub const DEFAULT_ASSISTANT_MAX_CONCURRENT: usize = 4;
 /// Default for how long an idle assistant conversation is kept (days).
 pub const DEFAULT_ASSISTANT_RETENTION_DAYS: u32 = 30;
+/// Default number of assistant runs per user in 24 hours (#306).
+pub const DEFAULT_ASSISTANT_DAILY_RUNS: u32 = 200;
+/// Default number of model tokens (input + output) per user in 24 hours (#306).
+pub const DEFAULT_ASSISTANT_DAILY_TOKENS: u64 = 2_000_000;
+
+/// Per-user limits of the built-in assistant over the last 24 hours
+/// (`TEAMCRAFT_ASSISTANT_DAILY_RUNS`, `TEAMCRAFT_ASSISTANT_DAILY_TOKENS`;
+/// 0 = no limit). They bound what one account can cost on the server's
+/// model key.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AssistantQuota {
+    pub runs: u32,
+    pub tokens: u64,
+}
 
 /// Which wire format the assistant speaks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -956,7 +978,8 @@ impl Config {
             }
         };
         // 0 = no limit; at most 16 TiB
-        let preview_cache_max_mb = env.parse_or("TEAMCRAFT_PREVIEW_CACHE_MAX_MB", 0u64)?;
+        let preview_cache_max_mb =
+            env.parse_or("TEAMCRAFT_PREVIEW_CACHE_MAX_MB", DEFAULT_PREVIEW_CACHE_MB)?;
         if preview_cache_max_mb > MAX_PREVIEW_CACHE_MB {
             bail!("TEAMCRAFT_PREVIEW_CACHE_MAX_MB must be between 0 (no limit) and {MAX_PREVIEW_CACHE_MB}");
         }
@@ -1174,6 +1197,16 @@ impl Config {
             direct,
         });
         let assistant = assistant_config(&env)?;
+        let assistant_quota = AssistantQuota {
+            runs: env.parse_or(
+                "TEAMCRAFT_ASSISTANT_DAILY_RUNS",
+                DEFAULT_ASSISTANT_DAILY_RUNS,
+            )?,
+            tokens: env.parse_or(
+                "TEAMCRAFT_ASSISTANT_DAILY_TOKENS",
+                DEFAULT_ASSISTANT_DAILY_TOKENS,
+            )?,
+        };
         let local_agents = match env.get("TEAMCRAFT_LOCAL_AGENTS")? {
             Some(raw) => LocalAgents::parse(&raw)?,
             None => LocalAgents::Allowed,
@@ -1233,6 +1266,7 @@ impl Config {
             request_digest_hours,
             mattermost,
             assistant,
+            assistant_quota,
             local_agents,
             webhooks,
         })
@@ -1251,6 +1285,25 @@ impl Config {
         self.demo
             .as_ref()
             .is_some_and(|d| d.username.eq_ignore_ascii_case(username.trim()))
+    }
+
+    /// Risky but valid settings, logged as warnings at every start.
+    pub fn warnings(&self) -> Vec<String> {
+        let mut warnings = Vec::new();
+        if let Some(oidc) = &self.oidc {
+            if oidc.viewer_group.is_none() {
+                // #311: with a large shared identity provider (a university
+                // or company SSO) every account there could read everything
+                // outside restricted project groups.
+                warnings.push(format!(
+                    "single sign-on without TEAMCRAFT_OIDC_VIEWER_GROUP: every account of the \
+                     identity provider {} can sign in and read as a viewer; set a viewer group \
+                     to admit only its members (docs: Users and roles)",
+                    oidc.issuer_url
+                ));
+            }
+        }
+        warnings
     }
 
     /// Password-free summary for the startup log.
@@ -1911,6 +1964,29 @@ mod tests {
     }
 
     #[test]
+    fn sso_without_a_viewer_group_is_warned_about() {
+        let sso = [
+            ("TEAMCRAFT_DB_PASSWORD", "x"),
+            ("TEAMCRAFT_OIDC_ISSUER_URL", "https://auth.example.org/"),
+            ("TEAMCRAFT_OIDC_CLIENT_ID", "client"),
+            ("TEAMCRAFT_OIDC_CLIENT_SECRET", "s3cret"),
+        ];
+        let open = config_from(&sso).unwrap();
+        let warnings = open.warnings();
+        assert_eq!(warnings.len(), 1, "{warnings:?}");
+        assert!(warnings[0].contains("TEAMCRAFT_OIDC_VIEWER_GROUP"));
+        assert!(warnings[0].contains("auth.example.org"));
+        assert!(!warnings[0].contains("s3cret"));
+
+        let mut limited = sso.to_vec();
+        limited.push(("TEAMCRAFT_OIDC_VIEWER_GROUP", "teamcraft-viewers"));
+        assert!(config_from(&limited).unwrap().warnings().is_empty());
+        // without single sign-on nothing to warn about
+        let local = config_from(&[("TEAMCRAFT_DB_PASSWORD", "x")]).unwrap();
+        assert!(local.warnings().is_empty());
+    }
+
+    #[test]
     fn some_login_method_is_required() {
         let defaults = config_from(&[("TEAMCRAFT_DB_PASSWORD", "x")]).unwrap();
         assert!(defaults.local_login);
@@ -2016,9 +2092,16 @@ mod tests {
         let d = config_from(&[("TEAMCRAFT_DB_PASSWORD", "x")]).unwrap();
         assert_eq!(d.audit_retention_days, 0, "the audit log is kept for ever");
         assert_eq!(
-            d.preview_cache_max_bytes, 0,
-            "the preview cache has no limit"
+            d.preview_cache_max_bytes,
+            10 * 1024 * 1024 * 1024,
+            "the preview cache is limited to 10 GiB"
         );
+        let unlimited = config_from(&[
+            ("TEAMCRAFT_DB_PASSWORD", "x"),
+            ("TEAMCRAFT_PREVIEW_CACHE_MAX_MB", "0"),
+        ])
+        .unwrap();
+        assert_eq!(unlimited.preview_cache_max_bytes, 0, "0 = no limit");
         let c = config_from(&[
             ("TEAMCRAFT_DB_PASSWORD", "x"),
             ("TEAMCRAFT_AUDIT_RETENTION_DAYS", "3650"),
