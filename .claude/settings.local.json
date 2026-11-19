@@ -33,6 +33,9 @@
     "deny": [
       "Bash(sudo *)",
       "Bash(* 2>&1)",
+      "Bash(cargo test *)",
+      "Bash(cargo check *)",
+      "Bash(cargo build *)",
       "Bash(git checkout main*)"
     ]
   },

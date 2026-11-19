@@ -1,26 +1,28 @@
 # TeamCraft CI: formatting, lints and the full test suite against
 # PostgreSQL on Linux (with coverage on one leg); build and unit tests on
-# Windows (and macOS on main); dependency checks. Nothing is packaged or
-# published.
+# Windows (and macOS on main); the documentation and configuration guards;
+# dependency checks. Nothing is packaged or published.
 #
 # Runner time is free for this public repository; what is scarce is the
-# number of concurrent jobs (20, of them 5 macOS). Pull requests therefore
-# run the jobs that can find something new there; main runs everything.
+# number of concurrent jobs (20, of them 5 macOS). Each job therefore runs
+# only when a file it compiles, tests or reads changed: the changes job asks
+# scripts/ci-changes.sh, the one table from files to jobs (CONTRIBUTING.md,
+# "What CI runs for a change"). The weekly run and "Run workflow" run
+# everything.
 name: CI
 
 on:
+  # every push to main and every pull request, also one that changes only
+  # documentation: the job "CI result" is the required check of main and must
+  # report on each of them; the changes job decides what runs
   push:
     branches: [main]
-    paths-ignore: ["**.md", "docs/**", "platforms/**"]
-  # Every pull request, also one that changes only documentation: the job
-  # "CI result" is the required check of main and must report on each of them.
-  # The changes job below skips the Rust jobs for documentation-only changes.
   pull_request:
   # a merge queue (Settings → Rules) tests every pull request against the
-  # main it lands on; the required checks must run here too, so no path
-  # filter (a merge_group event has none anyway)
+  # main it lands on (the changes job compares with its base)
   merge_group:
-  # new security advisories appear without a code change
+  # everything once a week: new security advisories appear without a code
+  # change, and a file the table misses is caught within a week
   schedule:
     - cron: "17 5 * * 1"
   workflow_dispatch:
@@ -48,38 +50,33 @@ env:
   CARGO_PROFILE_TEST_DEBUG: line-tables-only
 
 jobs:
-  # Whether the Rust jobs have anything to check: not for a pull request
-  # that changes only documentation (*.md, docs/, platforms/ – the paths the
-  # push trigger ignores) and not for the weekly advisory run.
+  # Which jobs the change needs (scripts/ci-changes.sh): `server` for the
+  # Rust jobs, `guards` for the documentation and configuration checks
+  # without a database, `deny` for the lock files to check.
   changes:
     name: changes
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
-      code: ${{ steps.c.outputs.code }}
+      server: ${{ steps.c.outputs.server }}
+      guards: ${{ steps.c.outputs.guards }}
+      deny: ${{ steps.c.outputs.deny }}
     steps:
       - uses: actions/checkout@v4
-        if: github.event_name == 'pull_request'
         with:
           fetch-depth: 2
+      - name: Self-test of the change table
+        run: bash scripts/ci-changes.sh --self-test
       - id: c
-        shell: bash
-        run: |
-          set -euo pipefail
-          code=true
-          if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then code=false; fi
-          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            # the merge commit of the pull request: HEAD^1 is the base
-            changed=$(git diff --name-only HEAD^1 HEAD)
-            echo "$changed"
-            grep -qvE '.md$|^docs/|^platforms/' <<<"$changed" || code=false
-          fi
-          echo "code=$code" | tee -a "$GITHUB_OUTPUT"
+        env:
+          CI_PUSH_BEFORE: ${{ github.event.before }}
+          CI_MERGE_BASE: ${{ github.event.merge_group.base_sha }}
+        run: bash scripts/ci-changes.sh
 
   lint:
     name: fmt and clippy
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.server == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -107,7 +104,7 @@ jobs:
     # (docs/src/dev/coverage.md).
     name: tests (Linux, PostgreSQL ${{ matrix.postgres }})
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.server == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
@@ -154,9 +151,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: ${{ matrix.coverage && 'llvm-tools-preview' || '' }}
+      # a shared key: the guards job reads the PostgreSQL 16 cache (same
+      # profile and environment) instead of keeping a cache of its own
       - uses: Swatinem/rust-cache@v2
         with:
-          key: pg${{ matrix.postgres }}
+          shared-key: tests-pg${{ matrix.postgres }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - uses: taiki-e/install-action@v2
@@ -242,7 +241,7 @@ jobs:
     # run here.
     name: build (windows-latest)
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.server == 'true'
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -269,7 +268,7 @@ jobs:
     # code. A real compile or test failure still shows as a red job here.
     name: build (macos-latest)
     needs: changes
-    if: needs.changes.outputs.code == 'true' && github.event_name != 'pull_request'
+    if: needs.changes.outputs.server == 'true' && github.event_name != 'pull_request'
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
@@ -287,15 +286,41 @@ jobs:
       - name: unit tests (the database tests run on Linux; 1 s limit, see .config/nextest.toml)
         run: cargo nextest run --locked --lib
 
+  # The configuration and documentation checks that read files outside the
+  # server's sources – every page of the book, the shipped configuration
+  # examples – for a change to those files alone. No database; a change in
+  # the server area runs the same tests in the full suite instead.
+  guards:
+    name: docs and config guards
+    needs: changes
+    if: needs.changes.outputs.guards == 'true' && needs.changes.outputs.server != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # the cache of the PostgreSQL 16 test job (see there), read only
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: tests-pg16
+          save-if: false
+      - name: configuration tests (docs/src/admin/configuration.md, deploy/, packaging/)
+        run: cargo test --locked --lib -- config::tests
+      - name: architecture guards (every configuration variable documented in the book)
+        run: cargo test --locked --test architecture_guards
+
   dependencies:
-    # the server and the desktop app ship separate lock files
+    # the server and the desktop app ship separate lock files; each is
+    # checked when it, deny.toml or this workflow changed, and weekly
     name: cargo deny (${{ matrix.manifest }})
+    needs: changes
+    if: needs.changes.outputs.deny != '[]'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        manifest: [Cargo.toml, desktop/Cargo.toml]
+        manifest: ${{ fromJSON(needs.changes.outputs.deny) }}
     steps:
       - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2
@@ -312,7 +337,7 @@ jobs:
   result:
     name: CI result
     if: always()
-    needs: [changes, lint, test, build, dependencies]
+    needs: [changes, lint, test, build, guards, dependencies]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
