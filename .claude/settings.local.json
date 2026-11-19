@@ -15,9 +15,9 @@
       "Bash(cat *)",
       "Bash(tree *)",
       "Bash(cargo *)",
-      "Bash(gh *)",
       "Bash(curl *)",
       "Bash(jq *)",
+      "Bash(sed *)",
       "Bash(gh *)",
       "Bash(git branch)",
       "Bash(git pull)",
@@ -28,8 +28,7 @@
       "Bash(git diff *)",
       "Bash(git log *)",
       "Bash(git show *)",
-      "Bash(git checkout *)",
-      "Bash(rm -rf ./**)"
+      "Bash(git checkout *)"
     ],
     "deny": [
       "Bash(sudo *)",
