@@ -129,7 +129,7 @@ check-outs and reviews, and a **local working folder**:
   revision and file name filled in and an optional screenshot or PDF; the
   worklist lists the requests assigned to you and your open ones;
 * on Windows with Inventor or Solid Edge installed, *STEP* (workspace) and
-  the check-in option create STEP exports for the 3D preview with that
+  the check-in option (off by default) create STEP exports for the 3D preview with that
   program; the Files tab shows the preview image stored in native files.
 * with a *Preferred CAD program* set on your account page in the web UI, the
   Files tab of a revision collapses the native files of other CAD programs
@@ -228,7 +228,7 @@ CHG-000002*). The **one highlighted button is the most likely next step**:
 
 | Revision                                                                    | Highlighted                                                 |
 |-----------------------------------------------------------------------------|-------------------------------------------------------------|
-| in work, not checked out                                                    | *Check out*                                                 |
+| in work, not checked out                                                    | *Check out and open*                                        |
 | checked out by you, with local changes (or the workspace could not be read) | *Check in…*                                                 |
 | checked out by you, no local changes                                        | *Release…* (when it can be released, otherwise *Check in…*) |
 | in review, obsolete, or checked out by somebody else                        | nothing                                                     |
@@ -239,7 +239,9 @@ shown or the app window gets the focus back – save in the CAD program, switch
 back, and *Check in…* is highlighted.
 
 * revision tab: **Lock** (*Check out*, or *Check in…* and *Cancel check-out*
-  / *Force unlock* while checked out) · **Work** (*Edit*, *Get…*, *Open
+  / *Force unlock* while checked out) · **Open** (*Check out and open*, or *Open in CAD* for your own
+  check-out, with the CAD program that will open the file next to it – see
+  [Check out and open](#check-out-and-open)) · **Work** (*Edit*, *Get…*, *Open
   folder*) · **Lifecycle** (*Release…*, *Revise*) · **Collaborate**
   (*Request change…*, *Watch*, *Agent*);
 * change tab: **Review** (*Approve change* highlighted, *Reject* – the comment field
@@ -316,6 +318,42 @@ Keyboard: `Ctrl/Cmd+N` new item, `Ctrl/Cmd+F` search, `F5` refresh,
 `Ctrl/Cmd+1/2/3/4/5` Home, Worklist, Changes, Agent, Projects, `Ctrl/Cmd+W` close the tab,
 `Ctrl/Cmd` + `+` / `-` / `0` (or `Ctrl` + mouse wheel) zoom.
 
+## Check out and open
+
+*Check out and open* (revision toolbar, group **Open**) takes the lock,
+copies the files into your working folder and opens the main CAD file in the
+CAD program – in one click. For your own check-out the button is *Open in
+CAD*. The chip right next to the button names the program, for example
+*Inventor 2026*; its tooltip says why, and a click shows the project group's
+setting in the web UI.
+
+* **Which file:** a native CAD file of the revision (one CAD program's
+  part, assembly or drawing), of the group's default program when there is
+  one – the assembly before the part before the drawing.
+* **Which program:** the project group's **default CAD program** (set by
+  its managers on the group page in the web UI, see
+  [Concepts](concepts.md#default-cad-program)) in its version; is that
+  version not installed, the newest installed version of the program. A
+  group without a default, and a file of another program, open in the
+  **newest installed version of the program that fits the file type**.
+  Without such a program – and for neutral files such as STEP or PDF – the
+  operating system opens the file with its default application. A dashed
+  chip means the program asked for is not the one used.
+* **Where the programs are looked for:** on Windows the install folders
+  below *Program Files* (`Autodesk\Inventor 2026`, `Siemens\Solid Edge
+  2025`, `Siemens\NX2312`, `PTC\Creo 10.0.0.0`, `Dassault Systemes\B33`,
+  `FreeCAD 1.0`, `Rhino 8`, `SketchUp\SketchUp 2024`) and for SOLIDWORKS the
+  versions its installer registers; on macOS the apps in `/Applications`
+  (FreeCAD, Rhino, SketchUp, Fusion); on Linux FreeCAD on the `PATH`. The
+  app looks once per start – restart it after installing a CAD program.
+* *Open* in the Files tab uses the same choice for CAD files.
+
+*Import CAD folder* shows the CAD program the folder belongs to – for
+Inventor with the version read from the files (*Detected CAD program:
+Autodesk Inventor 2021*) – and offers to make it the group's default
+program (managers of the group and administrators; the import report says
+whether it was set).
+
 ## How files appear on your computer
 
 There is **one working folder per project group**, and inside it the files
@@ -346,6 +384,16 @@ scanned tree; uploads without a folder put new files at the top of the
 group, and a file keeps its folder when new versions arrive. While a
 revision is checked out, the revision page can move a file to another
 folder.
+
+**Umlauts and accents.** macOS hands out file names *decomposed* (Unicode
+NFD: `a` followed by a combining diaeresis for `ä`), Windows and the CAD
+programs there write them *composed* (NFC). The two look the same, but on
+Windows and Linux they are different files, and an assembly saved on Windows
+does not find a part whose name came through a Mac. TeamCraft therefore keeps
+every file and folder name composed: the server composes what it receives,
+the folder import and the working folder use composed names on every system,
+and a file an older app version wrote under a decomposed name is renamed at
+the next Get or when the Workspace tab looks at it.
 
 **Read-only rule.** Files you have **not** checked out are read-only on disk (the read-only attribute on Windows, no
 write permission on Linux and macOS).

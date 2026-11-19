@@ -27,7 +27,7 @@ use crate::{
 // readable by everyone): any future delete must refuse restricted groups that
 // still have items.
 const COLUMNS: &str = "id, code, name, description, active, created_at, oidc_group, created_by,
-    number_scheme, visibility,
+    number_scheme, visibility, default_cad, default_cad_version,
     (SELECT COUNT(*) FROM project_members pm WHERE pm.project_id = projects.id) AS member_count";
 
 /// The project groups the actor may see: restricted groups only for their
@@ -510,6 +510,87 @@ pub async fn set_number_scheme(
             scheme.as_deref().unwrap_or(domain::DEFAULT_NUMBER_SCHEME)
         ),
         json!({ "before": current.number_scheme, "after": scheme }),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(project)
+}
+
+/// Sets the default CAD program of a project group (managers and admins):
+/// a format family (`inventor`, `solidworks`, …; see
+/// `cadformat::families`) and optionally its version (`2026`). TeamCraft
+/// Desktop opens the group's CAD files with it (*Check out and open*). An
+/// empty family removes the default (the desktop then takes the newest
+/// installed program that fits the file); the version is dropped with it.
+///
+/// # Invariants
+///
+/// * **Permission:** the group is visible to the actor ("not found"
+///   otherwise) and the actor manages it (or is an administrator; 403).
+/// * **Validation:** a known family, a plain version of at most
+///   `cadformat::MAX_CAD_VERSION` characters (400 otherwise).
+/// * **Locks:** the group row (`FOR UPDATE`).
+/// * **Audit:** `project.default_cad` (program and version before and after).
+/// * **Notifications / webhooks:** none.
+/// * **Atomic:** one transaction.
+pub async fn set_default_cad(
+    pool: &PgPool,
+    actor: &Actor,
+    id: Uuid,
+    family: &str,
+    version: &str,
+) -> AppResult<Project> {
+    let family = family.trim();
+    if !family.is_empty() && !crate::cadformat::is_family(family) {
+        return Err(AppError::BadRequest(format!(
+            "'{family}' is not a CAD program TeamCraft knows – choose one of the list."
+        )));
+    }
+    let version = crate::cadformat::cad_version(version).ok_or_else(|| {
+        AppError::BadRequest(format!(
+            "The version may have at most {} letters, digits, spaces and . - _ /",
+            crate::cadformat::MAX_CAD_VERSION
+        ))
+    })?;
+    let version = if family.is_empty() {
+        String::new()
+    } else {
+        version
+    };
+    let mut tx = pool.begin().await?;
+    let current = sqlx::query_as::<_, Project>(&format!(
+        "SELECT {COLUMNS} FROM projects WHERE id = $1 FOR UPDATE"
+    ))
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| AppError::not_found("Project not found."))?;
+    require_manager(&mut tx, actor, id).await?;
+    let project = sqlx::query_as::<_, Project>(&format!(
+        "UPDATE projects SET default_cad = $2, default_cad_version = $3 WHERE id = $1
+         RETURNING {COLUMNS}"
+    ))
+    .bind(id)
+    .bind(family)
+    .bind(&version)
+    .fetch_one(&mut *tx)
+    .await?;
+    let label = crate::cadformat::program_label(family, &version);
+    audit::record(
+        &mut tx,
+        Some(actor),
+        "project.default_cad",
+        "project",
+        Some(id),
+        format!(
+            "Default CAD program of project {}: {}",
+            project.code,
+            if label.is_empty() { "none" } else { &label }
+        ),
+        json!({
+            "before": { "program": current.default_cad, "version": current.default_cad_version },
+            "after": { "program": family, "version": version },
+        }),
     )
     .await?;
     tx.commit().await?;

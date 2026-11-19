@@ -191,6 +191,9 @@ async fn the_desktop_app_signs_in_to_the_demo_under_a_random_name() {
     assert!(!text.contains("Leos-Laptop"), "{text}");
     assert!(text.contains("demo-computer-"), "{text}");
     assert!(text.contains("the name of your computer is not"), "{text}");
+    // the appearance forms in the header return to the page under the random
+    // name (they repeated the request's address, real name included)
+    assert!(text.contains("&amp;device=demo-computer-"), "{text}");
 
     // "Allow" passes the read-only rule; a posted real name is replaced too
     let r = app

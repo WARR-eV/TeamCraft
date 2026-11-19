@@ -186,6 +186,29 @@ structure should not prevent translations later). They may land in 1.x minor rel
 
 ## To-do
 
+### 0. Priority 1: *Check out and open* with the project's CAD program
+
+Requested by the user as the current top priority (before sections 1 and 2).
+
+- [x] Server: default CAD program per project group (`projects.default_cad`, `default_cad_version`, migration 0074),
+  set by managers and admins on the group page and with `PUT /api/v1/projects/{code}/default-cad`, audited
+  (`project.default_cad`), in the group's JSON; `GET /api/v1/formats` names each format's `family`
+  (`tests/project_default_cad.rs`).
+- [x] Desktop: find the installed CAD programs and versions (Windows install folders and registry, macOS
+  `/Applications`, FreeCAD on Linux) and choose: the group's program and version, else its newest installed version;
+  without a default (or for files of another program) the newest installed program that fits the file type; else the
+  operating system's program.
+- [x] Desktop: *Check out and open* button on the revision toolbar with the chosen program shown next to it; *Open in
+  …* for one's own check-out; the Files tab opens through the same choice.
+- [x] Desktop: *Import CAD folder* detects the program of the folder (and the Inventor version from the files'
+  properties, `2021 (Build …)` in the NIST samples) and offers to set it as the group's default.
+- [x] Docs of the desktop part (`desktop/README.md`, `docs/src/guide/desktop.md`, threat model: starting local
+  programs), research page entry for the Inventor version finding (`docs/src/research/cad-folder-import.md`).
+- [ ] Left: try it on Windows with real installations (Inventor 2025/2026 side by side, SOLIDWORKS – the registry
+  keys, Solid Edge, NX, Creo, CATIA) and on macOS; the install folders and the SOLIDWORKS registry keys are the
+  installers' usual defaults, untested here. Versions of other programs than Inventor are not read from the files
+  (SOLIDWORKS keeps them in compressed sections).
+
 ### 1. Proofing
 
 **Tests** (priority: more unit tests)

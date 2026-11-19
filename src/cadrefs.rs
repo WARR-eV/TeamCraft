@@ -245,9 +245,11 @@ const PREFIXED_MIN: usize = 5;
 const PREFIXED_MAX: usize = 1024;
 
 /// Whether a UTF-16 code unit is text for the scans (Latin-1 and Latin
-/// Extended-A, as in [`utf16_runs`]).
+/// Extended-A, as in [`utf16_runs`], and the combining diacritical marks: a
+/// name that went through macOS is decomposed, `a` + U+0308 for `ä`, and a
+/// CAD program on Windows that resolved such a file stores it that way).
 fn printable_unit(unit: u16) -> bool {
-    (0x20..0x7f).contains(&unit) || (0xa0..0x180).contains(&unit)
+    (0x20..0x7f).contains(&unit) || (0xa0..0x180).contains(&unit) || (0x300..0x370).contains(&unit)
 }
 
 /// Length-prefixed UTF-16LE strings: a `u32` LE count of code units directly
@@ -478,13 +480,14 @@ fn raw_names(content: &[u8]) -> Vec<String> {
     found
 }
 
-/// Normalised, without the file itself, each name once.
+/// Normalised (Creo iterations, Unicode NFC as stored file names are), without
+/// the file itself, each name once.
 fn finish(found: Vec<String>, own_name: &str) -> Vec<String> {
-    let own = cadformat::normalize_name(own_name).to_lowercase();
+    let own = count_key(own_name);
     let mut seen = HashSet::new();
     found
         .into_iter()
-        .map(|n| cadformat::normalize_name(&n).to_string())
+        .map(|n| cadformat::normalize_name(&crate::util::nfc(&n)).to_string())
         .filter(|n| n.to_lowercase() != own && is_referencable(n))
         .filter(|n| seen.insert(n.to_lowercase()))
         .take(MAX_REFERENCES)
@@ -515,7 +518,7 @@ pub struct FileRef {
 /// The lookup key of a referenced file name: normalised as [`finish`] does,
 /// lower case.
 fn count_key(name: &str) -> String {
-    cadformat::normalize_name(name).to_lowercase()
+    cadformat::normalize_name(&crate::util::nfc(name)).to_lowercase()
 }
 
 /// How often an assembly places each component file – keyed by the lower
@@ -760,6 +763,26 @@ mod tests {
         let mut plain = utf16("C:\\Rover\\Motor mount.iam");
         plain.extend([0x43, 0x00, 0x00, 0x00]);
         assert!(find(&plain, "rover.iam").is_empty());
+    }
+
+    #[test]
+    fn decomposed_names_are_found_composed() {
+        // An assembly saved on Windows after its parts came through a Mac:
+        // the references are decomposed (NFD), the stored files composed (NFC).
+        let mut content = prefixed("C:\\ROVER\\Design\\Rad Mitte\\Planetentra\u{308}ger2.ipt");
+        content.extend([0x43, 0x00, 0x00, 0x00]);
+        content.extend(utf16("Gearbox\\Motor_shaft_hu\u{308}lse.ipt"));
+        content.extend([0x00, 0x00]);
+        // (plain UTF-16 runs are listed before the length-prefixed strings)
+        assert_eq!(
+            find(&content, "Rad Mitte TEST3.iam"),
+            vec!["Motor_shaft_h\u{fc}lse.ipt", "Planetentr\u{e4}ger2.ipt"]
+        );
+        // the file's own name is left out in either form
+        let mut own = prefixed("C:\\Rad\\Stirnra\u{308}der3.iam");
+        own.extend([0x00, 0x00]);
+        assert!(find(&own, "Stirnr\u{e4}der3.iam").is_empty());
+        assert_eq!(count_key("Ha\u{308}lfte.IPT"), count_key("H\u{e4}lfte.ipt"));
     }
 
     #[test]
@@ -1120,7 +1143,14 @@ mod tests {
     fn a_non_ascii_letter_in_the_extension_does_not_panic() {
         let content = "board a.\u{212A}icad_pcb and other text".as_bytes();
         let names = find(content, "x.kicad_pro");
-        assert!(names.iter().all(|n| n.starts_with('a')), "{names:?}");
+        // Composing (NFC) turns the Kelvin sign into the letter K it is
+        // canonically equivalent to: the name is found whole, like its ASCII
+        // spelling `board a.Kicad_pcb` would be.
+        assert_eq!(names, vec!["board a.Kicad_pcb"]);
+        assert_eq!(
+            find(b"board a.Kicad_pcb and other text", "x.kicad_pro"),
+            names
+        );
         // the same text as UTF-16 is not even read as a name (Latin only)
         let utf16: Vec<u8> = "a.\u{212A}icad_pcb "
             .encode_utf16()

@@ -8,6 +8,7 @@ import { canEdit, canEditProject, freshProjects, refreshWorklistCount } from "./
 import { activeProject, selectView } from "./navigator.js";
 import { table } from "./tabs.js";
 import { openRevision } from "./revision.js";
+import { cadFormats, detectFolderProgram } from "./cad-open.js";
 
 // ------------------------------------------- import of a CAD folder tree
 // (docs/src/research/cad-folder-import.md)
@@ -116,8 +117,18 @@ export function importLogKey(project, folder) {
   return "teamcraft.import-log:" + JSON.stringify([state.session.server_url, project, folder]);
 }
 export function importLog(project, folder) {
-  try { return JSON.parse(window.localStorage.getItem(importLogKey(project, folder))) || {}; }
+  var log;
+  try { log = JSON.parse(window.localStorage.getItem(importLogKey(project, folder))) || {}; }
   catch (e) { return {}; }
+  // The scan names files composed (NFC); a log an older version wrote for an
+  // import on a Mac has decomposed keys – composed here, so those items are
+  // not imported a second time.
+  var out = {};
+  Object.keys(log).forEach(function (k) {
+    var nfc = k.normalize("NFC");
+    if (!(nfc in out) || nfc === k) out[nfc] = log[k];
+  });
+  return out;
 }
 export function saveImportLog(project, folder, log) {
   try { window.localStorage.setItem(importLogKey(project, folder), JSON.stringify(log)); }
@@ -268,7 +279,7 @@ export function openImportFolderDialog() {
   if (!projects.length) { toast("You are not a member of any project group – ask an admin to add you.", "error"); return; }
   var folder = h("input", { type: "text", spellcheck: "false", placeholder: "Folder with the CAD files" });
   // another folder: scan again before Import (the plan and the log belong to the scanned folder)
-  function forgetScan() { if (!running) { scanned = null; plan = null; scannedPath = ""; report.textContent = ""; } }
+  function forgetScan() { if (!running) { scanned = null; plan = null; scannedPath = ""; report.textContent = ""; detected = null; showDetected(); } }
   folder.addEventListener("input", forgetScan);
   var pick = TAURI.dialog ? h("button", { type: "button", on: { click: function () {
     TAURI.dialog.open({ directory: true, title: "CAD folder to import" }).then(function (dir) { if (dir && !running) { folder.value = dir; forgetScan(); } });
@@ -284,6 +295,35 @@ export function openImportFolderDialog() {
   var bar = h("progress.hidden", { max: "1", value: "0" });
   var status = h("p.small", { role: "status" });
   var scanned = null, scannedPath = "", kinds = null, plan = null, running = false, stop = false;
+  // the CAD program of the folder (cad-open.js) and the offer to make it the group's default
+  var detected = null;
+  var cadBox = h("input", { type: "checkbox" });
+  var cadText = h("span");
+  var cadRow = h("div.stack.hidden", null, [h("p.small.cad-detected"), h("label.check", null, [cadBox, cadText])]);
+  function groupOf(code) { return state.projects.filter(function (p) { return p.code === code; })[0]; }
+  function sameDefault(p) {
+    return p && p.default_cad === detected.family && (!detected.version || p.default_cad_version === detected.version);
+  }
+  function showDetected() {
+    cadRow.classList.toggle("hidden", !detected);
+    if (!detected) { cadBox.checked = false; return; }
+    var p = groupOf(project.value), same = sameDefault(p);
+    cadRow.firstChild.textContent = "Detected CAD program: " + detected.name + " (" + detected.files + " of " + detected.total + " CAD files)" +
+      (detected.version ? "" : " – no version found in the files") + (same ? " – already the default CAD program of " + project.value : "");
+    cadBox.parentNode.classList.toggle("hidden", same);
+    cadBox.checked = !same && !(p && p.default_cad);
+    cadText.textContent = "Make " + detected.name + " the default CAD program of " + project.value +
+      (p && p.default_cad ? " (now: " + p.default_cad + (p.default_cad_version ? " " + p.default_cad_version : "") + ")" : "") +
+      " – TeamCraft Desktop opens the group's CAD files with it (managers of the group and administrators)";
+  }
+  /** Sets the detected program as the group's default, if ticked; a refusal is reported, not fatal. */
+  function setDefaultCad(group, failed) {
+    if (!detected || !cadBox.checked || cadBox.parentNode.classList.contains("hidden")) return Promise.resolve(null);
+    var name = detected.name;
+    return api("PUT", "/projects/" + enc(group) + "/default-cad", { program: detected.family, version: detected.version })
+      .then(function () { return freshProjects().then(function () { return name; }); },
+        function (err) { failed.push("Default CAD program of " + group + " not set: " + errorText(err)); return null; });
+  }
 
   function options() { return { numbersFromNames: fromNames.checked, extras: extras.checked }; }
   function progress(done, total, text) { bar.classList.remove("hidden"); bar.max = Math.max(total, 1); bar.value = done; status.textContent = text; }
@@ -317,15 +357,18 @@ export function openImportFolderDialog() {
     var path = folder.value.trim();
     if (!path) { d.fail("Choose the folder first."); return; }
     status.textContent = "Scanning …";
-    Promise.all([call("scan_folder", { path: path }), formatKinds(), adoptFolderImportLog(path)]).then(function (r) {
+    Promise.all([call("scan_folder", { path: path }), formatKinds(), adoptFolderImportLog(path), cadFormats().catch(function () { return null; })]).then(function (r) {
       if (folder.value.trim() !== path) { status.textContent = ""; return; } // changed while scanning
       scanned = r[0]; kinds = r[1]; scannedPath = path;
+      detected = r[3] ? detectFolderProgram(scanned, r[3]) : null;
+      showDetected();
       status.textContent = "Scanned – nothing is uploaded yet. Check the list, then Import.";
       showPlan();
     }, function (err) { status.textContent = ""; d.fail(err); });
   }
   // the project group too: what counts as "already imported" is kept per group
   [fromNames, extras, project].forEach(function (box) { box.addEventListener("change", function () { if (scanned && !running) showPlan(); }); });
+  project.addEventListener("change", function () { if (scanned && !running) showDetected(); });
 
   function importNow(d) {
     if (running) return;
@@ -334,6 +377,7 @@ export function openImportFolderDialog() {
     var todo = plan.items.filter(function (it) { return !importDone(log, it.key); });
     var created = [], failed = [], files = 0, checkedIn = 0;
     running = true; stop = false;
+    var cadSet = null;
     todo.reduce(function (chain, it, i) {
       return chain.then(function () {
         if (stop) return;
@@ -383,7 +427,7 @@ export function openImportFolderDialog() {
               function (err) { failed.push(rev.item_number + ": check-in – " + errorText(err)); });
         }, function (err) { failed.push(it.name + ": " + errorText(err)); });
       });
-    }, Promise.resolve()).then(function () {
+    }, setDefaultCad(group, failed).then(function (name) { cadSet = name; })).then(function () {
       // the assemblies are checked out once more for their BOM lines – and always checked in again
       return bom.checked ? bomFromReferences(created, progress, failed) : { lines: 0, assumed: 0 };
     }).catch(function (err) {
@@ -401,7 +445,7 @@ export function openImportFolderDialog() {
       importFinishedDialog({
         stopped: stop, created: created, files: files, skipped: plan.items.length - todo.length,
         bom: bom.checked, lines: lines.lines, assumed: lines.assumed, checkedIn: checkedIn, failed: failed,
-        folder: scanned.folder_name, project: group
+        folder: scanned.folder_name, project: group, cad: cadSet
       });
     });
   }
@@ -414,6 +458,7 @@ export function openImportFolderDialog() {
     h("label.check", null, [fromNames, "Use file names as item numbers where they are valid – otherwise numbers are generated"]),
     h("label.check", null, [extras, "Put project files (.ipj …) and other documents into one document item"]),
     h("label.check", null, [bom, "Create BOM lines from the references found in the assemblies (instance counts of SOLIDWORKS, NX and STEP assemblies, otherwise quantity 1 – check those)"]),
+    cadRow,
     report, bar, status
   ]), [
     { label: "Close", onClick: function (d) { stop = true; d.close(); } },
@@ -448,6 +493,7 @@ export function importFinishedDialog(r) {
         count("part") + " parts, " + count("document") + " documents – with " + r.files + " files" }),
       r.skipped ? h("li", { text: r.skipped + " items were imported before and skipped" }) : null,
       r.bom ? h("li", { text: bomReportLine(r.lines, r.assumed) }) : null,
+      r.cad ? h("li", { text: "Default CAD program of " + r.project + ": " + r.cad + " – Check out and open uses it" }) : null,
       h("li", { text: r.checkedIn === r.created.length
         ? "Every new item is checked in – nothing is locked"
         : r.checkedIn + " of " + r.created.length + " new items checked in – the others are still checked out to you" }),

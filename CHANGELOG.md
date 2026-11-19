@@ -13,6 +13,8 @@ see the notices in the README.
 
 ## [Unreleased]
 
+## [0.2.10] - 2026-11-19
+
 ### Security
 
 - E-mail delivery: `lettre` 0.11.24 fixes six SMTP advisories (RUSTSEC-2026-0560
@@ -50,6 +52,25 @@ see the notices in the README.
 
 ### Added
 
+- **Check out and open** in TeamCraft Desktop: one button on the revision
+  toolbar takes the lock, gets the files and opens the main CAD file in the
+  CAD program; the chip next to it names the program (e.g. *Inventor 2026*).
+  The program is the project group's default CAD program in its version,
+  else its newest installed version; without a default (or for a file of
+  another program) the newest installed version of the program that fits the
+  file type; else the system's default application. Installed programs are
+  found by their install folders (Windows, SOLIDWORKS via the registry,
+  macOS, FreeCAD on Linux). *Open* in the Files tab uses the same choice.
+  *Import CAD folder* detects the folder's CAD program – Inventor with the
+  release year read from the files' properties – and offers to set it as the
+  group's default.
+- **Default CAD program per project group** (*Project groups → the group →
+  Default CAD program*, managers and administrators; `PUT
+  /api/v1/projects/{code}/default-cad` with `{program, version?}`): the
+  program and version, e.g. Autodesk Inventor 2026 or SolidWorks 2025, that
+  *Check out and open* uses. Audited as `project.default_cad`; the group's JSON carries
+  `default_cad` and `default_cad_version`; `GET /api/v1/formats` names each
+  format's `family`. Migration 0074.
 - **TeamCraft Desktop: several servers and accounts** (#322, #323).
   *Settings → Connections* lists the saved connections (server, account,
   working folder) with *Switch* and *Remove*; *Add another account…* signs in
@@ -126,6 +147,15 @@ see the notices in the README.
   go up to TiB. On the web, the states `unchanged`, `modified`, `outdated`,
   `conflict`, `clash` and `missing` get the desktop's glyphs. See
   [Shared UI](https://warr-ev.github.io/TeamCraft/dev/shared-ui.html).
+- The check-in button is called **Check in** (desktop check-in dialog, revision
+  page and vault explorer of the web UI) instead of *Check in and release*: it
+  ends the check-out, the revision stays in work – "release" read like the
+  lifecycle *Release…* that freezes a revision for manufacturing. The tooltips
+  say so too (*end your check-out*).
+- The desktop check-in option **Create STEP exports with … first** is off by
+  default (#342): the export through Inventor did not finish for a large
+  assembly, and because the exports run before the upload, the whole check-in
+  failed with it. Tick it for a check-in that should bring a 3D preview.
 - The preview cache is limited to **10 GiB by default** (#309):
   `TEAMCRAFT_PREVIEW_CACHE_MAX_MB` defaults to `10240` instead of `0`, so the
   hourly housekeeping trims `<vault>/previews` (least recently used first)
@@ -182,6 +212,23 @@ see the notices in the README.
 
 ### Fixed
 
+- **Umlauts from a Mac broke Inventor assemblies on Windows.** macOS hands
+  out file names decomposed (Unicode NFD, `a` + U+0308 for `ä`), Windows and
+  its CAD programs write them composed (NFC); NTFS and ext4 see two different
+  names. A CAD folder imported from a Mac was stored decomposed, the desktop
+  app on Windows wrote the parts under those names, and an assembly asked for
+  every part with an umlaut. Now every file and folder name is composed: on
+  upload and check-in (server), in the folder import, the working folder and
+  its state (desktop); CAD references stored decomposed are recognised too.
+  Migration 0073 composes the names stored before (files, folders, references
+  and the item names the folder import took from such file names). A Get or
+  the Workspace tab gives a file the app wrote under a decomposed name its
+  composed name, and the import log of an earlier Mac import still skips the
+  items it created.
+- Live demo, desktop sign-in (#325, #336): the confirmation page still held
+  the visitor's real computer name – the appearance forms in the header
+  repeat the page's address as their `back` target, `device=…` included. For
+  the demo account they now return to the address with the random name.
 - Trigram indexes of the item search could be missing without anyone
   noticing (#308): migrations 0023 and 0031 swallowed *every* error while
   creating them. Migration 0072 creates the six indexes again where they are
@@ -984,7 +1031,8 @@ Changes since the `v0.2.0` tag.
   app keeps the private file and shows a warning. Server addresses with plain
   `http://` to another computer get a warning.
 
-[Unreleased]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.9...HEAD
+[Unreleased]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.10...HEAD
+[0.2.10]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.9...v0.2.10
 [0.2.9]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.6...v0.2.7

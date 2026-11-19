@@ -1,6 +1,6 @@
 [package]
 name = "teamcraft"
-version = "0.2.9"
+version = "0.2.10"
 edition = "2021"
 rust-version = "1.82"
 description = "TeamCraft – an open-source product lifecycle management (PLM) system for engineering teams"
@@ -88,6 +88,9 @@ tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["trace", "set-header", "catch-panic"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+# File and folder names in Unicode NFC (macOS hands out NFD names, Windows CAD
+# programs look for NFC); already in the tree through url/idna (MIT/Apache-2.0)
+unicode-normalization = "0.1"
 uuid = { version = "1", features = ["v4", "serde"] }
 regex = "1"
 

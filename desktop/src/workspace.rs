@@ -40,14 +40,14 @@ use crate::{
 /// The file of a folder that holds the newest content of a server file: the
 /// highest Creo iteration, or the file itself.
 pub async fn newest_local(dir: &Path, name: &str) -> Result<Option<PathBuf>, ApiError> {
-    let wanted = name.to_lowercase();
+    let wanted = layout::key_of(name);
     let mut best: Option<(u32, PathBuf)> = None;
     if dir.is_dir() {
         let mut entries = tokio::fs::read_dir(dir).await?;
         while let Some(entry) = entries.next_entry().await? {
             let file_name = entry.file_name().to_string_lossy().to_string();
             let (logical, iteration) = logical_name(&file_name);
-            if logical.to_lowercase() != wanted || !entry.metadata().await?.is_file() {
+            if layout::key_of(logical) != wanted || !entry.metadata().await?.is_file() {
                 continue;
             }
             if best.as_ref().is_none_or(|(i, _)| iteration > *i) {
@@ -137,6 +137,86 @@ pub fn is_read_only(path: &Path) -> bool {
     std::fs::metadata(path)
         .map(|m| m.permissions().readonly())
         .unwrap_or(false)
+}
+
+/// Gives a file that sits on disk under its decomposed name the composed
+/// name the server uses (`rel`, see [`layout::nfc`]).
+///
+/// Earlier versions wrote names that came from a Mac unchanged; on NTFS and
+/// ext4 such a file is not the one the CAD program looks for, and a Get
+/// would put a second copy next to it. Folders on the way are matched the
+/// same way; the file moves into the composed folder and emptied decomposed
+/// folders are removed. Nothing happens when the composed path exists (on
+/// macOS it is the same file), when no such file is there, or when the
+/// rename fails (the file is open). Returns whether the file was renamed.
+pub fn adopt_decomposed(root: &Path, rel: &str) -> bool {
+    if rel.is_ascii() {
+        return false;
+    }
+    let target = layout::join_rel(root, rel);
+    if target.exists() {
+        return false;
+    }
+    let Some(actual) = decomposed_twin(root, rel) else {
+        return false;
+    };
+    if actual == target {
+        return false;
+    }
+    if let Some(dir) = target.parent() {
+        if std::fs::create_dir_all(dir).is_err() {
+            return false;
+        }
+    }
+    if std::fs::rename(&actual, &target).is_err() {
+        return false;
+    }
+    // emptied folders of the decomposed path, up to the first composed one
+    let mut dir = actual.parent();
+    while let Some(d) = dir.filter(|d| *d != root && d.starts_with(root)) {
+        let decomposed = d
+            .file_name()
+            .is_some_and(|n| !layout::is_nfc(&n.to_string_lossy()));
+        if !decomposed || std::fs::remove_dir(d).is_err() {
+            break;
+        }
+        dir = d.parent();
+    }
+    true
+}
+
+/// Runs [`adopt_decomposed`]; the state entry of a renamed file gets the
+/// composed path.
+fn adopt_into_state(state: &mut State, root: &Path, rel: &str) -> bool {
+    if !adopt_decomposed(root, rel) {
+        return false;
+    }
+    if let Some(mut entry) = state.get(rel).cloned() {
+        entry.path = rel.to_string();
+        state.insert(entry);
+    }
+    true
+}
+
+/// The existing path whose names equal those of `rel` after composing
+/// ([`layout::key_of`]), segment by segment below `root`.
+fn decomposed_twin(root: &Path, rel: &str) -> Option<PathBuf> {
+    let mut actual = root.to_path_buf();
+    for part in rel.split('/').filter(|p| !p.is_empty()) {
+        let exact = actual.join(part);
+        if exact.exists() {
+            actual = exact;
+            continue;
+        }
+        let wanted = layout::key_of(part);
+        let name = std::fs::read_dir(&actual)
+            .ok()?
+            .flatten()
+            .map(|e| e.file_name())
+            .find(|n| layout::key_of(&n.to_string_lossy()) == wanted)?;
+        actual.push(name);
+    }
+    actual.is_file().then_some(actual)
 }
 
 /// Percent-encoding of a path segment (item numbers are `A-Z0-9._-` anyway).
@@ -303,6 +383,7 @@ pub async fn fetch(
     let mut infos = HashMap::new();
     for f in files {
         let rel = f.rel();
+        adopt_into_state(&mut state, root, &rel);
         if let Some(info) = local_info(&layout::join_rel(root, &rel), state.get(&rel)).await? {
             local.insert(layout::key_of(&rel), info.0.clone());
             infos.insert(layout::key_of(&rel), info);
@@ -681,7 +762,8 @@ async fn new_local_files(
                 continue;
             }
             let (logical, _) = logical_name(&disk);
-            let logical = logical.to_string();
+            // sent to the server composed, like every name (`layout::nfc`)
+            let logical = layout::nfc(logical);
             let rel = format!("{dir_rel}/{logical}")
                 .trim_start_matches('/')
                 .to_string();
@@ -764,8 +846,10 @@ pub async fn status(
     let mut state = State::load(root);
     let before = state.clone();
     let mut found = Vec::new();
+    let mut renamed = false;
     for f in &rev.files {
         let rel = f.rel();
+        renamed |= adopt_into_state(&mut state, root, &rel);
         let dir = layout::join_rel(root, &rel);
         let dir = dir.parent().unwrap_or(root).to_path_buf();
         let entry = state.get(&rel).cloned();
@@ -881,7 +965,7 @@ pub async fn status(
             clash_with: f.clash_with,
         });
     }
-    if state_changed {
+    if state_changed || renamed {
         let _ = State::store(root, state.changes_since(&before));
     }
     out.sort_by_key(|f| (f.path.to_lowercase(), f.name.to_lowercase()));
@@ -2012,5 +2096,60 @@ mod tests {
             checkout_summary(&Downloaded::default(), "PRT-000001", "A"),
             "Checked out PRT-000001/A."
         );
+    }
+
+    #[test]
+    fn decomposed_files_get_the_composed_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        // written by an older app from names that came from a Mac
+        let old_dir = root.join("ROVER").join("Za\u{308}hne");
+        std::fs::create_dir_all(&old_dir).unwrap();
+        let old = old_dir.join("Planetentra\u{308}ger2.ipt");
+        std::fs::write(&old, b"part").unwrap();
+        set_read_only(&old, true).unwrap();
+        let rel = "ROVER/Z\u{e4}hne/Planetentr\u{e4}ger2.ipt";
+        let target = layout::join_rel(root, rel);
+        if old == target || target.exists() {
+            // a file system that treats both forms as one name (APFS):
+            // the CAD program finds the file anyway, nothing to do
+            assert!(!adopt_decomposed(root, rel));
+            return;
+        }
+        let mut state = State::default();
+        let mut entry = layout::ServerFile {
+            project: Some("ROVER".into()),
+            item: "PRT-000243".into(),
+            revision: "A".into(),
+            file_id: "f1".into(),
+            filename: "Planetentr\u{e4}ger2.ipt".into(),
+            folder: "Z\u{e4}hne".into(),
+            version: 1,
+            sha256: "s1".into(),
+            size: 4,
+            locked_by_me: false,
+        }
+        .entry("s1", 4, 1);
+        entry.path = "ROVER/Za\u{308}hne/Planetentra\u{308}ger2.ipt".into();
+        state.insert(entry);
+        assert!(adopt_into_state(&mut state, root, rel));
+        assert_eq!(std::fs::read(&target).unwrap(), b"part");
+        assert!(is_read_only(&target), "still read-only");
+        assert!(
+            !old.exists() && !old_dir.exists(),
+            "the decomposed folder is gone"
+        );
+        assert_eq!(state.get(rel).unwrap().path, rel);
+        // done once: nothing left to rename
+        assert!(!adopt_decomposed(root, rel));
+        // a composed file that exists already is never replaced
+        let other = root.join("ROVER").join("Hu\u{308}lse.ipt");
+        std::fs::write(&other, b"old").unwrap();
+        std::fs::write(root.join("ROVER").join("H\u{fc}lse.ipt"), b"new").unwrap();
+        assert!(!adopt_decomposed(root, "ROVER/H\u{fc}lse.ipt"));
+        assert_eq!(std::fs::read(&other).unwrap(), b"old");
+        // plain names and missing files: nothing happens
+        assert!(!adopt_decomposed(root, "ROVER/bracket.prt"));
+        assert!(!adopt_decomposed(root, "ROVER/Gr\u{f6}\u{df}e.ipt"));
     }
 }

@@ -50,11 +50,23 @@ impl AuthorizeParams {
 /// come back here afterwards.
 pub async fn authorize_page(
     State(st): State<AppState>,
-    ctx: WebCtx,
+    mut ctx: WebCtx,
     Query(params): Query<AuthorizeParams>,
 ) -> AppResult<Response> {
     let req = params.request(&st, &ctx)?;
     let demo = st.config.is_demo_user(&ctx.me.username);
+    if demo {
+        // The forms in the header (appearance) send the visitor back to this
+        // address (`here`); for the demo account it carries the random name,
+        // so the real computer name of the app's request is nowhere on the page.
+        ctx.here = format!(
+            "/desktop/authorize?port={}&state={}&challenge={}&device={}",
+            util::pct_encode(&params.port),
+            util::pct_encode(&params.state),
+            util::pct_encode(&params.challenge),
+            util::pct_encode(&req.device)
+        );
+    }
     let mut page = render(
         &st,
         &ctx,
