@@ -303,6 +303,18 @@ half a state behind. Prefer tests that fail on a real regression over tests that
   hand; `:edge` follows `main` within a day. A pull request that changes `packaging/**` or
   `desktop/tauri.conf.json` builds everything before it is merged. CI, CodeQL and the desktop workflow no longer
   cancel or replace runs on `main` either
+- [x] CI runs only the jobs a change needs (2026-11-19): one table, `scripts/ci-changes.sh` (with a self-test that
+  every `changes` job runs first), maps the changed files to the jobs of CI, Desktop app, CodeQL and Docs; pushes to
+  `main` and merge-queue entries compare with their base as pull requests do. A desktop UI change no longer runs the
+  server suite (two PostgreSQL legs, Windows build, clippy – ~35 runner-min) or the six-platform desktop build; a
+  Rust-free change skips the 12-minute CodeQL Rust analysis; `cargo deny` checks only the lock file that changed; a
+  docs change runs the new *docs and config guards* job (the configuration and documentation tests, no database –
+  before, docs-only pull requests ran no test at all although two tests read the book). CI and Desktop now run
+  everything weekly as the safety net. Also removed: a stray `cargo clippy|` line in `desktop.yml` that piped a
+  second clippy pass into an extra `cargo fmt --check` on every platform. Left: watch whether a pull request that
+  skips a CodeQL language shows a "configuration not found" notice in *Code scanning results*; the release builds
+  keep building server and desktop together (each nightly artifact is kept 14 days, so a part built less often
+  would expire)
 - [ ] Run `scale.yml` once by hand – its schedule has never fired yet – and make a failing scheduled run open an
   issue instead of only an e-mail
 - [x] `fuzz.yml` had never built a single target: the prebuilt `cargo-fuzz` from `taiki-e/install-action` is a musl

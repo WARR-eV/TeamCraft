@@ -75,10 +75,11 @@ must never be committed.
 
 ## Checks before a pull request
 
-CI runs these checks on every pull request: the tests against PostgreSQL 16
+CI runs these checks on pull requests: the tests against PostgreSQL 16
 and 18 on Linux (with coverage on one leg), the server build on Windows, the
 desktop app on Linux, macOS and Windows; `main` adds the macOS server build and
-more desktop runners (`.github/workflows/`). A pull request that changes a
+more desktop runners (`.github/workflows/`) – each only when a file it checks
+changed (see [What CI runs for a change](#what-ci-runs-for-a-change)). A pull request that changes a
 pure module also gets a mutation-testing report for the changed lines (report-only for now, see
 [mutation testing](docs/src/dev/mutation-testing.md)).
 Run them locally first:
@@ -120,6 +121,42 @@ warnings and errors (`RUST_LOG` selects more), so a `500` shows its cause.
 | the documentation                      | `mdbook build docs` (mdBook 0.5) and `scripts/check-doc-links.sh`                                                                                 |
 | the web UI                             | check the changed pages in a browser (no CSP errors in the console)                                                                               |
 | a pure module in `.cargo/mutants.toml` | `cargo mutants -F '^src/<module>\.rs:'` – every missed mutant gets a unit test or a reason ([mutation testing](docs/src/dev/mutation-testing.md)) |
+
+### What CI runs for a change
+
+A job runs only when a file it compiles, tests or reads changed. One table
+decides it for the workflows CI, Desktop app, CodeQL and Docs:
+[`scripts/ci-changes.sh`](scripts/ci-changes.sh). Each workflow's `changes`
+job runs its self-test first, then compares the pull request with its base
+(a push to `main` with the previous `main`, a merge-queue entry with its
+base) and starts only the jobs that need it.
+
+| Changed files                                                                                                                                                                                               | Jobs that run                                                                                    |
+|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
+| server: `src/`, `tests/`, `migrations/`, `templates/`, `static/`, `shared/`, `vendor/`, `media/logos/`, `media/icons/`, `fuzz/seeds/`, `Cargo.toml`/`Cargo.lock`, `build.rs`, lint and nextest configuration | CI: fmt and clippy, tests on PostgreSQL 16 and 18, Windows build (`main`: also macOS)            |
+| the desktop files server tests compare with: `desktop/ui/app.css`, `desktop/ui/index.html`, `desktop/ui/js/{core,settings,shell}.js`, `desktop/src/compat.rs`                                               | the server jobs as well                                                                          |
+| `docs/src/`, `deploy/teamcraft.env.example`, `deploy/docker-compose.yml`, `packaging/linux/teamcraft.env`                                                                                                   | CI: *docs and config guards* – `config::tests` and `tests/architecture_guards.rs`, no database   |
+| `Cargo.toml`/`Cargo.lock`, `desktop/Cargo.*`, `deny.toml`, `vendor/`                                                                                                                                        | CI: `cargo deny` for the lock file concerned                                                     |
+| the desktop app's Rust code and configuration, `shared/`, `media/logos/`, `media/icons/`, `tests/fixtures/cad/nist/`                                                                                        | Desktop app: fmt, clippy, tests, build and start-up test on every platform                      |
+| `desktop/ui/`, `static/`, `shared/`, `scripts/*.mjs`                                                                                                                                                        | Desktop app: *desktop UI* (syntax, imports, the Node tests)                                      |
+| `*.rs` and Cargo files / `*.js`, `*.mjs`, `*.html` / workflows                                                                                                                                              | CodeQL: the Rust / JavaScript / Actions analysis                                                 |
+| `docs/`, `src/`, the Cargo files                                                                                                                                                                            | Docs: build of the book and the API reference (on `main`: deploy); the links check runs always   |
+
+A change of a workflow runs its own jobs; a change of `scripts/ci-changes.sh`
+runs everything. Scheduled runs (CI and Desktop app weekly, CodeQL weekly)
+and *Run workflow* run everything, so a file the table misses is caught
+within a week. **When a test starts to read a file outside its area, add the
+file to the table** (and a line to the self-test). To see what a branch
+would run:
+
+```sh
+git diff --name-only origin/main... | bash scripts/ci-changes.sh --files
+bash scripts/ci-changes.sh --self-test
+```
+
+Mutation testing, the release builds and the screenshots keep their own
+path filters (`.github/workflows/mutants.yml`, `release.yml`,
+`screenshots.yml`); fuzzing and the scale check run on a schedule only.
 
 ### Scale check
 
@@ -453,9 +490,9 @@ another pull request changed, formatting after a conflict resolution.
   before anything else is merged, so that every red ✗ on `main` points to
   one real failure.
 * **CI result** is the one check that sums up the CI workflow: it is green
-  when every job passed or was skipped on purpose (a pull request that only
-  changes `*.md`, `docs/` or `platforms/` skips the Rust jobs), red when
-  one failed or was cancelled. The macOS build (`build (macos-latest)`, on
+  when every job passed or was skipped on purpose (a job runs only for the
+  files it checks, see [What CI runs for a change](#what-ci-runs-for-a-change)),
+  red when one failed or was cancelled. The macOS build (`build (macos-latest)`, on
   `main` only) is advisory and not part of it: GitHub's hosted macOS
   runners are often unavailable, and a job that never got a runner is
   cancelled – that is no fault of the code. CI also runs on `merge_group`, so a merge

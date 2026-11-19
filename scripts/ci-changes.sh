@@ -131,7 +131,7 @@ changed_files() {
     local base
     case "${GITHUB_EVENT_NAME:-}" in
         # the merge commit of the pull request: its first parent is the base
-        pull_request) git diff --name-only HEAD^1 HEAD; return ;;
+        pull_request) git -c core.quotepath=off diff --name-only HEAD^1 HEAD; return ;;
         push) base=${CI_PUSH_BEFORE:-} ;;
         merge_group) base=${CI_MERGE_BASE:-} ;;
         # schedule, workflow_dispatch: everything
@@ -140,7 +140,7 @@ changed_files() {
     # a new branch or a force push has no usable base
     case "$base" in '' | *[!0-9a-f]* | 0000000000000000000000000000000000000000) return 1 ;; esac
     git fetch --quiet --no-tags --depth=1 origin "$base" || return 1
-    git diff --name-only "$base" HEAD
+    git -c core.quotepath=off diff --name-only "$base" HEAD
 }
 
 # ---- self-test ---------------------------------------------------------------
