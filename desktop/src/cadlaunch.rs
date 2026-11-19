@@ -694,6 +694,7 @@ if ($null -eq $doc) { [void]$app.Documents.Open($Path, $true) } else { [void]$do
 
 /// How *Check out and open* goes on after asking a running instance.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(not(windows), allow(dead_code))] // `Opened` is only constructed on Windows
 pub enum Reuse {
     /// The running instance opens the file.
     Opened,
