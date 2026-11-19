@@ -88,6 +88,33 @@ SOLIDWORKS, the registry keys its installer writes – see
 `desktop/src/cadlaunch.rs`; these are the installers' usual default
 locations, not tested against real installations here.
 
+### Reusing a running Inventor (#350)
+
+Starting `Inventor.exe <file>` while Inventor runs starts a second
+instance. Inventor's documented COM interface (the *Inventor API* reference
+in the Inventor help, the same API iLogic and add-ins use) offers what is
+needed to open the file in the running one instead:
+
+* the running instance: `GetActiveObject("Inventor.Application")` (.NET
+  `Marshal.GetActiveObject`, Microsoft's documentation of the running object
+  table); `Application.Visible` tells a user's instance from an invisible
+  automation one;
+* its installation: `Application.InstallPath`, compared with the folder of
+  the `Inventor.exe` the desktop app chose;
+* its project: `DesignProjectManager.ActiveDesignProject.FullFileName`,
+  compared with the Inventor project file (`.ipj`) of the working folder –
+  the one in the nearest folder from the file's own up to the working folder
+  root (Inventor projects keep their files below the `.ipj`);
+* opening: `Documents.Open(FullDocumentName, OpenVisible = True)`, or
+  `Document.Activate` for a document already open; the window comes to the
+  front with `WScript.Shell.AppActivate(<process id>)`.
+
+The desktop app runs this as a short Windows PowerShell script, like the
+STEP export ([CAD previews](cad-previews.md)), and starts a new instance
+for any other answer. Only public API documentation was used; not tested
+against a real Inventor here
+(`desktop/src/cadlaunch.rs`, `open_in_running`).
+
 ## Sources
 
 * Autoloader and Inventor projects:

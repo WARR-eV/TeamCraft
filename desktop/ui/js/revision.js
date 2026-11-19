@@ -15,6 +15,7 @@ import { openChange } from "./change.js";
 import { openRequest, requestChangeDialog } from "./requests.js";
 import { bomFromCadDialog, importBomDialog } from "./bom-import.js";
 import { cadTargetChip, groupDefault, mainCadFile, openWithCad } from "./cad-open.js";
+import { incompleteGet, notOpenedText } from "./get-rules.js";
 
 /** Opens a revision tab; `viewerFile` (a file id) picks the file of its 3D viewer. */
 export function openRevision(number, code, sub, viewerFile) {
@@ -449,10 +450,14 @@ export function exportStep(rev, name) {
 }
 
 /** Check out and open: takes the lock (the files come into the working
- * folder), then opens the main CAD file in the chosen program. */
+ * folder), then opens the main CAD file in the chosen program – only when
+ * the Get finished: after Cancel, or with files that could not be copied,
+ * the assembly would open without its parts (#348). The check-out stays. */
 export function checkOutAndOpen(tab, file) {
   var rev = tab.data.rev;
-  doCheckout(tab, function () {
+  doCheckout(tab, function (r) {
+    var why = incompleteGet(r);
+    if (why) { toast(notOpenedText(file.filename, why) + " The check-out stays.", "info"); return; }
     openWithCad(rev, file).catch(function (e) { toast(errorText(e), "error"); });
   });
 }

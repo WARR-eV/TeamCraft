@@ -23,6 +23,16 @@
 //! Without such a program, and for neutral files (STEP, PDF, …), the
 //! operating system opens the file with its default application.
 //!
+//! **A running Inventor** ([`open_in_running`], Windows): when an Inventor
+//! the user started is already running, is the installation [`plan`] chose
+//! and has the working folder's Inventor project ([`project_file`]) active,
+//! the file opens there as a new document window instead of in a second
+//! instance (#350). Inventor is asked through its documented COM interface
+//! (`GetActiveObject`, `InstallPath`,
+//! `DesignProjectManager.ActiveDesignProject`, `Documents.Open`) by a short
+//! Windows PowerShell script, like the STEP export (`cadexport.rs`). Any
+//! other answer starts a new instance as before, with a note why.
+//!
 //! Not tested against real installations in the development environment;
 //! the paths are the installers' defaults.
 
@@ -349,6 +359,10 @@ pub struct OpenPlan {
     /// The program that was asked for is not the one used (another
     /// version, or not installed).
     pub fallback: bool,
+    /// The file opened in an instance that was already running (#350).
+    pub reused: bool,
+    /// Why a running instance was not used (empty = nothing to say).
+    pub note: String,
 }
 
 /// Chooses the program for a file (see the module documentation).
@@ -358,6 +372,8 @@ pub fn plan(installed: &[Installed], wish: &Wish) -> OpenPlan {
         label: "Default app".into(),
         reason,
         fallback,
+        reused: false,
+        note: String::new(),
     };
     let file = wish.file_family.as_str();
     if file.is_empty() {
@@ -404,6 +420,8 @@ pub fn plan(installed: &[Installed], wish: &Wish) -> OpenPlan {
                 program: Some(program.clone()),
                 reason,
                 fallback: !exact,
+                reused: false,
+                note: String::new(),
             }
         }
         None => system(
@@ -502,6 +520,314 @@ pub fn launch(program: &Installed, file: &Path) -> Result<(), String> {
         let _ = child.wait();
     });
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// A running Inventor (#350)
+// ---------------------------------------------------------------------------
+
+/// The extension of Inventor project files.
+const PROJECT_EXTENSION: &str = "ipj";
+
+/// How long a running Inventor may take to say whether it opens the file
+/// (a busy or blocked instance: a new one starts instead). Opening the file
+/// itself is not waited for – a large assembly loads for minutes.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub const ASK_LIMIT: std::time::Duration = std::time::Duration::from_secs(20);
+
+/// The Inventor project file (`.ipj`) of a file in the working folder: the
+/// nearest folder, from the file's own up to the working folder `root`,
+/// that holds exactly one. A folder with several makes it unknown, and so
+/// does a file outside the working folder (`None` for both).
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn project_file(file: &Path, root: &Path) -> Option<PathBuf> {
+    for dir in file.ancestors().skip(1) {
+        if !dir.starts_with(root) {
+            return None;
+        }
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            let mut found = entries.flatten().map(|e| e.path()).filter(|p| {
+                p.is_file()
+                    && p.extension()
+                        .and_then(|e| e.to_str())
+                        .is_some_and(|e| e.eq_ignore_ascii_case(PROJECT_EXTENSION))
+            });
+            if let Some(first) = found.next() {
+                return found.next().is_none().then_some(first);
+            }
+        }
+        if dir == root {
+            return None;
+        }
+    }
+    None
+}
+
+/// What a running Inventor answered when asked to open a file.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Running {
+    /// No Inventor the user started runs, or it could not be asked in time.
+    Nothing,
+    /// It opens the file as a new document window.
+    Opening,
+    /// Another installation runs (its install folder).
+    OtherVersion(String),
+    /// It has another project active (its project file; empty = none).
+    OtherProject(String),
+}
+
+/// One line of [`INVENTOR_OPEN_SCRIPT`]'s answer: `none`, `opening`,
+/// `version <install folder>` or `project <project file>`; `None` for any
+/// other line.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn parse_answer(line: &str) -> Option<Running> {
+    let line = line.trim();
+    let rest = |word: &str| {
+        line.strip_prefix(word)
+            .filter(|r| r.is_empty() || r.starts_with(' '))
+            .map(|r| r.trim().to_string())
+    };
+    match line {
+        "none" => Some(Running::Nothing),
+        "opening" => Some(Running::Opening),
+        _ => rest("version")
+            .map(Running::OtherVersion)
+            .or_else(|| rest("project").map(Running::OtherProject)),
+    }
+}
+
+/// The last part of a Windows or Unix path (`C:\…\Inventor 2025` →
+/// `Inventor 2025`), without the `.ipj` of a project file.
+fn last_part(path: &str) -> String {
+    let name = path
+        .trim_end_matches(['\\', '/'])
+        .rsplit(['\\', '/'])
+        .next()
+        .unwrap_or_default();
+    let dot = name.len().saturating_sub(PROJECT_EXTENSION.len() + 1);
+    match name.get(dot..) {
+        Some(ext) if dot > 0 && ext.eq_ignore_ascii_case(".ipj") => name[..dot].to_string(),
+        _ => name.to_string(),
+    }
+}
+
+/// The note shown when a running Inventor was not used (`None` when none
+/// runs, or when it opened the file).
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn running_note(
+    running: &Running,
+    wanted: &Installed,
+    project: Option<&Path>,
+) -> Option<String> {
+    match running {
+        Running::Nothing | Running::Opening => None,
+        Running::OtherVersion(dir) => Some(format!(
+            "{} is running, not {} – opened in a new instance.",
+            last_part(dir),
+            wanted.label
+        )),
+        Running::OtherProject(active) => {
+            let active = if active.is_empty() {
+                "no project".to_string()
+            } else {
+                format!("the project {}", last_part(active))
+            };
+            Some(match project {
+                Some(own) => format!(
+                    "Inventor is running with {active}, not {} – opened in a new instance.",
+                    last_part(&own.to_string_lossy())
+                ),
+                None => format!(
+                    "Inventor is running with {active}, and the working folder has no Inventor project file (.ipj) to compare it with – opened in a new instance."
+                ),
+            })
+        }
+    }
+}
+
+/// Whether a `tasklist /FO CSV /NH` answer lists the program `image`
+/// (`"Inventor.exe","1234",…`; any other answer, a localised "no tasks"
+/// message too, does not).
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn tasklist_has(answer: &str, image: &str) -> bool {
+    answer.lines().any(|line| {
+        line.trim()
+            .strip_prefix('"')
+            .and_then(|l| l.split('"').next())
+            .is_some_and(|name| name.eq_ignore_ascii_case(image))
+    })
+}
+
+/// Asks a running Inventor to open a file, and answers with one line (see
+/// [`parse_answer`]) – before `Documents.Open`, so the app does not wait
+/// for a large assembly to load. Only an instance the user can see counts:
+/// an invisible one is an automation run (a STEP export, `cadexport.rs`).
+#[cfg_attr(not(windows), allow(dead_code))]
+pub const INVENTOR_OPEN_SCRIPT: &str = r#"param([Parameter(Mandatory = $true)][string]$Path, [Parameter(Mandatory = $true)][string]$InstallDir, [string]$Project = '')
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+function Say([string]$Line) { [Console]::Out.WriteLine($Line); [Console]::Out.Flush() }
+function Same([string]$A, [string]$B) {
+    if (-not $A -or -not $B) { return $false }
+    return [IO.Path]::GetFullPath($A).TrimEnd('\') -ieq [IO.Path]::GetFullPath($B).TrimEnd('\')
+}
+try { $app = [Runtime.InteropServices.Marshal]::GetActiveObject('Inventor.Application') }
+catch { Say 'none'; exit 0 }
+if (-not $app.Visible) { Say 'none'; exit 0 }
+$dir = [string]$app.InstallPath
+if (-not (Same $dir $InstallDir)) { Say "version $dir"; exit 0 }
+$active = ''
+$current = $app.DesignProjectManager.ActiveDesignProject
+if ($null -ne $current) { $active = [string]$current.FullFileName }
+if (-not (Same $active $Project)) { Say "project $active"; exit 0 }
+Say 'opening'
+try {
+    $shell = New-Object -ComObject WScript.Shell
+    foreach ($p in @(Get-Process -Name Inventor -ErrorAction SilentlyContinue)) {
+        if ($p.Path -and (Same (Split-Path (Split-Path $p.Path)) $InstallDir)) { [void]$shell.AppActivate($p.Id); break }
+    }
+} catch { }
+$doc = $null
+foreach ($d in $app.Documents) { if (Same $d.FullFileName $Path) { $doc = $d } }
+if ($null -eq $doc) { [void]$app.Documents.Open($Path, $true) } else { [void]$doc.Activate() }
+"#;
+
+/// How *Check out and open* goes on after asking a running instance.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(not(windows), allow(dead_code))] // `Opened` is only constructed on Windows
+pub enum Reuse {
+    /// The running instance opens the file.
+    Opened,
+    /// Start a new instance; the note says why a running one was not used
+    /// (empty = none runs).
+    NewInstance(String),
+}
+
+/// Opens `file` in a running instance of `program` when that is the
+/// installation [`plan`] chose and has the working folder's project active
+/// (#350; Inventor on Windows – anywhere else nothing is asked and a new
+/// instance starts, as before).
+pub fn open_in_running(program: &Installed, file: &Path, root: &Path) -> Reuse {
+    if program.family != "inventor" {
+        return Reuse::NewInstance(String::new());
+    }
+    #[cfg(windows)]
+    {
+        let project = project_file(file, root);
+        match running::ask(program, file, project.as_deref()) {
+            Running::Opening => Reuse::Opened,
+            other => Reuse::NewInstance(
+                running_note(&other, program, project.as_deref()).unwrap_or_default(),
+            ),
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (file, root);
+        Reuse::NewInstance(String::new())
+    }
+}
+
+#[cfg(windows)]
+mod running {
+    use super::*;
+    use std::{
+        io::BufRead,
+        os::windows::process::CommandExt,
+        process::{Command, Stdio},
+        sync::mpsc,
+    };
+
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+    /// Whether an Inventor process runs at all – `tasklist` starts much
+    /// faster than PowerShell, which is then only started when one does.
+    fn inventor_runs() -> bool {
+        Command::new("tasklist")
+            .args(["/FI", "IMAGENAME eq Inventor.exe", "/FO", "CSV", "/NH"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .is_ok_and(|o| tasklist_has(&String::from_utf8_lossy(&o.stdout), "Inventor.exe"))
+    }
+
+    pub fn ask(program: &Installed, file: &Path, project: Option<&Path>) -> Running {
+        // Bin\Inventor.exe → the install folder Inventor reports
+        let Some(install) = program.path.parent().and_then(Path::parent) else {
+            return Running::Nothing;
+        };
+        if !inventor_runs() {
+            return Running::Nothing;
+        }
+        let script = std::env::temp_dir().join(format!(
+            "teamcraft-open-in-inventor-{}-{}.ps1",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_nanos())
+        ));
+        if std::fs::write(&script, INVENTOR_OPEN_SCRIPT).is_err() {
+            return Running::Nothing;
+        }
+        let mut command = Command::new("powershell.exe");
+        command
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+            ])
+            .arg(&script)
+            .arg("-Path")
+            .arg(file)
+            .arg("-InstallDir")
+            .arg(install);
+        if let Some(project) = project {
+            command.arg("-Project").arg(project);
+        }
+        let mut child = match command
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+        {
+            Ok(child) => child,
+            Err(_) => {
+                let _ = std::fs::remove_file(&script);
+                return Running::Nothing;
+            }
+        };
+        let (tx, rx) = mpsc::channel();
+        if let Some(out) = child.stdout.take() {
+            std::thread::spawn(move || {
+                let mut answered = false;
+                for line in std::io::BufReader::new(out).lines() {
+                    let Ok(line) = line else { break };
+                    if !answered {
+                        if let Some(answer) = parse_answer(&line) {
+                            answered = true;
+                            let _ = tx.send(answer);
+                        }
+                    }
+                }
+            });
+        }
+        let (answer, stuck) = match rx.recv_timeout(ASK_LIMIT) {
+            Ok(answer) => (answer, false),
+            Err(mpsc::RecvTimeoutError::Timeout) => (Running::Nothing, true),
+            Err(mpsc::RecvTimeoutError::Disconnected) => (Running::Nothing, false),
+        };
+        // the script goes on opening the file; collected on the side
+        std::thread::spawn(move || {
+            if stuck {
+                let _ = child.kill();
+            }
+            let _ = child.wait();
+            let _ = std::fs::remove_file(&script);
+        });
+        answer
+    }
 }
 
 #[cfg(windows)]
@@ -710,5 +1036,161 @@ mod tests {
         // neutral files
         let p = plan(&all, &wish("", "inventor", "2026"));
         assert!(p.program.is_none() && !p.fallback);
+    }
+
+    fn touch(path: &Path) {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, b"").unwrap();
+    }
+
+    #[test]
+    fn the_nearest_single_project_file_counts() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("TeamCraft");
+        let design = root.join("GRAKSLER").join("Design");
+        let part = design.join("Arm").join("A-100").join("arm.ipt");
+        touch(&part);
+        // nothing up to the working folder: unknown
+        assert_eq!(project_file(&part, &root), None);
+        // the group's project file, found from a sub folder
+        touch(&design.join("Graksler 4.3.IPJ"));
+        assert_eq!(
+            project_file(&part, &root),
+            Some(design.join("Graksler 4.3.IPJ"))
+        );
+        // a nearer one wins
+        touch(&design.join("Arm").join("Arm.ipj"));
+        assert_eq!(
+            project_file(&part, &root),
+            Some(design.join("Arm").join("Arm.ipj"))
+        );
+        // two in the nearest folder that has any: unknown, not the next one up
+        touch(&design.join("Arm").join("Old.ipj"));
+        assert_eq!(project_file(&part, &root), None);
+        // the working folder itself is searched, nothing above it
+        let other = root.join("OTHER").join("x.ipt");
+        touch(&other);
+        touch(&dir.path().join("Above.ipj"));
+        assert_eq!(project_file(&other, &root), None);
+        touch(&root.join("Root.ipj"));
+        assert_eq!(project_file(&other, &root), Some(root.join("Root.ipj")));
+        // a file outside the working folder
+        assert_eq!(project_file(&dir.path().join("loose.ipt"), &root), None);
+    }
+
+    #[test]
+    fn the_running_inventor_answers_are_read() {
+        assert_eq!(parse_answer("none\r"), Some(Running::Nothing));
+        assert_eq!(parse_answer(" opening "), Some(Running::Opening));
+        assert_eq!(
+            parse_answer(r"version C:\Program Files\Autodesk\Inventor 2025\"),
+            Some(Running::OtherVersion(
+                r"C:\Program Files\Autodesk\Inventor 2025\".into()
+            ))
+        );
+        assert_eq!(
+            parse_answer(r"project C:\TeamCraft\OTHER\Other.ipj"),
+            Some(Running::OtherProject(
+                r"C:\TeamCraft\OTHER\Other.ipj".into()
+            ))
+        );
+        // no active project: the bare word
+        assert_eq!(
+            parse_answer("project "),
+            Some(Running::OtherProject(String::new()))
+        );
+        assert_eq!(parse_answer("projects x"), None);
+        assert_eq!(parse_answer("WARNING: something"), None);
+        assert_eq!(parse_answer(""), None);
+    }
+
+    #[test]
+    fn the_script_says_only_what_is_read() {
+        // every answer the script prints is one parse_answer knows
+        let says: Vec<&str> = INVENTOR_OPEN_SCRIPT
+            .lines()
+            .flat_map(|l| l.split("Say ").skip(1))
+            .map(|s| {
+                s.split(';')
+                    .next()
+                    .unwrap()
+                    .trim()
+                    .trim_matches(['\'', '"'])
+            })
+            .collect();
+        assert_eq!(
+            says,
+            vec!["none", "none", "version $dir", "project $active", "opening"]
+        );
+        for said in says {
+            let line = said
+                .replace("$dir", r"C:\x")
+                .replace("$active", r"C:\p.ipj");
+            assert!(parse_answer(&line).is_some(), "{line}");
+        }
+        // the answer comes before the file is opened (a large assembly loads
+        // for minutes), and only the user's visible instance is used
+        let opening = INVENTOR_OPEN_SCRIPT.find("Say 'opening'").unwrap();
+        assert!(INVENTOR_OPEN_SCRIPT.find("Documents.Open").unwrap() > opening);
+        assert!(INVENTOR_OPEN_SCRIPT.contains("if (-not $app.Visible)"));
+        assert!(!INVENTOR_OPEN_SCRIPT.contains("New-Object -ComObject 'Inventor.Application'"));
+    }
+
+    #[test]
+    fn notes_say_why_a_new_instance_starts() {
+        let wanted = inst("inventor", "2026");
+        assert_eq!(running_note(&Running::Nothing, &wanted, None), None);
+        assert_eq!(running_note(&Running::Opening, &wanted, None), None);
+        let other = Running::OtherVersion(r"C:\Program Files\Autodesk\Inventor 2025\".into());
+        assert_eq!(
+            running_note(&other, &wanted, None).unwrap(),
+            "Inventor 2025 is running, not Inventor 2026 – opened in a new instance."
+        );
+        let own = PathBuf::from("/w/GRAKSLER/Design/Graksler 4.3.ipj");
+        let project = Running::OtherProject(
+            r"C:\Users\Public\Documents\Autodesk\Inventor 2026\Default.ipj".into(),
+        );
+        assert_eq!(
+            running_note(&project, &wanted, Some(&own)).unwrap(),
+            "Inventor is running with the project Default, not Graksler 4.3 – opened in a new instance."
+        );
+        let none = Running::OtherProject(String::new());
+        let note = running_note(&none, &wanted, None).unwrap();
+        assert!(
+            note.starts_with("Inventor is running with no project,"),
+            "{note}"
+        );
+        assert!(note.contains("no Inventor project file (.ipj)"), "{note}");
+    }
+
+    #[test]
+    fn tasklist_answers_are_read() {
+        let running = "\"Inventor.exe\",\"10244\",\"Console\",\"1\",\"1.234.567 K\"\r\n";
+        assert!(tasklist_has(running, "Inventor.exe"));
+        assert!(tasklist_has(&running.to_lowercase(), "Inventor.exe"));
+        assert!(!tasklist_has(
+            "INFORMATION: Es werden keine Aufgaben mit den angegebenen Kriterien ausgeführt.\r\n",
+            "Inventor.exe"
+        ));
+        assert!(!tasklist_has(
+            "\"InventorHelper.exe\",\"1\"",
+            "Inventor.exe"
+        ));
+        assert!(!tasklist_has("", "Inventor.exe"));
+    }
+
+    #[test]
+    fn only_inventor_is_asked_and_only_on_windows() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("a.sldprt");
+        assert_eq!(
+            open_in_running(&inst("solidworks", "2025"), &file, dir.path()),
+            Reuse::NewInstance(String::new())
+        );
+        #[cfg(not(windows))]
+        assert_eq!(
+            open_in_running(&inst("inventor", "2026"), &file, dir.path()),
+            Reuse::NewInstance(String::new())
+        );
     }
 }

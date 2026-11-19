@@ -29,6 +29,26 @@ see the notices in the README.
   everything once a week, so a file the table misses is caught within a
   week. Also removed: a stray line in the desktop workflow that ran an extra
   clippy pass and format check on every platform.
+- **Check out and open reuses a running Inventor** (#350, Windows). If
+  Inventor already runs – the installation chosen for the file, with the
+  working folder's Inventor project (`.ipj`) active – the file opens there as
+  a new document window instead of in a second instance. A new instance
+  still starts when no Inventor runs, another version runs or another
+  project is active; the message after opening says why. The running
+  instance is asked through Inventor's COM interface by a short Windows
+  PowerShell script (`desktop/src/cadlaunch.rs`).
+
+### Fixed
+
+- Desktop: *Check out and open* no longer opens the assembly after *Cancel*
+  during the download, or when files could not be copied (#348) – it would
+  open without the parts that were still to come. The check-out stays and
+  the message says to get the files first. *Open* in the Files tab and *Get
+  latest and open* follow the same rule for CAD files (`desktop/ui/js/get-rules.js`,
+  tested by `scripts/desktop-get-rules.test.mjs`).
+- Desktop: the worklist in the navigator updates at once after cancelling a
+  check-out (or checking out, checking in, acknowledging a dependent) in a
+  tab, instead of only after *Refresh* (#347).
 
 ## [0.2.10] - 2026-11-19
 

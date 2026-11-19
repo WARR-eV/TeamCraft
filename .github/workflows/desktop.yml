@@ -92,6 +92,10 @@ jobs:
       # the reviewers of the release dialog and when a draft can be submitted
       - name: Test the release rules
         run: node scripts/desktop-release-rules.test.mjs
+      # whether a Get left the working folder complete enough to open the
+      # main CAD file (Check out and open after Cancel, #348)
+      - name: Test the Get rules
+        run: node scripts/desktop-get-rules.test.mjs
       # the mesh check of the shared 3D viewer: empty, cut-off or invalid
       # models end in a message, not in an empty canvas (#290)
       - name: Test the 3D viewer's mesh check
