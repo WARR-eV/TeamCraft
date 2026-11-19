@@ -131,6 +131,22 @@ see the notices in the README.
 
 ### Changed
 
+- **Shared UI rules with drift guards.** The web UI and the desktop app now
+  share their labels, number, size and age formats, state glyphs and the
+  assistant's markdown-lite through `shared/js/` (`format.js`, `states.js`,
+  `markdown.js`, `dom.js`). The desktop app no longer has its own copies, and
+  its separate markdown parser is gone. The rules the server renders in Rust
+  are pinned to the same test vectors in `shared/test-vectors/`
+  (`src/ui_vectors.rs` and `scripts/shared-vectors.test.mjs`). New CI guards:
+  a desktop module or `static/app.js` may not re-declare a shared function;
+  an app stylesheet may not restyle a class that `shared/css/` owns; a new
+  component styled in both app stylesheets fails `cargo test` (today's list of
+  duplicates may only shrink); and shared stylesheets contain no literal
+  colours. Visible in the desktop app: numbers have no thousands separators
+  (`1234.5`, as on the web), and sizes read `1 KiB` instead of `1.0 KiB` and
+  go up to TiB. On the web, the states `unchanged`, `modified`, `outdated`,
+  `conflict`, `clash` and `missing` get the desktop's glyphs. See
+  [Shared UI](https://warr-ev.github.io/TeamCraft/dev/shared-ui.html).
 - The check-in button is called **Check in** (desktop check-in dialog, revision
   page and vault explorer of the web UI) instead of *Check in and release*: it
   ends the check-out, the revision stays in work – "release" read like the

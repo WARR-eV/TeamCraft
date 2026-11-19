@@ -2,7 +2,8 @@
 // TeamCraft Desktop – The main window: rail, navigator, status bar, update notice, notifications, long operations.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, ICONS, api, badge, call, clear, dialog, enc, errorText, fmtDate, fmtSize, h, invoke, label, run, setStatus, state, svgIcon, toast, tool } from "./core.js";
+import { $, ICONS, api, badge, call, clear, dialog, enc, errorText, h, invoke, run, setStatus, state, svgIcon, toast, tool } from "./core.js";
+import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
 import { checkServerVersion, showConnect } from "./connect.js";
 import { navHead, selectView } from "./navigator.js";
 import { activeTab, closeTab, renderActive, renderTabs, tabShortcut } from "./tabs.js";

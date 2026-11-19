@@ -6,11 +6,16 @@ research page *Sharing UI code between the web UI and the desktop app*
 ([`docs/src/research/shared-ui.md`](../docs/src/research/shared-ui.md)): one CSS, one markup contract, two renderers.
 
 ```text
-css/skins.css   design tokens and skins (colours, radii, spacing, density, fonts)
+css/skins.css      design tokens and skins (colours, radii, spacing, density, fonts)
 css/assistant.css  the "Ask TeamCraft" panel (a drawer on the web, inline in the desktop's Agent tab)
-fonts/          Montserrat, Oswald (variable WOFF2) and their SIL OFL texts
-js/viewer.js    3D preview (WebGL2, TCMESH01), still a classic script
-js/assistant.js "Ask TeamCraft" sidebar: ES module, mount(host, {api, getContext, link, …}) – no fetch, no invoke
+fonts/             Montserrat, Oswald (variable WOFF2) and their SIL OFL texts
+js/viewer.js       3D preview (WebGL2, TCMESH01), still a classic script
+js/assistant.js    "Ask TeamCraft" sidebar: ES module, mount(host, {api, getContext, link, …}) – no fetch, no invoke
+js/format.js       label, fmtNum, fmtFixed, fmtSize, fmtAge, fmtDate – the Rust filters' rules
+js/states.js       glyph(state): the state glyph table (domain::state_glyph on the server)
+js/markdown.js     markdown(text, link): the assistant's markdown-lite as DOM nodes
+js/dom.js          el(tag, attrs, children): text-only DOM builder of the shared modules
+test-vectors/      JSON input → expected output, run against Rust and JS (not served, not copied)
 ```
 
 ## How the apps get these files
@@ -52,6 +57,41 @@ js/assistant.js "Ask TeamCraft" sidebar: ES module, mount(host, {api, getContext
 6. **Syntax check.** CI (`.github/workflows/desktop.yml`, job `ui`) parses
    every script here with `node --input-type=module --check`; Node.js is used
    by CI only.
+
+## Keeping the two apps in step
+
+Each rule below has a guard that fails CI. The failure message names the rule.
+
+7. **One source per rule.** A rule that can live here lives *only* here. App
+   code imports it and never writes a second copy. Desktop modules import with
+   the URL both apps serve, `import { label } from "/static/shared/js/format.js";`.
+   Shared modules import their neighbours relatively (`"./dom.js"`).
+   *Guard:* `scripts/check-desktop-modules.mjs` fails when a desktop module
+   or `static/app.js` declares a name that a shared module exports.
+8. **Rust and JS side by side, pinned to one set of vectors.** Some rules
+   exist twice because the server renders without JavaScript: labels,
+   numbers, sizes, ages, state glyphs and markdown-lite. Both versions run
+   against the same `test-vectors/*.json`: Rust in `src/ui_vectors.rs` (in
+   `cargo test --lib`), JS in `scripts/shared-vectors.test.mjs`. To change a
+   rule, change the vector first; then both sides fail until both are
+   fixed.
+9. **Shared CSS owns its classes.** A class that starts a rule in
+   `css/*.css` must not start a rule in `static/style.css` or
+   `desktop/ui/app.css`. An app may still adjust it in its own context
+   (`.toolbar .badge`). *Guard:* `assets::tests::shared_css_classes_are_not_redefined`.
+10. **No new component written twice.** A class styled by both app
+    stylesheets is a component written twice. Today's ones are listed in
+    `STYLED_TWICE` (`src/assets.rs`). That list may only shrink: a new class
+    for both apps goes into `css/` from the start, and a class that moves here
+    leaves the list. The test fails in both directions.
+    *Guard:* `assets::tests::no_new_component_styled_in_both_apps`.
+11. **Colours only as tokens.** Stylesheets here, apart from `skins.css`,
+    contain no literal colours. *Guard:*
+    `assets::tests::shared_components_use_no_literal_colours`, plus
+    `css_tokens_are_defined` for every `var(--x)`.
+
+Where a new piece of UI goes, and how to add a vector, is described in
+`docs/src/dev/shared-ui.md`.
 
 ## The assistant sidebar (`js/assistant.js`, `css/assistant.css`)
 

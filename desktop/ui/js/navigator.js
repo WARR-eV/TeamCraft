@@ -2,7 +2,8 @@
 // TeamCraft Desktop – Navigator views: home, worklist, changes, search.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, ICONS, api, append, badge, clear, dialog, enc, errorText, field, fmtDate, h, label, lockIcon, state, svgIcon, toast } from "./core.js";
+import { $, ICONS, api, append, badge, clear, dialog, enc, errorText, field, h, lockIcon, state, svgIcon, toast } from "./core.js";
+import { fmtDate, label } from "/static/shared/js/format.js";
 import { canEdit, checkInAll, refreshWorklistCount, reloadProjects, renderNotifications } from "./shell.js";
 import { assistantContextChanged } from "./assistant.js";
 import { agent, renderAgentView } from "./agent.js";
@@ -15,7 +16,7 @@ import { newItemDialog } from "./dialogs.js";
 import { getProjectsDialog } from "./group-sync.js";
 import { importFolderDialog } from "./folder-import.js";
 import { renderFiles } from "./browser.js";
-import { cutLevel, describe, normalizeMode, pathKey, quantityText, rootNodes, usageBadge } from "./structure.js";
+import { cutLevel, describeNode, normalizeMode, pathKey, quantityText, rootNodes, usageBadge } from "./structure.js";
 
 // ======================================================================
 // Navigator views
@@ -489,7 +490,7 @@ function loadStructureRoots(p, ul, count) {
 
 /** One line of the structure view (a BOM line below an assembly, or a top-level item). */
 export function structureNode(n, parentKey) {
-  var d = describe(n, structureRule());
+  var d = describeNode(n, structureRule());
   var key = pathKey(parentKey, n.item_number || ("line" + n.find_number));
   var open = d.expandable && !!state.expanded[key];
   var children = h("ul.tree" + (open ? "" : ".hidden"));

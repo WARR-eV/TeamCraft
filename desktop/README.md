@@ -64,7 +64,8 @@ under a virtual display – and must still be running after 20 seconds) on
 Linux x86_64 (Ubuntu 24.04 and 26.04) and ARM64, macOS ARM64 and Windows
 x86_64; Windows ARM64 runs as a preview that never blocks. A separate job
 parses every script of `ui/`, the web UI and `shared/` (`node --check`; Node.js is only
-used by CI, the app has no build step). Nothing is packaged or published.
+used by CI, the app has no build step), checks the module imports and runs the shared
+rules against `shared/test-vectors/`. Nothing is packaged or published.
 
 ## Download or run from source
 
@@ -155,11 +156,15 @@ Where the app keeps its data:
 ## Layout
 
 `build.rs` copies the assets the app shares with the web UI into `ui/static/`
-(git-ignored): the whole `shared/` tree (skins, fonts, the 3D viewer) to
+(git-ignored): the whole `shared/` tree (skins, fonts, the 3D viewer, the assistant,
+formatters, state glyphs, markdown-lite) to
 `ui/static/shared/` and the logos and icons from `media/`. The app loads them
 from the same URLs as the web UI (`/static/shared/…`, `/static/media/…`); the
 test `shared_ui_files_are_mirrored` checks the copy byte for byte. What belongs
-into `shared/` and its rules: [`shared/README.md`](../shared/README.md).
+into `shared/` and its rules: [`shared/README.md`](../shared/README.md). Desktop modules
+import shared code by URL (`import { label } from "/static/shared/js/format.js";`) and
+never keep their own copy: `scripts/check-desktop-modules.mjs` fails on a desktop module
+that declares a name a shared module exports.
 
 ```text
 src/main.rs        Tauri setup, native menu, state

@@ -1,0 +1,17 @@
+{
+  "about": "Code → label of a state, role or other enum value. Pinned by src/ui_vectors.rs (filter_label) and scripts/shared-vectors.test.mjs (shared/js/format.js label). null is a missing value.",
+  "cases": [
+    [null, ""],
+    ["", ""],
+    ["in_work", "WIP"],
+    ["editor", "CAD editor"],
+    ["in_review", "In Review"],
+    ["released", "Released"],
+    ["up_to_date", "Up To Date"],
+    ["in_triage", "In Triage"],
+    ["admin", "Admin"],
+    ["a__b", "A B"],
+    ["_lead", "Lead"],
+    ["brand_new_state", "Brand New State"]
+  ]
+}

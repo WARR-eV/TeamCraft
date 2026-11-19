@@ -2,7 +2,8 @@
 // TeamCraft Desktop – Settings, sign-out and About.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, SKINS, TAURI, api, call, confirmDialog, dialog, errorText, field, h, label, run, state, toast } from "./core.js";
+import { $, SKINS, TAURI, api, call, confirmDialog, dialog, errorText, field, h, run, state, toast } from "./core.js";
+import { label } from "/static/shared/js/format.js";
 import { applySkin } from "./skins.js";
 import { checkServerUrl, showConnect } from "./connect.js";
 import { atRisk, checkUpdate, checkoutsWithChanges, localChangesList, refreshWorklistCount, sendLocalChanges } from "./shell.js";

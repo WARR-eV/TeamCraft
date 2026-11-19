@@ -2,7 +2,8 @@
 // TeamCraft Desktop – Change tab.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { api, append, badge, call, clear, enc, errorText, fmtDate, h, label, lockBadge, moreMenu, priorityBadge, run, state, toast, tool, toolGroup } from "./core.js";
+import { api, append, badge, call, clear, enc, errorText, h, lockBadge, moreMenu, priorityBadge, run, state, toast, tool, toolGroup } from "./core.js";
+import { fmtDate, label } from "/static/shared/js/format.js";
 import { canEdit, refreshWorklistCount, watchTool } from "./shell.js";
 import { openTab, recordLink, reloadActive, renderTabs, table } from "./tabs.js";
 import { agentButton } from "./agent.js";

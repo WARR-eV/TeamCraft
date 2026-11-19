@@ -14,6 +14,7 @@ on:
       - "scripts/desktop-files-view.test.mjs"
       - "scripts/desktop-release-rules.test.mjs"
       - "scripts/viewer-mesh.test.mjs"
+      - "scripts/shared-vectors.test.mjs"
       - "static/**"
       - "shared/**"
       - "media/logos/**"
@@ -29,6 +30,7 @@ on:
       - "scripts/desktop-files-view.test.mjs"
       - "scripts/desktop-release-rules.test.mjs"
       - "scripts/viewer-mesh.test.mjs"
+      - "scripts/shared-vectors.test.mjs"
       - "static/**"
       - "shared/**"
       - "media/logos/**"
@@ -74,8 +76,9 @@ jobs:
             node --input-type=module --check < "$f"
           done
       # the desktop modules: every import resolves, every name of another
-      # module that is used is imported, all reachable from js/main.js
-      - name: Check the imports of the desktop UI modules
+      # module that is used is imported, all reachable from js/main.js; no
+      # desktop module or static/app.js re-declares a shared/js export
+      - name: Check the imports of the desktop UI and shared modules
         run: node scripts/check-desktop-modules.mjs
       # the pure rules of the tab order (moving, switching, closing)
       - name: Test the tab order rules
@@ -90,6 +93,11 @@ jobs:
       # models end in a message, not in an empty canvas (#290)
       - name: Test the 3D viewer's mesh check
         run: node scripts/viewer-mesh.test.mjs
+      # the shared rules (labels, numbers, sizes, ages, state glyphs,
+      # markdown-lite) against shared/test-vectors – the same vectors
+      # src/ui_vectors.rs pins the server's Rust side to
+      - name: Test the shared UI rules against the test vectors
+        run: node scripts/shared-vectors.test.mjs
 
   test:
     name: desktop (${{ matrix.os }})

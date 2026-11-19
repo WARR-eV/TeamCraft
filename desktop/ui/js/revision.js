@@ -2,7 +2,8 @@
 // TeamCraft Desktop – Revision tab: overview, files, structure, where used.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, ICONS, api, append, badge, call, dialog, enc, errorText, fmtDate, fmtNum, fmtSize, h, invoke, label, lockBadge, moreMenu, run, state, svgIcon, toast, tool, toolGroup } from "./core.js";
+import { $, ICONS, api, append, badge, call, dialog, enc, errorText, h, invoke, lockBadge, moreMenu, run, state, svgIcon, toast, tool, toolGroup } from "./core.js";
+import { fmtDate, fmtNum, fmtSize, label } from "/static/shared/js/format.js";
 import { canEdit, canEditProject, savePackage, watchTool } from "./shell.js";
 import { typeIcon } from "./navigator.js";
 import { openTab, reloadActive, renderActive, renderTabs, table } from "./tabs.js";
