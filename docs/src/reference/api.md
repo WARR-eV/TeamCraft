@@ -304,7 +304,10 @@ belongs to: `file_id`, `filename`, `size_bytes`, `format`, `format_label`,
 files of the latest revision of every item. At the top of the group the items
 without files follow the files (`file_id` and `filename` are `null`), so
 every item of the group is in the browser. `total` counts the entries of the
-folder; `limit` is at most 500.
+folder; `limit` is at most 500. `project_folders` names, at the top of the
+group only (empty below it), the folders that hold an Inventor project file
+(`.ipj`; at most 20, by path, not the top itself) – the desktop suggests them
+as the favourite folder Home starts in.
 
 `POST /worklist/checkin-all` (body optional: `{"revisions": [id, …]}`) checks
 in all of my check-outs – or the listed ones – **without new files**, one

@@ -421,6 +421,35 @@ tr.row-conflict td:first-child, tr.row-clash td:first-child { box-shadow: inset 
 /* Files view (js/browser.js): the folder icon, and the line before the items without files */
 .node .ico svg { width: 13px; height: 13px; vertical-align: -2px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .tree-sep { margin: 8px 0 2px 22px; font-size: 11px; line-height: 14px; color: var(--text-dim); }
+/* The favourite folder Home starts in (issue #352): a banner in the accent
+   colour, so it is never taken for the top of the group; the suggestion of
+   the folder with the Inventor project file; the star of a folder row. */
+.home-root { margin: 0 4px 8px 8px; }
+.home-root:empty { display: none; }
+.home-root p { margin: 0; line-height: 18px; }
+.home-root .row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.home-root.on {
+  padding: 6px 8px 8px 10px; border-radius: var(--radius-sm);
+  border: 1px solid var(--accent); box-shadow: inset 3px 0 0 var(--accent);
+  background: var(--accent-soft); color: var(--text);
+}
+.home-root.on .home-root-title { color: var(--accent); }
+.home-root.on .home-root-title strong { color: inherit; }
+.home-root-path { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.home-root-star { color: var(--accent); margin-right: 4px; }
+.home-root.hint { padding: 6px 8px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2); }
+.home-root-back { display: inline-flex; align-items: center; }
+.node .fav {
+  height: 18px; min-width: 18px; padding: 0 2px; justify-content: center;
+  border: none; background: none; color: var(--text-dim); font-size: 13px; line-height: 1;
+}
+.node .fav.on { color: var(--accent); }
+@media (hover: hover) {
+  /* an empty star shows on the row the pointer or the focus is on */
+  .node.folder .fav:not(.on) { opacity: 0; }
+  .node.folder:hover .fav, .node.folder:focus-within .fav, .node .fav:focus-visible { opacity: 1; }
+  .node .fav:where(:enabled):hover { background: none; color: var(--accent); }
+}
 .chip {
   height: 24px; font-size: 12px; padding: 0 8px; border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong); background: none; color: var(--text-muted);
@@ -1097,6 +1126,7 @@ ul.file-picks li .mono { overflow: hidden; text-overflow: ellipsis; white-space:
   table.grid tbody tr.selected > td:first-child, .node.selected { border-left: 3px solid Highlight; }
   .skin-card.selected { outline: 2px solid Highlight; }
   .notice { border-left: 3px solid CanvasText; }
+  .home-root.on { border: 1px solid Highlight; border-left-width: 4px; }
 }
 
 /* progress dialogs (Pack and Go) */

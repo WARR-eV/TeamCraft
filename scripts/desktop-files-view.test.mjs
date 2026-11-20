@@ -14,7 +14,8 @@ import { fileURLToPath } from "node:url";
 const source = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../desktop/ui/js/files-view.js");
 const {
   compareNames, countText, entryIconType, entryName, entryRevision, entryTitle, folderKey,
-  groupTotal, mergeEntries, remaining, sortEntries, sortFolders
+  favouriteKey, favouritePath, favouriteSuggestions, groupTotal, mergeEntries, normalizeFavourite, remaining,
+  sortEntries, sortFolders, suggestionKey
 } = await import("data:text/javascript;base64," + Buffer.from(fs.readFileSync(source, "utf8")).toString("base64"));
 
 let passed = 0;
@@ -133,6 +134,42 @@ test("counts read naturally", () => {
   assert.equal(countText(1, "file", "files"), "1 file");
   assert.equal(countText(0, "file", "files"), "0 files");
   assert.equal(countText(12, "file", "files"), "12 files");
+});
+
+test("the favourite folder is kept per server and group (#352)", () => {
+  const a = favouriteKey("https://plm.example.org", "ROVER");
+  assert.equal(a, 'teamcraft.home-root:["https://plm.example.org","ROVER"]');
+  assert.notEqual(a, favouriteKey("https://plm.example.org", "ROCKET"));
+  assert.notEqual(a, favouriteKey("http://127.0.0.1:8080", "ROVER"));
+  // no code can be read as another server's: the parts are quoted
+  assert.notEqual(favouriteKey("a", "b:c"), favouriteKey("a:b", "c"));
+  assert.notEqual(a, suggestionKey("https://plm.example.org", "ROVER"));
+  assert.equal(favouriteKey(null, undefined), 'teamcraft.home-root:["",""]');
+});
+
+test("a stored favourite is a folder as the server writes it, or the top", () => {
+  assert.equal(normalizeFavourite("Design/Rover"), "Design/Rover");
+  assert.equal(normalizeFavourite("\\Design\\Rover\\"), "Design/Rover");
+  assert.equal(normalizeFavourite("/Design//./Rover/"), "Design/Rover");
+  assert.equal(normalizeFavourite("100%/a_b"), "100%/a_b");
+  for (const bad of [null, undefined, 42, {}, "", "/", "..", "Design/../outside"]) assert.equal(normalizeFavourite(bad), "", String(bad));
+});
+
+test("where the favourite folder is in its group", () => {
+  assert.equal(favouritePath("ROVER", "Design/Rover"), "ROVER / Design / Rover");
+  assert.equal(favouritePath("ROVER", ""), "ROVER");
+});
+
+test("the folders with an Inventor project file are suggested – at most 3, never twice", () => {
+  const top = { project_folders: ["Design/arm", "Design/Rover", "Design/Rover", "", "Design/x", "Design/y"] };
+  assert.deepEqual(favouriteSuggestions(top, "", false), ["Design/arm", "Design/Rover", "Design/x"]);
+  // none while the group has a favourite or the suggestion was declined
+  assert.deepEqual(favouriteSuggestions(top, "Design/arm", false), []);
+  assert.deepEqual(favouriteSuggestions(top, "", true), []);
+  // an older server does not name them; nothing loaded yet
+  assert.deepEqual(favouriteSuggestions({ folders: [] }, "", false), []);
+  assert.deepEqual(favouriteSuggestions({ project_folders: "Design" }, "", false), []);
+  assert.deepEqual(favouriteSuggestions(null, "", false), []);
 });
 
 console.log(passed + " tests passed");
