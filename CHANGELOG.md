@@ -100,6 +100,16 @@ see the notices in the README.
 
 ### Added
 
+
+- Guard test for read permissions (#312): `tests/architecture_guards.rs`
+  fails when a service function takes an actor and queries items, revisions
+  or files without a visibility guard in its body – an `access::*` SQL
+  fragment, `ensure_visible`, `ensure_editable` or a guarded getter. The
+  twelve functions that do so on purpose (writes inside an already checked
+  transaction, change propagation, notifications filtered by recipient,
+  management counts) were reviewed and are listed with their reasons on
+  `NOT_GUARDED`; none leaked. Row-level security in PostgreSQL as a second
+  layer is not part of this.
 - **Check out and open** in TeamCraft Desktop: one button on the revision
   toolbar takes the lock, gets the files and opens the main CAD file in the
   CAD program; the chip next to it names the program (e.g. *Inventor 2026*).
