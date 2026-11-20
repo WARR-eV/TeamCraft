@@ -456,6 +456,13 @@ tr.row-conflict td:first-child, tr.row-clash td:first-child { box-shadow: inset 
 .node .meta { margin-left: auto; padding-left: 6px; display: flex; gap: 4px; align-items: center; flex: none; }
 .node.group > .label { color: var(--text-muted); }
 .node .count { color: var(--text-dim); font-size: 12px; }
+/* "New item here" on a folder row of the Files view: shown on hover and focus. */
+.node .meta button.icon.folder-new { width: 20px; height: 20px; }
+.node .meta button.icon.folder-new svg { width: 12px; height: 12px; }
+@media (hover: hover) {
+  .node .meta button.icon.folder-new { opacity: 0; }
+  .node:hover .meta button.icon.folder-new, .node .meta button.icon.folder-new:focus-visible { opacity: 1; }
+}
 /* In the dense tree a state is its glyph alone; the label stays for screen
    readers, the row's title carries it for the eye. */
 .node .meta .badge {

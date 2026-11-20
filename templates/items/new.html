@@ -55,6 +55,9 @@
         {% if basis and basis_other_group %}<span class="hint">You may not create items in the project group of {{ basis.label }}; another of your groups is preselected.</span>{% endif %}
         {% if not projects %}<span class="hint">You are not a member of any project group yet – ask an admin to add you.</span>{% endif %}
       </label>
+      <label>Folder <span class="hint">inside the project group, e.g. chassis/brackets – empty: the top; the files above go there too</span>
+        <input class="mono" type="text" name="folder" value="{{ form.folder }}" maxlength="400" placeholder="(top of the group)">
+      </label>
       {% if not basis %}<label>Unit of measure
         <input type="text" name="unit" value="{{ form.unit }}" list="units" maxlength="16">
         <datalist id="units">{% for u in units %}<option value="{{ u }}">{% endfor %}</datalist>

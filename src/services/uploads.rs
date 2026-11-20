@@ -106,7 +106,7 @@ pub struct NewSession {
     pub content_type: Option<String>,
     pub base: Option<BaseVersion>,
     /// Folder inside the project group (normalised here); `None` keeps the
-    /// folder of an existing file (`""` for a new one).
+    /// folder of an existing file (the item's folder for a new one).
     pub folder: Option<String>,
 }
 

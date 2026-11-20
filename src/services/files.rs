@@ -58,7 +58,7 @@ pub struct Upload {
     pub base: Option<BaseVersion>,
     /// Folder inside the project group (normalised, see
     /// `domain::normalize_folder`); `None` keeps the folder of an existing
-    /// file (`""` for a new one).
+    /// file (the item's folder for a new one, `Revision::item_folder`).
     pub folder: Option<String>,
     /// The beginning of a small text file (at most `resultscan::SCAN_MAX_BYTES`)
     /// for result values from exchange files and templates; empty for other
@@ -978,7 +978,8 @@ pub(crate) async fn store_uploads(
                 .bind(&upload.blob.sha256)
                 .bind(actor.id)
                 .bind(format)
-                .bind(upload.folder.as_deref().unwrap_or(""))
+                // no folder named: the item's folder (the top of the group by default)
+                .bind(upload.folder.as_deref().unwrap_or(&rev.item_folder))
                 .execute(&mut *conn)
                 .await?;
                 (id, 1, true)

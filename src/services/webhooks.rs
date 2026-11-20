@@ -1000,6 +1000,7 @@ mod tests {
             unit: "each".into(),
             project_id: None,
             project_code: Some("ROVER".into()),
+            item_folder: String::new(),
             seq: 1,
             code: "A".into(),
             state: "in_review".into(),

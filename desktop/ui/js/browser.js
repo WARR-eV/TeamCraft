@@ -8,10 +8,18 @@ import { ICONS, api, badge, clear, enc, errorText, h, lockIcon, state, svgIcon, 
 import { label } from "/static/shared/js/format.js";
 import { typeIcon } from "./navigator.js";
 import { openRevision } from "./revision.js";
-import { countText, entryIconType, entryName, entryRevision, entryTitle, folderKey, groupTotal, mergeEntries, remaining, sortEntries, sortFolders } from "./files-view.js";
+import { canEdit, canEditProject } from "./shell.js";
+import { newItemDialog } from "./dialogs.js";
+import { countText, entryIconType, entryName, entryRevision, entryTitle, folderKey, groupTotal, mergeEntries, parentFolder, remaining, sortEntries, sortFolders } from "./files-view.js";
 
 /** Entries asked for per request (the server's maximum). */
 var PAGE = 500;
+
+/** The folder one works in, per group: *New* (Ctrl/Cmd+N) starts there. */
+function remember(p, path) {
+  if (!state.filesFolder) state.filesFolder = {};
+  state.filesFolder[p.code] = path || "";
+}
 
 /** A row that opens with a click, Enter or Space. */
 function row(spec, attrs, children, onOpen) {
@@ -87,10 +95,10 @@ function drawLevel(p, path, ul, level, sort, emptyText) {
     folders.forEach(function (f) { ul.appendChild(folderNode(p, f, sort)); });
     var files = entries.filter(function (e) { return e.filename; });
     var loose = entries.filter(function (e) { return !e.filename; });
-    files.forEach(function (e) { ul.appendChild(entryNode(e)); });
+    files.forEach(function (e) { ul.appendChild(entryNode(p, path, e)); });
     if (loose.length) {
       ul.appendChild(h("li.tree-sep", { text: "Items without files" }));
-      loose.forEach(function (e) { ul.appendChild(entryNode(e)); });
+      loose.forEach(function (e) { ul.appendChild(entryNode(p, path, e)); });
     }
     var rest = remaining(total, loaded.length);
     if (rest) {
@@ -107,14 +115,24 @@ function folderNode(p, f, sort) {
   var open = !!state.expanded[key];
   var children = h("ul.tree" + (open ? "" : ".hidden"));
   var twisty = h("span.twisty", { text: open ? "▾" : "▸" });
+  // New item here: the dialog starts with this group and folder
+  var here = canEdit() && p.active && canEditProject(p.id) ? h("button.icon.folder-new", {
+    type: "button", title: "New item in " + f.path, "aria-label": "New item in " + f.path,
+    on: { click: function (ev) {
+      ev.stopPropagation();
+      remember(p, f.path);
+      newItemDialog({ project: p.code, folder: f.path });
+    } }
+  }, svgIcon(ICONS.plus)) : null;
   var node = row("div.node.folder", {
     title: f.path + " – " + countText(f.files, "file", "files"), "aria-expanded": String(open)
   }, [
     twisty, h("span.ico", null, svgIcon(ICONS.folder)),
     h("span.label", null, h("strong", { text: f.name })),
-    h("span.meta", null, h("span.count", { text: String(f.files) }))
+    h("span.meta", null, [here, h("span.count", { text: String(f.files) })])
   ], function () {
     open = state.expanded[key] = !state.expanded[key];
+    remember(p, open ? f.path : parentFolder(f.path));
     twisty.textContent = open ? "▾" : "▸";
     node.setAttribute("aria-expanded", String(open));
     children.classList.toggle("hidden", !open);
@@ -124,9 +142,10 @@ function folderNode(p, f, sort) {
   return h("li", null, [node, children]);
 }
 
-/** A file (or an item without files): the name first, the revision dimmed
- *  after it – like the rows of All items (navigator.js itemNode). */
-function entryNode(e) {
+/** A file (or an item without files) of the folder `path`: the name first,
+ *  the revision dimmed after it – like the rows of All items (navigator.js
+ *  itemNode). */
+function entryNode(p, path, e) {
   var key = "rev:" + e.item_number + ":" + e.code;
   var meta = [];
   if (e.state) meta.push(badge(e.state));
@@ -140,6 +159,6 @@ function entryNode(e) {
     h("span.twisty"), h("span.ico", { text: typeIcon(entryIconType(e)) }),
     h("span.label", null, [h("span.fname", { text: entryName(e) }), h("span.dim.mono", { text: " " + entryRevision(e) })]),
     h("span.meta", null, meta)
-  ], function () { openRevision(e.item_number, e.code); });
+  ], function () { remember(p, path); openRevision(e.item_number, e.code); });
   return h("li", null, node);
 }

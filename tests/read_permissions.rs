@@ -1473,6 +1473,7 @@ async fn visibility_is_managed_and_audited() {
         Some(rover),
         "each",
         None,
+        None,
     )
     .await;
     assert!(
@@ -1904,6 +1905,7 @@ async fn texts_naming_restricted_objects_are_redacted() {
                 unit_cost: None,
                 classification: Default::default(),
                 attributes: Vec::new(),
+                folder: String::new(),
             },
         )
     };

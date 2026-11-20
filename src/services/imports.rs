@@ -930,6 +930,7 @@ async fn run_tx(
                     unit_cost: None,
                     classification: Default::default(),
                     attributes: Vec::new(),
+                    folder: String::new(),
                 },
             )
             .await?;
@@ -1036,6 +1037,7 @@ async fn create_item(
                 .iter()
                 .map(|a| (a.key.clone(), a.value.clone()))
                 .collect(),
+            folder: String::new(),
         },
     )
     .await?;

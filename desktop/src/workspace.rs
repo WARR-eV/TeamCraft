@@ -231,6 +231,9 @@ pub fn enc(segment: &str) -> String {
 /// The files of one revision and its lock, from the file status of the server.
 pub struct RevisionFiles {
     pub files: Vec<ServerFile>,
+    /// The item's folder in its group (`""` = the top; older servers send
+    /// none): the place of a revision without files.
+    pub item_folder: String,
     pub locked_by_me: bool,
     pub locked_by_name: Option<String>,
     pub status: Value,
@@ -288,6 +291,7 @@ pub async fn revision_files(
         .await?;
     Ok(RevisionFiles {
         files: server_files_of(&status, project, item, code),
+        item_folder: status["item_folder"].as_str().unwrap_or("").to_string(),
         locked_by_me: status["locked_by_me"].as_bool().unwrap_or(false),
         locked_by_name: status["locked_by_name"].as_str().map(str::to_string),
         status,
@@ -295,22 +299,36 @@ pub async fn revision_files(
 }
 
 /// The folders of the workspace the files of a revision live in, with the
-/// server folder each stands for; without files the project group folder.
-pub(crate) fn revision_dirs(project: Option<&str>, files: &[ServerFile]) -> Vec<(String, String)> {
+/// server folder each stands for; without files the item's folder
+/// (`item_folder`, `""` = the project group folder).
+pub(crate) fn revision_dirs(
+    project: Option<&str>,
+    files: &[ServerFile],
+    item_folder: &str,
+) -> Vec<(String, String)> {
     let mut dirs: BTreeMap<String, String> = BTreeMap::new();
     for f in files {
         dirs.entry(layout::local_dir_rel(project, &f.folder))
             .or_insert_with(|| f.folder.clone());
     }
     if dirs.is_empty() {
-        dirs.insert(layout::local_dir_rel(project, ""), String::new());
+        dirs.insert(
+            layout::local_dir_rel(project, item_folder),
+            item_folder.to_string(),
+        );
     }
     dirs.into_iter().collect()
 }
 
-/// The folder to show for a revision: where its first file lives.
-pub fn main_dir(root: &Path, project: Option<&str>, files: &[ServerFile]) -> PathBuf {
-    let rel = revision_dirs(project, files)
+/// The folder to show for a revision: where its first file lives (without
+/// files: the item's folder).
+pub fn main_dir(
+    root: &Path,
+    project: Option<&str>,
+    files: &[ServerFile],
+    item_folder: &str,
+) -> PathBuf {
+    let rel = revision_dirs(project, files, item_folder)
         .into_iter()
         .next()
         .map(|(rel, _)| rel)
@@ -527,7 +545,7 @@ pub async fn download_revision(
 ) -> Result<Downloaded, ApiError> {
     let rev = revision_files(api, project, item, code).await?;
     let mut report = fetch(api, root, &rev.files, cancel, progress).await?;
-    report.dir = main_dir(root, project, &rev.files);
+    report.dir = main_dir(root, project, &rev.files, &rev.item_folder);
     report.revisions = 1;
     Ok(report)
 }
@@ -558,7 +576,7 @@ pub async fn get_structure(
         .await?;
     let (files, root_files, root_project, revisions) = workset_files(&set);
     let mut report = fetch(api, root, &files, cancel, progress).await?;
-    report.dir = main_dir(root, root_project.as_deref(), &root_files);
+    report.dir = main_dir(root, root_project.as_deref(), &root_files, "");
     report.revisions = revisions;
     let strings = |v: &Value| -> Vec<String> {
         v.as_array()
@@ -750,7 +768,7 @@ async fn new_local_files(
     if files.is_empty() {
         return Ok(out);
     }
-    for (dir_rel, folder) in revision_dirs(project, files) {
+    for (dir_rel, folder) in revision_dirs(project, files, "") {
         let dir = layout::join_rel(root, &dir_rel);
         let Ok(mut entries) = tokio::fs::read_dir(&dir).await else {
             continue;
@@ -813,7 +831,7 @@ pub fn inaccessible_status(root: &Path, project: Option<&str>, item: &str, code:
         .collect();
     files.sort_by_key(|f| f.path.to_lowercase());
     Status {
-        dir: main_dir(root, project, &[]),
+        dir: main_dir(root, project, &[], ""),
         exists: !files.is_empty(),
         locked_by_me: false,
         locked_by_name: None,
@@ -969,7 +987,7 @@ pub async fn status(
         let _ = State::store(root, state.changes_since(&before));
     }
     out.sort_by_key(|f| (f.path.to_lowercase(), f.name.to_lowercase()));
-    let dir = main_dir(root, project, &rev.files);
+    let dir = main_dir(root, project, &rev.files, &rev.item_folder);
     Ok(Status {
         exists: out.iter().any(|f| f.state != "missing"),
         dir,
@@ -1011,7 +1029,7 @@ pub async fn locate(
             safe_name(&f.filename),
         ),
         None => (
-            revision_dirs(project, &rev.files)
+            revision_dirs(project, &rev.files, &rev.item_folder)
                 .into_iter()
                 .map(|(rel, _)| layout::join_rel(root, &rel))
                 .collect(),
@@ -1159,7 +1177,7 @@ async fn send_local(
             Some(path.clone())
         } else {
             // a new file at the top of the revision's first folder
-            let (dir_rel, folder) = revision_dirs(project, &rev.files)
+            let (dir_rel, folder) = revision_dirs(project, &rev.files, &rev.item_folder)
                 .into_iter()
                 .next()
                 .unwrap_or_default();

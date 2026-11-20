@@ -905,7 +905,7 @@ pub async fn workspace_open(
                 None => {
                     let rev =
                         workspace::revision_files(&api, project.as_deref(), &item, &code).await?;
-                    workspace::main_dir(&root, project.as_deref(), &rev.files)
+                    workspace::main_dir(&root, project.as_deref(), &rev.files, &rev.item_folder)
                 }
             }
         }
@@ -2001,6 +2001,7 @@ pub async fn workspace_add_plan(
         &workspace_root(&app, &state),
         project.as_deref(),
         &rev.files,
+        &rev.item_folder,
         &paths,
         &subfolder,
     )
@@ -2030,7 +2031,14 @@ pub async fn workspace_add_files(
             "Check out {item}/{code} first – files can only be added under your check-out."
         )));
     }
-    let plan = addfiles::plan(&root, project.as_deref(), &rev.files, &paths, &subfolder)?;
+    let plan = addfiles::plan(
+        &root,
+        project.as_deref(),
+        &rev.files,
+        &rev.item_folder,
+        &paths,
+        &subfolder,
+    )?;
     let (copied, skipped) = addfiles::copy_in(&root, &plan, &confirmed)?;
     let done: Vec<addfiles::PlanItem> = plan
         .into_iter()

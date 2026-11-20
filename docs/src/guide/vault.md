@@ -64,6 +64,16 @@ results, reports; CAD model, drawing, STEP). The desktop app has *Add files…*
   checked out the *Folder* column of the revision page moves a file. Folders
   are relative: `..`, drive letters and names that are invalid on Windows
   are refused.
+* An **item has a folder** as well, chosen when it is created: the *Folder*
+  field of the *New item* form (*More → New item in this folder…* on a
+  revision page fills it in with the folder of that revision's first file, or
+  of the item when it has none), *New item here* on a
+  folder of the desktop *Files* view, or `folder` in the API. The files
+  uploaded with the item go there, so do later new files that are uploaded
+  without a folder, and the file browser lists the item in that folder while
+  it has no file. *Edit master data* changes it; the files keep their own
+  folder (*Move to folder*). Empty = the top of the group, as for every item
+  created before.
 * **Cancel check-out** releases your lock at once – no dialog, nothing is
   uploaded. **Force unlock** (admins) releases someone else's lock after a
   confirmation, is recorded in the audit log and **notifies the owner**

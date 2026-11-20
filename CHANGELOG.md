@@ -13,6 +13,24 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Added
+
+- **Create an item in a folder.** An item now has a folder in its project
+  group (migration `0075_item_folder`; empty = the top, as for every existing
+  item). It is chosen when the item is created: the new *Folder* field of the
+  web *New item* form (prefilled by `?folder=` and by *More → New item in this
+  folder…* on a revision page), the *Folder* field of the desktop *New*
+  dialog (prefilled with the folder last opened in Home → *Files*), the new
+  **+** (*New item here*) on every folder row of the desktop *Files* view, and
+  `folder` in `POST /api/v1/items`. The files uploaded with the item go
+  there, later new files uploaded without a folder too, and the file browser
+  (`GET /projects/{code}/files`, desktop *Files*) lists an item without files
+  in its folder instead of at the top of the group – before, a file-less item
+  could not be placed at all and every file had to be moved one by one.
+  *Edit master data* and `PATCH /api/v1/items/{number}` change it (the files
+  keep theirs); revisions and `file-status` return it as `item_folder`, so
+  the desktop *Add files…* of a revision without files starts in it.
+
 ### Changed
 
 - **Database pool** (#317): `TEAMCRAFT_DB_MAX_CONNECTIONS` defaults to 20

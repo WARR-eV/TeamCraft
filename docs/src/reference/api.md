@@ -106,7 +106,8 @@ is pinned. A hidden or unknown basis is 404, an invalid role 400, `basis` on
 another item type or together with `idempotency_key` 400.
 
 `POST /items` takes `{item_type, name, project, number?, unit?, description?,
-material?, mass_kg?, unit_cost?, classification?, attributes?}` and answers **201** with the new revision `A`. A client
+material?, mass_kg?, unit_cost?, classification?, attributes?, folder?}` and answers **201** with the new revision `A`
+(`item_folder` = the item's folder, see [Working folder](#working-folder-folders-and-the-working-set)). A client
 that lost the answer (timeout,
 crash) cannot tell whether the item exists. With the optional **`idempotency_key`** (1 to 255 printable ASCII characters
 without spaces,
@@ -253,7 +254,7 @@ place it gets in the desktop working folder
 `<workspace>/<group>/<folder>/<file>`. Uploads and check-ins set it with the
 multipart field `folder` (one folder for all files of the request) or
 `folders` (a JSON object from file name to folder, wins over `folder`); files
-sent without one keep their folder (new files: the top). Folders are
+sent without one keep their folder (new files: the item's folder, see below). Folders are
 normalised (`\` → `/`, no leading or trailing `/`) and refused with 400 if
 they contain `..`, a drive letter or names invalid on Windows.
 `PATCH /files/{id}` with `{"folder": "chassis/brackets"}` moves a file while
@@ -262,6 +263,16 @@ you hold the check-out (no new version; recorded in the history);
 versions of that file after a grace period, see
 [Data retention](../admin/operations.md#data-retention). File lists
 and `file-status` return the `folder`.
+
+An **item** has a folder too (`""` = the top): `POST /items` takes it as
+`folder`, `PATCH /items/{number}` changes it with
+`{"folder": "chassis/brackets"}` (the files keep theirs), and items and
+revisions return it (`folder` on the item, `item_folder` on a revision and in
+`file-status`). The file browser lists an item without files in that folder,
+and a new file whose upload names no folder goes there – so the files of an
+item created "in" a folder land there too. It is normalised and refused like
+the folder of a file; an idempotent `POST /items` counts it as one of its
+fields.
 
 ```sh
 curl -s -X POST -H "$H" -F file=@bracket.prt -F file=@chassis.asm \
@@ -296,14 +307,15 @@ time: `GET /projects/{code}/files?folder=&limit=&offset=` answers
 `{folder, folders, entries, total}` for the folder (`chassis/brackets`; empty
 = the top of the group; normalised like the `folder` of an upload). `folders`
 are the folders directly below it (`name`, `path` to ask for, `files` = files
-in it at any depth). `entries` are its files by name, each with the item it
+in it at any depth, an item without files counted as one). `entries` are its files by name, each with the item it
 belongs to: `file_id`, `filename`, `size_bytes`, `format`, `format_label`,
 `format_kind` (`part`, `assembly`, `drawing`, …; `null` if unknown),
 `item_number`, `item_type`, and `name`, `code`, `state` and
 `checked_out_by_name` of the item's latest revision – the browser shows the
-files of the latest revision of every item. At the top of the group the items
-without files follow the files (`file_id` and `filename` are `null`), so
-every item of the group is in the browser. `total` counts the entries of the
+files of the latest revision of every item. The items without files follow
+the files in their own folder (`file_id` and `filename` are `null`; the top of
+the group unless the item was given a folder), so every item of the group is
+in the browser. `total` counts the entries of the
 folder; `limit` is at most 500.
 
 `POST /worklist/checkin-all` (body optional: `{"revisions": [id, …]}`) checks
@@ -385,7 +397,7 @@ the caller cannot read are left out; a successor there is a placeholder with
 
 | Resource                | Endpoints                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 |-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Items                   | `GET/POST /items` (`class=`, `attr=` + `value=`, `result=` + `result_name=` filters), `GET /items/duplicates?name=&type=` (likely duplicates by name, before creating), `POST /items/bulk` (`{"action": "revise"\|"obsolete", "items": [number]}`: the latest revision of up to 200 items, each in its own transaction, outcome per item), `GET/PATCH /items/{number}` (classification, unit, project), `where-used` (`levels=1…25` for parents of parents), `interchange`, `alternates`, `supersession`, `replace`, history, impacts, watch |
+| Items                   | `GET/POST /items` (`class=`, `attr=` + `value=`, `result=` + `result_name=` filters), `GET /items/duplicates?name=&type=` (likely duplicates by name, before creating), `POST /items/bulk` (`{"action": "revise"\|"obsolete", "items": [number]}`: the latest revision of up to 200 items, each in its own transaction, outcome per item), `GET/PATCH /items/{number}` (classification, unit, project, folder), `where-used` (`levels=1…25` for parents of parents), `interchange`, `alternates`, `supersession`, `replace`, history, impacts, watch |
 | Attributes              | `GET /attributes` (`all=true`: also inactive), `POST /attributes`, `PATCH /attributes/{key}` (admins); values in `attributes` of a revision                                                                                                                                                                                                                                                                                                                                                                                                  |
 | Revisions               | `GET/PATCH /items/{number}/revisions/{code\|latest}`, `checkout`, `checkin`, `cancel-checkout`, `file-status`, `revise`, `obsolete`                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Worklist                | `GET /worklist` (check-outs, reviews, impacts and `impact_groups`, statistics), `POST /worklist/checkin-all`                                                                                                                                                                                                                                                                                                                                                                                                                                 |

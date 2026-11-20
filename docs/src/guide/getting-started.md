@@ -55,9 +55,10 @@ installations and the desktop app:
    sign-on (see [Users, roles and SSO](../admin/users.md)).
 4. **Items → New item**: choose the CAD file (s) first – the model, its
    drawing and a STEP export for the 3D preview. Name and type are taken from
-   the first file (an assembly for `.iam`, `.asm`, `.sldasm`, …). The item is
-   created together with its files; its first revision *A* is *in work* and
-   checked out to you.
+   the first file (an assembly for `.iam`, `.asm`, `.sldasm`, …). *Folder*
+   (optional, e.g. `chassis/brackets`) is where the item and its files go in
+   the project group's folder tree. The item is created together with its
+   files; its first revision *A* is *in work* and checked out to you.
 5. **Check in**, then release it with a change order.
 
 **Appearance:** TeamCraft follows the light or dark appearance of your

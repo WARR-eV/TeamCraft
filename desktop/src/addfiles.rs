@@ -64,11 +64,12 @@ pub fn plan(
     root: &Path,
     project: Option<&str>,
     files: &[ServerFile],
+    item_folder: &str,
     sources: &[PathBuf],
     subfolder: &str,
 ) -> Result<Vec<PlanItem>, ApiError> {
     let sub = layout::normalize_folder(subfolder).map_err(ApiError::local)?;
-    let main_folder = revision_dirs(project, files)
+    let main_folder = revision_dirs(project, files, item_folder)
         .into_iter()
         .next()
         .map(|(_, folder)| folder)
@@ -270,6 +271,7 @@ mod tests {
             ws.path(),
             Some("ROVER"),
             &files,
+            "",
             std::slice::from_ref(&report),
             "",
         )
@@ -308,6 +310,7 @@ mod tests {
             ws.path(),
             Some("ROVER"),
             &files,
+            "",
             std::slice::from_ref(&f),
             "sim/run 1",
         )
@@ -317,10 +320,34 @@ mod tests {
         copy_in(ws.path(), &p, &[]).unwrap();
         assert!(ws.path().join("ROVER/hub/sim/run 1/deck.inp").is_file());
         // without files: the group folder itself
-        let p = plan(ws.path(), Some("ROVER"), &[], &[f], "").unwrap();
+        let p = plan(
+            ws.path(),
+            Some("ROVER"),
+            &[],
+            "",
+            std::slice::from_ref(&f),
+            "",
+        )
+        .unwrap();
         assert_eq!(p[0].rel, "ROVER/deck.inp");
+        // without files, an item with a folder: that folder, sub-folders below it
+        let p = plan(
+            ws.path(),
+            Some("ROVER"),
+            &[],
+            "chassis",
+            std::slice::from_ref(&f),
+            "",
+        )
+        .unwrap();
+        assert_eq!(
+            (p[0].folder.as_str(), p[0].rel.as_str()),
+            ("chassis", "ROVER/chassis/deck.inp")
+        );
+        let p = plan(ws.path(), Some("ROVER"), &[], "chassis", &[f], "fea").unwrap();
+        assert_eq!(p[0].folder, "chassis/fea");
         // invalid sub-folder
-        assert!(plan(ws.path(), Some("ROVER"), &[], &[], "../x").is_err());
+        assert!(plan(ws.path(), Some("ROVER"), &[], "", &[], "../x").is_err());
     }
 
     #[test]
@@ -333,7 +360,7 @@ mod tests {
         let new = write(src.path(), "HUB.PRT", "new");
         let files = [server_file("hub.prt", "hub")];
         // the server file decides name and folder, a sub-folder is ignored
-        let p = plan(ws.path(), Some("ROVER"), &files, &[new], "other").unwrap();
+        let p = plan(ws.path(), Some("ROVER"), &files, "", &[new], "other").unwrap();
         assert!(p[0].new_version && p[0].needs_confirmation());
         assert_eq!(p[0].name, "hub.prt");
         assert_eq!(p[0].folder, "hub");
@@ -365,10 +392,10 @@ mod tests {
         let ws = tempfile::tempdir().unwrap();
         let src = tempfile::tempdir().unwrap();
         let tmp = write(src.path(), "~$report.docx", "x");
-        assert!(plan(ws.path(), None, &[], &[tmp], "").is_err());
+        assert!(plan(ws.path(), None, &[], "", &[tmp], "").is_err());
         let a = write(src.path(), "a.txt", "1");
         assert!(
-            plan(ws.path(), None, &[], &[a.clone(), a.clone()], "").is_err(),
+            plan(ws.path(), None, &[], "", &[a.clone(), a.clone()], "").is_err(),
             "picked twice"
         );
     }
@@ -383,6 +410,7 @@ mod tests {
             ws.path(),
             Some("ROVER"),
             &[],
+            "",
             std::slice::from_ref(&in_ws),
             "",
         )
@@ -400,7 +428,7 @@ mod tests {
         std::fs::create_dir_all(stray.parent().unwrap()).unwrap();
         std::fs::write(&stray, "stray").unwrap();
         let f = write(src.path(), "notes.txt", "picked");
-        let p = plan(ws.path(), Some("ROVER"), &[], &[f], "").unwrap();
+        let p = plan(ws.path(), Some("ROVER"), &[], "", &[f], "").unwrap();
         assert!(!p[0].new_version && p[0].exists_locally && p[0].needs_confirmation());
     }
 }

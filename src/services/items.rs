@@ -18,7 +18,7 @@ use crate::{
 pub(crate) const ITEM_SELECT: &str = "
     SELECT i.id, i.number, i.item_type, i.unit, i.project_id, p.code AS project_code,
            i.created_by, u.display_name AS created_by_name, i.created_at, i.classification,
-           i.owner_id, ou.display_name AS owner_name
+           i.owner_id, ou.display_name AS owner_name, i.folder
     FROM items i
     LEFT JOIN projects p ON p.id = i.project_id
     JOIN users u ON u.id = i.created_by
@@ -471,6 +471,11 @@ pub struct NewItem {
     pub classification: Classification,
     /// Custom attribute values, `key → value as text` (empty ones are skipped).
     pub attributes: Vec<(String, String)>,
+    /// Folder inside the project group (`chassis/brackets`; empty = the top),
+    /// normalised by `domain::normalize_folder`: where the file browser lists
+    /// the item while it has no file, and the folder of its files whose upload
+    /// names none.
+    pub folder: String,
 }
 
 fn validate_unit(unit: &str) -> AppResult<String> {
@@ -497,7 +502,9 @@ fn validate_unit(unit: &str) -> AppResult<String> {
 /// * **Webhooks:** none.
 /// * **Data:** a generated number steps the group's counter (numbers already
 ///   taken are skipped); the first revision `A` is in work and checked out by
-///   the creator. A failed creation rolls the counter back with it.
+///   the creator. A failed creation rolls the counter back with it. The
+///   item's folder is normalised (`domain::normalize_folder`, 400 for `..`,
+///   absolute paths and names invalid on Windows).
 /// * **Atomic:** one transaction; concurrent creations get distinct numbers
 ///   (`tests/numbering_and_watches.rs`).
 pub async fn create(pool: &PgPool, actor: &Actor, input: NewItem) -> AppResult<Revision> {
@@ -598,7 +605,8 @@ pub async fn create_idempotent(
 ///
 /// * **Permission / locks / audit / data:** as [`create`], then the new
 ///   revision is locked (`revisions::lock`) and the files are stored like in
-///   [`files::attach`] (`file.upload` per file).
+///   [`files::attach`] (`file.upload` per file); a file whose upload names no
+///   folder goes into the item's folder.
 /// * **Notifications:** none; the creator only starts watching the item.
 /// * **Webhooks:** `simulation.result_added` when the item is a simulation
 ///   and result values are read from the uploaded files (see
@@ -646,6 +654,7 @@ pub(crate) async fn create_tx(
     }
     .validated()?;
     let unit = validate_unit(&input.unit)?;
+    let folder = domain::normalize_folder(&input.folder)?;
     let attribute_values = attributes::apply_changes(
         &mut *conn,
         input.item_type.as_str(),
@@ -776,8 +785,9 @@ pub(crate) async fn create_tx(
 
     let item_id = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO items (id, number, item_type, unit, project_id, created_by, owner_id, classification)
-         VALUES ($1, $2, $3, $4, $5, $6, $6, $7)",
+        "INSERT INTO items (id, number, item_type, unit, project_id, created_by, owner_id, classification,
+                            folder)
+         VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8)",
     )
     .bind(item_id)
     .bind(&number)
@@ -786,6 +796,7 @@ pub(crate) async fn create_tx(
     .bind(project_id)
     .bind(actor.id)
     .bind(input.classification.as_str())
+    .bind(&folder)
     .execute(&mut *tx)
     .await
     .map_err(|e| {
@@ -823,7 +834,11 @@ pub(crate) async fn create_tx(
             input.item_type.label(),
             attrs.name
         ),
-        json!({ "revision_id": rev_id, "item_type": input.item_type.as_str() }),
+        json!({
+            "revision_id": rev_id,
+            "item_type": input.item_type.as_str(),
+            "folder": folder
+        }),
     )
     .await?;
     // The creator follows the item (notifications about checks and releases).
@@ -850,7 +865,9 @@ pub(crate) async fn create_tx(
 /// * **Audit:** `item.update`.
 /// * **Notifications / webhooks:** none.
 /// * **Data:** the unit cannot change once a revision is in review, released
-///   or obsolete (409).
+///   or obsolete (409). `folder` (`None` keeps it) is the item's folder in
+///   its group, normalised (`domain::normalize_folder`, 400); the folders of
+///   its files do not change.
 /// * **Atomic:** one transaction.
 pub async fn update_master(
     pool: &PgPool,
@@ -859,9 +876,11 @@ pub async fn update_master(
     project_id: Option<Uuid>,
     unit: &str,
     classification: Option<Classification>,
+    folder: Option<&str>,
 ) -> AppResult<Item> {
     actor.require(Role::Editor)?;
     let unit = validate_unit(unit)?;
+    let folder = folder.map(domain::normalize_folder).transpose()?;
     let mut tx = pool.begin().await?;
     let current =
         sqlx::query_as::<_, Item>(&format!("{ITEM_SELECT} WHERE i.id = $1 FOR UPDATE OF i"))
@@ -918,13 +937,17 @@ pub async fn update_master(
     let classification = classification
         .map(Classification::as_str)
         .unwrap_or(current.classification.as_str());
-    sqlx::query("UPDATE items SET project_id = $2, unit = $3, classification = $4 WHERE id = $1")
-        .bind(item_id)
-        .bind(project_id)
-        .bind(&unit)
-        .bind(classification)
-        .execute(&mut *tx)
-        .await?;
+    let folder = folder.unwrap_or_else(|| current.folder.clone());
+    sqlx::query(
+        "UPDATE items SET project_id = $2, unit = $3, classification = $4, folder = $5 WHERE id = $1",
+    )
+    .bind(item_id)
+    .bind(project_id)
+    .bind(&unit)
+    .bind(classification)
+    .bind(&folder)
+    .execute(&mut *tx)
+    .await?;
     audit::record(
         &mut tx,
         Some(actor),
@@ -932,7 +955,12 @@ pub async fn update_master(
         "item",
         Some(item_id),
         format!("Updated master data of {}", current.number),
-        json!({ "project_id": project_id, "unit": unit, "classification": classification }),
+        json!({
+            "project_id": project_id,
+            "unit": unit,
+            "classification": classification,
+            "folder": folder
+        }),
     )
     .await?;
     tx.commit().await?;

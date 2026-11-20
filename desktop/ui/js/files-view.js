@@ -106,3 +106,15 @@ export function folderKey(project, path) {
 export function countText(n, one, many) {
   return n + " " + (n === 1 ? one : many);
 }
+
+/** The folder above `path` (`chassis/brackets` → `chassis`, `chassis` → ``). */
+export function parentFolder(path) {
+  var cut = (path || "").lastIndexOf("/");
+  return cut < 0 ? "" : path.slice(0, cut);
+}
+
+/** The folder *New item* starts with in group `code`: the one last opened or
+ *  clicked in the Files view (`remembered` = state.filesFolder), else the top. */
+export function newItemFolder(remembered, code) {
+  return (remembered && code && remembered[code]) || "";
+}

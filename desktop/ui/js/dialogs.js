@@ -6,6 +6,7 @@ import { $, ITEM_TYPES, TAURI, api, call, dialog, errorText, field, h, materialF
 import { label } from "/static/shared/js/format.js";
 import { canEdit, canEditProject, freshProjects, refreshWorklistCount } from "./shell.js";
 import { activeProject, selectView } from "./navigator.js";
+import { newItemFolder } from "./files-view.js";
 import { openRevision } from "./revision.js";
 
 // ======================================================================
@@ -31,9 +32,13 @@ export function guessFromFile(path) {
   };
 }
 
-export function newItemDialog() { freshProjects().then(openNewItemDialog); }
+/** *New item*; `opts.project` (code) and `opts.folder` preselect the group and
+ *  the folder (*New item here* in the Files view) – without them the active
+ *  group and the folder last opened in it. */
+export function newItemDialog(opts) { freshProjects().then(function () { openNewItemDialog(opts); }); }
 
-export function openNewItemDialog() {
+export function openNewItemDialog(opts) {
+  opts = opts || {};
   if (!canEdit()) { toast("Viewers cannot create items.", "error"); return; }
   var projects = state.projects.filter(function (p) { return p.active && canEditProject(p.id); });
   if (!projects.length) { toast("You are not a member of any project group – ask an admin to add you.", "error"); return; }
@@ -42,6 +47,15 @@ export function openNewItemDialog() {
   // the group one works in (Home), when one may create items in it
   var active = activeProject();
   if (active && projects.indexOf(active) !== -1) project.value = active.code;
+  if (opts.project && projects.some(function (p) { return p.code === opts.project; })) project.value = opts.project;
+  // the folder inside the group: the item's place in the Files view, its files go there
+  var folder = h("input.mono", { type: "text", maxlength: "400", spellcheck: "false", placeholder: "(top of the group)",
+    value: opts.folder != null && project.value === opts.project ? opts.folder : newItemFolder(state.filesFolder, project.value) });
+  var folderTyped = false;
+  folder.addEventListener("input", function () { folderTyped = true; });
+  project.addEventListener("change", function () {
+    if (!folderTyped) folder.value = newItemFolder(state.filesFolder, project.value);
+  });
   var name = h("input", { type: "text", maxlength: "200", required: true, placeholder: "from the first file" });
   var number = h("input", { type: "text", maxlength: "64", placeholder: "automatic (PRT-000042 …)" });
   var materialF = materialField(""), material = materialF.input;
@@ -72,6 +86,7 @@ export function openNewItemDialog() {
   dialog("New item", h("div.stack", null, [
     field("Files", h("div.stack", null, [pick, fileList]), "the CAD model with its drawing and a STEP export for the 3D preview – uploaded right after the item is created"),
     h("div.grid-2", null, [field("Type", type), field("Project group", project)]),
+    field("Folder", folder, "inside the group, e.g. chassis/brackets – the item and its files go there; empty: the top"),
     field("Name", name), field("Number", number, "optional"),
     h("div.grid-2", null, [materialF.el, field("Mass per unit (kg)", mass)]),
     field("Description", desc)
@@ -83,13 +98,16 @@ export function openNewItemDialog() {
         var body = {
           item_type: type.value, name: name.value, project: project.value,
           number: number.value.trim() || null, material: material.value, description: desc.value,
-          mass_kg: m ? Number(m) : null
+          mass_kg: m ? Number(m) : null, folder: folder.value.trim()
         };
         if (m && !isFinite(body.mass_kg)) { d.fail("Mass: '" + mass.value + "' is not a number."); return; }
         api("POST", "/items", body).then(function (rev) {
           if (!paths.length) return rev;
           setStatus("Uploading " + paths.length + (paths.length === 1 ? " file" : " files") + " …");
-          return call("upload_files", { item: rev.item_number, code: rev.code, paths: paths, comment: null }).then(function () {
+          // the folder per file as well: a server without item folders still puts them there
+          var folders = {};
+          paths.forEach(function (p) { folders[baseName(p)] = rev.item_folder != null ? rev.item_folder : body.folder; });
+          return call("upload_files", { item: rev.item_number, code: rev.code, paths: paths, comment: null, folders: folders }).then(function () {
             setStatus("");
             return rev;
           }, function (err) {
@@ -99,7 +117,7 @@ export function openNewItemDialog() {
           });
         }).then(function (rev) {
           d.close();
-          toast("Created " + rev.item_number + "/" + rev.code + (paths.length ? " with " + paths.length + (paths.length === 1 ? " file" : " files") : "") + " – it is checked out to you");
+          toast("Created " + rev.item_number + "/" + rev.code + (paths.length ? " with " + paths.length + (paths.length === 1 ? " file" : " files") : "") + (rev.item_folder ? " in " + rev.item_folder : "") + " – it is checked out to you");
           openRevision(rev.item_number, rev.code);
           delete state.expanded[body.project];
           if (state.view === "home") selectView("home");

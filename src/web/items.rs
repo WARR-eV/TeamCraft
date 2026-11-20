@@ -185,6 +185,10 @@ pub struct NewItemForm {
     unit_cost: String,
     #[serde(default)]
     classification: String,
+    /// Folder inside the project group (`chassis/brackets`; empty = the top):
+    /// the item's folder and the folder of the files uploaded with it.
+    #[serde(default)]
+    folder: String,
     /// Id of the revision a new simulation is based on (empty: none).
     #[serde(default)]
     basis: String,
@@ -275,6 +279,8 @@ pub struct NewQuery {
     #[serde(rename = "type")]
     item_type: Option<String>,
     project: Option<String>,
+    /// Folder inside the group to prefill (`chassis/brackets`).
+    folder: Option<String>,
     /// Revision id a new simulation is based on; unknown or hidden = ignored.
     basis: Option<String>,
 }
@@ -288,6 +294,7 @@ pub async fn new_form(
     let mut form = NewItemForm {
         item_type: q.item_type.unwrap_or_else(|| "part".into()),
         project_id: q.project.unwrap_or_default(),
+        folder: q.folder.unwrap_or_default(),
         unit: "each".into(),
         basis: q.basis.unwrap_or_default(),
         ..Default::default()
@@ -329,6 +336,7 @@ fn parse_new_item(form: &NewItemForm) -> AppResult<items::NewItem> {
         classification: Classification::parse_field(Some(&form.classification))?
             .unwrap_or_default(),
         attributes: Vec::new(),
+        folder: form.folder.clone(),
     })
 }
 
@@ -395,9 +403,10 @@ pub async fn create(State(st): State<AppState>, ctx: WebCtx, req: Request) -> Ap
             let message = e.public_message();
             if scripted {
                 let back = format!(
-                    "/items/new?type={}&project={}&basis={}",
+                    "/items/new?type={}&project={}&folder={}&basis={}",
                     util::pct_encode(&early_form.item_type),
                     util::pct_encode(&early_form.project_id),
+                    util::pct_encode(&early_form.folder),
                     util::pct_encode(&early_form.basis)
                 );
                 return Ok(super::redirect_flash(
@@ -496,8 +505,14 @@ pub async fn create(State(st): State<AppState>, ctx: WebCtx, req: Request) -> Ap
                 &st,
                 &format!("/revisions/{}", rev.id),
                 super::Flash::success(format!(
-                    "Created {} – {}{files}; it is checked out to you.{hint}",
-                    rev.item_number, rev.name
+                    "Created {} – {}{files}{place}; it is checked out to you.{hint}",
+                    rev.item_number,
+                    rev.name,
+                    place = if rev.item_folder.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" in the folder {}", rev.item_folder)
+                    }
                 )),
             ))
         }
@@ -508,9 +523,10 @@ pub async fn create(State(st): State<AppState>, ctx: WebCtx, req: Request) -> Ap
             }
             if scripted {
                 let back = format!(
-                    "/items/new?type={}&project={}&basis={}",
+                    "/items/new?type={}&project={}&folder={}&basis={}",
                     util::pct_encode(&form.item_type),
                     util::pct_encode(&form.project_id),
+                    util::pct_encode(&form.folder),
                     util::pct_encode(&form.basis)
                 );
                 return Ok(super::redirect_flash(
@@ -608,6 +624,8 @@ pub struct MasterForm {
     unit: String,
     #[serde(default)]
     classification: String,
+    /// The item's folder in its group; missing (older pages) keeps it.
+    folder: Option<String>,
     back: Option<String>,
 }
 
@@ -626,7 +644,16 @@ pub async fn update_master(
     });
     let result = match parsed {
         Ok((project_id, classification)) => {
-            items::update_master(&st.db, &ctx.me, id, project_id, &form.unit, classification).await
+            items::update_master(
+                &st.db,
+                &ctx.me,
+                id,
+                project_id,
+                &form.unit,
+                classification,
+                form.folder.as_deref(),
+            )
+            .await
         }
         Err(e) => Err(e),
     };

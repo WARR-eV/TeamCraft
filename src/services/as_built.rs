@@ -463,6 +463,7 @@ pub async fn record_unit(
             unit_cost: None,
             classification: Classification::default(),
             attributes: Vec::new(),
+            folder: String::new(),
         },
     )
     .await?;

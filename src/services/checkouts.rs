@@ -100,6 +100,9 @@ pub struct RevisionStatus {
     /// app tells the former holder that their local changes stay but need
     /// a new check-out. `None` otherwise.
     pub released: Option<ReleasedCheckout>,
+    /// The item's folder in its group (`items.folder`): where a revision
+    /// without files has its place in the working folder.
+    pub item_folder: String,
     pub files: Vec<FileStatus>,
 }
 
@@ -281,6 +284,7 @@ pub async fn file_status(
         locked_at: rev.checked_out_at,
         locked_by_me: rev.checked_out_by == Some(actor.id),
         locked_by_other: rev.checked_out_by.is_some_and(|id| id != actor.id),
+        item_folder: rev.item_folder.clone(),
         files: out,
     })
 }

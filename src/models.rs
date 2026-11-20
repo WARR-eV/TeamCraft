@@ -128,6 +128,10 @@ pub struct Item {
     pub owner_name: String,
     /// `make`, `purchased` or `standard` (`domain::Classification`).
     pub classification: String,
+    /// Folder inside the project group (`chassis/brackets`, `""` = the top):
+    /// where the file browser lists the item while it has no file, and the
+    /// folder of new files whose upload names none.
+    pub folder: String,
 }
 
 /// Definition of a custom attribute (maintained by administrators).
@@ -157,6 +161,8 @@ pub struct Revision {
     pub unit: String,
     pub project_id: Option<Uuid>,
     pub project_code: Option<String>,
+    /// Folder of the item inside its group (see [`Item::folder`]).
+    pub item_folder: String,
     pub seq: i32,
     pub code: String,
     pub state: String,

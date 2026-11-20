@@ -27,7 +27,8 @@
 //   * a click on a file opens its revision in a tab;
 //   * a server without the file browser gets the items by name (All items);
 //   * an empty group says so;
-//   * New item starts with the active group;
+//   * New item starts with the active group and the folder last opened; the
+//     + of a folder row (New item here) fills in that folder;
 //   * the All items and Structure modes are still there;
 //   * no page errors.
 import fs from "node:fs";
@@ -313,7 +314,28 @@ async function check(browserType, name) {
   await page.waitForSelector("form.dialog select");
   same("project group of a new item", await page.evaluate(() => Array.prototype.map.call(document.querySelectorAll("form.dialog select"), (s) => s.value)
     .filter((v) => /^[A-Z]+$/.test(v))), ["ROVER"]);
+  const folderField = "form.dialog input[placeholder='(top of the group)']";
+  same("folder of a new item from the top", await page.locator(folderField).inputValue(), "");
   await page.locator("form.dialog button", { hasText: "Cancel" }).click();
+
+  // New item here: the + of a folder row opens New with the group and that
+  // folder, without opening the folder
+  const chassisRow = page.locator("#navigator .node.folder", { hasText: "Chassis" });
+  await chassisRow.hover();
+  await chassisRow.locator("button.folder-new").click();
+  await page.waitForSelector(folderField);
+  same("folder of New item here", await page.locator(folderField).inputValue(), "Chassis");
+  same("project group of New item here", await page.evaluate(() => Array.prototype.map.call(document.querySelectorAll("form.dialog select"), (s) => s.value)
+    .filter((v) => /^[A-Z]+$/.test(v))), ["ROVER"]);
+  same("the folder stays closed", await chassisRow.getAttribute("aria-expanded"), "false");
+  await page.locator("form.dialog button", { hasText: "Cancel" }).click();
+  // New (Ctrl/Cmd+N) starts in the folder last opened
+  await chassisRow.click();
+  await page.locator("#navigator .nav-head button", { hasText: "New" }).click();
+  await page.waitForSelector(folderField);
+  same("folder of New after opening a folder", await page.locator(folderField).inputValue(), "Chassis");
+  await page.locator("form.dialog button", { hasText: "Cancel" }).click();
+  await chassisRow.click();
 
   // the other modes are still there for the active group
   await page.locator("#navigator .chip", { hasText: "Structure" }).click();

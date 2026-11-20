@@ -80,6 +80,8 @@ pub async fn save_as(
             unit_cost: src.unit_cost,
             classification: domain::Classification::parse(&src.classification).unwrap_or_default(),
             attributes: Vec::new(),
+            // the copy sits next to its source
+            folder: src.item_folder.clone(),
         },
     )
     .await?;
