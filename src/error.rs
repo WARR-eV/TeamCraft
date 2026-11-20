@@ -56,6 +56,14 @@ pub struct ErrorInfo {
     pub message: String,
 }
 
+/// What a request is told when every database connection is busy.
+const BUSY: &str =
+    "The server is busy right now (all database connections are in use). Try again in a moment.";
+
+/// Requests that found no free database connection within the acquire
+/// timeout since the start (`teamcraft_db_pool_timeouts` in `/metrics`, #317).
+pub static POOL_TIMEOUTS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 impl AppError {
     pub fn not_found(what: impl Into<String>) -> Self {
         AppError::NotFound(what.into())
@@ -72,6 +80,7 @@ impl AppError {
             AppError::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             AppError::TooManyRequests { .. } => StatusCode::TOO_MANY_REQUESTS,
             AppError::Database(sqlx::Error::RowNotFound) => StatusCode::NOT_FOUND,
+            AppError::Database(sqlx::Error::PoolTimedOut) => StatusCode::SERVICE_UNAVAILABLE,
             AppError::Database(_)
             | AppError::Io(_)
             | AppError::Template(_)
@@ -90,6 +99,7 @@ impl AppError {
             AppError::Unavailable(_) => "unavailable",
             AppError::TooManyRequests { .. } => "too_many_requests",
             AppError::Database(sqlx::Error::RowNotFound) => "not_found",
+            AppError::Database(sqlx::Error::PoolTimedOut) => "unavailable",
             AppError::Database(_)
             | AppError::Io(_)
             | AppError::Template(_)
@@ -101,6 +111,7 @@ impl AppError {
     pub fn public_message(&self) -> String {
         match self {
             AppError::Database(sqlx::Error::RowNotFound) => "Not found.".to_string(),
+            AppError::Database(sqlx::Error::PoolTimedOut) => BUSY.to_string(),
             AppError::Database(_)
             | AppError::Io(_)
             | AppError::Template(_)
@@ -125,7 +136,14 @@ impl AppError {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let status = self.status();
-        if status.is_server_error() && !matches!(self, AppError::Unavailable(_)) {
+        if matches!(self, AppError::Database(sqlx::Error::PoolTimedOut)) {
+            // load, not a defect: counted for /metrics and logged, not reported (#317)
+            POOL_TIMEOUTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            tracing::warn!(
+                "no free database connection within the acquire timeout – raise \
+                 TEAMCRAFT_DB_MAX_CONNECTIONS (docs: Operations → Database connections)"
+            );
+        } else if status.is_server_error() && !matches!(self, AppError::Unavailable(_)) {
             tracing::error!(error = %self, "request failed");
             crate::notify::report_error(&self.to_string());
         }
@@ -151,6 +169,25 @@ impl IntoResponse for AppError {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn an_exhausted_pool_is_a_503_and_counted() {
+        let e = AppError::Database(sqlx::Error::PoolTimedOut);
+        assert_eq!(e.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(e.code(), "unavailable");
+        assert!(
+            e.public_message().contains("busy"),
+            "{}",
+            e.public_message()
+        );
+        let before = POOL_TIMEOUTS.load(std::sync::atomic::Ordering::Relaxed);
+        let r = e.into_response();
+        assert_eq!(r.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert!(POOL_TIMEOUTS.load(std::sync::atomic::Ordering::Relaxed) > before);
+        // other database errors stay internal errors
+        let e = AppError::Database(sqlx::Error::PoolClosed);
+        assert_eq!(e.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     #[test]
     fn too_many_requests_is_429_with_retry_after() {

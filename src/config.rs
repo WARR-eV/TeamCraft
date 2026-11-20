@@ -261,6 +261,8 @@ pub struct Config {
     pub database_password: Option<String>,
     /// Human readable, password-free description of the database target.
     pub database_display: String,
+    /// Size of the one connection pool shared by requests and background jobs
+    /// (`TEAMCRAFT_DB_MAX_CONNECTIONS`, default [`DEFAULT_DB_MAX_CONNECTIONS`]).
     pub db_max_connections: u32,
     /// Root directory of the file vault (and of the cached 3D previews).
     pub vault_dir: PathBuf,
@@ -349,6 +351,10 @@ pub struct Config {
 /// Shortest audit log retention (`TEAMCRAFT_AUDIT_RETENTION_DAYS`): a typo
 /// must not empty the audit trail.
 pub const MIN_AUDIT_RETENTION_DAYS: u32 = 30;
+
+/// Default size of the database pool (#317: 10 let requests wait behind long
+/// imports and background jobs; PostgreSQL allows 100 connections by default).
+pub const DEFAULT_DB_MAX_CONNECTIONS: u32 = 20;
 
 /// Default preview cache limit in MiB (10 GiB, #309): without one the cache
 /// grew until the disk was full.
@@ -939,7 +945,8 @@ impl Config {
 
         let (database, database_display, database_password) = database_options(&env)?;
 
-        let db_max_connections = env.parse_or("TEAMCRAFT_DB_MAX_CONNECTIONS", 10u32)?;
+        let db_max_connections =
+            env.parse_or("TEAMCRAFT_DB_MAX_CONNECTIONS", DEFAULT_DB_MAX_CONNECTIONS)?;
         if db_max_connections == 0 {
             bail!("TEAMCRAFT_DB_MAX_CONNECTIONS must be at least 1");
         }

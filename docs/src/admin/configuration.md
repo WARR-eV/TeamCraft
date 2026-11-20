@@ -52,7 +52,7 @@ output can be read by scripts.
 | `DATABASE_URL`                                                                     | –                                                | fallback for `TEAMCRAFT_DATABASE_URL` (the usual name in hosting platforms) |
 | `TEAMCRAFT_DB_PASSWORD`                                                            | –                                                | password (not needed with trust authentication or `~/.pgpass`)              |
 | `TEAMCRAFT_DB_SSLMODE`                                                             | `prefer`                                         | `disable`, `prefer`, `require`, `verify-ca`, `verify-full`                  |
-| `TEAMCRAFT_DB_MAX_CONNECTIONS`                                                     | `10`                                             | pool size                                                                   |
+| `TEAMCRAFT_DB_MAX_CONNECTIONS`                                                     | `20`                                             | pool size, shared by requests and background jobs; see [Operations → Database connections](operations.md#database-connections) |
 
 Start-up waits up to 20 s for the database, then stops with the reason.
 Migrations run automatically (`teamcraft serve --no-migrate` skips them).

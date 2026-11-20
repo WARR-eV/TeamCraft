@@ -15,6 +15,13 @@ see the notices in the README.
 
 ### Changed
 
+- **Database pool** (#317): `TEAMCRAFT_DB_MAX_CONNECTIONS` defaults to 20
+  instead of 10 – requests and background jobs share the pool, and long
+  imports made requests wait. A request that finds no free connection within
+  10 seconds now answers **503** *The server is busy* (it was a 500 reported
+  as a defect), logs a warning and counts in the new gauge
+  `teamcraft_db_pool_timeouts`; `teamcraft_db_pool_max_connections` shows the
+  limit. The operations guide has a section on sizing the pool.
 - **Token lifetimes are limited by default** (#313).
   `TEAMCRAFT_TOKEN_MAX_DAYS` (new, default `365`, `0` = no limit) gives a
   new personal token without an expiry, or with a longer one, that many

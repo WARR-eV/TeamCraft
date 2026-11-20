@@ -399,6 +399,29 @@ starts, before any bytes are sent. Lowering a quota never removes anything –
 the user just cannot store more. Changes are recorded as `user.quota` and
 `vault.quota` in the audit log.
 
+## Database connections
+
+Requests and the background jobs (housekeeping, e-mail and webhook outboxes,
+reminders, previews) share one connection pool of
+`TEAMCRAFT_DB_MAX_CONNECTIONS` (default 20). A request waits up to 10 seconds
+for a free connection; after that it answers **503** with *The server is busy*,
+the server logs a warning and `teamcraft_db_pool_timeouts` counts it. Most
+requests hold a connection for milliseconds; long holders are BOM imports,
+large check-ins, Pack and Go and backups.
+
+* **Watch** `teamcraft_db_pool_connections` against
+  `teamcraft_db_pool_max_connections` and `teamcraft_db_pool_idle_connections`
+  ([Metrics](#metrics-for-prometheus)): idle at 0 for minutes, or any pool
+  timeout, means the pool is too small for the load.
+* **Raise** `TEAMCRAFT_DB_MAX_CONNECTIONS` (for example to 40 for a hundred
+  people working at once), and keep the sum over all TeamCraft instances,
+  plus `pg_dump` and your own tools, below PostgreSQL's `max_connections`
+  (100 by default; raise it in `postgresql.conf` together with
+  `shared_buffers`). Each PostgreSQL connection costs a few MB of RAM.
+* **Behind PgBouncer** (transaction pooling), give TeamCraft the bouncer's
+  address and size the pool to the bouncer's `default_pool_size`; note the
+  `options` startup parameter under [Sizing](#sizing).
+
 ## Metrics for Prometheus
 
 Set `TEAMCRAFT_METRICS_TOKEN` (at least 16 characters, also as `_FILE`) and
@@ -417,6 +440,7 @@ scrape_configs:
 | `teamcraft_http_requests_total{class}`                                           | answered requests by status class (`2xx` … `5xx`) since the start                                                      |
 | `teamcraft_http_request_duration_seconds`                                        | latency histogram: time until the response headers are ready; the streaming of a body (file downloads) is not included |
 | `teamcraft_db_pool_connections`, `teamcraft_db_pool_idle_connections`            | database pool                                                                                                          |
+| `teamcraft_db_pool_max_connections`, `teamcraft_db_pool_timeouts`             | the pool's limit, and requests since the start that waited 10 s for a connection in vain (answered 503) |
 | `teamcraft_webhook_deliveries_pending`                                           | webhook outbox backlog                                                                                                 |
 | `teamcraft_notification_emails_pending`, `teamcraft_notification_chat_pending`   | notification outbox backlogs                                                                                           |
 | `teamcraft_preview_conversions_running`, `teamcraft_preview_conversions_waiting` | 3D preview queue: conversions running now (at most 2 per server) and conversions waiting for a free slot               |
@@ -435,6 +459,7 @@ instance reports the same number: aggregate them with `max()`, never `sum()`.
 
 Useful alerts: a rising `teamcraft_webhook_deliveries_pending` or
 `teamcraft_notification_*_pending` (a receiver or the mail server is down),
-`teamcraft_db_pool_idle_connections` at 0 for minutes,
+`teamcraft_db_pool_idle_connections` at 0 for minutes, any increase of
+`teamcraft_db_pool_timeouts`,
 `teamcraft_preview_conversions_waiting` above 0 for many minutes (previews pile
 up behind slow conversions), and a share of `5xx` above 1 % of the requests.
