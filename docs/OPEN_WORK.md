@@ -74,7 +74,7 @@ feature milestone – the features in *What works* are enough; what is missing i
   and 2 of [agent-interface](src/research/agent-interface.md): provider, base URL, model and key (`_FILE`) in the
   configuration, `teamcraft assistant check`, the loop tests run for every provider, recorded fixtures per server
 - [ ] Per-user daily budget and admin feature switches for the assistant (phase 4), so that an operator can enable
-  it with a bought key without surprises
+  it with a bought key without surprises. Done: the daily quota per user (#306); left: the feature switches
 
 *Security*
 
@@ -117,7 +117,8 @@ feature milestone – the features in *What works* are enough; what is missing i
     - [ ] F14: fuzz targets for `simmesh` and `pdftext` (`resultscan` and `cadformat` have theirs since #156; the
       no-panic lints and the 3DS and Kelvin fixes are in `main` since #106/#108)
     - [ ] F15: prompt injection: confirmation of assistant drafts per write, or taint for MCP sessions as well
-    - [ ] F16: per-user quota for the assistant and MCP (with the daily budget in section 2, *Assistant*)
+    - [x] F16: per-user daily quota for the assistant (`TEAMCRAFT_ASSISTANT_DAILY_RUNS` / `_TOKENS`, #306);
+      left: a request rate limit for MCP (no model cost, load only)
     - [ ] F17: `teamcraft mcp`: no redirects, a warning (or refusal) for `http://` servers other than `localhost`
     - [x] F18: desktop token in the OS keychain (Windows Credential Manager, macOS Keychain, Secret Service); warn on
       `http://` server URLs – file fallback with a warning where there is no keychain
@@ -184,6 +185,34 @@ of the UI (English only in 1.0; the
 structure should not prevent translations later). They may land in 1.x minor releases.
 
 ## To-do
+
+### 0. Priority 1: *Check out and open* with the project's CAD program
+
+Requested by the user as the current top priority (before sections 1 and 2).
+
+- [x] Server: default CAD program per project group (`projects.default_cad`, `default_cad_version`, migration 0074),
+  set by managers and admins on the group page and with `PUT /api/v1/projects/{code}/default-cad`, audited
+  (`project.default_cad`), in the group's JSON; `GET /api/v1/formats` names each format's `family`
+  (`tests/project_default_cad.rs`).
+- [x] Desktop: find the installed CAD programs and versions (Windows install folders and registry, macOS
+  `/Applications`, FreeCAD on Linux) and choose: the group's program and version, else its newest installed version;
+  without a default (or for files of another program) the newest installed program that fits the file type; else the
+  operating system's program.
+- [x] Desktop: *Check out and open* button on the revision toolbar with the chosen program shown next to it; *Open in
+  …* for one's own check-out; the Files tab opens through the same choice.
+- [x] Desktop: *Import CAD folder* detects the program of the folder (and the Inventor version from the files'
+  properties, `2021 (Build …)` in the NIST samples) and offers to set it as the group's default.
+- [x] Docs of the desktop part (`desktop/README.md`, `docs/src/guide/desktop.md`, threat model: starting local
+  programs), research page entry for the Inventor version finding (`docs/src/research/cad-folder-import.md`).
+- [x] Desktop: a running Inventor with the working folder's project (`.ipj`) opens the file as a new window instead
+  of a second instance (#350, COM through Windows PowerShell); no opening after a cancelled or failed Get (#348); the
+  worklist navigator follows actions in the tabs (#347).
+- [ ] Left: try the reuse of a running Inventor (#350) with real Inventor installations – `InstallPath`,
+  `ActiveDesignProject`, `Documents.Open` and bringing the window to the front are untested here.
+- [ ] Left: try it on Windows with real installations (Inventor 2025/2026 side by side, SOLIDWORKS – the registry
+  keys, Solid Edge, NX, Creo, CATIA) and on macOS; the install folders and the SOLIDWORKS registry keys are the
+  installers' usual defaults, untested here. Versions of other programs than Inventor are not read from the files
+  (SOLIDWORKS keeps them in compressed sections).
 
 ### 1. Proofing
 
@@ -279,6 +308,18 @@ half a state behind. Prefer tests that fail on a real regression over tests that
   hand; `:edge` follows `main` within a day. A pull request that changes `packaging/**` or
   `desktop/tauri.conf.json` builds everything before it is merged. CI, CodeQL and the desktop workflow no longer
   cancel or replace runs on `main` either
+- [x] CI runs only the jobs a change needs (2026-11-19): one table, `scripts/ci-changes.sh` (with a self-test that
+  every `changes` job runs first), maps the changed files to the jobs of CI, Desktop app, CodeQL and Docs; pushes to
+  `main` and merge-queue entries compare with their base as pull requests do. A desktop UI change no longer runs the
+  server suite (two PostgreSQL legs, Windows build, clippy – ~35 runner-min) or the six-platform desktop build; a
+  Rust-free change skips the 12-minute CodeQL Rust analysis; `cargo deny` checks only the lock file that changed; a
+  docs change runs the new *docs and config guards* job (the configuration and documentation tests, no database –
+  before, docs-only pull requests ran no test at all although two tests read the book). CI and Desktop now run
+  everything weekly as the safety net. Also removed: a stray `cargo clippy|` line in `desktop.yml` that piped a
+  second clippy pass into an extra `cargo fmt --check` on every platform. Left: watch whether a pull request that
+  skips a CodeQL language shows a "configuration not found" notice in *Code scanning results*; the release builds
+  keep building server and desktop together (each nightly artifact is kept 14 days, so a part built less often
+  would expire)
 - [ ] Run `scale.yml` once by hand – its schedule has never fired yet – and make a failing scheduled run open an
   issue instead of only an e-mail
 - [x] `fuzz.yml` had never built a single target: the prebuilt `cargo-fuzz` from `taiki-e/install-action` is a musl
@@ -323,6 +364,20 @@ half a state behind. Prefer tests that fail on a real regression over tests that
   `tests/change_request_paths.rs` pins the REST paths), `desktop/ui/app.js` (~5000 → ES modules per view, no bundler) –
   desktop done (`desktop/ui/js/*.js`, `js/main.js` starts the app; `scripts/check-desktop-modules.mjs` in the CI job
   `ui` checks that every import resolves and every name of another module is imported)
+- [ ] **Shared UI without drift** (web UI and desktop app, `docs/src/research/shared-ui.md`,
+  `docs/src/dev/shared-ui.md`):
+  - [x] guards: the test vectors in `shared/test-vectors/` are run against the Rust (`src/ui_vectors.rs`) and the JS
+    side (`scripts/shared-vectors.test.mjs`); `check-desktop-modules.mjs` rejects a re-declared shared export; the CSS
+    ownership test, the `STYLED_TWICE` ratchet and the no-literal-colour test cover the stylesheets
+  - [x] labels, number, size and age formats, state glyphs and markdown-lite shared (`shared/js/format.js`,
+    `states.js`, `markdown.js`, `dom.js`); the desktop's own copies and its second markdown parser are removed
+  - [ ] `shared/css/components.css`, one family per PR, each shrinking `STYLED_TWICE`: badge/state glyph/lock/priority
+    (the desktop takes the shared badge builder and drops its SVG state icons), tables and tree rows,
+    card/stat/empty/notice, menu pop-up, lifecycle track (`done`/`current`/`future` on the desktop), thread/impact
+    group, viewer bar and legend
+  - [ ] the viewer as an ES module (`export function mount`), and the web's `<time>` rewrite via `format.js`
+  - [ ] widgets `menu.js`, `tabs.js`, `tree.js` and the icon sprite `shared/icons/sprite.svg`
+  - [ ] the component gallery: a hidden, admin-only `/dev/ui` page plus a debug-build desktop gallery
 - [ ] One request/response contract for web, REST and MCP where they do the same thing (e.g. BOM, where-used,
   change requests): shared view structs in `services::*` instead of three hand-built JSON/HTML shapes
 - [ ] Typed ids (`ItemId`, `RevisionId`, `ChangeId`, … as newtypes over `Uuid`) at the service boundary, so that ids
@@ -361,11 +416,12 @@ half a state behind. Prefer tests that fail on a real regression over tests that
 
 **Operations and repository**
 
-- [ ] Host the live demo (**maintainer action**). Ready in the code: the read-only demo account
-  (`TEAMCRAFT_DEMO_USER`, `TEAMCRAFT_DEMO_PASSWORD`), `scripts/seed-demo.sh` (the README demo data) and
-  `deploy/demo/demo.sh` (snapshot, nightly reset). Left: server, DNS, TLS, seed, snapshot, cron – the runbook is
-  [docs/src/admin/live-demo.md](src/admin/live-demo.md) – then link the demo from the top of the README and from
-  `docs/src/index.md`.
+- [x] Host the live demo (**maintainer action**): <https://teamcraft-demo.tailc7ef5b.ts.net> (`demo` /
+  `try-teamcraft`), seeded with `scripts/seed-demo.sh`, snapshot and nightly reset with `deploy/demo/demo.sh`,
+  HTTPS through Tailscale Funnel (no own domain yet); linked from the top of the README and from
+  `docs/src/index.md`. Runbook: [docs/src/admin/live-demo.md](src/admin/live-demo.md). Left: confirm that wrong
+  passwords for `demo` are counted per visitor behind Funnel (check in the runbook, step 3b); later an own domain
+  with Caddy for more traffic.
 - [ ] Test e-mail (SMTP) and Mattermost notifications against real servers (so far only against fakes)
 - [ ] Enable private vulnerability reporting (*Settings → Code security → Private vulnerability reporting*), which
   `SECURITY.md` points to

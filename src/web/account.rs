@@ -44,6 +44,8 @@ async fn render_account(
             "api_base": format!("{}/api/v1", st.config.public_url),
             // idle limit of single sign-on users' tokens (0 = none)
             "sso_token_idle_days": st.config.oidc_token_idle_days,
+            // longest lifetime of a new token (0 = none, #313)
+            "token_max_days": st.config.token_max_days,
             "skins": domain::SKINS,
             "cad_families": crate::cadformat::families()
                 .iter()
@@ -206,8 +208,8 @@ pub async fn create_token(
         }
         .ok_or_else(|| AppError::BadRequest("Choose what the token may do.".into()))?;
         let asked = users::TokenLifetime::fixed(days);
-        let idle = st.config.oidc_token_idle_days;
-        let lifetime = users::token_lifetime_for(&st.db, ctx.me.id, asked, idle).await?;
+        let limits = st.config.token_limits();
+        let lifetime = users::token_lifetime_for(&st.db, ctx.me.id, asked, limits).await?;
         users::create_token(&st.db, &ctx.me, &form.name, lifetime, scope).await
     }
     .await;

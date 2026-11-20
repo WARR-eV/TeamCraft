@@ -54,6 +54,67 @@ An in-app tutorial (desktop *Help → Import a CAD folder*) explains the
 preparation (Pack and Go, project file, unique names), the wizard and the
 check afterwards.
 
+## Detecting the CAD program and its version
+
+The scan also tells which CAD program the folder belongs to, so the wizard
+can offer it as the project group's **default CAD program** (TeamCraft
+Desktop's *Check out and open* opens the group's files with it):
+
+* **Program:** the format family (`format_info.family` / `family` of
+  `GET /api/v1/formats`, from `src/cadformat.rs`) with the most files, by
+  file extension. Ambiguous extensions (`.prt`, `.asm`, `.drw`, …) are not
+  counted.
+* **Version, Inventor:** Inventor writes the release that saved a file into
+  its document properties as text, `2021 (Build 250183000, 183)` – UTF-16
+  in an OLE property set (the OLE property set format is public:
+  [MS-OLEPS](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-oleps/);
+  the property is the one Inventor shows as *Last Updated With* in its
+  iProperties). Found in the two NIST Inventor 2021 parts of
+  `tests/fixtures/cad` (`INV_nist_ctc_01_asme1_2021.ipt`,
+  `INV_nist_ftc_11_asme1_2021.ipt`) with a plain `strings -el` text search –
+  no program was run or analysed. The scan reads the first 4 MiB of at most
+  40 Inventor files (assemblies first) and takes the newest year it finds in
+  each (a file created with an older release carries that year as well);
+  the newest year of all files is offered, because an older release cannot
+  open files saved by a newer one (`desktop/src/folderimport.rs`
+  `inventor_year`).
+* **Version, other programs:** not read. SOLIDWORKS 2015+ keeps its
+  metadata in compressed sections and the NIST samples show no plain
+  version text; the user types the version on the group page if wanted.
+
+The installed programs on the user's computer are found by their install
+folders (Windows *Program Files*, macOS `/Applications`) and, for
+SOLIDWORKS, the registry keys its installer writes – see
+`desktop/src/cadlaunch.rs`; these are the installers' usual default
+locations, not tested against real installations here.
+
+### Reusing a running Inventor (#350)
+
+Starting `Inventor.exe <file>` while Inventor runs starts a second
+instance. Inventor's documented COM interface (the *Inventor API* reference
+in the Inventor help, the same API iLogic and add-ins use) offers what is
+needed to open the file in the running one instead:
+
+* the running instance: `GetActiveObject("Inventor.Application")` (.NET
+  `Marshal.GetActiveObject`, Microsoft's documentation of the running object
+  table); `Application.Visible` tells a user's instance from an invisible
+  automation one;
+* its installation: `Application.InstallPath`, compared with the folder of
+  the `Inventor.exe` the desktop app chose;
+* its project: `DesignProjectManager.ActiveDesignProject.FullFileName`,
+  compared with the Inventor project file (`.ipj`) of the working folder –
+  the one in the nearest folder from the file's own up to the working folder
+  root (Inventor projects keep their files below the `.ipj`);
+* opening: `Documents.Open(FullDocumentName, OpenVisible = True)`, or
+  `Document.Activate` for a document already open; the window comes to the
+  front with `WScript.Shell.AppActivate(<process id>)`.
+
+The desktop app runs this as a short Windows PowerShell script, like the
+STEP export ([CAD previews](cad-previews.md)), and starts a new instance
+for any other answer. Only public API documentation was used; not tested
+against a real Inventor here
+(`desktop/src/cadlaunch.rs`, `open_in_running`).
+
 ## Sources
 
 * Autoloader and Inventor projects:

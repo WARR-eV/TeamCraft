@@ -1,4 +1,24 @@
-//! Small string helpers without external dependencies.
+//! Small string helpers.
+
+use std::borrow::Cow;
+
+use unicode_normalization::{is_nfc_quick, IsNormalized, UnicodeNormalization};
+
+/// A name in Unicode normal form C (composed): `a` + U+0308 becomes `ä`.
+///
+/// macOS hands out file names in the decomposed form (NFD), Windows and the
+/// CAD programs there write the composed one. The two look the same but are
+/// different names to NTFS and ext4 – an assembly from Windows then misses
+/// every part with an umlaut that went through a Mac. TeamCraft therefore
+/// keeps every file and folder name in NFC (see `sanitize_filename`,
+/// `domain::normalize_folder` and migration 0073).
+pub fn nfc(name: &str) -> Cow<'_, str> {
+    if is_nfc_quick(name.chars()) == IsNormalized::Yes {
+        Cow::Borrowed(name)
+    } else {
+        Cow::Owned(name.nfc().collect())
+    }
+}
 
 /// Percent-encodes everything except RFC 3986 unreserved characters.
 pub fn pct_encode(input: &str) -> String {
@@ -13,10 +33,11 @@ pub fn pct_encode(input: &str) -> String {
     out
 }
 
-/// Reduces an uploaded file name to a safe base name.
+/// Reduces an uploaded file name to a safe base name in Unicode NFC (see
+/// [`nfc`]).
 pub fn sanitize_filename(raw: &str) -> String {
     let base = raw.rsplit(['/', '\\']).next().unwrap_or(raw);
-    let cleaned: String = base
+    let cleaned: String = nfc(base)
         .chars()
         .filter(|c| !c.is_control())
         .collect::<String>()
@@ -121,10 +142,33 @@ mod tests {
         assert_eq!(sanitize_filename("  .hidden "), "hidden");
         assert_eq!(sanitize_filename("a\u{0}b.txt"), "ab.txt");
         assert_eq!(sanitize_filename(""), "file");
+        // a name from macOS (decomposed) is stored composed, as Windows writes it
+        assert_eq!(
+            sanitize_filename("/Users/x/Planetentra\u{308}ger2.ipt"),
+            "Planetentr\u{e4}ger2.ipt"
+        );
         assert_eq!(
             content_disposition("Düse \"v2\".step"),
             "attachment; filename=\"D_se _v2_.step\"; filename*=UTF-8''D%C3%BCse%20%22v2%22.step"
         );
+    }
+
+    #[test]
+    fn names_in_nfc() {
+        // already composed: borrowed, nothing allocated
+        assert!(matches!(nfc("Hülse.ipt"), Cow::Borrowed(_)));
+        assert!(matches!(nfc("bracket.prt"), Cow::Borrowed(_)));
+        assert_eq!(nfc("Hu\u{308}lse.ipt"), "H\u{fc}lse.ipt");
+        assert_eq!(
+            nfc("Stirnra\u{308}der3_MIR.iam"),
+            "Stirnr\u{e4}der3_MIR.iam"
+        );
+        // Hangul, accents and Å keep their composed form
+        assert_eq!(
+            nfc("Cafe\u{301} \u{1100}\u{1161}.step"),
+            "Caf\u{e9} \u{ac00}.step"
+        );
+        assert_eq!(nfc("A\u{30a}ngstr\u{f6}m.iam"), "\u{c5}ngstr\u{f6}m.iam");
     }
 
     #[test]

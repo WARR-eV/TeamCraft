@@ -141,10 +141,58 @@ pub async fn migrate(pool: &PgPool) -> Result<()> {
         .await
         .context("connecting for the migrations failed")?;
     let result = MIGRATOR.run(&mut *conn).await;
-    if result.is_err() {
+    if let Err(error) = result {
         let _ = conn.detach().close().await;
+        return Err(error).context("running database migrations failed");
     }
-    result.context("running database migrations failed")
+    drop(conn);
+    check_search_indexes(pool).await;
+    Ok(())
+}
+
+/// Trigram indexes of the substring search (migrations 0023, 0031, 0072).
+pub const SEARCH_INDEXES: [&str; 6] = [
+    "items_number_trgm_idx",
+    "revisions_name_trgm_idx",
+    "revisions_description_trgm_idx",
+    "revisions_material_trgm_idx",
+    "files_filename_trgm_idx",
+    "revisions_attribute_values_trgm_idx",
+];
+
+/// Names of [`SEARCH_INDEXES`] that are not in `present`.
+fn missing_search_indexes(present: &[String]) -> Vec<&'static str> {
+    SEARCH_INDEXES
+        .iter()
+        .copied()
+        .filter(|name| !present.iter().any(|p| p == name))
+        .collect()
+}
+
+/// Warns at start-up when trigram indexes of the search are missing
+/// (pg_trgm not installed or not allowed): the search stays correct but
+/// reads whole tables (issue #308). Never fails the start.
+async fn check_search_indexes(pool: &PgPool) {
+    let present = sqlx::query_scalar::<_, String>(
+        "SELECT indexname::text FROM pg_indexes
+         WHERE schemaname = current_schema() AND indexname = ANY($1)",
+    )
+    .bind(SEARCH_INDEXES.map(String::from).to_vec())
+    .fetch_all(pool)
+    .await;
+    match present {
+        Ok(present) => {
+            let missing = missing_search_indexes(&present);
+            if !missing.is_empty() {
+                tracing::warn!(
+                    missing = %missing.join(", "),
+                    "trigram indexes of the item search are missing: the search works but reads \
+                     whole tables – install the pg_trgm extension (docs: Operations → Scale)"
+                );
+            }
+        }
+        Err(error) => tracing::warn!(%error, "checking the trigram indexes failed"),
+    }
 }
 
 async fn accept_edits_before_release(pool: &PgPool) -> Result<()> {
@@ -195,6 +243,17 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn missing_search_indexes_are_named() {
+        let all: Vec<String> = SEARCH_INDEXES.iter().map(|s| s.to_string()).collect();
+        assert!(missing_search_indexes(&all).is_empty());
+        assert_eq!(missing_search_indexes(&[]), SEARCH_INDEXES.to_vec());
+        let some = vec!["items_number_trgm_idx".to_string(), "other".to_string()];
+        let missing = missing_search_indexes(&some);
+        assert_eq!(missing.len(), 5);
+        assert!(!missing.contains(&"items_number_trgm_idx"));
     }
 
     #[test]

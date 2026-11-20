@@ -102,10 +102,12 @@ pub const MAX_FOLDER_SEGMENT: usize = 120;
 /// `..`, names that are not valid on Windows, macOS and Linux (`<>:"|?*`,
 /// control characters, trailing dots or spaces, `CON`, `NUL`, `COM1`, …) and
 /// paths longer than [`MAX_FOLDER_LEN`] or deeper than [`MAX_FOLDER_DEPTH`].
+/// The result is in Unicode NFC, like file names (`util::nfc`).
 pub fn normalize_folder(raw: &str) -> Result<String, AppError> {
     let bad = |why: String| AppError::BadRequest(format!("Folder '{}': {why}", raw.trim()));
+    let composed = crate::util::nfc(raw);
     let mut segments = Vec::new();
-    for segment in raw.trim().split(['/', '\\']) {
+    for segment in composed.trim().split(['/', '\\']) {
         let segment = segment.trim_start();
         if segment.is_empty() || segment == "." {
             continue;

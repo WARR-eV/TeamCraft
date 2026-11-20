@@ -2,9 +2,9 @@
 // TeamCraft Desktop – References and change propagation; changes and history of a revision.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { api, badge, confirmDialog, dialog, enc, field, fmtDate, h, label, run, state, toast } from "./core.js";
+import { api, badge, confirmDialog, dialog, enc, field, h, run, toast } from "./core.js";
+import { fmtDate, label } from "/static/shared/js/format.js";
 import { canEditProject, refreshWorklistCount } from "./shell.js";
-import { selectView } from "./navigator.js";
 import { reloadActive, table } from "./tabs.js";
 import { openRevision, revisionAbilities } from "./revision.js";
 import { reviseRevision } from "./workspace.js";
@@ -136,7 +136,6 @@ export function acknowledgeAllDialog(g) {
           toast(g.item_number + "/" + g.revision_code + " checked: " + r.acknowledged.length + " acknowledged" +
             (r.skipped ? " (" + r.skipped + " resolved in the meantime)" : ""));
           refreshWorklistCount().catch(function () {});
-          if (state.view === "worklist") selectView("worklist");
           reloadActive();
         }, function (err) { d.fail(err); });
       }
@@ -157,7 +156,6 @@ export function acknowledgeDialog(i) {
         api("POST", "/impacts/" + i.id + "/acknowledge", { note: note.value }).then(function () {
           d.close(); toast(i.item_number + " checked against " + i.source_number + "/" + i.source_code);
           refreshWorklistCount().catch(function () {});
-          if (state.view === "worklist") selectView("worklist");
           reloadActive();
         }, function (err) { d.fail(err); });
       }

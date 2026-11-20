@@ -2,8 +2,9 @@
 // TeamCraft Desktop – Navigator views: home, worklist, changes, search.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, ICONS, api, append, badge, clear, dialog, enc, errorText, field, fmtDate, h, label, lockIcon, state, svgIcon, toast } from "./core.js";
-import { canEdit, checkInAll, refreshWorklistCount, reloadProjects, renderNotifications } from "./shell.js";
+import { $, ICONS, api, append, badge, clear, dialog, enc, errorText, field, h, lockIcon, state, svgIcon, toast } from "./core.js";
+import { fmtDate, label } from "/static/shared/js/format.js";
+import { canEdit, checkInAll, fetchWorklist, reloadProjects, renderNotifications } from "./shell.js";
 import { assistantContextChanged } from "./assistant.js";
 import { agent, renderAgentView } from "./agent.js";
 import { openRevision } from "./revision.js";
@@ -15,7 +16,7 @@ import { newItemDialog } from "./dialogs.js";
 import { getProjectsDialog } from "./group-sync.js";
 import { importFolderDialog } from "./folder-import.js";
 import { renderFiles } from "./browser.js";
-import { cutLevel, describe, normalizeMode, pathKey, quantityText, rootNodes, usageBadge } from "./structure.js";
+import { cutLevel, describeNode, normalizeMode, pathKey, quantityText, rootNodes, usageBadge } from "./structure.js";
 
 // ======================================================================
 // Navigator views
@@ -285,36 +286,43 @@ export function sectionTitle(text, n) {
 }
 
 export function renderWorklist() {
-  return refreshWorklistCount().then(function (w) {
-    var nav = $("navigator");
-    clear(nav);
-    nav.appendChild(navHead("My worklist", [
-      w.checkouts.length ? h("button.small", { type: "button", title: "Check in every check-out without local changes (releases the locks)",
-        on: { click: function () { checkInAll(); } } }, [svgIcon(ICONS.checkin), " Check in all"]) : null,
-      h("button.icon", { type: "button", title: "Refresh", "aria-label": "Refresh", on: { click: function () { selectView("worklist"); } } }, svgIcon(ICONS.refresh))
+  return fetchWorklist().then(drawWorklist);
+}
+
+/** Draws the worklist navigator from the worklist `w` – on opening the view
+ * and again after every refresh while it is shown (shell.js,
+ * refreshWorklistCount), keeping the scroll position. */
+export function drawWorklist(w) {
+  var nav = $("navigator");
+  var top = nav.scrollTop;
+  clear(nav);
+  nav.appendChild(navHead("My worklist", [
+    w.checkouts.length ? h("button.small", { type: "button", title: "Check in every check-out without local changes (releases the locks)",
+      on: { click: function () { checkInAll(); } } }, [svgIcon(ICONS.checkin), " Check in all"]) : null,
+    h("button.icon", { type: "button", title: "Refresh", "aria-label": "Refresh", on: { click: function () { selectView("worklist"); } } }, svgIcon(ICONS.refresh))
+  ]));
+  nav.appendChild(sectionTitle("Checked out by me", w.checkouts.length));
+  nav.appendChild(w.checkouts.length ? h("ul.tree", null, w.checkouts.map(function (r) {
+    return h("li", null, h("div.node", { title: "Checked out " + fmtDate(r.checked_out_at), on: { click: function () { openRevision(r.item_number, r.code); } } }, [
+      h("span.twisty"), h("span.ico", null, lockIcon(true)),
+      h("span.label", null, [h("span.mono", { text: r.item_number + "/" + r.code }), " ", r.name]),
+      h("span.meta.small.dim", { text: lockAge(r.checked_out_at) })
     ]));
-    nav.appendChild(sectionTitle("Checked out by me", w.checkouts.length));
-    nav.appendChild(w.checkouts.length ? h("ul.tree", null, w.checkouts.map(function (r) {
-      return h("li", null, h("div.node", { title: "Checked out " + fmtDate(r.checked_out_at), on: { click: function () { openRevision(r.item_number, r.code); } } }, [
-        h("span.twisty"), h("span.ico", null, lockIcon(true)),
-        h("span.label", null, [h("span.mono", { text: r.item_number + "/" + r.code }), " ", r.name]),
-        h("span.meta.small.dim", { text: lockAge(r.checked_out_at) })
-      ]));
-    })) : h("p.empty", { text: "Nothing checked out." }));
-    nav.appendChild(sectionTitle("Waiting for my review", w.reviews.length));
-    nav.appendChild(w.reviews.length ? h("ul.tree", null, w.reviews.map(changeNode)) : h("p.empty", { text: "Nothing to review." }));
-    var groups = impactGroups(w);
-    nav.appendChild(sectionTitle("Dependents to check", groups.length));
-    nav.appendChild(groups.length ? h("ul.tree", null, groups.map(dependentNode)) : h("p.empty", { text: "Nothing to check." }));
-    nav.appendChild(sectionTitle("My open changes", w.my_changes.length));
-    nav.appendChild(w.my_changes.length ? h("ul.tree", null, w.my_changes.map(changeNode)) : h("p.empty", { text: "No open changes." }));
-    // change requests (older servers: none)
-    var assigned = w.requests_assigned || [], mine = w.my_requests || [];
-    nav.appendChild(sectionTitle("Requests assigned to me", assigned.length));
-    nav.appendChild(assigned.length ? h("ul.tree", null, assigned.map(requestNode)) : h("p.empty", { text: "No change requests assigned to you." }));
-    nav.appendChild(sectionTitle("My open requests", mine.length));
-    nav.appendChild(mine.length ? h("ul.tree", null, mine.map(requestNode)) : h("p.empty", { text: "Found a problem? Use “Request change…” on a revision or a workspace file." }));
-  });
+  })) : h("p.empty", { text: "Nothing checked out." }));
+  nav.appendChild(sectionTitle("Waiting for my review", w.reviews.length));
+  nav.appendChild(w.reviews.length ? h("ul.tree", null, w.reviews.map(changeNode)) : h("p.empty", { text: "Nothing to review." }));
+  var groups = impactGroups(w);
+  nav.appendChild(sectionTitle("Dependents to check", groups.length));
+  nav.appendChild(groups.length ? h("ul.tree", null, groups.map(dependentNode)) : h("p.empty", { text: "Nothing to check." }));
+  nav.appendChild(sectionTitle("My open changes", w.my_changes.length));
+  nav.appendChild(w.my_changes.length ? h("ul.tree", null, w.my_changes.map(changeNode)) : h("p.empty", { text: "No open changes." }));
+  // change requests (older servers: none)
+  var assigned = w.requests_assigned || [], mine = w.my_requests || [];
+  nav.appendChild(sectionTitle("Requests assigned to me", assigned.length));
+  nav.appendChild(assigned.length ? h("ul.tree", null, assigned.map(requestNode)) : h("p.empty", { text: "No change requests assigned to you." }));
+  nav.appendChild(sectionTitle("My open requests", mine.length));
+  nav.appendChild(mine.length ? h("ul.tree", null, mine.map(requestNode)) : h("p.empty", { text: "Found a problem? Use “Request change…” on a revision or a workspace file." }));
+  nav.scrollTop = top;
 }
 
 /** Worklist: one line per dependent with the number of changes to check;
@@ -489,7 +497,7 @@ function loadStructureRoots(p, ul, count) {
 
 /** One line of the structure view (a BOM line below an assembly, or a top-level item). */
 export function structureNode(n, parentKey) {
-  var d = describe(n, structureRule());
+  var d = describeNode(n, structureRule());
   var key = pathKey(parentKey, n.item_number || ("line" + n.find_number));
   var open = d.expandable && !!state.expanded[key];
   var children = h("ul.tree" + (open ? "" : ".hidden"));

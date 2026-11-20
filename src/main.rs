@@ -553,6 +553,9 @@ async fn serve_with(
         env!("CARGO_PKG_VERSION"),
         config.summary()
     );
+    for warning in config.warnings() {
+        tracing::warn!("configuration: {warning}");
+    }
 
     let pool = db::connect(&config).await?;
     if no_migrate {
@@ -831,6 +834,14 @@ async fn backup_command(dir: std::path::PathBuf, encrypt: bool) -> Result<ExitCo
         summary.db_dump_bytes,
         summary.db_dump_sha256
     );
+    if !encrypt {
+        // #314: a stolen backup medium exposes every file and the password
+        // and token hashes of the dump.
+        eprintln!(
+            "note: the backup is not encrypted – use `teamcraft backup --encrypt` for copies \
+             that leave this server (docs: Operations → Encrypted backups)"
+        );
+    }
     Ok(ExitCode::SUCCESS)
 }
 

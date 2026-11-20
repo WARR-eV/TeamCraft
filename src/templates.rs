@@ -73,6 +73,9 @@ pub fn environment(instance_name: &str) -> Result<Environment<'static>, minijinj
     env.add_filter("sig", filter_sig);
     env.add_filter("filesize", filter_filesize);
     env.add_filter("label", filter_label);
+    env.add_filter("glyph", |value: Option<String>| {
+        crate::domain::state_glyph(value.as_deref().unwrap_or_default())
+    });
     env.add_filter("urlencode", |value: String| util::pct_encode(&value));
     env.add_filter("age", filter_age);
     env.add_global("instance_name", instance_name.to_string());
@@ -121,7 +124,7 @@ fn filter_num(value: Option<f64>, decimals: Option<usize>) -> String {
 
 /// A number with exactly `decimals` places (default 2), so a column of
 /// costs or masses lines up at the decimal point; `—` when missing.
-fn filter_fixed(value: Option<f64>, decimals: Option<usize>) -> String {
+pub(crate) fn filter_fixed(value: Option<f64>, decimals: Option<usize>) -> String {
     match value {
         Some(v) => format!("{v:.prec$}", prec = decimals.unwrap_or(2)),
         None => "—".to_string(),
@@ -149,7 +152,7 @@ fn filter_filesize(value: i64) -> String {
 }
 
 /// `in_review` → `In Review`; a few codes have fixed labels (`in_work` → `WIP`).
-fn filter_label(value: Option<String>) -> String {
+pub(crate) fn filter_label(value: Option<String>) -> String {
     let Some(value) = value else {
         return String::new();
     };
@@ -475,7 +478,7 @@ mod tests {
         for expected in [
             "Sounding rocket",
             "Bracket &lt;b&gt;",
-            "Check in and release",
+            "type=\"submit\">Check in</button>",
             "/cancel-checkout?back=",
             "?back=%2Fvault%3Ffolder%3D",
             "enctype=\"multipart/form-data\"",
@@ -875,7 +878,10 @@ mod tests {
                 html.contains("/files/") && html.contains("/restore"),
                 "rollback offered"
             );
-            assert!(html.contains("Check in and release"), "check-in form");
+            assert!(
+                html.contains("type=\"submit\">Check in</button>"),
+                "check-in form"
+            );
             assert!(
                 html.contains(&format!("/files/{OTHER}/preview"))
                     && html.contains(&format!("/file-versions/{ME}/preview")),
@@ -1546,8 +1552,11 @@ mod tests {
                       "active_managers": 2, "last_active_at": TS },
                 ],
                 "manager_gap_ids": [ROCKET, OTHER], "stale_days": 90,
+                "ungrouped_items": 3,
             })),
         );
+        assert!(html.contains("3 items have no project group"));
+        assert!(html.contains("href=\"/vault?folder=none\""));
         assert!(html.contains("Groups without an active manager"));
         assert!(html.contains("Sounding &lt;rocket&gt; –") && html.contains("no active manager"));
         assert!(html.contains("2 active managers, none seen for 90 days"));
@@ -1558,9 +1567,11 @@ mod tests {
             with_common(json!({
                 "projects": [project()], "my_projects": [ROCKET], "review_due": [],
                 "manager_gaps": [], "manager_gap_ids": [], "stale_days": 90,
+                "ungrouped_items": 0,
             })),
         );
         assert!(!html.contains("manager-gaps"));
+        assert!(!html.contains("ungrouped-items"));
         let html = render(
             &env,
             "projects/access_review.html",

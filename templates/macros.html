@@ -14,16 +14,11 @@
 </label>
 {%- endmacro %}
 
-{#- The glyph of a state: colour is never the only cue (style.css, badges). -#}
+{#- The glyph of a state: colour is never the only cue. One table for both
+    apps: domain::state_glyph and shared/js/states.js, pinned to
+    shared/test-vectors/states.json. -#}
 {% macro glyph_char(value) -%}
-{%- if value in ["released", "approved", "accepted", "implemented", "pass", "sent", "up_to_date"] %}✓
-{%- elif value in ["in_review", "pending", "in_triage", "retrying", "out_of_date"] %}○
-{%- elif value in ["rejected", "fail", "failed"] %}×
-{%- elif value in ["obsolete", "cancelled", "withdrawn", "deferred"] %}–
-{%- elif value in ["in_work", "draft", "new"] %}◐
-{%- elif value == "high" %}▲
-{%- elif value == "critical" %}▲▲
-{%- endif -%}
+{{ value|glyph }}
 {%- endmacro %}
 
 {#- A lifecycle / status badge: glyph plus label. -#}

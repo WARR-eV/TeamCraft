@@ -309,7 +309,12 @@ async fn tokens_are_managed_through_the_api_with_a_scope() {
     assert!(summary.contains("read-only"), "{summary}");
     assert!(!details.to_string().contains(&value));
 
-    // the default scope is full; no expiry = never
+    // the default scope is full; no expiry = the maximum of 365 days (#313)
+    let days_left = |r: &common::Response| {
+        let at: chrono::DateTime<chrono::Utc> =
+            serde_json::from_value(r.json()["expires_at"].clone()).expect("an expiry");
+        (at - chrono::Utc::now()).num_days()
+    };
     let r = app
         .api(
             Method::POST,
@@ -320,7 +325,18 @@ async fn tokens_are_managed_through_the_api_with_a_scope() {
         .await;
     assert_eq!(r.status, StatusCode::CREATED, "{}", r.text());
     assert_eq!(r.json()["scope"], "full");
-    assert!(r.json()["expires_at"].is_null());
+    assert!((364..=365).contains(&days_left(&r)), "{}", r.text());
+    // a longer lifetime is shortened to the maximum
+    let r = app
+        .api(
+            Method::POST,
+            "/api/v1/tokens",
+            &full,
+            Some(json!({ "name": "ci-long", "expires_in_days": 1000 })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::CREATED, "{}", r.text());
+    assert!((364..=365).contains(&days_left(&r)), "{}", r.text());
 
     // refusals: unknown scope, lifetime out of range, no name – nothing created
     let before = count(&app, "api_tokens").await;

@@ -63,8 +63,8 @@ pub(super) async fn create_token(
         ));
     }
     let asked = TokenLifetime::fixed(body.expires_in_days);
-    let idle = st.config.oidc_token_idle_days;
-    let lifetime = users::token_lifetime_for(&st.db, me.id, asked, idle).await?;
+    let limits = st.config.token_limits();
+    let lifetime = users::token_lifetime_for(&st.db, me.id, asked, limits).await?;
     let (record, token) = users::create_token(&st.db, &me, &body.name, lifetime, scope).await?;
     let mut answer = json!(record);
     answer["token"] = json!(token);

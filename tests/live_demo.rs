@@ -161,3 +161,99 @@ async fn wrong_passwords_do_not_lock_the_demo_account() {
     );
     app.teardown().await;
 }
+
+/// The desktop app signs in to the demo (#325): the public account may
+/// confirm the sign-in, but the visitor's computer name is replaced by a
+/// random one before anything is shown or stored, and the app's token reads
+/// like the browser and changes nothing.
+#[tokio::test]
+async fn the_desktop_app_signs_in_to_the_demo_under_a_random_name() {
+    let Some(app) = demo_app().await else {
+        return;
+    };
+    app.user_in("demo", Role::Editor, &["ROCKET"]).await;
+    let verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+    let challenge = teamcraft::services::desktop::challenge_of(verifier);
+    let state = "state-0123456789abcdef";
+    let cookie = app.login("demo").await;
+
+    // the confirmation page never shows the real name
+    let page = app
+        .get_page(
+            &format!(
+                "/desktop/authorize?port=53682&state={state}&challenge={challenge}&device=Leos-Laptop"
+            ),
+            Some(&cookie),
+        )
+        .await;
+    assert_eq!(page.status, StatusCode::OK, "{}", page.text());
+    let text = page.text();
+    assert!(!text.contains("Leos-Laptop"), "{text}");
+    assert!(text.contains("demo-computer-"), "{text}");
+    assert!(text.contains("the name of your computer is not"), "{text}");
+    // the appearance forms in the header return to the page under the random
+    // name (they repeated the request's address, real name included)
+    assert!(text.contains("&amp;device=demo-computer-"), "{text}");
+
+    // "Allow" passes the read-only rule; a posted real name is replaced too
+    let r = app
+        .post_form(
+            "/desktop/authorize",
+            Some(&cookie),
+            Some(ORIGIN),
+            &[
+                ("port", "53682"),
+                ("state", state),
+                ("challenge", &challenge),
+                ("device", "Leos-Laptop"),
+                ("decision", "allow"),
+            ],
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::SEE_OTHER, "{}", r.text());
+    let location = r.header("location").unwrap();
+    let code = location
+        .split("code=")
+        .nth(1)
+        .and_then(|rest| rest.split('&').next())
+        .unwrap_or_else(|| panic!("{location}"))
+        .to_string();
+    let r = app
+        .api(
+            Method::POST,
+            "/api/v1/desktop/token",
+            "",
+            Some(json!({ "code": code, "verifier": verifier })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let name = r.json()["token_name"].as_str().unwrap().to_string();
+    assert!(
+        name.starts_with("TeamCraft Desktop – demo-computer-"),
+        "{name}"
+    );
+    let token = r.json()["token"].as_str().unwrap().to_string();
+
+    // the real name is nowhere in the database
+    let leaks: i64 = sqlx::query_scalar(
+        "SELECT (SELECT COUNT(*) FROM audit_log WHERE summary LIKE '%Leos%' OR details::text LIKE '%Leos%')
+              + (SELECT COUNT(*) FROM api_tokens WHERE name LIKE '%Leos%')
+              + (SELECT COUNT(*) FROM desktop_auth_codes WHERE device LIKE '%Leos%')",
+    )
+    .fetch_one(&app.pool)
+    .await
+    .unwrap();
+    assert_eq!(leaks, 0);
+
+    // the app reads, but changes nothing
+    let r = app.api(Method::GET, "/api/v1/me", &token, None).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert_eq!(r.json()["username"], "demo");
+    let body = json!({ "item_type": "part", "name": "Mine", "project": "ROCKET" });
+    let r = app
+        .api(Method::POST, "/api/v1/items", &token, Some(body))
+        .await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN, "{}", r.text());
+    assert!(r.text().contains("read-only live demo"), "{}", r.text());
+    app.teardown().await;
+}

@@ -2,7 +2,8 @@
 // TeamCraft Desktop – 3D viewer, workspace, check-out/in, edit, release, revise.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, api, badge, call, clear, confirmDialog, dialog, enc, errorText, field, fmtDate, fmtSize, h, invoke, label, lockBadge, materialField, run, setStatus, state, toast, tool } from "./core.js";
+import { $, api, badge, call, clear, confirmDialog, dialog, enc, errorText, field, h, invoke, lockBadge, materialField, run, setStatus, state, toast, tool } from "./core.js";
+import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
 import { isCancelled, refreshWorklistCount, uploadLine } from "./shell.js";
 import { reloadActive, renderActive, table } from "./tabs.js";
 import { PROGRAM_LABEL, cadPrograms, dd, exportProgram, exportStep, openRevision, previewFormat, revisionAbilities } from "./revision.js";
@@ -10,6 +11,8 @@ import { openChange } from "./change.js";
 import { reviewerProblem } from "./release-rules.js";
 import { requestChangeDialog } from "./requests.js";
 import { refreshStructure } from "./navigator.js";
+import { fileFamily, openWithCad } from "./cad-open.js";
+import { incompleteGet, notOpenedText } from "./get-rules.js";
 
 // ---------------------------------------------------------------- 3D viewer
 
@@ -324,7 +327,7 @@ export function foreignLockText(rev) {
 export function openLocalFile(tab, f) {
   var rev = tab.data.rev;
   var lockText = foreignLockText(rev);
-  function open() { openFile(tab, f.name, true, true); }
+  function open(got) { openFile(tab, f.name, true, true, got); }
   if (f.state === "outdated") {
     dialog("Newer version on the server", h("div.stack", null, [
       h("p", { text: f.name + " in your workspace is v" + (f.base_version || "?") + "; the server has " +
@@ -336,7 +339,7 @@ export function openLocalFile(tab, f) {
       { label: "Get latest and open", primary: true, submit: true, onClick: function (d) {
         d.close();
         getting(call("workspace_download", { project: rev.project_code, item: rev.item_number, code: rev.code }))
-          .then(function (r) { reportDownload(r); open(); renderActive(); }, function (e) { toast(errorText(e), "error"); });
+          .then(function (r) { reportDownload(r); open(r); renderActive(); }, function (e) { toast(errorText(e), "error"); });
       } }
     ]);
     return;
@@ -353,21 +356,32 @@ export function openLocalFile(tab, f) {
     ]);
 }
 
-export function openFile(tab, filename, local, warned) {
+/** Opens a file of a revision: `local` = it is in the working folder already
+ * (`got`: the Get that just brought it, if any), else it is fetched first. */
+export function openFile(tab, filename, local, warned, got) {
   var rev = tab.data.rev;
   var lockText = warned ? null : foreignLockText(rev);
   var asked = lockText ? confirmDialog("Checked out by " + rev.checked_out_by_name, lockText, "Open anyway") : Promise.resolve(true);
   asked.then(function (ok) {
     if (!ok) return;
-    var ready = local ? Promise.resolve() :
+    var ready = local ? Promise.resolve(got) :
       getting(call("workspace_download", { project: rev.project_code, item: rev.item_number, code: rev.code }));
-    return ready.then(function () {
+    return ready.then(function (r) {
+      // a native CAD file: in the CAD program chosen for it (cad-open.js) –
+      // not after a stopped or failed Get, an assembly would open without
+      // its parts (#348)
+      var file = (tab.data.files || []).filter(function (f) { return f.filename === filename; })[0];
+      if (fileFamily(file)) {
+        var why = incompleteGet(r);
+        if (why) { toast(notOpenedText(filename, why), "info"); return; }
+        return openWithCad(rev, file);
+      }
       return call("workspace_open", { project: rev.project_code, item: rev.item_number, code: rev.code, file: filename });
     });
   }).catch(function (e) { if (e) toast(errorText(e), "error"); });
 }
 
-export function doCheckout(tab) {
+export function doCheckout(tab, then) {
   var rev = tab.data.rev;
   run("Checking out " + rev.item_number + "/" + rev.code, function () {
     return getting(call("workspace_checkout", { project: rev.project_code, item: rev.item_number, code: rev.code }));
@@ -379,6 +393,8 @@ export function doCheckout(tab) {
     tab.sub = "workspace";
     reloadActive();
     refreshWorklistCount();
+    // Check out and open: the files are in the working folder now
+    if (then) then(r);
   }, function () {});
 }
 
@@ -422,7 +438,9 @@ export function checkinDialog(tab, park) {
     var progressLine = h("p.small.muted.hidden", { role: "status" });
     // Like the CAD add-ins of PDM systems: viewables at check-in.
     var exportable = boxes.filter(function (b) { return exportProgram(b.name, programs); });
-    var withStep = h("input", { type: "checkbox", checked: true });
+    // off by default (#342): a slow or failed export through the CAD program
+    // runs before the upload and takes the whole check-in down with it
+    var withStep = h("input", { type: "checkbox", checked: false });
     var stepNote = exportable.length ? h("label.check", null, [withStep,
       "Create STEP exports with " + exportable.map(function (b) { return PROGRAM_LABEL[exportProgram(b.name, programs)]; })
         .filter(function (v, i, a) { return a.indexOf(v) === i; }).join(" / ") +
@@ -431,7 +449,7 @@ export function checkinDialog(tab, park) {
       h("p.small.muted", null, ["From ", h("span.mono", { text: ws.dir })]),
       candidates.length ? h("div.stack", null, boxes.map(function (b) {
         return h("label.check", null, [b.input, b.name, " ", badge(b.state, SYNC_LABEL[b.state])]);
-      })) : h("p.empty", { text: "No modified or new files – checking in only releases the lock." }),
+      })) : h("p.empty", { text: "No modified or new files – checking in only ends your check-out; the revision stays in work." }),
       boxes.some(function (b) { return b.state === "conflict"; }) ? h("p.notice.error", { text: "Conflict: these files changed on the server since you got them. " +
         "The server refuses to overwrite the newer version (nothing is stored) – save your copy under another name, get the current files and merge." }) : null,
       stepNote,
@@ -458,7 +476,7 @@ export function checkinDialog(tab, park) {
       // Park: the same upload, but the lock stays (issue #173, step 10) –
       // the work is safe on the server, the revision stays yours.
       { label: "Park (keep checked out)", primary: !!park, submit: !!park, onClick: function (d) { send(d, true); } },
-      { label: "Check in and release", primary: !park, submit: !park, onClick: function (d) { send(d, false); } }
+      { label: "Check in", primary: !park, submit: !park, onClick: function (d) { send(d, false); } }
     ], opts);
     function send(d, parking) {
       if (running) return;

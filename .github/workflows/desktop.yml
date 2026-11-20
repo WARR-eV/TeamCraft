@@ -2,38 +2,20 @@
 # Linux (x86_64, ARM64), macOS (ARM64) and Windows (x86_64, ARM64 preview),
 # plus a syntax check of the user interfaces (desktop/ui, static, shared).
 # Installers are not built or published.
+#
+# Each job runs only when a file it checks changed (scripts/ci-changes.sh,
+# the one table from files to jobs): the UI job for the scripts and styles,
+# the platform matrix for the app's Rust code, configuration, icons and the
+# shared/ mirror – a change of desktop/ui/js alone no longer builds the app
+# on six platforms. The weekly run and "Run workflow" run everything.
 name: Desktop app
 
 on:
   push:
     branches: [main]
-    paths:
-      - "desktop/**"
-      - "scripts/check-desktop-modules.mjs"
-      - "scripts/desktop-tab-order.test.mjs"
-      - "scripts/desktop-files-view.test.mjs"
-      - "scripts/desktop-release-rules.test.mjs"
-      - "scripts/viewer-mesh.test.mjs"
-      - "static/**"
-      - "shared/**"
-      - "media/logos/**"
-      - "media/icons/**"
-      - ".github/workflows/desktop.yml"
+  pull_request:
   schedule:
     - cron: "41 4 * * 1"
-  pull_request:
-    paths:
-      - "desktop/**"
-      - "scripts/check-desktop-modules.mjs"
-      - "scripts/desktop-tab-order.test.mjs"
-      - "scripts/desktop-files-view.test.mjs"
-      - "scripts/desktop-release-rules.test.mjs"
-      - "scripts/viewer-mesh.test.mjs"
-      - "static/**"
-      - "shared/**"
-      - "media/logos/**"
-      - "media/icons/**"
-      - ".github/workflows/desktop.yml"
   workflow_dispatch:
 
 permissions:
@@ -51,8 +33,31 @@ env:
   CARGO_INCREMENTAL: 0
 
 jobs:
+  # Which jobs the change needs (scripts/ci-changes.sh): `desktop_ui` for the
+  # UI job, `desktop_rust` for the platform matrix.
+  changes:
+    name: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      ui: ${{ steps.c.outputs.desktop_ui }}
+      rust: ${{ steps.c.outputs.desktop_rust }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Self-test of the change table
+        run: bash scripts/ci-changes.sh --self-test
+      - id: c
+        env:
+          CI_PUSH_BEFORE: ${{ github.event.before }}
+          CI_MERGE_BASE: ${{ github.event.merge_group.base_sha }}
+        run: bash scripts/ci-changes.sh
+
   ui:
     name: desktop UI (JavaScript syntax)
+    needs: changes
+    if: needs.changes.outputs.ui == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -74,8 +79,9 @@ jobs:
             node --input-type=module --check < "$f"
           done
       # the desktop modules: every import resolves, every name of another
-      # module that is used is imported, all reachable from js/main.js
-      - name: Check the imports of the desktop UI modules
+      # module that is used is imported, all reachable from js/main.js; no
+      # desktop module or static/app.js re-declares a shared/js export
+      - name: Check the imports of the desktop UI and shared modules
         run: node scripts/check-desktop-modules.mjs
       # the pure rules of the tab order (moving, switching, closing)
       - name: Test the tab order rules
@@ -86,13 +92,24 @@ jobs:
       # the reviewers of the release dialog and when a draft can be submitted
       - name: Test the release rules
         run: node scripts/desktop-release-rules.test.mjs
+      # whether a Get left the working folder complete enough to open the
+      # main CAD file (Check out and open after Cancel, #348)
+      - name: Test the Get rules
+        run: node scripts/desktop-get-rules.test.mjs
       # the mesh check of the shared 3D viewer: empty, cut-off or invalid
       # models end in a message, not in an empty canvas (#290)
       - name: Test the 3D viewer's mesh check
         run: node scripts/viewer-mesh.test.mjs
+      # the shared rules (labels, numbers, sizes, ages, state glyphs,
+      # markdown-lite) against shared/test-vectors – the same vectors
+      # src/ui_vectors.rs pins the server's Rust side to
+      - name: Test the shared UI rules against the test vectors
+        run: node scripts/shared-vectors.test.mjs
 
   test:
     name: desktop (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     # ARM64 Windows runners are still a preview: report, but never block.
@@ -128,8 +145,6 @@ jobs:
         working-directory: desktop
         shell: bash
         run: |
-          cargo clippy|
-          cargo fmt --all -- --check
           cargo clippy --all-targets --locked -- -D warnings
           cargo test --locked
       - name: Build the app

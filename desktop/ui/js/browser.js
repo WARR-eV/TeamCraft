@@ -4,7 +4,8 @@
 // group is never loaded as a whole. The rules are in files-view.js.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { ICONS, api, badge, clear, enc, errorText, h, label, lockIcon, state, svgIcon, toast } from "./core.js";
+import { ICONS, api, badge, clear, enc, errorText, h, lockIcon, state, svgIcon, toast } from "./core.js";
+import { label } from "/static/shared/js/format.js";
 import { typeIcon } from "./navigator.js";
 import { openRevision } from "./revision.js";
 import { countText, entryIconType, entryName, entryRevision, entryTitle, folderKey, groupTotal, mergeEntries, remaining, sortEntries, sortFolders } from "./files-view.js";
