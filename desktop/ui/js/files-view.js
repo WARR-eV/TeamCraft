@@ -106,3 +106,49 @@ export function folderKey(project, path) {
 export function countText(n, one, many) {
   return n + " " + (n === 1 ? one : many);
 }
+
+// ---------------------------------------------------------------- the favourite folder (issue #352)
+//
+// A group's favourite folder is where Home starts: an engineer whose work is
+// several folders down (the folder of the Inventor project file) does not
+// open them one by one each time. It is kept per computer, per server and
+// group; Home marks it in the accent colour, so it is never taken for the
+// top of the group.
+
+/** The storage key of a group's favourite folder on a server. */
+export function favouriteKey(server, project) {
+  return "teamcraft.home-root:" + JSON.stringify([server || "", project || ""]);
+}
+
+/** The storage key that remembers a declined suggestion of a group. */
+export function suggestionKey(server, project) {
+  return "teamcraft.home-root-hint:" + JSON.stringify([server || "", project || ""]);
+}
+
+/** A stored folder as the server writes folders (`Design/Rover`): forward
+ *  slashes, none at the ends, no empty or `.` segments; `""` (the top of the
+ *  group) for anything else or a `..` segment. */
+export function normalizeFavourite(value) {
+  if (typeof value !== "string") return "";
+  var parts = value.split(/[\\/]/).map(function (s) { return s.trim(); }).filter(function (s) { return s && s !== "."; });
+  if (parts.some(function (s) { return s === ".."; })) return "";
+  return parts.join("/");
+}
+
+/** `ROVER / Design / Rover`: where a favourite folder is in its group. */
+export function favouritePath(project, folder) {
+  return [project].concat(normalizeFavourite(folder).split("/").filter(Boolean)).join(" / ");
+}
+
+/** Suggestions to offer, at most 3: the folders with an Inventor project
+ *  file (`project_folders` of the group's top) – none while the group has a
+ *  favourite or its suggestion was declined. */
+export function favouriteSuggestions(level, favourite, declined) {
+  if (favourite || declined || !level) return [];
+  var out = [];
+  (Array.isArray(level.project_folders) ? level.project_folders : []).forEach(function (f) {
+    var path = normalizeFavourite(f);
+    if (path && out.indexOf(path) === -1 && out.length < 3) out.push(path);
+  });
+  return out;
+}

@@ -16,6 +16,7 @@ import { newItemDialog } from "./dialogs.js";
 import { getProjectsDialog } from "./group-sync.js";
 import { importFolderDialog } from "./folder-import.js";
 import { renderFiles } from "./browser.js";
+import { favouriteKey, normalizeFavourite, suggestionKey } from "./files-view.js";
 import { cutLevel, describeNode, normalizeMode, pathKey, quantityText, rootNodes, usageBadge } from "./structure.js";
 
 // ======================================================================
@@ -77,6 +78,41 @@ export function activeProject() {
 
 export function setActiveProject(code) {
   try { localStorage.setItem(ACTIVE_PROJECT_KEY, code); } catch (e) { /* storage off */ }
+}
+
+// ---------------------------------------------------------------- the favourite folder (issue #352)
+
+/** Groups whose top is shown although they have a favourite folder (until
+ *  the app restarts or the user goes back to the favourite). */
+var showGroupTop = {};
+
+function serverUrl() {
+  return (state.session && state.session.server_url) || "";
+}
+
+/** The favourite folder of group `p` on this computer; `""` = none. */
+export function favouriteFolder(p) {
+  var v = null;
+  try { v = localStorage.getItem(favouriteKey(serverUrl(), p.code)); } catch (e) { /* storage off */ }
+  return normalizeFavourite(v);
+}
+
+/** Makes `path` the favourite folder of `p` (`""` removes it) and shows it. */
+export function setFavouriteFolder(p, path) {
+  path = normalizeFavourite(path);
+  try {
+    if (path) localStorage.setItem(favouriteKey(serverUrl(), p.code), path);
+    else localStorage.removeItem(favouriteKey(serverUrl(), p.code));
+  } catch (e) { toast("The favourite folder cannot be kept on this computer.", "error"); }
+  delete showGroupTop[p.code];
+}
+
+function suggestionDeclined(p) {
+  try { return !!localStorage.getItem(suggestionKey(serverUrl(), p.code)); } catch (e) { return false; }
+}
+
+function declineSuggestion(p) {
+  try { localStorage.setItem(suggestionKey(serverUrl(), p.code), "declined"); } catch (e) { /* asked again next time */ }
 }
 
 var SORTS = [
@@ -149,6 +185,9 @@ export function drawHome() {
   ]));
   nav.appendChild(h("p.dim.nav-sub", { text: p.name }));
   nav.appendChild(modeToggle());
+  // the favourite folder's banner or suggestion (browser.js), Files only
+  var bar = h("div.home-root");
+  if (navMode() === "files") nav.appendChild(bar);
   var list = h("ul.tree");
   var count = h("span.count", { text: "" });
   if (navMode() !== "structure") {
@@ -162,8 +201,20 @@ export function drawHome() {
   var items = function () { return loadProjectItems(p, list, count, { nameFirst: true, sort: homeSort() }); };
   // Files: the folders and files of the group (browser.js); a server that
   // cannot list them yet gets the items instead
-  if (navMode() === "files") renderFiles(p, list, { sort: homeSort(), count: count, olderServer: items });
-  else items();
+  if (navMode() === "files") {
+    renderFiles(p, list, {
+      sort: homeSort(), count: count, olderServer: items, bar: bar,
+      favourite: favouriteFolder(p), atTop: !!showGroupTop[p.code], declined: suggestionDeclined(p),
+      actions: {
+        favour: function (path) { setFavouriteFolder(p, path); drawHome(); },
+        showTop: function (on) {
+          if (on) showGroupTop[p.code] = true; else delete showGroupTop[p.code];
+          drawHome();
+        },
+        decline: function () { declineSuggestion(p); drawHome(); }
+      }
+    });
+  } else items();
 }
 
 /** A project group to choose; `active` marks the current one. */

@@ -302,7 +302,8 @@ end-to-end tests against a real PostgreSQL.
   distribution skins; responsive down to phone width.
 - **Desktop app** – Linux, macOS and Windows client with a local working
   folder, *Get* of whole assemblies, an import wizard, a *Files* view of each
-  project group, a navigable *Graph* of every revision (BOM children,
+  project group (starting in a favourite folder, e.g. the one with the
+  Inventor project file, if you like), a navigable *Graph* of every revision (BOM children,
   references and where-used, coloured by state, with quantities and preview
   images), *Park* of work in progress, an Agent view, crash reports the user
   decides about and an update notice (never installs anything itself). The

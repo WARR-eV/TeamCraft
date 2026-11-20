@@ -814,6 +814,10 @@ needs an issue with a reason first (see *Direction*).
 
 ## Done
 
+- [x] **Desktop: favourite folder of a group (#352):** a folder's ☆ in *Home → Files* makes it the folder Home starts
+  in, under an accent banner (*not the top of the group*, *Whole group*, *Remove favourite*); the folder of the group's
+  Inventor project file is suggested (`project_folders` of `GET /projects/{code}/files`). Kept per computer, server
+  and group (browser storage); left: other project file kinds (KiCad, Altium) could be suggested the same way
 - [x] **From the feature demand list (#199):** storage quotas per user and for the vault (F9, `teamcraft user quota` /
   `vault quota`), malware scanning of uploads with ClamAV (`TEAMCRAFT_CLAMD_ADDR`), likely duplicates by name
   (`GET /items/duplicates`, hint after creating an item), bulk revise/obsolete (`POST /items/bulk`), section plane and
