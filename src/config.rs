@@ -138,6 +138,7 @@ pub const KNOWN_VARIABLES: &[&str] = &[
     "TEAMCRAFT_SIGNIN_MAX_FAILURES",
     "TEAMCRAFT_SMTP_URL",
     "TEAMCRAFT_TOKEN",
+    "TEAMCRAFT_TOKEN_MAX_DAYS",
     "TEAMCRAFT_UPLOAD_CHUNK_MB",
     "TEAMCRAFT_VAULT_DIR",
     "TEAMCRAFT_WEBHOOK_ALLOWED_HOSTS",
@@ -296,11 +297,15 @@ pub struct Config {
     /// client address; 0 = off). See [`crate::auth::SignInThrottle`].
     pub signin_max_failures: u32,
     /// Idle lifetime in days of new API and desktop tokens of single sign-on
-    /// users (`TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS`; 0 = off, the default): a token
+    /// users (`TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS`; default 90, 0 = off): a token
     /// without an expiry or with a longer one expires after that many days
     /// without use, so a leaver removed only at the identity provider does
-    /// not keep a working token (issue #173).
+    /// not keep a working token (issues #173, #313).
     pub oidc_token_idle_days: u32,
+    /// Longest fixed lifetime in days of a new personal token
+    /// (`TEAMCRAFT_TOKEN_MAX_DAYS`; default 365, 0 = no limit): a token
+    /// without an expiry or with a longer one gets this many days (#313).
+    pub token_max_days: u32,
     /// Bearer token of `GET /metrics`; `None` = the endpoint is off.
     pub metrics_token: Option<String>,
     /// Adds the `Secure` attribute to cookies (required when served via HTTPS).
@@ -1040,9 +1045,13 @@ impl Config {
             })?,
         };
 
-        let oidc_token_idle_days = env.parse_or("TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS", 0u32)?;
+        let oidc_token_idle_days = env.parse_or("TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS", 90u32)?;
         if oidc_token_idle_days > 3650 {
             bail!("TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS must be between 0 (off) and 3650");
+        }
+        let token_max_days = env.parse_or("TEAMCRAFT_TOKEN_MAX_DAYS", 365u32)?;
+        if token_max_days > 3650 {
+            bail!("TEAMCRAFT_TOKEN_MAX_DAYS must be between 0 (no limit) and 3650");
         }
 
         let audit_retention_days = env.parse_or("TEAMCRAFT_AUDIT_RETENTION_DAYS", 0u32)?;
@@ -1243,6 +1252,7 @@ impl Config {
             retention_latest_grace_days,
             signin_max_failures,
             oidc_token_idle_days,
+            token_max_days,
             metrics_token,
             cookie_secure,
             log_format,
@@ -1260,6 +1270,14 @@ impl Config {
             local_agents,
             webhooks,
         })
+    }
+
+    /// Limits of new personal tokens (#173, #313).
+    pub fn token_limits(&self) -> crate::services::users::TokenLimits {
+        crate::services::users::TokenLimits {
+            max_days: self.token_max_days,
+            sso_idle_days: self.oidc_token_idle_days,
+        }
     }
 
     /// Whether `username` is the public account of a hosted live demo.
@@ -1921,6 +1939,26 @@ mod tests {
             ("TEAMCRAFT_DB_PASSWORD", "x"),
             ("TEAMCRAFT_OIDC_ISSUER_URL", "https://auth.example.org/"),
             ("TEAMCRAFT_OIDC_CLIENT_ID", "client"),
+        ])
+        .is_err());
+    }
+
+    #[test]
+    fn token_limits_default_to_a_year_and_90_idle_days() {
+        let defaults = config_from(&[("TEAMCRAFT_DB_PASSWORD", "x")]).unwrap();
+        assert_eq!(defaults.token_max_days, 365);
+        assert_eq!(defaults.oidc_token_idle_days, 90);
+        let off = config_from(&[
+            ("TEAMCRAFT_DB_PASSWORD", "x"),
+            ("TEAMCRAFT_TOKEN_MAX_DAYS", "0"),
+            ("TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS", "0"),
+        ])
+        .unwrap();
+        assert_eq!(off.token_limits().max_days, 0);
+        assert_eq!(off.token_limits().sso_idle_days, 0);
+        assert!(config_from(&[
+            ("TEAMCRAFT_DB_PASSWORD", "x"),
+            ("TEAMCRAFT_TOKEN_MAX_DAYS", "3651")
         ])
         .is_err());
     }

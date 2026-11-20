@@ -47,7 +47,7 @@ Keycloak, Entra ID, Google, …). Register the redirect URI
 | `TEAMCRAFT_OIDC_ADMIN_GROUP`                  | `teamcraft-admins`     | members become admins              |
 | `TEAMCRAFT_OIDC_EDITOR_GROUP`                 | `teamcraft-editors`    | members become CAD editors         |
 | `TEAMCRAFT_OIDC_VIEWER_GROUP`                 | –                      | if set, required to sign in at all |
-| `TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS`              | `0` (off)              | idle lifetime of SSO users' tokens |
+| `TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS`              | `90` (`0` = off)       | idle lifetime of SSO users' tokens |
 
 **Set a viewer group with a shared identity provider.** Without
 `TEAMCRAFT_OIDC_VIEWER_GROUP`, every account the identity provider
@@ -58,7 +58,7 @@ viewer group, or restrict the application to the team at the provider. The
 server logs a warning at every start while single sign-on runs without a
 viewer group, and *Admin → Users* says so.
 
-`TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS` (1 to 3650) caps the API and desktop
+`TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS` (default 90, 1 to 3650, `0` = off) caps the API and desktop
 tokens that single sign-on users create from then on: a token without an
 expiry, or with a longer one, expires after that many days without use
 instead (every use renews it); a shorter fixed expiry stays. A leaver who is
@@ -242,8 +242,9 @@ leave:
   logged them out. Each row links to the user (*Offboard and deactivate*)
   and to what they hold. Administrators only; shown when SSO is configured.
 * **Tokens that expire on their own.** With
-  `TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS` (for example `30`), new API and desktop
-  tokens of SSO users stop working after that many days without use.
+  `TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS` (90 by default), new API and desktop
+  tokens of SSO users stop working after that many days without use; every
+  new personal token ends after `TEAMCRAFT_TOKEN_MAX_DAYS` (365 by default).
 * **Back-channel logout.** Registered at the provider (see [Single sign-on](#single-sign-on-openid-connect)),
   it ends the leaver's browser sessions the moment the provider logs them out
   or removes them, instead of after `TEAMCRAFT_SESSION_TTL_HOURS`.

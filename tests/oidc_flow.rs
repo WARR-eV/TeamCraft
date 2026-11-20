@@ -984,11 +984,11 @@ async fn sso_tokens_get_an_idle_lifetime_and_idle_sso_users_are_reported() {
         "{}",
         account.text()
     );
-    // a local account is not capped
+    // a local account gets no idle limit, only the maximum of 365 days (#313)
     let root = app.login("root").await;
     assert_eq!(
         create(root.clone(), "local-never", "never").await,
-        (None, true)
+        (None, false)
     );
 
     // nobody is idle yet

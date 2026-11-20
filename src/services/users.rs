@@ -413,17 +413,55 @@ impl TokenLifetime {
             _ => TokenLifetime::IdleDays(idle),
         }
     }
+
+    /// The lifetime under a maximum of `max` days (0 = none, #313): no
+    /// expiry or a longer fixed one becomes `Days(max)`. A sliding lifetime
+    /// keeps renewing on use – it already ends when nobody uses the token –
+    /// but its idle period is not longer than `max`.
+    pub fn limited(self, max: u32) -> Self {
+        let max = i64::from(max);
+        if max == 0 {
+            return self;
+        }
+        match self {
+            TokenLifetime::Unlimited => TokenLifetime::Days(max),
+            TokenLifetime::Days(d) => TokenLifetime::Days(d.min(max)),
+            TokenLifetime::IdleDays(d) => TokenLifetime::IdleDays(d.min(max)),
+        }
+    }
+
+    /// Refuses a lifetime outside 1 to 3650 days (400), before any limit
+    /// shortens it.
+    fn check(self) -> AppResult<Self> {
+        match self {
+            TokenLifetime::Days(d) | TokenLifetime::IdleDays(d) if !(1..=3650).contains(&d) => Err(
+                AppError::BadRequest("Token lifetime must be between 1 and 3650 days.".into()),
+            ),
+            _ => Ok(self),
+        }
+    }
 }
 
-/// The lifetime of a new token of `user`: for a single sign-on user capped by
-/// `TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS` (`sso_idle_days`, 0 = off; issue #173),
-/// for anybody else as asked.
+/// Instance limits of new personal tokens (`Config::token_limits`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TokenLimits {
+    /// `TEAMCRAFT_TOKEN_MAX_DAYS` (0 = no limit), for every account.
+    pub max_days: u32,
+    /// `TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS` (0 = off), for single sign-on users.
+    pub sso_idle_days: u32,
+}
+
+/// The lifetime of a new token of `user`: limited to
+/// `TEAMCRAFT_TOKEN_MAX_DAYS` for everybody (#313), and for a single sign-on
+/// user also capped by `TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS` (issue #173).
 pub async fn token_lifetime_for(
     pool: &PgPool,
     user: Uuid,
     asked: TokenLifetime,
-    sso_idle_days: u32,
+    limits: TokenLimits,
 ) -> AppResult<TokenLifetime> {
+    let asked = asked.check()?.limited(limits.max_days);
+    let sso_idle_days = limits.sso_idle_days;
     if sso_idle_days == 0 {
         return Ok(asked);
     }
@@ -1447,5 +1485,28 @@ mod tests {
         assert_eq!(Days(30).capped(30), Days(30));
         assert_eq!(Days(7).capped(30), Days(7));
         assert_eq!(IdleDays(14).capped(30), IdleDays(14));
+    }
+
+    #[test]
+    fn the_maximum_limits_token_lifetimes() {
+        use TokenLifetime::*;
+        // off: everything as asked
+        assert_eq!(Unlimited.limited(0), Unlimited);
+        assert_eq!(Days(3650).limited(0), Days(3650));
+        // no expiry or a longer one becomes the maximum
+        assert_eq!(Unlimited.limited(365), Days(365));
+        assert_eq!(Days(400).limited(365), Days(365));
+        assert_eq!(IdleDays(400).limited(365), IdleDays(365));
+        // shorter lifetimes stay
+        assert_eq!(Days(90).limited(365), Days(90));
+        assert_eq!(IdleDays(30).limited(365), IdleDays(30));
+        // with the SSO idle limit on top (the order of token_lifetime_for)
+        assert_eq!(Unlimited.limited(365).capped(90), IdleDays(90));
+        // out of range is refused, not shortened
+        assert!(Days(0).check().is_err());
+        assert!(Days(3651).check().is_err());
+        assert!(IdleDays(0).check().is_err());
+        assert!(Unlimited.check().is_ok());
+        assert!(Days(3650).check().is_ok());
     }
 }

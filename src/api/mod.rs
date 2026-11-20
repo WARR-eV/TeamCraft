@@ -886,8 +886,8 @@ async fn desktop_token(
     State(st): State<AppState>,
     ApiJson(body): ApiJson<DesktopTokenBody>,
 ) -> AppResult<Json<Value>> {
-    let idle = st.config.oidc_token_idle_days;
-    let token = desktop::exchange(&st.db, &body.code, &body.verifier, idle).await?;
+    let limits = st.config.token_limits();
+    let token = desktop::exchange(&st.db, &body.code, &body.verifier, limits).await?;
     Ok(Json(json!(token)))
 }
 
