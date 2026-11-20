@@ -2,7 +2,8 @@
 // TeamCraft Desktop – Settings, sign-out and About.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, SKINS, TAURI, api, call, confirmDialog, dialog, errorText, field, h, label, run, state, toast } from "./core.js";
+import { $, SKINS, TAURI, api, call, confirmDialog, dialog, errorText, field, h, run, state, toast } from "./core.js";
+import { label } from "/static/shared/js/format.js";
 import { applySkin } from "./skins.js";
 import { checkServerUrl, showConnect } from "./connect.js";
 import { atRisk, checkUpdate, checkoutsWithChanges, localChangesList, refreshWorklistCount, sendLocalChanges } from "./shell.js";
@@ -83,8 +84,10 @@ export function openSettings() {
       h("button.danger", { type: "button", on: { click: function () { dlg.close(); signOut(); } } }, "Sign out"),
       // single-sign-on accounts have no password here (older servers send no auth_source)
       state.me.auth_source === "oidc" ? null : h("button", { type: "button", on: { click: function () { dlg.close(); passwordDialog(); } } }, "Change password…"),
-      h("button", { type: "button", on: { click: function () { dlg.close(); signOut(true); } } }, "Change server")
-    ])
+      h("button", { type: "button", on: { click: function () { dlg.close(); showConnect("server"); } } }, "Switch server…")
+    ]),
+    h("h3", { text: "Connections" }),
+    connectionsBox(function () { dlg.close(); })
   ]);
   var dlg = dialog("Settings", body, [
     { label: "Close", onClick: function (d) { d.close(); } },
@@ -105,6 +108,60 @@ export function openSettings() {
     }
   ], { wide: true });
   notify.load();
+}
+
+/**
+ * The saved connections (#322, #323): servers and accounts the app keeps a
+ * sign-in for. Switching keeps the sign-in of the connection left behind;
+ * each connection has its own working folder, so files of different servers
+ * never mix (src/profiles.rs). The window reloads after a switch.
+ */
+function connectionsBox(closeSettings) {
+  var box = h("div.stack", null, [h("p.hint", { text: "Loading …" })]);
+  function switchTo(id) {
+    call("switch_connection", { id: id }).then(function () { window.location.reload(); },
+      function (e) { toast(errorText(e), "error"); });
+  }
+  function draw(list) {
+    var rows = list.map(function (c) {
+      var who = c.display_name || c.username;
+      return h("li.row", null, [
+        h("span", null, [
+          h("strong", { text: c.server_url }),
+          who ? " – " + who : " – not signed in yet",
+          h("br"),
+          h("span.small.muted", { text: "Working folder: " + (c.workspace_dir || "the default folder") })
+        ]),
+        c.active ? h("span.badge", { text: "active" }) : h("span.row", null, [
+          h("button", { type: "button", on: { click: function () { closeSettings(); switchTo(c.id); } } }, "Switch"),
+          h("button", { type: "button", title: "Forget this connection and its sign-in; its working folder stays on disk", on: { click: function () {
+            confirmDialog("Remove connection", "Forget the connection to " + c.server_url + (who ? " as " + who : "") +
+              "? Its sign-in is removed from this computer; the working folder stays.", "Remove", true).then(function (ok) {
+              if (!ok) return;
+              call("remove_connection", { id: c.id }).then(load, function (e) { toast(errorText(e), "error"); });
+            });
+          } } }, "Remove")
+        ])
+      ]);
+    });
+    box.replaceChildren(
+      h("p.hint", { text: "TeamCraft Desktop keeps a sign-in for each server and account you use. Each connection has its own working folder, so the files of different servers never mix." }),
+      h("ul.connections.stack", null, rows),
+      h("div.row", null, [
+        h("button", { type: "button", title: "Sign in with another account on " + (state.session.server_url || "this server") + "; your current sign-in is kept", on: { click: function () {
+          closeSettings();
+          call("add_account").then(function () { window.location.reload(); }, function (e) { toast(errorText(e), "error"); });
+        } } }, "Add another account…")
+      ])
+    );
+  }
+  function load() {
+    call("connections").then(draw, function (e) {
+      box.replaceChildren(h("p.hint", { text: "Not available: " + errorText(e) }));
+    });
+  }
+  load();
+  return box;
 }
 
 /**

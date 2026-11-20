@@ -103,6 +103,50 @@ impl Keychain for OsKeychain {
     }
 }
 
+/// Another entry of the app's keychain service: the tokens of saved
+/// connections that are not active (`api-token@<profile id>`, src/profiles.rs).
+pub struct OsKeychainEntry(pub String);
+
+#[cfg(any(target_os = "linux", target_os = "macos", windows))]
+impl Keychain for OsKeychainEntry {
+    fn get(&self) -> Result<Option<String>, String> {
+        let entry = keyring::Entry::new(keychain_service(), &self.0).map_err(|e| e.to_string())?;
+        match entry.get_password() {
+            Ok(token) => Ok(Some(token)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    fn set(&self, token: &str) -> Result<(), String> {
+        keyring::Entry::new(keychain_service(), &self.0)
+            .map_err(|e| e.to_string())?
+            .set_password(token)
+            .map_err(|e| e.to_string())
+    }
+
+    fn delete(&self) -> Result<(), String> {
+        let entry = keyring::Entry::new(keychain_service(), &self.0).map_err(|e| e.to_string())?;
+        match entry.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
+impl Keychain for OsKeychainEntry {
+    fn get(&self) -> Result<Option<String>, String> {
+        Err("no keychain support on this system".into())
+    }
+    fn set(&self, _token: &str) -> Result<(), String> {
+        Err("no keychain support on this system".into())
+    }
+    fn delete(&self) -> Result<(), String> {
+        Err("no keychain support on this system".into())
+    }
+}
+
 /// Where the token is kept.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -161,6 +205,14 @@ pub struct Settings {
     /// src/localserver.rs). While `server_url` is `http://127.0.0.1:<this
     /// port>`, the app starts that server when it starts.
     pub local_server_port: Option<u16>,
+    /// Saved connections – servers and the accounts signed in there (#322,
+    /// #323, src/profiles.rs). The fields above (`server_url`,
+    /// `workspace_dir`, the token) always belong to the active one.
+    #[serde(default)]
+    pub profiles: Vec<crate::profiles::Profile>,
+    /// Id of the active connection in [`Settings::profiles`].
+    #[serde(default)]
+    pub active_profile: Option<String>,
     /// Not stored in settings.json.
     #[serde(skip)]
     pub token: Option<String>,
@@ -195,7 +247,13 @@ fn remove_token_file(dir: &Path) -> std::io::Result<()> {
 
 /// Writes the fallback file, readable by the user only.
 fn write_token_file(dir: &Path, token: &str) -> anyhow::Result<()> {
-    let path = dir.join(TOKEN_FILE);
+    write_private_file(dir, TOKEN_FILE, token)
+}
+
+/// Writes `name` in `dir` with `content`, readable by the user only (mode
+/// 0600 on Unix) – the token fallback files.
+pub(crate) fn write_private_file(dir: &Path, name: &str, content: &str) -> anyhow::Result<()> {
+    let path = dir.join(name);
     fs::create_dir_all(dir)?;
     let mut options = fs::OpenOptions::new();
     options.write(true).create(true).truncate(true);
@@ -205,7 +263,7 @@ fn write_token_file(dir: &Path, token: &str) -> anyhow::Result<()> {
         options.mode(0o600);
     }
     let mut file = options.open(&path)?;
-    file.write_all(token.as_bytes())?;
+    file.write_all(content.as_bytes())?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

@@ -229,6 +229,19 @@ A unit test checks the SPDX line on every `.css`, `.js` and `.svg` in
 Small pull requests, each behaviour-preserving unless it says otherwise,
 each with before/after screenshots of both apps in the description.
 
+**Status (2026-11-18):** steps 1 and 2 are merged, and so are the shared
+assistant panel (`shared/js/assistant.js`, `shared/css/assistant.css`) and the
+pure part of steps 4 and 6: `format.js`, `states.js`, `markdown.js` and
+`dom.js`, with `shared/test-vectors/` run by `src/ui_vectors.rs` and
+`scripts/shared-vectors.test.mjs`. Guards were added before the rest moves, so
+any new drift fails CI. A desktop module or `static/app.js` that re-declares a
+shared export fails `scripts/check-desktop-modules.mjs`. Classes styled by both
+app stylesheets are listed in `STYLED_TWICE` (`src/assets.rs`), a list that may
+only shrink. Contributor workflow: [Shared UI](../dev/shared-ui.md). Still open:
+step 3 (`components.css`, which also moves the desktop to the shared badge
+builder), step 5, the `<time>` rewrite of the web `app.js` (a classic script)
+using `format.js`, step 7 and the component gallery.
+
 1. **Folder and plumbing.** Create `shared/` with `README.md`; move
    `skins.css`, `fonts/` and `viewer.js` (still a classic script) into it.
    Server serves `/static/shared/…`, build-script asset table,
@@ -265,14 +278,14 @@ each with before/after screenshots of both apps in the description.
 Not planned: sharing page layouts, the desktop shell, forms, or any data
 access code.
 
-## Open questions
+## Decided questions
 
-- The desktop's SVG state icons (`media/icons/Green_tick.svg` …): drop them
-  for the text glyphs (recommended, step 3) or keep them as a desktop-only
-  option?
-- Should a living component gallery exist (a docs page or a hidden `/ui`
-  page rendering every component through the macros), so reviewers compare
-  both apps without starting the desktop app?
+- The desktop's SVG state icons (`media/icons/Green_tick.svg` …) are **dropped**
+  for the text glyphs of the shared table (decided 2026-11-18, done in step 3).
+- A **component gallery** will exist as a hidden, admin-only `/dev/ui` page that
+  renders every macro with the test vectors in both densities, plus a
+  debug-build gallery in the desktop app that renders the same vectors with
+  the JS builders (decided 2026-11-18).
 
 ## Sources
 

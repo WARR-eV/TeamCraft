@@ -13,12 +13,14 @@ mod api;
 mod autoallow;
 mod bomimport;
 mod cadexport;
+mod cadlaunch;
 mod commands;
 mod compat;
 mod crash;
 mod folderimport;
 mod layout;
 mod localserver;
+mod profiles;
 mod resume;
 mod settings;
 mod signin;
@@ -216,6 +218,10 @@ fn main() {
             commands::cancel_sign_in,
             commands::sign_in_token,
             commands::sign_out,
+            commands::connections,
+            commands::switch_connection,
+            commands::add_account,
+            commands::remove_connection,
             commands::set_skin,
             commands::set_workspace_dir,
             commands::api,
@@ -253,6 +259,9 @@ fn main() {
             commands::import_bom,
             commands::cad_programs,
             commands::cad_export_step,
+            commands::cad_installed,
+            commands::cad_open_plan,
+            commands::workspace_open_cad,
             commands::scan_folder,
             commands::agent_profiles,
             commands::set_agent_profiles,

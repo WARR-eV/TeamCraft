@@ -159,7 +159,7 @@
         <option value="30">30 days</option>
         <option value="90" selected>90 days</option>
         <option value="365">1 year</option>
-        <option value="never">never expires</option>
+        {% if not token_max_days %}<option value="never">never expires</option>{% endif %}
       </select>
       <select name="scope" aria-label="Scope">
         <option value="full" selected>full access</option>
@@ -169,6 +169,9 @@
       </select>
       <button type="submit">Create</button>
     </form>
+    {% if token_max_days and not (sso_token_idle_days and user.auth_source == "oidc") %}
+    <p class="hint">A new token expires after {{ token_max_days }} days at the latest.</p>
+    {% endif %}
     {% if sso_token_idle_days and user.auth_source == "oidc" %}
     <p class="hint">Single sign-on accounts: a new token expires after {{ sso_token_idle_days }} days without use at
       the latest (every use renews it).</p>

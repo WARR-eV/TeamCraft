@@ -124,6 +124,7 @@ pub fn router(state: &AppState) -> Router<AppState> {
             "/projects/{code}/numbering",
             get(project_numbering).put(set_project_numbering),
         )
+        .route("/projects/{code}/default-cad", put(set_project_default_cad))
         .route("/items", get(list_items).post(create_item))
         .route("/items/duplicates", get(item_duplicates))
         .route("/items/bulk", post(items_bulk))
@@ -535,6 +536,7 @@ async fn index() -> Json<Value> {
             "POST   /api/v1/projects/{code}/members                   {username, manager?} – managers and admins",
             "GET    /api/v1/projects/{code}/numbering?scheme=         next generated item numbers per type; scheme = preview another scheme",
             "PUT    /api/v1/projects/{code}/numbering                 {scheme} e.g. {PROJECT}-{TYPE}-{YYYY}-{SEQ:4}, empty = {TYPE}-{SEQ:6} – managers and admins",
+            "PUT    /api/v1/projects/{code}/default-cad               {program, version?} default CAD program of the group (format family such as inventor, solidworks; empty = none) – TeamCraft Desktop opens the files with it – managers and admins",
             "POST   /api/v1/mcp                                       Model Context Protocol (JSON-RPC 2.0) for AI assistants, see the MCP reference",
             "GET    /api/v1/assistant                                 whether the built-in assistant is enabled, and its quick actions",
             "POST   /api/v1/assistant                                 {question?, action?: ask|release_notes|release_check|review_brief|attention|impact|simulation_status|result_values, context: {kind?, item?, revision?, change?, request?, project?, view?, rule?, query?, filters?, selected?, shown?}, allow_drafts?, thread?}",
@@ -884,8 +886,8 @@ async fn desktop_token(
     State(st): State<AppState>,
     ApiJson(body): ApiJson<DesktopTokenBody>,
 ) -> AppResult<Json<Value>> {
-    let idle = st.config.oidc_token_idle_days;
-    let token = desktop::exchange(&st.db, &body.code, &body.verifier, idle).await?;
+    let limits = st.config.token_limits();
+    let token = desktop::exchange(&st.db, &body.code, &body.verifier, limits).await?;
     Ok(Json(json!(token)))
 }
 

@@ -440,3 +440,33 @@ pub(super) async fn project_files(
         folders::level(&st.db, &me, project.id, &folder, page).await?
     )))
 }
+
+#[derive(Deserialize)]
+pub(super) struct SetDefaultCad {
+    /// Format family (`inventor`, `solidworks`, …); empty or absent = none.
+    #[serde(default)]
+    program: Option<String>,
+    /// Version of the program (`2026`); empty or absent = any version.
+    #[serde(default)]
+    version: Option<String>,
+}
+
+/// `PUT /api/v1/projects/{code}/default-cad` – managers and admins: the CAD
+/// program TeamCraft Desktop opens the group's files with.
+pub(super) async fn set_project_default_cad(
+    State(st): State<AppState>,
+    ApiUser(me): ApiUser,
+    Path(code): Path<String>,
+    ApiJson(body): ApiJson<SetDefaultCad>,
+) -> AppResult<Json<Value>> {
+    let project = projects::get_by_code(&st.db, &me, &code).await?;
+    let project = projects::set_default_cad(
+        &st.db,
+        &me,
+        project.id,
+        body.program.as_deref().unwrap_or(""),
+        body.version.as_deref().unwrap_or(""),
+    )
+    .await?;
+    Ok(Json(json!(project)))
+}

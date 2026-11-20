@@ -2,7 +2,8 @@
 // TeamCraft Desktop – Object tabs and the toolbar.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, ICONS, append, clear, errorText, fmtDate, fmtSize, h, label, state, svgIcon, tool } from "./core.js";
+import { $, ICONS, append, clear, errorText, h, state, svgIcon, tool } from "./core.js";
+import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
 import { canEdit, checkInAll, refreshWorklistCount } from "./shell.js";
 import { selectView } from "./navigator.js";
 import { assistantContextChanged } from "./assistant.js";

@@ -58,6 +58,12 @@ pub struct Project {
     pub number_scheme: Option<String>,
     /// `internal` or `restricted` (see `domain::ProjectVisibility`).
     pub visibility: String,
+    /// Default CAD program of the group (a format family such as `inventor`,
+    /// see `cadformat::families`; `""` = none): what TeamCraft Desktop
+    /// suggests for *Check out and open*.
+    pub default_cad: String,
+    /// Version of the default CAD program (`"2026"`; `""` = any version).
+    pub default_cad_version: String,
 }
 
 impl Project {
@@ -925,6 +931,8 @@ mod tests {
             created_by: None,
             number_scheme: None,
             visibility: ProjectVisibility::Internal.as_str().into(),
+            default_cad: String::new(),
+            default_cad_version: String::new(),
         };
         assert!(!p.is_restricted());
         p.visibility = ProjectVisibility::Restricted.as_str().into();

@@ -25,6 +25,14 @@
 </section>
 {% endif %}
 
+{% if ungrouped_items %}
+<section class="card" id="ungrouped-items">
+  <h2>Items without a project group</h2>
+  <p class="hint">{{ ungrouped_items }} item{% if ungrouped_items != 1 %}s have{% else %} has{% endif %} no project group: everyone can read {% if ungrouped_items != 1 %}them{% else %}it{% endif %} and every CAD editor can change {% if ungrouped_items != 1 %}them{% else %}it{% endif %}. New items always get a group; these are older ones. Move them into a group on the item page (<em>Edit</em> → project group).</p>
+  <p><a href="/vault?folder=none">Show the items without a group</a></p>
+</section>
+{% endif %}
+
 <div class="card">
   {% if projects %}
   <div class="table-wrap">

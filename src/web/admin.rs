@@ -40,6 +40,12 @@ pub async fn projects(State(st): State<AppState>, ctx: WebCtx) -> AppResult<Resp
     } else {
         Vec::new()
     };
+    // administrators: items without a group, readable by everyone (#310)
+    let ungrouped_items = if ctx.me.is_admin() {
+        projects::count_ungrouped_items(&st.db).await?
+    } else {
+        0
+    };
     render(
         &st,
         &ctx,
@@ -51,6 +57,7 @@ pub async fn projects(State(st): State<AppState>, ctx: WebCtx) -> AppResult<Resp
             "manager_gaps": crate::services::manager_gaps::to_json(&gaps),
             "manager_gap_ids": gaps.iter().map(|g| g.project_id).collect::<Vec<_>>(),
             "stale_days": crate::services::manager_gaps::STALE_DAYS,
+            "ungrouped_items": ungrouped_items,
         }),
     )
 }
@@ -176,6 +183,8 @@ pub async fn project_show(
             "previewing": candidate.is_some() && scheme_error.is_none(),
             "scheme_error": scheme_error,
             "default_scheme": domain::DEFAULT_NUMBER_SCHEME,
+            "cad_families": crate::cadformat::families(),
+            "default_cad_label": crate::cadformat::program_label(&project.default_cad, &project.default_cad_version),
         }),
     )
 }
@@ -204,6 +213,36 @@ pub async fn update_numbering(
                     .as_deref()
                     .unwrap_or(domain::DEFAULT_NUMBER_SCHEME)
             ),
+        )
+    })
+}
+
+#[derive(Deserialize)]
+pub struct DefaultCadForm {
+    #[serde(default)]
+    program: String,
+    #[serde(default)]
+    version: String,
+}
+
+/// Saves the default CAD program of a project group (managers and admins).
+pub async fn update_default_cad(
+    State(st): State<AppState>,
+    ctx: WebCtx,
+    Path(id): Path<Uuid>,
+    Form(form): Form<DefaultCadForm>,
+) -> AppResult<Response> {
+    let back = format!("/projects/{id}");
+    let result = projects::set_default_cad(&st.db, &ctx.me, id, &form.program, &form.version).await;
+    finish(&st, result, &back, |p| {
+        let label = crate::cadformat::program_label(&p.default_cad, &p.default_cad_version);
+        (
+            back.clone(),
+            if label.is_empty() {
+                format!("{}: no default CAD program – the desktop app takes the newest installed program that fits the file", p.code)
+            } else {
+                format!("{}: CAD files open in {label}", p.code)
+            },
         )
     })
 }

@@ -2,9 +2,10 @@
 // TeamCraft Desktop – The main window: rail, navigator, status bar, update notice, notifications, long operations.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, ICONS, api, badge, call, clear, dialog, enc, errorText, fmtDate, fmtSize, h, invoke, label, run, setStatus, state, svgIcon, toast, tool } from "./core.js";
+import { $, ICONS, api, badge, call, clear, dialog, enc, errorText, h, invoke, run, setStatus, state, svgIcon, toast, tool } from "./core.js";
+import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
 import { checkServerVersion, showConnect } from "./connect.js";
-import { navHead, selectView } from "./navigator.js";
+import { drawWorklist, navHead, selectView } from "./navigator.js";
 import { activeTab, closeTab, renderActive, renderTabs, tabShortcut } from "./tabs.js";
 import { agent, agentProfiles, applyAiPolicy, localAgentsAllowed, openAgent, schedulePaint, updateAgentControls } from "./agent.js";
 import { openRevision } from "./revision.js";
@@ -498,11 +499,12 @@ function releaseClean(total, report, sent) {
       lines("Problems:", failed.concat(sent ? sent.failed : []), ".notice.error")
     ]);
     dialog("Check in all my check-outs", body, [{ label: "Close", primary: true, submit: true, onClick: function (d) { d.close(); } }]);
-    refreshWorklistCount().then(function () { if (state.view === "worklist") selectView("worklist"); renderActive(); }, function () {});
+    refreshWorklistCount().then(function () { renderActive(); }, function () {});
   }, function () {});
 }
 
-export function refreshWorklistCount() {
+/** Gets the worklist and shows its count on the rail (no redraw). */
+export function fetchWorklist() {
   return api("GET", "/worklist").then(function (w) {
     state.worklist = w;
     // dependents count once, however many changes they have to be checked against
@@ -514,6 +516,17 @@ export function refreshWorklistCount() {
     if (rail) {
       rail.setAttribute("aria-label", n ? "Worklist, " + n + " open" : "Worklist");
     }
+    return w;
+  });
+}
+
+/** After anything that changes the worklist (check out, cancel check-out,
+ * check in, a review …): the count on the rail, and the worklist navigator
+ * when it is shown – an action in a tab on the right shows up on the left at
+ * once (#347). */
+export function refreshWorklistCount() {
+  return fetchWorklist().then(function (w) {
+    if (state.view === "worklist") drawWorklist(w);
     return w;
   });
 }

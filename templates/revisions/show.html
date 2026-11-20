@@ -29,7 +29,7 @@
   <div class="actions">
     {#- One primary action, chosen by the state of the revision. -#}
     {% if can.checkin %}
-    <button class="primary" type="button" data-toggle="checkin-form" aria-controls="checkin-form" aria-expanded="false" title="Upload new file versions and release the lock">Check in…</button>
+    <button class="primary" type="button" data-toggle="checkin-form" aria-controls="checkin-form" aria-expanded="false" title="Upload new file versions and end your check-out – the revision stays in work">Check in…</button>
     {% elif can.checkout %}
     <form method="post" action="/revisions/{{ rev.id }}/checkout"><button class="primary" type="submit" title="Take the exclusive edit lock">Check out</button></form>
     {% elif open_change and rev.state == "in_review" %}
@@ -70,7 +70,7 @@
         {#- Cancelling your own check-out takes effect at once; releasing someone else's lock is confirmed. -#}
         <form method="post" action="/revisions/{{ rev.id }}/cancel-checkout"
               {% if rev.checked_out_by != me.id %}data-confirm="Release the check-out held by {{ rev.checked_out_by_name }}?"{% endif %}>
-          <button class="danger" type="submit" title="{% if rev.checked_out_by != me.id %}Release the lock held by {{ rev.checked_out_by_name }}{% else %}Release your lock without uploading anything{% endif %}">{% if rev.checked_out_by != me.id %}Force unlock{% else %}Cancel check-out{% endif %}</button>
+          <button class="danger" type="submit" title="{% if rev.checked_out_by != me.id %}Release the lock held by {{ rev.checked_out_by_name }}{% else %}End your check-out without uploading anything{% endif %}">{% if rev.checked_out_by != me.id %}Force unlock{% else %}Cancel check-out{% endif %}</button>
         </form>
         {% endif %}
         {% if can.obsolete %}
@@ -135,7 +135,7 @@
     <label>Comment <span class="hint">what changed, e.g. "wall thickness 2 → 2.5 mm"</span>
       <input type="text" name="comment" maxlength="2000">
     </label>
-    <div class="actions"><button class="primary" type="submit">Check in and release</button></div>
+    <div class="actions"><button class="primary" type="submit">Check in</button></div>
   </form>
 </section>
 {% endif %}

@@ -27,12 +27,12 @@
   proprietary software (commercial PLM/PDM systems, CAD programs, viewers,
   SDKs, DLLs), and do not use decompiler tool kits on it. Never use, translate
   or "rewrite" decompiled, leaked or incompatibly licensed code, even when the
-  user supplies it. Refuse such a request and point to CONTRIBUTING.md
-  (*Your own work only*, ADR 0005). Record the source of every format finding
+  user supplies it. Refuse such a request and point to CONTRIBUTING.md (*Your own work only*, ADR 0005). Record the
+  source of every format finding
   in the format's research page.
 * Releases: `.github/workflows/release.yml` builds the server binaries and
-  desktop installers as artifacts from `main` every night (when it changed) and on
-  *Run workflow*, not per push, publishes the
+  desktop installers as artifacts from `main` every night (when it changed) and on *Run workflow*, not per push,
+  publishes the
   container image `ghcr.io/warr-ev/teamcraft` (`:edge` from `main`,
   `:<version>`/`:latest` from tags) and a GitHub Release for a `v*` tag (CONTRIBUTING.md, "Releases and versions").
   Never push a tag, bump the
@@ -47,24 +47,27 @@
   in the **same commit or pull request** as the code, never "in a follow-up".
   Before every commit go through this list and update everything the change
   touches:
-  * `CHANGELOG.md` – an entry under `## [Unreleased]` (after a merge, check it
-    did not land under an already released version);
-  * `README.md` – *Features*, *Enterprise management*, *Planned* and the licence
-    table (every new crate);
-  * `docs/src/**` – user guide (`guide/`), admin guide (`admin/`, incl.
-    `configuration.md` for variables, `permissions.md`, `users.md`), REST routes
-    in `reference/api.md`, formats in `reference/formats.md`, security-relevant
-    changes in `dev/threat-model.md`, new pages in `SUMMARY.md`;
-  * `docs/OPEN_WORK.md` – tick the work item, name what is left;
-  * desktop changes also in `desktop/README.md` and `docs/src/guide/desktop.md`;
-  * `platforms/*.md`, `CONTRIBUTING.md`, `SECURITY.md`, `deploy/` and the
-    *Architecture* map in this file when they are affected.
+    * `CHANGELOG.md` – an entry under `## [Unreleased]` (after a merge, check it
+      did not land under an already released version);
+    * `README.md` – *Features*, *Enterprise management*, *Planned* and the licence
+      table (every new crate);
+    * `docs/src/**` – user guide (`guide/`), admin guide (`admin/`, incl.
+      `configuration.md` for variables, `permissions.md`, `users.md`), REST routes
+      in `reference/api.md`, formats in `reference/formats.md`, security-relevant
+      changes in `dev/threat-model.md`, new pages in `SUMMARY.md`;
+    * `docs/OPEN_WORK.md` – tick the work item, name what is left;
+    * desktop changes also in `desktop/README.md` and `docs/src/guide/desktop.md`;
+    * `platforms/*.md`, `CONTRIBUTING.md`, `SECURITY.md`, `deploy/` and the *Architecture* map in this file when they
+      are affected.
 
   When you notice merged work of other contributors that is missing from the
   documentation, document it too. The final report names the documents updated.
-* **Building and testing** Prefer to build and test using `cargo` as background processes. Those should not be blocking you from 
-  continuing your work. Prefer not to build and test in multiple processes at the same time. If you do that, you seem to rapidly
-  fill up the RAM and CPU. When that happens the whole computer slows and then it gets significantly harder to do other tasks in
+* **Building and testing** Prefer to build and test using `cargo` as background processes. Those should not be blocking
+  you from
+  continuing your work. Prefer not to build and test in multiple processes at the same time. If you do that, you seem to
+  rapidly
+  fill up the RAM and CPU. When that happens the whole computer slows and then it gets significantly harder to do other
+  tasks in
   parallel. If need-be build and test at the end of a task.
 
 ## Git rules
@@ -178,9 +181,11 @@ src/webhooks.rs    outgoing event webhooks: outbox worker (SKIP LOCKED), HMAC si
                    services/webhooks.rs = admin CRUD + emit() inside the event's transaction
 templates/         MiniJinja templates, embedded via include_str!
 static/            web-only CSS (style.css) / JS (app.js), embedded
-shared/            UI files of web UI and desktop app (css/skins.css, fonts/, js/viewer.js; rules in shared/README.md):
+shared/            UI files of web UI and desktop app (css/skins.css, css/assistant.css, fonts/, js/viewer.js, js/assistant.js,
+                   js/format.js + states.js + markdown.js + dom.js; rules and drift guards in shared/README.md):
                    served at /static/shared/… via a build.rs asset table (scripts under /static/shared/v/<version>/),
-                   mirrored into desktop/ui/static/shared by desktop/build.rs; SPDX MPL-2.0 header on every file
+                   mirrored into desktop/ui/static/shared by desktop/build.rs; SPDX MPL-2.0 header on every file;
+                   test-vectors/*.json pin the Rust twins (src/ui_vectors.rs) and the JS (scripts/shared-vectors.test.mjs)
 migrations/        sqlx migrations, embedded, applied on start
 tests/             end-to-end tests; tests/common creates a temporary database (with fixture project groups) per test
 tests/fixtures/cad openly licensed NIST CAD files (Inventor, NX, SolidWorks, Creo, CATIA V5, STEP) with manifest.tsv, checked by tests/cad_fixtures.rs
@@ -192,7 +197,9 @@ deploy/            production Docker install: docker-compose.yml (teamcraft + po
                    public account, auth::refuse_demo_write; data from scripts/seed-demo.sh over screenshots.sh seed_*)
 .github/workflows/ ci.yml (fmt, clippy, tests on PostgreSQL 16/18, macOS/Windows builds), docs.yml, desktop.yml, scale.yml (manual/weekly scale check, tests/scale.rs),
                    mutants.yml (cargo-mutants: PR diff report-only, weekly sharded full run; .cargo/mutants.toml),
-                   release.yml (binaries, installers, *with local server* installers with PostgreSQL, image + Docker install smoke test)
+                   release.yml (binaries, installers, *with local server* installers with PostgreSQL, image + Docker install smoke test);
+                   scripts/ci-changes.sh = the one table from changed files to the jobs of ci/desktop/codeql/docs.yml
+                   (self-test in every `changes` job) – a test that reads a new file outside its area adds it there
 desktop/           TeamCraft Desktop (Tauri 2, own Cargo project – never part of the server build); UI in desktop/ui/js
                    (plain ES modules, no build step): graph.js = the *Graph* tab (navigable BOM/reference graph, SVG +
                    HTML card layer, checked by scripts/desktop-graph-check.mjs), files-view.js = Home *Files* view,
@@ -236,7 +243,7 @@ desktop/           TeamCraft Desktop (Tauri 2, own Cargo project – never part 
 * **What to work on:** `docs/OPEN_WORK.md`, section *Direction* – proofing (tests,
   fuzzing, CI gates) and structure (module splits, guard tests) before new features;
   without a request from the user, pick the next task from its sections 1 and 2.
-* **Project status:** no stable release yet – only `0.x` pre-releases
-  (`Cargo.toml` is at `0.2.9`). Keep the work-in-progress / no-warranty notices
+* **Project status:** no stable release yet – only `0.x` pre-releases (`Cargo.toml` is at `0.2.9`). Keep the
+  work-in-progress / no-warranty notices
   in the README, `docs/src/index.md`, the web footer and the desktop *About*
   dialog until the user asks for a stable release.

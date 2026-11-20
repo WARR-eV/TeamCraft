@@ -16,7 +16,8 @@
 // external engine (the project ships no downloaded engines and the desktop UI
 // has no build step).
 
-import { api, enc, errorText, h, invoke, label, toast } from "./core.js";
+import { api, enc, errorText, h, invoke, toast } from "./core.js";
+import { label } from "/static/shared/js/format.js";
 import { typeIcon } from "./navigator.js";
 import { fetchRevision } from "./revision.js";
 import { findTab, openTab, renderActive, retargetTab } from "./tabs.js";
