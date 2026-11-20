@@ -10,7 +10,7 @@ import { typeIcon } from "./navigator.js";
 import { openRevision } from "./revision.js";
 import { canEdit, canEditProject } from "./shell.js";
 import { newItemDialog } from "./dialogs.js";
-import { countText, entryIconType, entryName, entryRevision, entryTitle, folderKey, groupTotal, mergeEntries, parentFolder, remaining, sortEntries, sortFolders } from "./files-view.js";
+import { countText, entryIconType, entryName, entryRevision, entryTitle, favouritePath, favouriteSuggestions, folderKey, groupTotal, mergeEntries, parentFolder, remaining, sortEntries, sortFolders } from "./files-view.js";
 
 /** Entries asked for per request (the server's maximum). */
 var PAGE = 500;
@@ -46,33 +46,95 @@ function fetchLevel(p, path, offset) {
  * `opts.count` the element that gets the number of rows of the group, and
  * `opts.olderServer()` draws the list for a server that does not know the
  * file browser yet.
+ *
+ * The favourite folder (issue #352): `opts.favourite` is the group's
+ * favourite folder (`""` = none), `opts.atTop` shows the top of the group
+ * although it has one, `opts.bar` is the element above the list for the
+ * banner or the suggestion, and `opts.actions` = `{ favour(path),
+ * showTop(on), decline() }` changes them (each draws Home again);
+ * without `opts.actions` there are no stars.
  */
 export function renderFiles(p, ul, opts) {
+  var root = opts.favourite && !opts.atTop ? opts.favourite : "";
   clear(ul);
   ul.appendChild(h("li.loading", { text: "Loading" }));
-  return fetchLevel(p, "", 0).then(function (level) {
+  // the banner is up before the list: a folder that cannot be listed can
+  // still be left
+  drawBar(p, opts, null);
+  return fetchLevel(p, root, 0).then(function (level) {
     if (opts.count) opts.count.textContent = String(groupTotal(level));
-    drawLevel(p, "", ul, level, opts.sort, "No files yet.");
+    drawBar(p, opts, level);
+    drawLevel(p, root, ul, level, opts, root ? "The favourite folder has no files." : "No files yet.");
   }, function (err) {
-    if (err && err.status === 404 && opts.olderServer) return opts.olderServer();
+    if (err && err.status === 404 && opts.olderServer) {
+      if (opts.bar) clear(opts.bar);
+      return opts.olderServer();
+    }
     clear(ul);
     ul.appendChild(h("li.notice.error", { text: errorText(err) }));
   });
+}
+
+/**
+ * Above the list: in the favourite folder a banner in the accent colour
+ * (where it is, the way to the whole group, removing it); at the top of a
+ * group with a favourite the way back to it; else, once the top is loaded,
+ * the folders with an Inventor project file as suggestions.
+ */
+function drawBar(p, opts, level) {
+  var bar = opts.bar, act = opts.actions;
+  if (!bar) return;
+  clear(bar);
+  bar.className = "home-root";
+  if (!act) return;
+  if (opts.favourite && !opts.atTop) {
+    bar.className = "home-root on";
+    bar.setAttribute("role", "note");
+    bar.appendChild(h("p.home-root-title", null, [
+      h("span.home-root-star", { "aria-hidden": "true", text: "★" }),
+      h("strong", { text: "Favourite folder" }), " – not the top of the group"
+    ]));
+    bar.appendChild(h("p.home-root-path", { title: favouritePath(p.code, opts.favourite), text: favouritePath(p.code, opts.favourite) }));
+    bar.appendChild(h("div.row", null, [
+      h("button.small", { type: "button", title: "Show the top of " + p.code + " – the favourite stays", on: { click: function () { act.showTop(true); } } }, "Whole group"),
+      h("button.small.ghost", { type: "button", title: "Home starts at the top of the group again", on: { click: function () { act.favour(""); } } }, "Remove favourite")
+    ]));
+    return;
+  }
+  bar.removeAttribute("role");
+  if (opts.favourite) {
+    bar.appendChild(h("button.link.small.home-root-back", {
+      type: "button", title: "Back to the favourite folder " + favouritePath(p.code, opts.favourite),
+      on: { click: function () { act.showTop(false); } }
+    }, [h("span.home-root-star", { "aria-hidden": "true", text: "★" }), "Back to the favourite folder"]));
+    return;
+  }
+  var suggested = favouriteSuggestions(level, opts.favourite, opts.declined);
+  if (!suggested.length) return;
+  bar.className = "home-root hint";
+  bar.appendChild(h("p", { text: suggested.length === 1
+    ? "The Inventor project file of this group is in " + suggested[0] + ". Start Home in that folder?"
+    : "This group has Inventor project files in several folders. Start Home in one of them?" }));
+  bar.appendChild(h("div.row", null, suggested.map(function (path) {
+    return h("button.small", { type: "button", title: "Make " + path + " the favourite folder: Home starts there (on this computer)",
+      on: { click: function () { act.favour(path); } } }, suggested.length === 1 ? "Start there" : path);
+  }).concat([h("button.small.ghost", { type: "button", title: "Do not suggest it again; a folder's ☆ still makes it the favourite",
+    on: { click: function () { act.decline(); } } }, "No, thanks")])));
 }
 
 /** Loads one folder into `ul`. */
-function loadFolder(p, path, ul, sort) {
+function loadFolder(p, path, ul, opts) {
   clear(ul);
   ul.appendChild(h("li.loading", { text: "Loading" }));
   return fetchLevel(p, path, 0).then(function (level) {
-    drawLevel(p, path, ul, level, sort, "This folder is empty.");
+    drawLevel(p, path, ul, level, opts, "This folder is empty.");
   }, function (err) {
     clear(ul);
     ul.appendChild(h("li.notice.error", { text: errorText(err) }));
   });
 }
 
-function drawLevel(p, path, ul, level, sort, emptyText) {
+function drawLevel(p, path, ul, level, opts, emptyText) {
   var loaded = level.entries || [];
   var total = level.total || loaded.length;
   function more() {
@@ -87,12 +149,12 @@ function drawLevel(p, path, ul, level, sort, emptyText) {
   function paint() {
     clear(ul);
     var folders = sortFolders(level.folders);
-    var entries = sortEntries(loaded, sort);
+    var entries = sortEntries(loaded, opts.sort);
     if (!folders.length && !entries.length) {
       ul.appendChild(h("li.empty", { text: emptyText }));
       return;
     }
-    folders.forEach(function (f) { ul.appendChild(folderNode(p, f, sort)); });
+    folders.forEach(function (f) { ul.appendChild(folderNode(p, f, opts)); });
     var files = entries.filter(function (e) { return e.filename; });
     var loose = entries.filter(function (e) { return !e.filename; });
     files.forEach(function (e) { ul.appendChild(entryNode(p, path, e)); });
@@ -109,8 +171,20 @@ function drawLevel(p, path, ul, level, sort, emptyText) {
   paint();
 }
 
+/** The star of a folder row: makes it the favourite folder, or (filled, on
+ *  the favourite) removes it. */
+function favouriteButton(f, opts) {
+  if (!opts.actions) return null;
+  var on = f.path === opts.favourite;
+  var text = on ? "Remove the favourite folder " + f.path : "Make " + f.path + " the favourite folder: Home starts there";
+  return h("button.fav" + (on ? ".on" : ""), {
+    type: "button", title: text, "aria-label": text, "aria-pressed": String(on),
+    on: { click: function (ev) { ev.stopPropagation(); opts.actions.favour(on ? "" : f.path); } }
+  }, on ? "★" : "☆");
+}
+
 /** A folder: expands into its own level when opened. */
-function folderNode(p, f, sort) {
+function folderNode(p, f, opts) {
   var key = folderKey(p.code, f.path);
   var open = !!state.expanded[key];
   var children = h("ul.tree" + (open ? "" : ".hidden"));
@@ -129,16 +203,16 @@ function folderNode(p, f, sort) {
   }, [
     twisty, h("span.ico", null, svgIcon(ICONS.folder)),
     h("span.label", null, h("strong", { text: f.name })),
-    h("span.meta", null, [here, h("span.count", { text: String(f.files) })])
+    h("span.meta", null, [here, favouriteButton(f, opts), h("span.count", { text: String(f.files) })])
   ], function () {
     open = state.expanded[key] = !state.expanded[key];
     remember(p, open ? f.path : parentFolder(f.path));
     twisty.textContent = open ? "▾" : "▸";
     node.setAttribute("aria-expanded", String(open));
     children.classList.toggle("hidden", !open);
-    if (open) loadFolder(p, f.path, children, sort);
+    if (open) loadFolder(p, f.path, children, opts);
   });
-  if (open) loadFolder(p, f.path, children, sort);
+  if (open) loadFolder(p, f.path, children, opts);
   return h("li", null, [node, children]);
 }
 

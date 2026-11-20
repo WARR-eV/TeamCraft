@@ -125,6 +125,16 @@ see the notices in the README.
 
 ### Added
 
+- **Favourite folder** in TeamCraft Desktop's *Home* (#352): the ☆ of a
+  folder in the *Files* view makes it the group's favourite folder, and Home
+  starts there instead of at the top of the group – no clicking through
+  sub-folders each time. A banner in the accent colour names the folder
+  (`ROVER / Design / Rover`) and says it is not the top of the group;
+  *Whole group* shows the top (with a way back), *Remove favourite* ends it.
+  The folder of the group's Inventor project file (`.ipj`) is suggested
+  (*Start there* / *No, thanks*). Kept per computer, server and group.
+  `GET /projects/{code}/files` names those folders at the top of a group in
+  the new field `project_folders`.
 
 - Guard test for read permissions (#312): `tests/architecture_guards.rs`
   fails when a service function takes an actor and queries items, revisions

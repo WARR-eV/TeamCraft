@@ -25,6 +25,11 @@
 //   * a folder opens its own level, "show … more" loads the next page, and
 //     the folder stays open when Home is shown again;
 //   * a click on a file opens its revision in a tab;
+//   * the folder of the Inventor project file is suggested as the favourite
+//     folder; Home then starts there, also after a reload, under a banner in
+//     the accent colour; *Whole group* shows the top and leads back, *Remove
+//     favourite* ends it, *No, thanks* stops the suggestion; a folder's star
+//     makes it the favourite (issue #352);
 //   * a server without the file browser gets the items by name (All items);
 //   * an empty group says so;
 //   * New item starts with the active group and the folder last opened; the
@@ -93,6 +98,8 @@ function fakeBackend() {
   const levels = {
     "ROVER:": {
       folders: [{ name: "wheels", path: "wheels", files: 3 }, { name: "Chassis", path: "Chassis", files: 521 }],
+      // the folder of the Inventor project file: suggested as the favourite
+      project_folders: ["Chassis/brackets"],
       entries: [
         file("Rover.iam", "ASM-0000001", "assembly", { state: "released" }),
         file("part2.ipt", "PRT-0000310"),
@@ -136,10 +143,11 @@ function fakeBackend() {
       const code = decodeURIComponent(m[1]);
       if (code === "PUMP") return notFound("Route"); // an older server
       const level = levels[code + ":" + (q.get("folder") || "")];
-      if (!level) return Promise.resolve({ folder: q.get("folder") || "", folders: [], entries: [], total: 0 });
+      if (!level) return Promise.resolve({ folder: q.get("folder") || "", folders: [], entries: [], total: 0, project_folders: [] });
       const offset = Number(q.get("offset") || 0), limit = Number(q.get("limit") || 50);
       return Promise.resolve({ folder: q.get("folder") || "", folders: level.folders,
-        entries: level.entries.slice(offset, offset + limit), total: offset < level.entries.length ? level.entries.length : 0 });
+        entries: level.entries.slice(offset, offset + limit), total: offset < level.entries.length ? level.entries.length : 0,
+        project_folders: level.project_folders || [] });
     }
     m = p.match(/^\/projects\/([^/]+)\/structure$/);
     if (method === "GET" && m) {
@@ -288,6 +296,75 @@ async function check(browserType, name) {
   await home("ROVER");
   await page.waitForSelector("#navigator .node.file");
 
+  // the favourite folder (issue #352): the folder of the Inventor project
+  // file is suggested; Home then starts there under an accent banner
+  const bar = "#navigator .home-root";
+  const barText = () => page.locator(bar).textContent();
+  await page.waitForSelector(bar + ".hint");
+  same("the suggestion", await page.locator(bar + " p").textContent(),
+    "The Inventor project file of this group is in Chassis/brackets. Start Home in that folder?");
+  await page.locator(bar + " button", { hasText: "Start there" }).click();
+  await page.waitForSelector(bar + ".on");
+  await home("ROVER");
+  await page.waitForSelector(top + " > .node.file");
+  same("the favourite folder", await rows(page, top), ["Gusset.ipt | PRT-0000100/A"]);
+  same("its banner", await page.locator(bar + " .home-root-path").textContent(), "ROVER / Chassis / brackets");
+  if (!(await barText()).includes("not the top of the group")) fail("the banner does not say that this is not the top of the group");
+  same("rows below the favourite", await page.locator("#navigator .nav-sort .count").textContent(), "1");
+  const accent = await page.evaluate((sel) => {
+    const el = document.querySelector(sel), probe = document.createElement("span");
+    probe.style.color = "var(--accent)";
+    document.body.appendChild(probe);
+    const want = getComputedStyle(probe).color;
+    probe.remove();
+    return { border: getComputedStyle(el).borderTopColor, want };
+  }, bar);
+  same("the banner is in the accent colour", accent.border, accent.want);
+  await page.screenshot({ path: path.join(shots, `home-check-favourite-${name}.png`) });
+  // kept per computer: a reload starts there again
+  await page.reload();
+  await page.waitForSelector(bar + ".on");
+  await home("ROVER");
+  same("the favourite after a reload", await rows(page, top), ["Gusset.ipt | PRT-0000100/A"]);
+  // the whole group, and back
+  await page.locator(bar + " button", { hasText: "Whole group" }).click();
+  await page.waitForSelector(bar + " .home-root-back");
+  await home("ROVER");
+  same("the whole group", (await rows(page, top)).slice(0, 2), ["[folder] Chassis 521", "[folder] wheels 3"]);
+  same("no suggestion beside a favourite", await page.locator(bar + ".hint").count(), 0);
+  await page.locator(bar + " .home-root-back").click();
+  await page.waitForSelector(bar + ".on");
+  await home("ROVER");
+  same("back in the favourite", await rows(page, top), ["Gusset.ipt | PRT-0000100/A"]);
+  // removed: the top again, with the suggestion; declined: no suggestion, also after a reload
+  await page.locator(bar + " button", { hasText: "Remove favourite" }).click();
+  await page.waitForSelector(bar + ".hint");
+  await home("ROVER");
+  same("the top after removing the favourite", (await rows(page, top)).slice(0, 2), ["[folder] Chassis 521", "[folder] wheels 3"]);
+  await page.locator(bar + " button", { hasText: "No, thanks" }).click();
+  await page.waitForFunction((sel) => !document.querySelector(sel).childNodes.length, bar);
+  await page.reload();
+  await home("ROVER");
+  await page.waitForSelector("#navigator .node.file");
+  same("a declined suggestion stays away", await page.locator(bar).count() ? await barText() : "", "");
+  // a folder's star makes it the favourite; the filled star removes it
+  const wheels = page.locator("#navigator .node.folder", { hasText: "wheels" });
+  same("an empty star", [await wheels.locator(".fav").textContent(), await wheels.locator(".fav").getAttribute("aria-pressed")], ["☆", "false"]);
+  await wheels.locator(".fav").click();
+  await page.waitForSelector(bar + ".on");
+  await home("ROVER");
+  same("the starred folder", await rows(page, top), ["Rim.ipt | PRT-0000201/A", "Tyre.ipt | PRT-0000202/A", "Wheel.ipt | PRT-0000200/A"]);
+  same("the starred folder's banner", await page.locator(bar + " .home-root-path").textContent(), "ROVER / wheels");
+  await page.locator(bar + " button", { hasText: "Whole group" }).click();
+  await page.waitForSelector(bar + " .home-root-back");
+  await home("ROVER");
+  same("a filled star on the favourite", await page.locator("#navigator .node.folder", { hasText: "wheels" }).locator(".fav").textContent(), "★");
+  if (await page.locator("#navigator .node.folder", { hasText: "wheels" }).getAttribute("aria-expanded") !== "false") fail("the star opened the folder");
+  await page.locator("#navigator .node.folder", { hasText: "wheels" }).locator(".fav").click();
+  await page.waitForFunction((sel) => !document.querySelector(sel).childNodes.length, bar);
+  await home("ROVER");
+  same("the top without a favourite", (await rows(page, top)).slice(0, 2), ["[folder] Chassis 521", "[folder] wheels 3"]);
+
   // the Projects page marks the active group; a server without the file
   // browser gets the items of the group instead (All items, by name)
   await page.locator(".rail button[data-view='projects']").click();
@@ -299,6 +376,7 @@ async function check(browserType, name) {
   await home("PUMP");
   await page.waitForSelector(top + " > .node");
   same("PUMP on an older server", await rows(page, top), ["Impeller | PRT-0000501/A", "Pump P-200 | ASM-0000050/B", "volute casing | PRT-0000500/A"]);
+  same("no favourite banner on an older server", await page.locator("#navigator .home-root").textContent(), "");
 
   // an empty group
   await page.locator(".rail button[data-view='projects']").click();

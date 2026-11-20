@@ -7,7 +7,9 @@
 //! the group the way a new working folder would look. Items whose latest
 //! revision has no file are listed in their own folder (`items.folder`, the
 //! top of the group by default), after the files, so every item of the group
-//! can be reached from the browser.
+//! can be reached from the browser. The top of a group also names the folders
+//! that hold an Inventor project file, the folders TeamCraft Desktop suggests
+//! to start its Home in (issue #352).
 //!
 //! # Invariants
 //!
@@ -27,6 +29,9 @@ use crate::{
 
 /// More sub-folders than this are never returned for one folder.
 pub const MAX_FOLDERS: i64 = 1000;
+
+/// More project folders than this are never returned (`Level::project_folders`).
+pub const MAX_PROJECT_FOLDERS: i64 = 20;
 
 /// A folder directly below the listed one.
 #[derive(Clone, Debug, Serialize, sqlx::FromRow)]
@@ -75,6 +80,12 @@ pub struct Level {
     pub entries: Vec<Entry>,
     /// Entries of the folder in all (0 beyond the last page).
     pub total: i64,
+    /// Only at the top of the group (empty below it): the folders that hold
+    /// an Inventor project file (`.ipj`), by path, at most
+    /// [`MAX_PROJECT_FOLDERS`]. TeamCraft Desktop suggests them as the
+    /// folder its Home starts in (issue #352). A project file at the top of
+    /// the group is no suggestion: Home starts there anyway.
+    pub project_folders: Vec<String>,
 }
 
 /// The latest revision of the item aliased `i`.
@@ -178,10 +189,31 @@ pub async fn level(
             entry
         })
         .collect();
+    // the folders of the project files; a file stored before its format was
+    // known is found by its extension
+    let project_folders = if folder.is_empty() {
+        sqlx::query_scalar::<_, String>(&format!(
+            "SELECT f.folder
+             FROM items i {LATEST}
+             JOIN files f ON f.revision_id = lr.id
+             WHERE i.project_id = $1 AND {visible} AND f.folder <> ''
+               AND (f.format = 'inventor-project' OR lower(f.filename) LIKE '%.ipj')
+             GROUP BY f.folder
+             ORDER BY lower(f.folder), f.folder
+             LIMIT {MAX_PROJECT_FOLDERS}"
+        ))
+        .bind(project_id)
+        .bind(&actor.hidden_projects)
+        .fetch_all(pool)
+        .await?
+    } else {
+        Vec::new()
+    };
     Ok(Level {
         folder: folder.to_string(),
         folders,
         entries,
         total,
+        project_folders,
     })
 }

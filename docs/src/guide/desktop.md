@@ -310,6 +310,19 @@ this computer.
   number);
 * *Structure*: the assemblies with their parts.
 
+**Favourite folder.** When your work is several folders down, make that
+folder the group's favourite: point at the folder in *Files* and click its
+☆. Home then starts in that folder instead of at the top of the group. A
+banner in the accent colour above the list shows where you are
+(`ROVER / Design / Rover`) and that it is *not the top of the group*;
+*Whole group* shows the top (*Back to the favourite folder* returns), and
+*Remove favourite* (or the filled ★ of the folder) lets Home start at the
+top again. If the group holds an Inventor project file (`.ipj`) in a
+folder, Home suggests that folder – *Start there*, or *No, thanks* to stop
+the suggestion for this group. The favourite is kept on this computer, for
+each server and group; the count next to the order then counts the rows
+below the favourite folder.
+
 *Files* and *All items* are sorted by name (or by number, type or state – the
 choice is kept). *Change…* goes back to *Projects*. *New* and *Import CAD
 Folder…* start with the active group. *New* (and `Ctrl/Cmd+N`) also starts

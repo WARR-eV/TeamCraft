@@ -225,6 +225,91 @@ async fn one_folder_level_with_subfolders_files_and_loose_items() {
     );
 }
 
+/// The top of a group names the folders that hold an Inventor project file
+/// (`.ipj`, whatever the case of its extension) – once each, by path, never
+/// the top itself and nothing of another group; below the top the list is
+/// empty (issue #352).
+#[tokio::test]
+async fn the_top_names_the_folders_of_inventor_project_files() {
+    let app = app_or_skip!();
+    let (_, erika) = app.user_in("erika", Role::Editor, &["ROVER"]).await;
+    let (_, max) = app.user_in("max", Role::Editor, &["ROCKET"]).await;
+
+    // no project file yet: nothing to suggest
+    item(
+        &app,
+        &erika,
+        "ROVER",
+        "part",
+        "Wheel",
+        "Design/Rover/wheels",
+        &["Wheel.ipt"],
+    )
+    .await;
+    let top = level(&app, &erika, "").await;
+    assert_eq!(top["project_folders"], json!([]), "{top}");
+
+    item(
+        &app,
+        &erika,
+        "ROVER",
+        "document",
+        "Rover project",
+        "Design/Rover",
+        &["Rover.ipj", "Spare.ipj"],
+    )
+    .await;
+    item(
+        &app,
+        &erika,
+        "ROVER",
+        "document",
+        "Arm project",
+        "Design/arm",
+        &["ARM.IPJ"],
+    )
+    .await;
+    item(
+        &app,
+        &erika,
+        "ROVER",
+        "document",
+        "Top project",
+        "",
+        &["Top.ipj"],
+    )
+    .await;
+    item(
+        &app,
+        &max,
+        "ROCKET",
+        "document",
+        "Rocket project",
+        "Design/Rocket",
+        &["Rocket.ipj"],
+    )
+    .await;
+
+    let top = level(&app, &erika, "").await;
+    assert_eq!(
+        top["project_folders"],
+        json!(["Design/arm", "Design/Rover"]),
+        "{top}"
+    );
+    // the project files are ordinary entries of their folders
+    let rover = level(&app, &erika, "?folder=Design/Rover").await;
+    assert_eq!(names(&rover), ["Rover.ipj", "Spare.ipj"], "{rover}");
+    assert_eq!(rover["entries"][0]["format"], "inventor-project");
+    assert_eq!(rover["project_folders"], json!([]), "{rover}");
+    // a page further down still names them: they belong to the folder, not the page
+    let page = level(&app, &erika, "?limit=1&offset=1").await;
+    assert_eq!(
+        page["project_folders"],
+        json!(["Design/arm", "Design/Rover"]),
+        "{page}"
+    );
+}
+
 /// A folder name is compared as it is: `%` and `_` are no wildcards, and a
 /// folder whose name only starts like the listed one is not below it.
 #[tokio::test]
