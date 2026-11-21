@@ -695,6 +695,18 @@ real files and belong to section 3 once such files are at hand.
 - [ ] STEP export through the local NX (NX Open / journal), on Windows and Linux
 - [ ] NX load options for the workspace only on request, in the workspace wizard; NX part of the tutorial
 
+**SolidCraft** (research page *SolidCraft designs*)
+
+- [x] Research page on the `.sc` design container and its sources (#363)
+- [ ] Preview image from the embedded thumbnail (#364)
+- [ ] Linked designs as file references with quantities (#365)
+- [ ] BOM import from SolidCraft's BOM CSV and from the design (#366)
+- [ ] Design properties read, shown, searchable, mismatches with the item flagged (#367)
+- [ ] Desktop: STEP export through `solidcraft-cli` at check-in, all OSes (#368)
+- [ ] Desktop: item number and revision written into the design properties (#369)
+- [ ] Desktop: designs open in SolidCraft (lock file) shown, warning at check-in (#370)
+- [ ] (research first) 3D preview from the `.sc` file alone (#371)
+
 ### 5. Feature demand (backlog)
 
 What users ask of PLM/PDM systems (reviews of commercial and open-source PLM/PDM systems, vendor community
