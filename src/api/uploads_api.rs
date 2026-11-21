@@ -1,7 +1,8 @@
 //! Chunked, resumable uploads (`/api/v1/uploads`, see `services::uploads`).
 //!
 //! ```text
-//! POST   /uploads              {item, revision, filename, size, sha256?, content_type?, base?, folder?}
+//! POST   /uploads              {item, revision, filename, size, sha256?, content_type?, base?, folder?,
+//!                               refuse_clash?, refuse_same_name?}
 //! PATCH  /uploads/{id}         Upload-Offset: <n>, body = the next chunk
 //! HEAD   /uploads/{id}         Upload-Offset / Upload-Length (GET: the same as JSON)
 //! POST   /uploads/{id}/finish  {comment?, check_in?}
@@ -23,7 +24,10 @@ use crate::{
     auth::{Actor, ApiUser},
     domain::BaseVersion,
     error::{AppError, AppResult},
-    services::uploads::{self, NewSession, UploadSession},
+    services::{
+        file_check::ClashGuard,
+        uploads::{self, NewSession, UploadSession},
+    },
     web, AppState,
 };
 
@@ -41,6 +45,8 @@ fn session_json(st: &AppState, s: &UploadSession) -> Value {
         "complete": s.complete(),
         "sha256": s.sha256,
         "folder": s.folder,
+        "refuse_clash": s.refuse_clash,
+        "refuse_same_name": s.refuse_same_name,
         "chunk_bytes": st.config.upload_chunk_bytes,
         "created_at": s.created_at,
         "expires_at": s.expires_at,
@@ -85,6 +91,14 @@ pub(super) struct CreateBody {
     /// Folder inside the project group (the desktop working folder).
     #[serde(default)]
     folder: Option<String>,
+    /// Refuse the file when it is new in the revision and another item of
+    /// the group has a current file at the same place (issue #359).
+    #[serde(default)]
+    refuse_clash: bool,
+    /// Also refuse it when another item has a current file of the same name
+    /// in another folder of the group (includes `refuse_clash`).
+    #[serde(default)]
+    refuse_same_name: bool,
 }
 
 pub(super) async fn create(
@@ -108,6 +122,7 @@ pub(super) async fn create(
             content_type: body.content_type,
             base,
             folder: body.folder,
+            guard: ClashGuard::new(body.refuse_clash, body.refuse_same_name),
         },
     )
     .await

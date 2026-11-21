@@ -13,6 +13,9 @@ import { requestChangeDialog } from "./requests.js";
 import { refreshStructure } from "./navigator.js";
 import { fileFamily, openWithCad } from "./cad-open.js";
 import { incompleteGet, notOpenedText } from "./get-rules.js";
+import { formatKinds } from "./folder-import.js";
+import { isNewModelOfItsOwn, workspacePath } from "./new-files.js";
+import { newItemDialog } from "./dialogs.js";
 
 // ---------------------------------------------------------------- 3D viewer
 
@@ -427,12 +430,15 @@ export var uploadWatcher = null;
  * the same dialog with both buttons; `park` only decides the default one. */
 export function checkinDialog(tab, park) {
   var rev = tab.data.rev;
-  Promise.all([call("workspace_status", { project: rev.project_code, item: rev.item_number, code: rev.code }), cadPrograms()]).then(function (r) {
-    var ws = r[0], programs = r[1];
+  Promise.all([call("workspace_status", { project: rev.project_code, item: rev.item_number, code: rev.code }), cadPrograms(),
+    formatKinds().catch(function () { return {}; })]).then(function (r) {
+    var ws = r[0], programs = r[1], kinds = r[2] || {};
     var candidates = ws.files.filter(function (f) { return f.state === "modified" || f.state === "new" || f.state === "conflict"; });
-    // conflicting files are offered, but not ticked: the server refuses them anyway
+    // conflicting files are offered, but not ticked: the server refuses them
+    // anyway; a second model file is usually a new item of its own (#359)
     var boxes = candidates.map(function (f) {
-      return { name: f.name, input: h("input", { type: "checkbox", checked: f.state !== "conflict" }), state: f.state };
+      var ownItem = isNewModelOfItsOwn(f, ws.files, kinds);
+      return { name: f.name, path: f.path, ownItem: ownItem, input: h("input", { type: "checkbox", checked: f.state !== "conflict" && !ownItem }), state: f.state };
     });
     var comment = h("input", { type: "text", maxlength: "2000", placeholder: "What changed, e.g. wall thickness 2 → 2.5 mm" });
     var progressLine = h("p.small.muted.hidden", { role: "status" });
@@ -448,7 +454,14 @@ export function checkinDialog(tab, park) {
     var body = h("div.stack", null, [
       h("p.small.muted", null, ["From ", h("span.mono", { text: ws.dir })]),
       candidates.length ? h("div.stack", null, boxes.map(function (b) {
-        return h("label.check", null, [b.input, b.name, " ", badge(b.state, SYNC_LABEL[b.state])]);
+        var row = h("label.check", null, [b.input, b.name, " ", badge(b.state, SYNC_LABEL[b.state])]);
+        if (!b.ownItem) return row;
+        return h("div.stack", null, [row, h("p.small.muted", null, [
+          "A new part or assembly – usually an item of its own, not a file of " + rev.item_number + ". ",
+          h("button.link.small", { type: "button", on: { click: function () {
+            newItemDialog({ paths: [workspacePath(state.session.workspace_dir, b.path)] });
+          } } }, "New item from this file")
+        ])]);
       })) : h("p.empty", { text: "No modified or new files – checking in only ends your check-out; the revision stays in work." }),
       boxes.some(function (b) { return b.state === "conflict"; }) ? h("p.notice.error", { text: "Conflict: these files changed on the server since you got them. " +
         "The server refuses to overwrite the newer version (nothing is stored) – save your copy under another name, get the current files and merge." }) : null,

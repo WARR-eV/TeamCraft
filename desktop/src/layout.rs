@@ -264,6 +264,33 @@ pub fn rel_of(root: &Path, path: &Path) -> Option<String> {
     (!parts.is_empty()).then(|| parts.join("/"))
 }
 
+/// [`rel_of`], also when `path` spells `root` in another case or composes
+/// its names differently: the file systems of Windows and macOS ignore case
+/// (`C:\TeamCraft` and `c:\teamcraft` are one folder), and macOS hands out
+/// decomposed names. The relative parts come from `path` as they are.
+pub fn rel_below(root: &Path, path: &Path) -> Option<String> {
+    if let Some(rel) = rel_of(root, path) {
+        return Some(rel);
+    }
+    if !cfg!(any(windows, target_os = "macos")) {
+        return None;
+    }
+    let fold = |c: std::path::Component<'_>| nfc(&c.as_os_str().to_string_lossy()).to_lowercase();
+    let root_parts: Vec<String> = root.components().map(fold).collect();
+    let parts: Vec<std::path::Component<'_>> = path.components().collect();
+    if parts.len() <= root_parts.len() || root_parts.iter().zip(&parts).any(|(r, p)| *r != fold(*p))
+    {
+        return None;
+    }
+    Some(
+        parts[root_parts.len()..]
+            .iter()
+            .map(|c| c.as_os_str().to_string_lossy().to_string())
+            .collect::<Vec<_>>()
+            .join("/"),
+    )
+}
+
 /// Revision codes in their order: `B` < `Y` < `AA` (same alphabet as the server).
 pub fn revision_order(code: &str) -> (usize, String) {
     (code.len(), code.to_ascii_uppercase())
@@ -975,6 +1002,28 @@ mod tests {
         assert_eq!(rel_of(root, Path::new("/elsewhere/a")), None);
         assert!(revision_order("B") < revision_order("Y"));
         assert!(revision_order("Y") < revision_order("AA"));
+    }
+
+    #[test]
+    fn rel_below_ignores_case_where_the_file_system_does() {
+        let root = Path::new("/home/u/TeamCraft");
+        assert_eq!(
+            rel_below(root, Path::new("/home/u/TeamCraft/ROVER/a.ipt")).as_deref(),
+            Some("ROVER/a.ipt")
+        );
+        assert_eq!(rel_below(root, Path::new("/home/u/Other/a.ipt")), None);
+        assert_eq!(
+            rel_below(root, root),
+            None,
+            "the root itself is no file below it"
+        );
+        // the root spelt in another case: one folder on Windows and macOS
+        let other_case = rel_below(root, Path::new("/home/u/teamcraft/ROVER/Sub/a.ipt"));
+        if cfg!(any(windows, target_os = "macos")) {
+            assert_eq!(other_case.as_deref(), Some("ROVER/Sub/a.ipt"));
+        } else {
+            assert_eq!(other_case, None);
+        }
     }
 
     #[test]

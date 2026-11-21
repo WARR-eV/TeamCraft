@@ -20,7 +20,11 @@ use crate::{
     domain::{self, BaseConflict, BaseVersion, FileRetention, ServerFile},
     error::{AppError, AppResult},
     models::{FileRecord, FileVersion, Revision},
-    services::{access, audit, references, revisions},
+    services::{
+        access, audit,
+        file_check::{self, ClashGuard},
+        references, revisions,
+    },
     util,
     vault::{StoredBlob, Vault},
 };
@@ -71,6 +75,9 @@ pub struct Upload {
     /// Solver summary (`solversummary`) computed from the head and tail
     /// read for the result scan; `None` for other files.
     pub solver_summary: Option<serde_json::Value>,
+    /// The duplicate guard the client asked for (issue #359, see
+    /// `services::file_check`): off by default.
+    pub guard: ClashGuard,
 }
 
 /// The name a file gets on the server – the key for bases and versions.
@@ -233,6 +240,7 @@ impl Upload {
             solver_summary,
             scan_head,
             scan_tail,
+            guard: ClashGuard::default(),
         }
     }
 }
@@ -892,7 +900,9 @@ pub async fn precheck_base(
 }
 
 /// Stores uploads as new files or new versions inside the caller's
-/// transaction. The revision must be locked and checked as editable.
+/// transaction. The revision must be locked and checked as editable. A file
+/// that is new in the revision passes the duplicate guard of its upload
+/// first (`Upload::guard`, `file_check::refuse_clash`: 409, nothing stored).
 pub(crate) async fn store_uploads(
     conn: &mut PgConnection,
     actor: &Actor,
@@ -964,6 +974,11 @@ pub(crate) async fn store_uploads(
                 (e.id, version, true)
             }
             None => {
+                // no folder named: the item's folder (the top of the group by default)
+                let folder = upload.folder.as_deref().unwrap_or(&rev.item_folder);
+                // a file new in the revision: the duplicate guard the upload asked
+                // for (#359) – a 409 rolls the caller's transaction back
+                file_check::refuse_clash(conn, rev, &filename, folder, upload.guard).await?;
                 let id = Uuid::new_v4();
                 sqlx::query(
                     "INSERT INTO files (id, revision_id, filename, content_type, size_bytes, sha256, uploaded_by,
@@ -978,8 +993,7 @@ pub(crate) async fn store_uploads(
                 .bind(&upload.blob.sha256)
                 .bind(actor.id)
                 .bind(format)
-                // no folder named: the item's folder (the top of the group by default)
-                .bind(upload.folder.as_deref().unwrap_or(&rev.item_folder))
+                .bind(folder)
                 .execute(&mut *conn)
                 .await?;
                 (id, 1, true)
@@ -1220,7 +1234,10 @@ pub async fn set_retention(
 ///   group); an empty upload list is a 400.
 /// * **Locks:** the revision row (`revisions::lock`) and the existing file
 ///   rows of the uploaded names (`FOR UPDATE`); an upload with a base version
-///   is checked against the current file (409 if it moved on).
+///   is checked against the current file (409 if it moved on). A new file
+///   whose upload asks for the duplicate guard (`refuse_clash`,
+///   `refuse_same_name`) takes the advisory lock of the project group and is
+///   refused (409) when another item already has it (`services::file_check`).
 /// * **Audit:** `file.upload` / `file.version` per changed file, `file.folder`
 ///   per moved file; identical content stores nothing new. For a simulation
 ///   revision, result values read from an exchange file or the group's
@@ -1261,7 +1278,8 @@ pub async fn attach(
 ///   (`revisions::ensure_editable`: in work, CAD editor of its group).
 /// * **Locks:** the revision row (`revisions::lock`) and the existing file
 ///   rows of the uploaded names (`FOR UPDATE`); every upload is checked
-///   against the version it is based on (409 if the file moved on).
+///   against the version it is based on (409 if the file moved on); the
+///   duplicate guard as in [`attach`].
 /// * **Audit:** `file.upload` / `file.version` per stored file, then
 ///   `revision.checkin`.
 /// * **Notifications:** the item's watchers, when a file changed.

@@ -124,7 +124,9 @@ function connectionsBox(closeSettings) {
   }
   function draw(list) {
     var rows = list.map(function (c) {
-      var who = c.display_name || c.username;
+      // the active connection: the account the app is signed in with, also
+      // before the connection has noted it (#356)
+      var who = c.display_name || c.username || (c.active && state.me ? state.me.display_name || state.me.username : "");
       return h("li.row", null, [
         h("span", null, [
           h("strong", { text: c.server_url }),

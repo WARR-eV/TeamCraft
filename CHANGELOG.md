@@ -15,6 +15,52 @@ see the notices in the README.
 
 ### Added
 
+- **New items from files on this computer** (#359). *New* in the desktop app
+  takes group and folder from where a file is in the working folder
+  (`<working folder>/GRAKSLER/Design/Struktur/Bracket.ipt` → group
+  `GRAKSLER`, folder `Design/Struktur`; every file keeps its own folder, files
+  picked from elsewhere are copied into the item's folder, never moved, and
+  nothing in the working folder is overwritten), so the item lands on the
+  server where the assemblies of everybody else expect it – before, the
+  files of a new item went to the top of the group. Duplicates are refused
+  before anything is created: a file that belongs to an item already
+  (tracked, or added with *Add files…*), a file another item has at the same
+  place, and – unless *Create anyway* – the same file name in another folder
+  of the group; the same content is a warning. The new read-only endpoint
+  `POST /api/v1/projects/{code}/file-check` answers per file with
+  `same_place`, `same_name` and `same_content` (the current files – the
+  latest revision of every item –, compared case-insensitively and in NFC; up
+  to 200 files; a hidden group answers 404 like an unknown one). The upload's
+  new flags `refuse_clash` and `refuse_same_name` (multipart fields of
+  `POST …/revisions/{code}/files` and `…/checkin`, also covering the chunked
+  sessions listed in `uploads`; JSON fields of `POST /api/v1/uploads`, kept
+  with the session, migration `0076_upload_session_clash_guard`) let the
+  server check the same again while it stores the files, under an advisory
+  lock of the group: a file new in the revision is refused with 409 when
+  another item of the group has it in that folder (the item's folder when the
+  upload names none) – with `refuse_same_name` also under that name in any
+  other folder –, and nothing of a refused request is stored, so of two
+  people creating the same new file at once one gets the 409. New versions
+  are never refused; without the flags nothing changes for other clients. The
+  item is created with an idempotency key from its main file, so *Create*
+  after a lost answer or a failed upload finds the item made the first time,
+  and the uploaded files are recorded in `state.json`. The worklist gets a
+  section **New on this computer**: the parts and assemblies in the working
+  folder that belong to no item yet, one suggestion per model file with its
+  drawing and exports of the same name, counted on the rail; a click opens
+  *New* prefilled, *Create items…* creates the ticked ones after a summary of
+  what is created and what is refused, *×* ignores a file
+  (`.teamcraft/ignored.json`, *Show ignored*). The scan
+  (`desktop/src/newfiles.rs`) skips tracked and added files, companions of
+  tracked files, lock, backup and temporary files, `OldVersions` and hidden
+  folders, visits at most 50 000 entries and reports at most 2 000 files, and
+  runs when the worklist opens or the window gets the focus back (at most
+  every 15 s); nothing is uploaded without the dialog or the summary. In
+  *Check in…* a new part or assembly file next to a revision that has a model
+  already is offered unticked, with *New item from this file*.
+- **The app version above the logo** in the rail of the desktop app, always
+  visible (#357) – which app runs is one look at a screenshot away.
+
 - **Create an item in a folder.** An item now has a folder in its project
   group (migration `0075_item_folder`; empty = the top, as for every existing
   item). It is chosen when the item is created: the new *Folder* field of the
@@ -33,6 +79,18 @@ see the notices in the README.
 
 ### Changed
 
+- **Get project groups takes the latest revision by default** (#355): the
+  desktop dialog preselects *Latest revision, also in work*; *Latest released
+  revision* stays the second choice. In a team that releases only before
+  manufacturing most items are in work, and *released* left the working
+  folder almost empty and the assemblies without their parts.
+- **CI: the macOS server build runs weekly and on *Run workflow* only** (#358),
+  no longer per push to `main`. GitHub's hosted macOS runners are often
+  unavailable; a job that never got a runner is cancelled after 15 minutes,
+  and a cancelled job turned the whole run – and the commit on `main` – red
+  although nothing was wrong with the code. The nightly Release run builds the
+  server for macOS anyway, so a real macOS compile failure still shows within
+  a day.
 - **Database pool** (#317): `TEAMCRAFT_DB_MAX_CONNECTIONS` defaults to 20
   instead of 10 – requests and background jobs share the pool, and long
   imports made requests wait. A request that finds no free connection within
@@ -76,6 +134,12 @@ see the notices in the README.
 
 ### Fixed
 
+- Desktop: *Settings → Connections* showed the active connection as *not
+  signed in yet* when the sign-in was kept from an app version before the
+  connections (#356). The account is now noted the first time the server
+  confirms the stored sign-in at the start (`GET /me`; the settings are
+  written only when it changed), and the list falls back to the signed-in
+  account for the active connection.
 - Desktop: *Check out and open* no longer opens the assembly after *Cancel*
   during the download, or when files could not be copied (#348) – it would
   open without the parts that were still to come. The check-out stays and

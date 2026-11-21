@@ -260,15 +260,18 @@ jobs:
         run: cargo nextest run --locked --lib
 
   build-macos:
-    # macOS (no server release, never failed on its own) only on main and by
-    # hand. Advisory: not in "CI result". GitHub's hosted macOS arm64 runners
-    # are scarce – since 2026-11-18 the job was cancelled again and again with
+    # macOS (no server release, never failed on its own) only in the weekly
+    # run and by hand ("Run workflow"), no longer per push to main (#358).
+    # Advisory: not in "CI result". GitHub's hosted macOS arm64 runners are
+    # scarce – since 2026-11-18 the job was cancelled again and again with
     # "The job was not acquired by Runner of type hosted even after multiple
-    # attempts", which turned main red although nothing was wrong with the
-    # code. A real compile or test failure still shows as a red job here.
+    # attempts", and a cancelled job turns the whole run red, so commits on
+    # main carried a red ✗ although nothing was wrong with the code. A real
+    # macOS compile failure still shows within a day: the nightly Release run
+    # (release.yml) builds the server for macOS aarch64.
     name: build (macos-latest)
     needs: changes
-    if: needs.changes.outputs.server == 'true' && github.event_name != 'pull_request'
+    if: needs.changes.outputs.server == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: macos-latest
     timeout-minutes: 30
     steps:

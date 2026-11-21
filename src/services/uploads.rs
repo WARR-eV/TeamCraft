@@ -29,7 +29,10 @@ use crate::{
     domain::{self, BaseVersion},
     error::{AppError, AppResult},
     models::Revision,
-    services::{files, retention},
+    services::{
+        file_check::{self, ClashGuard},
+        files, retention,
+    },
     vault::{StoredBlob, Vault},
 };
 
@@ -41,7 +44,8 @@ pub const MAX_OPEN_PER_USER: i64 = 16;
 
 const SESSION_SELECT: &str = "
     SELECT id, user_id, revision_id, filename, content_type, total_bytes, received_bytes,
-           sha256, base_version, base_sha256, stored_sha256, folder, created_at, updated_at, expires_at
+           sha256, base_version, base_sha256, stored_sha256, folder, refuse_clash,
+           refuse_same_name, created_at, updated_at, expires_at
     FROM upload_sessions";
 
 /// An upload in progress.
@@ -67,6 +71,10 @@ pub struct UploadSession {
     /// Folder inside the project group (`files.folder`); `None` keeps the
     /// folder of an existing file.
     pub folder: Option<String>,
+    /// The duplicate guard asked for when the upload started (issue #359,
+    /// see [`UploadSession::guard`]).
+    pub refuse_clash: bool,
+    pub refuse_same_name: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
@@ -93,6 +101,11 @@ impl UploadSession {
             (None, None) => None,
         }
     }
+
+    /// The duplicate guard of the file when it is stored.
+    pub fn guard(&self) -> ClashGuard {
+        ClashGuard::new(self.refuse_clash, self.refuse_same_name)
+    }
 }
 
 /// What a client announces when it starts an upload.
@@ -108,6 +121,9 @@ pub struct NewSession {
     /// Folder inside the project group (normalised here); `None` keeps the
     /// folder of an existing file (the item's folder for a new one).
     pub folder: Option<String>,
+    /// The duplicate guard of the file (`refuse_clash`, `refuse_same_name`),
+    /// applied when it is stored; off by default.
+    pub guard: ClashGuard,
 }
 
 /// A finished upload: the stored version and, for a check-in, the revision
@@ -238,7 +254,9 @@ async fn load(
 
 /// Starts an upload into a revision the actor has checked out. Refuses it
 /// early when the file cannot be stored anyway: too large, not checked out,
-/// or a stated base that the server file has moved on from.
+/// a stated base that the server file has moved on from, or a new file its
+/// duplicate guard refuses (`file_check::precheck`, checked again when the
+/// file is stored).
 ///
 /// # Invariants
 ///
@@ -295,6 +313,10 @@ pub async fn create(
     if let (Some(base), Some(rev)) = (&new.base, &rev) {
         files::precheck_base(pool, rev.id, &filename, base, sha256.as_deref()).await?;
     }
+    // a duplicate the guard will refuse anyway is refused before the bytes come
+    if let Some(rev) = &rev {
+        file_check::precheck(pool, rev, &filename, folder.as_deref(), new.guard).await?;
+    }
     let content_type = files::clean_content_type(new.content_type.as_deref());
     let (base_version, base_sha256) = match new.base {
         Some(BaseVersion::Version(v)) => (Some(v), None),
@@ -326,11 +348,12 @@ pub async fn create(
     let session = sqlx::query_as::<_, UploadSession>(
         "INSERT INTO upload_sessions (id, user_id, revision_id, filename, content_type,
                                       total_bytes, sha256, base_version, base_sha256, folder,
-                                      expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now() + make_interval(hours => $11))
+                                      expires_at, refuse_clash, refuse_same_name)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now() + make_interval(hours => $11),
+                 $12, $13)
          RETURNING id, user_id, revision_id, filename, content_type, total_bytes, received_bytes,
-                   sha256, base_version, base_sha256, stored_sha256, folder, created_at, updated_at,
-                   expires_at",
+                   sha256, base_version, base_sha256, stored_sha256, folder, refuse_clash,
+                   refuse_same_name, created_at, updated_at, expires_at",
     )
     .bind(id)
     .bind(actor.id)
@@ -343,6 +366,8 @@ pub async fn create(
     .bind(&base_sha256)
     .bind(&folder)
     .bind(SESSION_HOURS)
+    .bind(new.guard.same_place)
+    .bind(new.guard.same_name)
     .fetch_one(&mut *tx)
     .await?;
     vault.create_staging(id).await?;
@@ -411,8 +436,8 @@ pub async fn append(
              expires_at = now() + make_interval(hours => $3)
          WHERE id = $1
          RETURNING id, user_id, revision_id, filename, content_type, total_bytes, received_bytes,
-                   sha256, base_version, base_sha256, stored_sha256, folder, created_at, updated_at,
-                   expires_at",
+                   sha256, base_version, base_sha256, stored_sha256, folder, refuse_clash,
+                   refuse_same_name, created_at, updated_at, expires_at",
     )
     .bind(id)
     .bind(i64::try_from(end).unwrap_or(i64::MAX))
@@ -425,7 +450,7 @@ pub async fn append(
 
 /// Verifies a fully received upload (size, announced SHA-256), moves it into
 /// the vault and classifies it like a regular upload, with the session's
-/// base and folder. Nothing is registered in the database yet – pass the result to
+/// base, folder and duplicate guard. Nothing is registered in the database yet – pass the result to
 /// [`files::attach`] / [`files::check_in`] and then call [`forget`].
 ///
 /// Calling it again after a failed attach (e.g. the database was briefly
@@ -550,6 +575,7 @@ pub async fn complete_in(
         files::Upload::classify(vault, blob, session.filename.clone(), &session.content_type).await;
     upload.base = session.base();
     upload.folder = session.folder.clone();
+    upload.guard = session.guard();
     Ok(upload)
 }
 

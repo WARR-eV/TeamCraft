@@ -359,6 +359,12 @@ tr.row-conflict td:first-child, tr.row-clash td:first-child { box-shadow: inset 
   color: var(--on-primary); background: var(--primary); border-radius: 999px;
 }
 .rail-spacer { flex: 1; }
+.rail-version {
+  display: block; margin: 0 0 2px; padding: 0 2px;
+  font-size: 10px; line-height: 1.2; text-align: center;
+  color: var(--text-dim); font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere; user-select: text; cursor: default;
+}
 .rail-mark { width: 28px; height: 28px; object-fit: contain; margin: 0 auto 6px; }
 
 .navigator {
@@ -1037,6 +1043,11 @@ ul.notifications li.unread .n-title { font-weight: 600; }
 ul.file-picks { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 ul.file-picks li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 ul.file-picks li .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* New: where the item goes and what the duplicate checks found (#359) */
+.new-item-info:empty { display: none; }
+.new-item-info .notice { margin: 0; }
+/* worklist: New on this computer – the tick box before the row's icon */
+.node.new-file input[type="checkbox"] { flex: none; margin: 0 4px 0 2px; }
 
 /* Preview images stored in CAD files (Inventor, Solid Edge, SolidWorks):
    drawings on paper, white in both schemes */
