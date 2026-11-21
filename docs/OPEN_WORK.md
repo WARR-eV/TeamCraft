@@ -702,7 +702,7 @@ real files and belong to section 3 once such files are at hand.
 - [x] Linked designs as file references with quantities (#365); left: rewriting link paths after a rename (with #369)
 - [ ] BOM import from SolidCraft's BOM CSV and from the design (#366)
 - [ ] Design properties read, shown, searchable, mismatches with the item flagged (#367)
-- [ ] Desktop: STEP export through `solidcraft-cli` at check-in, all OSes (#368)
+- [x] Desktop: STEP export through `solidcraft-cli` at check-in, all OSes (#368); left: a rendered thumbnail (`solidcraft-cli snapshot`) for designs saved without one
 - [ ] Desktop: item number and revision written into the design properties (#369)
 - [x] Desktop: designs open in SolidCraft (lock file) shown, warning at check-in (#370)
 - [ ] (research first) 3D preview from the `.sc` file alone (#371)
