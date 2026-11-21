@@ -23,7 +23,9 @@
 //!   `Bracket.step` next to the tracked `Bracket.ipt`, which goes into that
 //!   item's check-in;
 //! * files the user chose to ignore (`.teamcraft/ignored.json`,
-//!   [`new_files_ignore`]) are hidden and only counted.
+//!   [`new_files_ignore`]) are hidden and only counted; after a complete walk
+//!   the entries of files that are gone are dropped from the list, after a
+//!   walk that stopped at a limit or could not read a folder nothing is.
 //!
 //! Names are reported composed (NFC, [`layout::nfc`]) with `/` separators, as
 //! the server stores them. The walk stops after [`MAX_ENTRIES`] directory
@@ -95,6 +97,14 @@ pub struct NewFilesScan {
     pub truncated: bool,
     /// Files left out because the user ignored them.
     pub ignored: usize,
+    /// The ignored files the walk met (their keys); after a complete walk an
+    /// entry of the ignore list that is not among them has no file any more.
+    #[serde(skip)]
+    pub(crate) seen_ignored: BTreeSet<String>,
+    /// The walk read every folder and stopped at no limit – only then may
+    /// the ignore list be cleaned up (`prune_ignored`).
+    #[serde(skip)]
+    pub(crate) complete: bool,
 }
 
 /// Where the walk stops ([`MAX_ENTRIES`], [`MAX_FILES`]; smaller in tests).
@@ -172,6 +182,8 @@ pub fn new_files_ignored(
 
 /// [`scan_root`] of the working folder with its state, the files added with
 /// *Add files…* and the ignore list; a missing folder has no new files.
+/// After a complete walk the ignore list loses the entries of files that are
+/// gone – deleted, moved, or part of an item meanwhile (`prune_ignored`).
 pub(crate) fn scan_workspace(root: &Path) -> NewFilesScan {
     if !root.is_dir() {
         return NewFilesScan::default();
@@ -182,7 +194,17 @@ pub(crate) fn scan_workspace(root: &Path) -> NewFilesScan {
         .map(|p| layout::key_of(&p.rel))
         .collect();
     let ignored: HashSet<String> = load_ignored(root).into_iter().collect();
-    scan_root(root, &state, &pending, &ignored, Limits::default())
+    let scan = scan_root(root, &state, &pending, &ignored, Limits::default());
+    if scan.complete {
+        let gone: Vec<String> = ignored
+            .iter()
+            .filter(|k| !scan.seen_ignored.contains(*k))
+            .cloned()
+            .collect();
+        // best effort: a list that cannot be written is cleaned up next time
+        let _ = prune_ignored(root, &gone);
+    }
+    scan
 }
 
 /// Walks the group folders below `root` for files that belong to no item:
@@ -206,9 +228,12 @@ pub(crate) fn scan_root(
         folder: String::new(),
     };
     let mut stack = vec![start];
+    // every folder and entry was read (else the ignore list stays as it is)
+    let mut complete = true;
     'walk: while let Some(dir) = stack.pop() {
         // an unreadable folder is skipped, never an error
         let Ok(read) = std::fs::read_dir(&dir.path) else {
+            complete = false;
             continue;
         };
         let mut entries = Vec::new();
@@ -218,8 +243,9 @@ pub(crate) fn scan_root(
                 break;
             }
             visited += 1;
-            if let Ok(entry) = entry {
-                entries.push(entry);
+            match entry {
+                Ok(entry) => entries.push(entry),
+                Err(_) => complete = false,
             }
         }
         // the same order on every scan, also when it stops at a limit
@@ -229,6 +255,7 @@ pub(crate) fn scan_root(
         let mut subdirs = Vec::new();
         for entry in entries {
             let Ok(kind) = entry.file_type() else {
+                complete = false;
                 continue;
             };
             // a name that is no valid Unicode cannot become a server name
@@ -258,6 +285,7 @@ pub(crate) fn scan_root(
             }
             if ignored.contains(&key) {
                 result.ignored += 1;
+                result.seen_ignored.insert(key);
                 continue;
             }
             if result.files.len() >= limits.files {
@@ -281,6 +309,7 @@ pub(crate) fn scan_root(
         // taken from the end: the folders are walked in name order
         stack.extend(subdirs.into_iter().rev());
     }
+    result.complete = complete && !result.truncated;
     result.files.sort_by_key(|f| f.rel.to_lowercase());
     result
 }
@@ -390,6 +419,25 @@ fn valid_rel(rel: &str) -> bool {
         && !rel.contains('\\')
         && rel.chars().count() <= MAX_REL_CHARS
         && !rel.split('/').any(|s| matches!(s, "" | "." | ".."))
+}
+
+/// Drops the keys `gone` from the ignore list: entries a complete scan found
+/// no file for. Only these keys go, so an entry added while the scan ran
+/// stays.
+fn prune_ignored(root: &Path, gone: &[String]) -> std::io::Result<()> {
+    if gone.is_empty() {
+        return Ok(());
+    }
+    let _guard = IGNORED_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut stored = load_ignored(root);
+    let before = stored.len();
+    for key in gone {
+        stored.remove(key);
+    }
+    if stored.len() != before {
+        save_ignored(root, &stored)?;
+    }
+    Ok(())
 }
 
 /// [`layout::key_of`] of each path of `rels`; the whole call is refused when
@@ -635,6 +683,40 @@ mod tests {
         let missing = root.join("missing");
         assert!(change_ignored(&missing, &many[..1], true).is_err());
         assert!(!missing.exists());
+    }
+
+    #[test]
+    fn entries_of_files_that_are_gone_leave_the_ignore_list() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        write(root, "GRAKSLER/Keep.ipt", "x");
+        write(root, "GRAKSLER/Gone.ipt", "x");
+        let both = owned(&["GRAKSLER/Keep.ipt", "GRAKSLER/Gone.ipt"]);
+        assert_eq!(change_ignored(root, &both, true).unwrap(), 2);
+        std::fs::remove_file(layout::join_rel(root, "GRAKSLER/Gone.ipt")).unwrap();
+        // a walk that stopped at a limit proves nothing: nothing is dropped
+        let state = layout::State::default();
+        let none: HashSet<String> = HashSet::new();
+        let ignored: HashSet<String> = load_ignored(root).into_iter().collect();
+        let limits = Limits {
+            entries: 1,
+            files: 100,
+        };
+        let cut = scan_root(root, &state, &none, &ignored, limits);
+        assert!(cut.truncated && !cut.complete);
+        assert_eq!(load_ignored(root).len(), 2);
+        // a complete scan drops the entry of the deleted file only
+        let scan = scan_workspace(root);
+        assert!(scan.complete);
+        assert_eq!(scan.ignored, 1);
+        let left: Vec<String> = load_ignored(root).into_iter().collect();
+        assert_eq!(left, ["graksler/keep.ipt"]);
+        // only the given keys go: an entry added meanwhile stays
+        let added = owned(&["GRAKSLER/New.ipt"]);
+        assert_eq!(change_ignored(root, &added, true).unwrap(), 2);
+        prune_ignored(root, &owned(&["graksler/keep.ipt"])).unwrap();
+        let left: Vec<String> = load_ignored(root).into_iter().collect();
+        assert_eq!(left, ["graksler/new.ipt"]);
     }
 
     #[test]

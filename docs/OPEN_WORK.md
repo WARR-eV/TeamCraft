@@ -822,9 +822,9 @@ needs an issue with a reason first (see *Direction*).
   `state.json`; the worklist section *New on this computer* suggests untracked parts and assemblies
   (`desktop/src/newfiles.rs`, ignore list `.teamcraft/ignored.json`, *Create items…* after a summary); *Check in…*
   offers a second model file of a revision unticked. Tests: `scripts/desktop-new-files.test.mjs`, the module tests of
-  `newfiles.rs`, `layout.rs` (`rel_below`), the server tests of the file check and the guard. Left: ordering the
-  suggestions by the assemblies of the user's check-outs that reference them (the references of a locally changed
-  assembly are not on the server yet), and pruning ignore-list entries of deleted files.
+  `newfiles.rs`, `layout.rs` (`rel_below`), the server tests of the file check and the guard. The ignore list loses
+  the entries of files that are gone after a complete scan. Left: ordering the suggestions by the assemblies of the
+  user's check-outs that reference them (the references of a locally changed assembly are not on the server yet).
 - [x] **Desktop: Get project groups defaults to the latest revision (#355)**, the app version above the logo in the
   rail (#357), the account of a kept sign-in in *Settings → Connections* (#356); CI: the macOS server build runs in
   the weekly run and on *Run workflow* only, no longer per push to `main` (#358).

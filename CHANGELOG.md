@@ -50,7 +50,8 @@ see the notices in the README.
   drawing and exports of the same name, counted on the rail; a click opens
   *New* prefilled, *Create items…* creates the ticked ones after a summary of
   what is created and what is refused, *×* ignores a file
-  (`.teamcraft/ignored.json`, *Show ignored*). The scan
+  (`.teamcraft/ignored.json`, *Show ignored*; the entries of files that are
+  gone are dropped after a scan that read the whole working folder). The scan
   (`desktop/src/newfiles.rs`) skips tracked and added files, companions of
   tracked files, lock, backup and temporary files, `OldVersions` and hidden
   folders, visits at most 50 000 entries and reports at most 2 000 files, and

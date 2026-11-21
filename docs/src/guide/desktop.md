@@ -142,7 +142,9 @@ check-outs and reviews, and a **local working folder**:
   its folder, after a summary that names what is refused and why (a refused
   file can still be created one by one with *New*, where a duplicate name can
   be confirmed); *×* ignores a file for good (`.teamcraft/ignored.json`,
-  *Show ignored* brings it back). Left out: files that are tracked, added
+  *Show ignored* brings it back; the entries of files that are gone –
+  deleted, moved or part of an item meanwhile – are dropped after a scan that
+  read the whole working folder). Left out: files that are tracked, added
   with *Add files…*, a companion of a tracked file (the STEP export next to
   a tracked model goes into that item's check-in), lock, backup and
   temporary files, `OldVersions` and hidden folders, files directly in the
