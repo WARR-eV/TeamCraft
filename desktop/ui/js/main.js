@@ -46,6 +46,15 @@ export function showZoom() {
   el.classList.toggle("hidden", Math.abs(state.zoom - 1) < 0.005);
 }
 
+/** The version of this app above the logo in the rail, always visible
+ *  (#357): which app runs is one look at a screenshot away. */
+function showAppVersion(version) {
+  var el = $("rail-version");
+  if (!el || !version) return;
+  el.textContent = version;
+  el.title = "TeamCraft Desktop " + version;
+}
+
 export function initZoom() {
   // capture phase: also above the 3D view, which zooms the model with the plain wheel
   window.addEventListener("wheel", function (e) {
@@ -135,6 +144,7 @@ export function boot() {
   });
   call("session").then(function (s) {
     state.session = s;
+    showAppVersion(s.version);
     state.zoom = s.zoom || 1;
     showZoom();
     applySkin(s.skin);

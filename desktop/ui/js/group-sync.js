@@ -32,9 +32,12 @@ export function openGetProjectsDialog() {
   var boxes = groups.map(function (p) {
     return { code: p.code, input: h("input", { type: "checkbox", checked: member(p) }), label: p.code + " – " + p.name + (member(p) ? " (member)" : "") };
   });
+  // Latest first (#355): in a team that releases only before manufacturing,
+  // most items are still in work – "released" would leave the working folder
+  // almost empty and assemblies without their parts.
   var rule = h("select", null, [
-    h("option", { value: "released", text: "Latest released revision – items without a release are skipped" }),
-    h("option", { value: "latest", text: "Latest revision, also in work" })
+    h("option", { value: "latest", text: "Latest revision, also in work" }),
+    h("option", { value: "released", text: "Latest released revision – items without a release are skipped" })
   ]);
   var bar = h("progress.hidden", { max: "1", value: "0" });
   var report = h("p.small", { role: "status" });

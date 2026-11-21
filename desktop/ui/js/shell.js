@@ -14,6 +14,8 @@ import { checkWorkspaceLayout } from "./workspace.js";
 import { openChange } from "./change.js";
 import { openRequest } from "./requests.js";
 import { openSettings } from "./settings.js";
+import { formatKinds } from "./folder-import.js";
+import { planNewFiles } from "./new-files.js";
 
 // ======================================================================
 // Shell
@@ -115,6 +117,7 @@ export function enterShell() {
     renderTabs();
     renderActive();
     refreshWorklistCount();
+    scanNewFiles(false).catch(function () {});
     pollNotifications(true);
     // the Agent view's backend: the server's policy (TEAMCRAFT_LOCAL_AGENTS, the
     // company AI) and the user's pick; then an agent that kept running while
@@ -202,9 +205,15 @@ export function initShell() {
   }, 60000);
   initSplitter();
   // back from the CAD program: is the next step of my check-out still right?
+  // and which files did it create (worklist, #359; at most every 15 s)
   window.addEventListener("focus", function () {
     var t = activeTab();
     if (t && t.data && t.recheckLocal) t.recheckLocal();
+    if (state.me) {
+      scanNewFiles(false).then(function () {
+        if (state.view === "worklist" && state.worklist) drawWorklist(state.worklist);
+      }, function () {});
+    }
   });
   document.addEventListener("keydown", function (e) {
     var mod = e.ctrlKey || e.metaKey;
@@ -507,17 +516,59 @@ function releaseClean(total, report, sent) {
 export function fetchWorklist() {
   return api("GET", "/worklist").then(function (w) {
     state.worklist = w;
-    // dependents count once, however many changes they have to be checked against
-    var n = w.checkouts.length + w.reviews.length + impactGroups(w).length + (w.requests_assigned || []).length;
-    var el = $("worklist-count");
-    el.textContent = String(n);
-    el.classList.toggle("hidden", n === 0);
-    var rail = el.closest("button");
-    if (rail) {
-      rail.setAttribute("aria-label", n ? "Worklist, " + n + " open" : "Worklist");
-    }
+    showWorklistCount();
     return w;
   });
+}
+
+/** The count on the rail: the open worklist entries and the files on this
+ *  computer suggested as new items (from the last scan, #359). */
+export function showWorklistCount() {
+  var w = state.worklist;
+  if (!w) return;
+  // dependents count once, however many changes they have to be checked against
+  var n = w.checkouts.length + w.reviews.length + impactGroups(w).length + (w.requests_assigned || []).length +
+    (state.newFiles ? state.newFiles.plan.suggestions.length : 0);
+  var el = $("worklist-count");
+  el.textContent = String(n);
+  el.classList.toggle("hidden", n === 0);
+  var rail = el.closest("button");
+  if (rail) {
+    rail.setAttribute("aria-label", n ? "Worklist, " + n + " open" : "Worklist");
+  }
+}
+
+var newFilesScan = null;
+/** Looks for files in the working folder that belong to no item yet – parts
+ *  and assemblies just created in the CAD program (#359): the worklist
+ *  suggests them as new items. At most every 15 s unless `force`; one scan
+ *  at a time; nothing for viewers. Never uploads anything. */
+export function scanNewFiles(force) {
+  if (!canEdit()) { state.newFiles = null; return Promise.resolve(null); }
+  if (!force && state.newFiles && Date.now() - state.newFiles.at < 15000) return Promise.resolve(state.newFiles);
+  if (newFilesScan) return newFilesScan;
+  newFilesScan = Promise.all([call("new_files_scan"), formatKinds().catch(function () { return {}; })]).then(function (r) {
+    var editable = function (code) {
+      var wanted = (code || "").toLowerCase();
+      return state.projects.some(function (p) { return p.active && canEditProject(p.id) && p.code.toLowerCase() === wanted; });
+    };
+    state.newFiles = { at: Date.now(), scan: r[0], plan: planNewFiles(r[0].files, r[1], editable) };
+    newFilesScan = null;
+    showWorklistCount();
+    return state.newFiles;
+  }, function (err) {
+    newFilesScan = null;
+    throw err;
+  });
+  return newFilesScan;
+}
+
+/** After files were created, ignored or turned into items: scan again and
+ *  redraw the worklist when it is shown. */
+export function rescanNewFiles() {
+  return scanNewFiles(true).then(function () {
+    if (state.view === "worklist" && state.worklist) drawWorklist(state.worklist);
+  }, function () {});
 }
 
 /** After anything that changes the worklist (check out, cancel check-out,

@@ -26,7 +26,7 @@ use crate::{
     api::{uploads_api, ApiJson},
     auth::WebUser,
     error::AppResult,
-    services::{revisions, uploads::NewSession},
+    services::{file_check::ClashGuard, revisions, uploads::NewSession},
     AppState,
 };
 
@@ -63,6 +63,7 @@ pub(super) async fn create(
             // The form's `bases` field applies when the session joins it.
             base: None,
             folder: None,
+            guard: ClashGuard::default(),
         },
     )
     .await

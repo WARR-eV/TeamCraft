@@ -44,10 +44,10 @@ use crate::{
     models::Revision,
     services::{
         access_log::{self, AccessCtx},
-        access_review, attributes, audit, bom, bom_references, changes, checkouts, desktop, files,
-        folders, impacts, imports, items, mass_properties, membership_conditions, notifications,
-        package, project_policy, projects, references, requests, reviewers, revisions, similar,
-        stats, structure, uploads, users, workset, Page,
+        access_review, attributes, audit, bom, bom_references, changes, checkouts, desktop,
+        file_check, files, folders, impacts, imports, items, mass_properties,
+        membership_conditions, notifications, package, project_policy, projects, references,
+        requests, reviewers, revisions, similar, stats, structure, uploads, users, workset, Page,
     },
     web, AppState,
 };
@@ -308,6 +308,7 @@ pub fn router(state: &AppState) -> Router<AppState> {
         )
         .route("/projects/{code}/structure", get(get_structure_roots))
         .route("/projects/{code}/files", get(project_files))
+        .route("/projects/{code}/file-check", post(project_file_check))
         .route("/items/{number}/revisions/{code}/similar", get(get_similar))
         .route(
             "/bom-imports",
@@ -569,7 +570,7 @@ async fn index() -> Json<Value> {
             "PATCH  /api/v1/items/{number}/revisions/{code}           {name?, description?, material?, mass_kg?, unit_cost?, attributes?: {key: value|null}}",
             "POST   /api/v1/items/{number}/revisions/{code}/checkout",
             "POST   /api/v1/items/{number}/revisions/{code}/checkin   optional multipart: 'file' (new versions), 'comment', 'bases' = {\"name\": version | sha256} → 409 if a file moved on, 'folder' or 'folders' = {\"name\": \"folder\"}, 'uploads' = [upload id] (chunked uploads)",
-            "POST   /api/v1/uploads                                   {item, revision, filename, size, sha256?, content_type?, base?, folder?} – start a chunked, resumable upload (checked-out revision)",
+            "POST   /api/v1/uploads                                   {item, revision, filename, size, sha256?, content_type?, base?, folder?, refuse_clash?, refuse_same_name?} – start a chunked, resumable upload (checked-out revision); the refuse flags are the duplicate guard of the multipart upload, applied when the file is stored",
             "GET    /api/v1/uploads/{id}                              state and offset to resume from (also HEAD: Upload-Offset, Upload-Length)",
             "PATCH  /api/v1/uploads/{id}                              header Upload-Offset, body = next chunk (≤ chunk_bytes) → 409 at any other offset",
             "POST   /api/v1/uploads/{id}/finish                       {comment?, check_in?} – verify size and sha256, store the new version (and release the check-out)",
@@ -590,6 +591,7 @@ async fn index() -> Json<Value> {
             "GET    /api/v1/items/{number}/revisions/{code}/structure?rule=latest|released&limit=  one level of the structure view: BOM lines with resolved revision, state, lock owner, used_in",
             "GET    /api/v1/projects/{code}/structure?limit=&offset=  top-level items of a group (not used in any BOM of the group) for the structure view",
             "GET    /api/v1/projects/{code}/files?folder=&limit=&offset=  file browser: the sub-folders and the files of one folder of a group (latest revision of every item; items without files in their own folder; at the top also project_folders: the folders holding an Inventor project file .ipj)",
+            "POST   /api/v1/projects/{code}/file-check                {files: [{folder, filename, sha256?}]} (1–200) – read-only duplicate check before an item is created: per file the item with a current file at the same place (same_place), files of the same name in other folders (same_name) and with the same content (same_content), at most 20 each",
             "POST   /api/v1/bom-imports                               multipart: file (CSV/Excel BOM or STEP assembly of a CAD program), project, name?, numbers=file|generate, match_existing=true|false, dry_run=true → plan only; creates a new assembly",
             "GET    /api/v1/items/{number}/revisions/{code}/bom/from-references  the BOM the CAD references lead to: children with instance counts, status (new/already_in_bom/differs/circular), unmatched names, hidden count",
             "POST   /api/v1/items/{number}/revisions/{code}/bom/from-references  {children: [item numbers], update_quantities?: false} – adds the chosen lines in one transaction (revision checked out by me)",
@@ -647,7 +649,7 @@ async fn index() -> Json<Value> {
             "POST   /api/v1/impacts/{id}/acknowledge                  {note} – the dependent needs no change",
             "POST   /api/v1/items/{number}/revisions/{code}/impacts/acknowledge  {note, impacts?: [id]} – acknowledge all open impacts on the dependent revision (or the listed ones) at once",
             "GET    /api/v1/items/{number}/revisions/{code}/files",
-            "POST   /api/v1/items/{number}/revisions/{code}/files     multipart/form-data, field 'file' (same name = new version), 'comment', 'bases', 'folder' (in the project group) or 'folders' = {\"name\": \"folder\"}",
+            "POST   /api/v1/items/{number}/revisions/{code}/files     multipart/form-data, field 'file' (same name = new version), 'comment', 'bases', 'folder' (in the project group) or 'folders' = {\"name\": \"folder\"}, 'uploads' (chunked session ids), 'refuse_clash' = true (refuse a new file another item of the group already has at that folder and name, 409) and 'refuse_same_name' = true (also that name in another folder)",
             "GET    /api/v1/files/{id}",
             "PATCH  /api/v1/files/{id}                                {folder?, retention?} – its place in the working folder; retention all | latest (old versions of a latest file are removed after a grace period) – revision checked out by you",
             "GET    /api/v1/files/{id}/content                   resumable: Range: bytes=N- with If-Range: \"<sha256>\" (ETag) → 206",

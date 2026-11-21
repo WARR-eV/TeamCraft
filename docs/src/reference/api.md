@@ -206,7 +206,7 @@ curl -s -X POST -H "$H" -H 'Content-Type: application/json' \
 
 | Request                     | Meaning                                                                                                                                                                                                                                                                                              |
 |-----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `POST /uploads`             | `{item, revision, filename, size, sha256?, content_type?, base?, folder?}` → **201** with the session (`folder` = place in the project group, see below; omitted = keep the file's folder); 413 above `TEAMCRAFT_MAX_UPLOAD_MB`, 409 if the revision is not checked out by you or `base` is outdated |
+| `POST /uploads`             | `{item, revision, filename, size, sha256?, content_type?, base?, folder?, refuse_clash?, refuse_same_name?}` → **201** with the session (`folder` = place in the project group, see below; omitted = keep the file's folder; `refuse_clash`/`refuse_same_name` = the [duplicate guard](#duplicates-of-new-files-check-and-guard), kept with the session and applied when the file is stored); 413 above `TEAMCRAFT_MAX_UPLOAD_MB`, 409 if the revision is not checked out by you, `base` is outdated or the guard refuses the new file already |
 | `PATCH /uploads/{id}`       | header `Upload-Offset`, body = the next chunk (≤ `chunk_bytes`) → the session with the new `offset`; **409** with the server's `Upload-Offset` header at any other offset, 400 beyond `size`                                                                                                         |
 | `HEAD`/`GET /uploads/{id}`  | headers `Upload-Offset`, `Upload-Length`; `GET` also as JSON (`offset`, `size`, `complete`, `expires_at`)                                                                                                                                                                                            |
 | `POST /uploads/{id}/finish` | body optional `{comment?, check_in?}`: verify size and SHA-256, store the new file or version (`check_in: true` also releases the check-out) → `{files, revision}`; 409 while incomplete, 400 if the content does not match (the upload is reset to offset 0)                                        |
@@ -217,7 +217,9 @@ upload: the field `uploads` lists their ids (`["…", "…"]` or `id,id`), and
 they are stored together with the `file` parts in one transaction – the
 desktop app checks in this way. A session's own `base` and `folder` win
 over the `bases`, `folders` and `folder` fields; either way the
-base-version guard of the check-in applies. Sessions are private (other users get 404), expire 24 hours
+base-version guard of the check-in applies. The duplicate guard of the
+session and the `refuse_clash` / `refuse_same_name` fields of the request
+both apply to it. Sessions are private (other users get 404), expire 24 hours
 after the last chunk and are limited to 16 unfinished ones per user. When
 storing fails after the content was verified (for example a 409 because the
 file moved on), the session keeps the verified content, so `finish` can be
@@ -326,6 +328,68 @@ in all of my check-outs – or the listed ones – **without new files**, one
 transaction and one audit record per revision. The answer lists every
 revision with `ok` and `error`, plus `checked_in`, `failed` and a `summary`.
 
+### Duplicates of new files: check and guard
+
+Before TeamCraft Desktop creates an item from a file of the working folder,
+it asks what the project group already has (`POST /projects/{code}/file-check`):
+
+```sh
+curl -s -X POST -H "$H" -H 'Content-Type: application/json' \
+     -d '{"files": [{"folder": "Design/Frame", "filename": "Bracket.ipt", "sha256": "9f86d0…"}]}' \
+     $API/projects/ROVER/file-check
+# {"files": [{"folder": "Design/Frame", "filename": "Bracket.ipt",
+#   "same_place": {"item_number": "PRT-000042", "code": "A", "name": "Bracket"},
+#   "same_name": [{"item_number": "PRT-000017", "code": "B", "folder": "Standard parts", "filename": "bracket.ipt"}],
+#   "same_content": [{"item_number": "PRT-000031", "code": "A", "folder": "Archive", "filename": "Bracket_old.ipt"}]}]}
+```
+
+The request lists 1 to 200 `files` with `folder` (empty, null or absent =
+the top of the group), `filename` and `sha256` (64 hexadecimal digits, or
+null). The answer has one entry per file, in request order, with the
+normalised `folder`, the `filename` as sent (in NFC) and:
+
+| Field          | Meaning                                                                                                                                                  |
+|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `same_place`   | the item with a current file in that folder with that name: `item_number`, and `code` and `name` of its latest revision; `null` if there is none         |
+| `same_name`    | current files of that name in other folders of the group                                                                                                 |
+| `same_content` | current files with that SHA-256, the `same_place` file left out; empty without `sha256`                                                                  |
+
+`same_name` and `same_content` hold at most 20 entries each (`item_number`,
+`code`, `folder`, `filename`), by folder, file name and item number. Only
+**current** files count: the files of the latest revision of every item, as
+in the file browser. Folders and names are compared case-insensitively and in
+Unicode NFC – the folder normalised like the `folder` of an upload, the name
+as an upload would store it. The route only reads: viewers may call it (with
+a token that may send a `POST`; a `read_only` token may not), and a group the
+caller cannot read answers 404 like an unknown code. A bad folder, a file name
+that is empty, contains `/`, `\` or control characters or is longer than 200
+characters, a malformed `sha256`, no file or more than 200 files are a 400.
+
+The check is advice. The binding rule is the **duplicate guard** an upload
+can ask for, off by default: the multipart fields `refuse_clash=true` and
+`refuse_same_name=true` of `POST …/files` and `POST …/checkin` (they also
+cover the chunked sessions listed in the `uploads` field), and the same
+fields of `POST /uploads`, which the session keeps until the file is stored
+(by `finish` or in the `uploads` field; a duplicate is refused when the
+session starts already). With `refuse_clash`, a file that is **new in the
+revision** is refused with **409** when another item of the group has a
+current file with the same name in the folder the file really gets (the
+item's folder when the upload names none):
+
+```text
+409 {"error": {"code": "conflict", "message": "Bracket.ipt in Design/Frame already belongs to PRT-000042/A – open that item instead of creating a duplicate. Nothing was stored."}}
+```
+
+`refuse_same_name` also refuses the name when it is a current file of
+another item in any other folder of the group (CAD programs find referenced
+files by name; the message names the item and the folder); it includes
+`refuse_clash`. The check runs in the transaction that stores the files,
+under a transaction-scoped advisory lock of the group, so of two people
+creating the same new file at the same time one gets the 409; nothing of a
+refused request is stored. A new version of a file the revision already has
+is never refused, items without a group have no guard, and uploads without
+the fields are stored as before.
+
 ### Dependents to check (impacts)
 
 `GET /worklist` lists the open impacts flat (`impacts`) and grouped by the
@@ -405,7 +469,7 @@ the caller cannot read are left out; a successor there is a placeholder with
 | Revisions               | `GET/PATCH /items/{number}/revisions/{code\|latest}`, `checkout`, `checkin`, `cancel-checkout`, `file-status`, `revise`, `obsolete`                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Worklist                | `GET /worklist` (check-outs, reviews, impacts and `impact_groups`, statistics), `POST /worklist/checkin-all`                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Users                   | `GET /users/{id}/holdings` – what a user still holds (check-outs, open change orders, pending reviews, change requests, owned items, memberships, tokens), as the caller may see it: administrators, and group managers for the groups they manage; `POST /users/{id}/offboard` `{hand_over_to?: username, release_checkouts?, revoke_tokens?, confirm_no_manager?}` – administrators deactivate a leaver in one step (see [When someone leaves](../admin/users.md#when-someone-leaves))                                                     |
-| Files                   | `POST …/files` (multipart, `folder`/`folders`), `GET/PATCH /files/{id}` (metadata, folder), `/content`, `/versions`, `/restore`, `/mesh`, `/thumbnail`, `…/workset`, `GET/POST /file-versions/{id}/annotations` + `DELETE /annotations/{id}` (3D notes)                                                                                                                                                                                                                                                                                      |
+| Files                   | `POST …/files` (multipart, `folder`/`folders`, duplicate guard `refuse_clash`/`refuse_same_name`), `GET/PATCH /files/{id}` (metadata, folder), `/content`, `/versions`, `/restore`, `/mesh`, `/thumbnail`, `…/workset`, `GET/POST /file-versions/{id}/annotations` + `DELETE /annotations/{id}` (3D notes)                                                                                                                                                                                                                                                                                      |
 | Uploads                 | `POST /uploads`, `PATCH/HEAD/GET/DELETE /uploads/{id}`, `POST /uploads/{id}/finish` – chunked, resumable uploads of large files                                                                                                                                                                                                                                                                                                                                                                                                              |
 | BOM                     | `GET/POST …/bom` (`rule=latest\|released\|as_released`, `expand=true`), `PATCH/DELETE /bom-lines/{id}`, `…/package` (Pack and Go ZIP); the expanded tree has `project_id` per line (`null` for restricted placeholders)                                                                                                                                                                                                                                                                                                                      |
 | BOM import              | `POST /bom-imports` (new assembly), `POST …/bom/import` (into a checked-out revision); multipart `file` = CSV/Excel table or STEP assembly, `dry_run=true` returns the plan (with `attribute_columns`, `unused_columns`, per item `classification` and `attributes`)                                                                                                                                                                                                                                                                         |
@@ -415,7 +479,7 @@ the caller cannot read are left out; a successor there is a placeholder with
 | Simulations             | `GET/POST /projects/{code}/result-templates`, `PUT/DELETE /result-templates/{id}`, `GET …/simulation`, `GET/POST …/simulation/bases`, `DELETE /simulation-bases/{id}`, `GET/POST/PUT …/simulation/results`, `…/results/import`, `PATCH/DELETE /simulation-results/{id}`, `…/simulation/compare`, `GET /items/{number}/simulations`                                                                                                                                                                                                           |
 | As-built                | `GET …/as-built`, `PUT …/as-built/record`, `GET/POST …/as-built/deviations`, `PATCH/DELETE /as-built-deviations/{id}`, `GET /items/{number}/built-units`, `POST …/revisions/{code}/built-units`                                                                                                                                                                                                                                                                                                                                              |
 | Changes                 | `GET/POST /changes`, items (`{item, revision?, action?: release\|obsolete\|supersede, successor?}`), reviewers (`POST {username}`; `DELETE /changes/{n}/reviewers/{username}` on a draft), `suggested-reviewers`, `readiness`, `dependencies` (add all unreleased), `submit`, `review`, `withdraw`, `cancel` (a draft or rejected change; its revisions are free again), `impact`                                                                                                                                                            |
-| Projects                | `GET/POST /projects`, `GET /projects/manager-gaps` (admins), `GET/POST /projects/{code}/members`, `GET/PUT /projects/{code}/numbering` (`?scheme=` previews), `PUT /projects/{code}/default-cad` (`{program, version?}`, managers and admins)                                                                                                                                                                                                                                                                                                                                                                                 |
+| Projects                | `GET/POST /projects`, `GET /projects/manager-gaps` (admins), `GET/POST /projects/{code}/members`, `GET/PUT /projects/{code}/numbering` (`?scheme=` previews), `PUT /projects/{code}/default-cad` (`{program, version?}`, managers and admins), `POST /projects/{code}/file-check` (duplicates of new files, read-only)                                                                                                                                                                                                                                                                                                                                                                                 |
 | Notifications           | `GET /notifications`, `POST /notifications/read`, settings, watches                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Personal                | `GET /favorites`, `POST/DELETE /items/{number}/favorite`, `GET/POST /searches`, `DELETE /searches/{id}`                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Audit log               | `GET /audit?entity_type=&username=&action=&format=json\|csv` – administrators; the filtered log as a download (at most 100 000 entries, `x-truncated`), recorded as `audit.export`; see [Operations](../admin/operations.md)                                                                                                                                                                                                                                                                                                                 |

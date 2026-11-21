@@ -20,6 +20,7 @@ mod crash;
 mod folderimport;
 mod layout;
 mod localserver;
+mod newfiles;
 mod profiles;
 mod resume;
 mod settings;
@@ -253,6 +254,8 @@ fn main() {
             commands::cancel_package,
             commands::save_stl,
             commands::upload_files,
+            commands::new_item_places,
+            commands::new_item_copy,
             commands::cancel_upload,
             commands::upload_request_attachment,
             commands::pick_bom_file,
@@ -279,6 +282,10 @@ fn main() {
             commands::crash_reports_discard,
             commands::set_crash_prompt,
             commands::record_ui_error,
+            newfiles::new_files_scan,
+            newfiles::new_files_ignore,
+            newfiles::new_files_unignore,
+            newfiles::new_files_ignored,
         ])
         .build(tauri::generate_context!())
         .expect("error while building TeamCraft Desktop")

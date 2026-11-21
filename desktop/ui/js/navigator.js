@@ -2,9 +2,9 @@
 // TeamCraft Desktop – Navigator views: home, worklist, changes, search.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, ICONS, api, append, badge, clear, dialog, enc, errorText, field, h, lockIcon, state, svgIcon, toast } from "./core.js";
+import { $, ICONS, api, append, badge, call, clear, dialog, enc, errorText, field, h, lockIcon, setStatus, state, svgIcon, toast } from "./core.js";
 import { fmtDate, label } from "/static/shared/js/format.js";
-import { canEdit, checkInAll, fetchWorklist, reloadProjects, renderNotifications } from "./shell.js";
+import { canEdit, checkInAll, fetchWorklist, refreshWorklistCount, reloadProjects, renderNotifications, rescanNewFiles, scanNewFiles, showWorklistCount } from "./shell.js";
 import { assistantContextChanged } from "./assistant.js";
 import { agent, renderAgentView } from "./agent.js";
 import { openRevision } from "./revision.js";
@@ -12,10 +12,11 @@ import { impactGroups, relationShort, relationText } from "./references.js";
 import { lockAge } from "./workspace.js";
 import { openChange } from "./change.js";
 import { openRequest } from "./requests.js";
-import { newItemDialog } from "./dialogs.js";
+import { checkNewItemFiles, createItemFromFiles, editableGroupOfFolder, newItemDialog } from "./dialogs.js";
 import { getProjectsDialog } from "./group-sync.js";
-import { importFolderDialog } from "./folder-import.js";
+import { formatKinds, importFolderDialog } from "./folder-import.js";
 import { renderFiles } from "./browser.js";
+import { ageText, batchSummary, newItemFindings, newItemPlacement } from "./new-files.js";
 import { favouriteKey, normalizeFavourite, suggestionKey } from "./files-view.js";
 import { cutLevel, describeNode, normalizeMode, pathKey, quantityText, rootNodes, usageBadge } from "./structure.js";
 
@@ -337,7 +338,12 @@ export function sectionTitle(text, n) {
 }
 
 export function renderWorklist() {
-  return fetchWorklist().then(drawWorklist);
+  // the files on this computer are looked at again whenever the worklist is
+  // opened or refreshed (#359); a failing scan never hides the worklist
+  return Promise.all([fetchWorklist(), scanNewFiles(true).catch(function () { return null; })]).then(function (r) {
+    showWorklistCount();
+    drawWorklist(r[0]);
+  });
 }
 
 /** Draws the worklist navigator from the worklist `w` – on opening the view
@@ -360,6 +366,7 @@ export function drawWorklist(w) {
       h("span.meta.small.dim", { text: lockAge(r.checked_out_at) })
     ]));
   })) : h("p.empty", { text: "Nothing checked out." }));
+  if (canEdit()) newFilesSection(nav);
   nav.appendChild(sectionTitle("Waiting for my review", w.reviews.length));
   nav.appendChild(w.reviews.length ? h("ul.tree", null, w.reviews.map(changeNode)) : h("p.empty", { text: "Nothing to review." }));
   var groups = impactGroups(w);
@@ -374,6 +381,181 @@ export function drawWorklist(w) {
   nav.appendChild(sectionTitle("My open requests", mine.length));
   nav.appendChild(mine.length ? h("ul.tree", null, mine.map(requestNode)) : h("p.empty", { text: "Found a problem? Use “Request change…” on a revision or a workspace file." }));
   nav.scrollTop = top;
+}
+
+// ------------------------------------------------ New on this computer (#359)
+
+/** The worklist section *New on this computer*: parts and assemblies in the
+ *  working folder that belong to no item yet, one suggestion per model with
+ *  its drawing and exports. A click opens *New* prefilled; ticked rows are
+ *  created together with *Create items…*; *Ignore* hides a file for good.
+ *  Nothing is uploaded without the dialog or the confirmed summary. */
+function newFilesSection(nav) {
+  var nf = state.newFiles;
+  if (!nf) return;
+  var list = nf.plan.suggestions, other = nf.plan.other;
+  state.newFilesTicked = state.newFilesTicked || {};
+  var ticked = state.newFilesTicked;
+  Object.keys(ticked).forEach(function (k) { if (!list.some(function (s) { return s.key === k; })) delete ticked[k]; });
+  var chosen = function () { return list.filter(function (s) { return ticked[s.key]; }); };
+  var createBtn = h("button.small", { type: "button", title: "Create one item for each ticked file, in its folder",
+    on: { click: function () { createSuggested(chosen()); } } }, "Create items…");
+  createBtn.disabled = !chosen().length;
+  var head = h("div.row", null, [sectionTitle("New on this computer", list.length), list.length ? createBtn : null]);
+  nav.appendChild(head);
+  if (!list.length) {
+    nav.appendChild(h("p.empty", { text: "No new parts or assemblies in your working folder." }));
+  } else {
+    nav.appendChild(h("ul.tree", null, list.map(function (s) {
+      var box = h("input", { type: "checkbox", "aria-label": "Tick " + s.name, checked: !!ticked[s.key],
+        on: { click: function (ev) { ev.stopPropagation(); }, change: function () {
+          ticked[s.key] = box.checked;
+          createBtn.disabled = !chosen().length;
+        } } });
+      var where = s.project + (s.folder ? " / " + s.folder : "");
+      var files = s.files.map(function (f) { return f.name; }).join(", ");
+      return h("li", null, h("div.node.new-file", {
+        title: "Create an item from " + files + " in " + where,
+        on: { click: function () { createOne(s); } }
+      }, [
+        box, h("span.ico", { text: s.type === "assembly" ? "▣" : "◇" }),
+        h("span.label", null, [h("span.fname", { text: s.name }), h("span.dim", { text: " " + where })]),
+        h("span.meta.small.dim", { text: (s.files.length > 1 ? s.files.length + " files · " : "") + ageText(s.modified_ms) }),
+        h("button.icon.small", { type: "button", title: "Ignore " + files + " – not suggested again", "aria-label": "Ignore " + s.name,
+          on: { click: function (ev) { ev.stopPropagation(); ignoreFiles(s.files); } } }, "×")
+      ]));
+    })));
+  }
+  if (other.length) {
+    var open = !!state.expanded["newfiles:other"];
+    var rows = h("ul.tree" + (open ? "" : ".hidden"), null, other.map(function (f) {
+      return h("li", null, h("div.node", { title: f.rel }, [
+        h("span.twisty"), h("span.ico.dim", { text: "·" }),
+        h("span.label", null, [h("span.fname", { text: f.name }), h("span.dim", { text: " " + f.project + (f.folder ? " / " + f.folder : "") })]),
+        h("button.icon.small", { type: "button", title: "Ignore " + f.name, "aria-label": "Ignore " + f.name,
+          on: { click: function () { ignoreFiles([f]); } } }, "×")
+      ]));
+    }));
+    var twisty = h("button.twisty-btn", { type: "button", "aria-expanded": String(open), on: { click: function () {
+      state.expanded["newfiles:other"] = !state.expanded["newfiles:other"];
+      twisty.textContent = state.expanded["newfiles:other"] ? "▾" : "▸";
+      twisty.setAttribute("aria-expanded", String(!!state.expanded["newfiles:other"]));
+      rows.classList.toggle("hidden", !state.expanded["newfiles:other"]);
+    } } }, open ? "▾" : "▸");
+    nav.appendChild(h("p.small.dim", null, [twisty, " Other new files (" + other.length + ") – no part or assembly, not suggested"]));
+    nav.appendChild(rows);
+  }
+  var notes = [];
+  if (nf.scan.truncated) notes.push("Only part of the working folder was looked at – it holds very many files.");
+  if (nf.scan.ignored) notes.push(nf.scan.ignored + " ignored");
+  if (notes.length) {
+    nav.appendChild(h("p.small.dim", null, [notes.join(" · "), nf.scan.ignored
+      ? h("button.link.small", { type: "button", on: { click: showIgnored } }, " Show ignored") : null]));
+  }
+}
+
+/** *New* prefilled with one suggestion: its files, name and type. */
+function createOne(s) {
+  newItemDialog({ paths: s.files.map(function (f) { return f.path; }), name: s.name, type: s.type });
+}
+
+function ignoreFiles(files) {
+  call("new_files_ignore", { rels: files.map(function (f) { return f.rel; }) })
+    .then(function () { return rescanNewFiles(); }, function (err) { toast(errorText(err), "error"); });
+}
+
+/** The ignored files, each with *Suggest again*. */
+function showIgnored() {
+  call("new_files_ignored").then(function (keys) {
+    var body = h("ul.plain", null, keys.map(function (k) {
+      var row = h("li.row", null, [h("span.mono.small", { text: k }),
+        h("button.small", { type: "button", on: { click: function () {
+          call("new_files_unignore", { rels: [k] }).then(function () { row.remove(); rescanNewFiles(); },
+            function (err) { toast(errorText(err), "error"); });
+        } } }, "Suggest again")]);
+      return row;
+    }));
+    dialog("Ignored new files", h("div.stack", null, [
+      h("p.small.muted", { text: "Files in your working folder the worklist does not suggest as new items." }),
+      keys.length ? body : h("p.empty", { text: "None." })
+    ]), [{ label: "Close", primary: true, submit: true, onClick: function (d) { d.close(); } }]);
+  }, function (err) { toast(errorText(err), "error"); });
+}
+
+/**
+ * *Create items…*: one item per ticked suggestion, each in its folder. The
+ * duplicate checks run for all of them first; a summary says what will be
+ * created and what is refused (and why), and only after *Create* is anything
+ * uploaded. A refused file can still be created one by one with *New*,
+ * where a duplicate name can be confirmed.
+ */
+function createSuggested(list) {
+  if (!list.length) return;
+  setStatus("Checking " + list.length + (list.length === 1 ? " suggestion" : " suggestions") + " …");
+  Promise.all([formatKinds().catch(function () { return {}; }),
+    Promise.all(list.map(function (s) { return call("new_item_places", { paths: s.files.map(function (f) { return f.path; }) }); }))
+  ]).then(function (r) {
+    var kinds = r[0];
+    var jobs = list.map(function (s, i) {
+      var places = r[1][i], placement = newItemPlacement(places, kinds);
+      var group = editableGroupOfFolder(placement.project);
+      return { s: s, places: places, placement: placement, group: group ? group.code : null };
+    });
+    return Promise.all(jobs.map(function (j) {
+      if (!j.group || j.placement.problems.length || !j.placement.inside) return Promise.resolve(null);
+      return checkNewItemFiles(j.group, j.places, j.placement.targets);
+    })).then(function (checks) {
+      var planned = [], refused = [];
+      jobs.forEach(function (j, i) {
+        var f = newItemFindings(j.places, j.placement.targets, checks[i]);
+        var why = !j.group ? "no project group " + j.s.project + " you may create items in"
+          : !j.placement.inside ? "not in the working folder any more"
+          : j.placement.problems[0] || f.blocking[0] || f.sameName[0];
+        if (why) refused.push(j.s.name + ": " + why); else planned.push(j);
+      });
+      setStatus("");
+      confirmBatch(planned, refused);
+    });
+  }).catch(function (err) { setStatus(""); toast(errorText(err), "error"); });
+}
+
+function confirmBatch(planned, refused) {
+  var text = batchSummary(planned.map(function (j) { return { project: j.group, folder: j.placement.folder }; }), refused);
+  dialog("Create items", h("div.stack", null, [
+    h("p", { text: text }),
+    planned.length ? h("p.small.muted", { text: "Each item gets its model file with the drawings and exports of the same name, stays checked out to you and is not released." }) : null
+  ]), [
+    { label: "Cancel", onClick: function (d) { d.close(); } },
+    { label: "Create", primary: true, submit: true, onClick: function (d) {
+      d.close();
+      if (planned.length) runBatch(planned);
+    } }
+  ]);
+}
+
+function runBatch(planned) {
+  var made = [], failed = [];
+  planned.reduce(function (chain, j, i) {
+    return chain.then(function () {
+      setStatus("Creating item " + (i + 1) + " of " + planned.length + ": " + j.s.name + " …");
+      return createItemFromFiles({
+        body: { item_type: j.s.type, name: j.s.name }, project: j.group, folder: j.placement.folder,
+        places: j.places, targets: j.placement.targets, main: j.placement.main, allowSameName: false
+      }).then(function (rev) { made.push(rev.item_number + "/" + rev.code); }, function (err) {
+        failed.push(j.s.name + ": " + errorText(err));
+        if (err && err.createdRevision) made.push(err.createdRevision.item_number + "/" + err.createdRevision.code + " (without files)");
+      });
+    });
+  }, Promise.resolve()).then(function () {
+    setStatus("");
+    state.newFilesTicked = {};
+    var text = made.length + (made.length === 1 ? " item" : " items") + " created" + (made.length ? ": " + made.join(", ") : "") +
+      (failed.length ? ". " + failed.length + " failed: " + failed.join("; ") : "") + ".";
+    toast(text, failed.length ? "error" : null);
+    if (state.view === "home") selectView("home");
+    refreshWorklistCount();
+    rescanNewFiles();
+  });
 }
 
 /** Worklist: one line per dependent with the number of changes to check;

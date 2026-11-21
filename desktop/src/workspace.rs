@@ -1127,6 +1127,56 @@ enum SendMode {
     Park,
 }
 
+/// After the files of a new item were uploaded from the working folder
+/// (*New* from a file there, #359): the uploaded content becomes the base of
+/// the local files of the revision, which is checked out to the user. Only a
+/// file at the place the server gives it, with the content just uploaded, is
+/// recorded – then no other check-out lists it as *new* and the worklist no
+/// longer suggests it. Returns how many files were recorded.
+pub async fn record_uploaded(
+    api: &Api,
+    root: &Path,
+    project: Option<&str>,
+    item: &str,
+    code: &str,
+    files: &[(String, PathBuf)],
+) -> Result<usize, ApiError> {
+    let after = revision_files(api, project, item, code).await?.files;
+    let mut state = State::load(root);
+    let before = state.clone();
+    let mut recorded = 0;
+    for (name, path) in files {
+        let name = layout::nfc(name);
+        let Some(server) = after
+            .iter()
+            .find(|f| f.filename.eq_ignore_ascii_case(&name))
+        else {
+            continue;
+        };
+        let at_its_place = layout::rel_below(root, path)
+            .is_some_and(|r| layout::key_of(&r) == layout::key_of(&server.rel()));
+        if !at_its_place {
+            continue;
+        }
+        let Ok(meta) = std::fs::metadata(path) else {
+            continue;
+        };
+        let sha = sha256_of(path).await?;
+        // changed since the upload: the next check-in takes care of it
+        if sha != server.sha256 {
+            continue;
+        }
+        let mut entry = server.entry(&sha, meta.len(), modified_ms(&meta));
+        entry.checked_out = true;
+        state.insert(entry);
+        recorded += 1;
+    }
+    if recorded > 0 {
+        State::store(root, state.changes_since(&before))?;
+    }
+    Ok(recorded)
+}
+
 async fn send_local(
     api: &Api,
     root: &Path,

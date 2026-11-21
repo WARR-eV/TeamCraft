@@ -27,7 +27,7 @@ use crate::{
 
 type CmdResult<T> = Result<T, ApiError>;
 
-fn snapshot(state: &State<'_, AppState>) -> Settings {
+pub(crate) fn snapshot(state: &State<'_, AppState>) -> Settings {
     state.settings.lock().expect("settings lock").clone()
 }
 
@@ -65,7 +65,7 @@ fn default_workspace(app: &AppHandle) -> PathBuf {
         .join("TeamCraft")
 }
 
-fn workspace_root(app: &AppHandle, state: &State<'_, AppState>) -> PathBuf {
+pub(crate) fn workspace_root(app: &AppHandle, state: &State<'_, AppState>) -> PathBuf {
     snapshot(state)
         .workspace_dir
         .unwrap_or_else(|| default_workspace(app))
@@ -290,15 +290,17 @@ pub fn remove_connection(state: State<'_, AppState>, id: String) -> CmdResult<()
     change_connection(&state, |s, _, parking| profiles::remove(s, parking, &id))
 }
 
-/// Notes the signed-in account on the active connection.
+/// Notes the signed-in account on the active connection; the settings are
+/// written only when it changed (this also runs on every `GET /me`).
 fn remember_user(state: &State<'_, AppState>, user: &Value) {
     let (Some(username), display) = (user["username"].as_str(), user["display_name"].as_str())
     else {
         return;
     };
     let mut s = state.settings.lock().expect("settings lock");
-    profiles::record_user(&mut s, username, display.unwrap_or(username));
-    let _ = s.save(&state.config_dir);
+    if profiles::record_user(&mut s, username, display.unwrap_or(username)) {
+        let _ = s.save(&state.config_dir);
+    }
 }
 
 /// Whether this app fits the server version (`compat::notice`): a message for
@@ -435,9 +437,16 @@ pub async fn api(
         "DELETE" => Method::DELETE,
         other => return Err(ApiError::local(format!("Unsupported method {other}."))),
     };
-    signed_in_api(&state)?
+    // The app asks for its account at every start (shell.js): a sign-in kept
+    // from an older version gets its account noted on the connection (#356).
+    let is_me = method == Method::GET && path == "/me";
+    let value = signed_in_api(&state)?
         .json(method, &path, body.as_ref())
-        .await
+        .await?;
+    if is_me {
+        remember_user(&state, &value);
+    }
+    Ok(value)
 }
 
 /// A question in the assistant sidebar (`POST /assistant`, in the user's
@@ -1198,7 +1207,15 @@ mod tests {
 /// `bracket.prt`). `folders` (file name → relative folder, from the folder
 /// import) gives every file its place in the project group, so the working
 /// folder later mirrors the original folder structure.
+///
+/// For *New* from files (#359): `refuse_clash` lets the server refuse a file
+/// another item of the group has at the same place, `refuse_same_name` one
+/// whose name another item uses anywhere in the group – checked atomically
+/// while storing (409, nothing stored). With `track`, the uploaded files that
+/// sit at their place in the working folder are recorded as the base of the
+/// revision (`project` = its group), see `workspace::record_uploaded`.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn upload_files(
     app: AppHandle,
     state: State<'_, AppState>,
@@ -1207,6 +1224,10 @@ pub async fn upload_files(
     paths: Vec<PathBuf>,
     comment: Option<String>,
     folders: Option<HashMap<String, String>>,
+    project: Option<String>,
+    track: Option<bool>,
+    refuse_clash: Option<bool>,
+    refuse_same_name: Option<bool>,
 ) -> CmdResult<Value> {
     let api = signed_in_api(&state)?;
     let files = upload_names(&paths)?;
@@ -1218,28 +1239,224 @@ pub async fn upload_files(
         .into_iter()
         .map(|(name, folder)| (name, Value::String(layout::folder_for_upload(&folder))))
         .collect();
+    let mut fields = vec![
+        ("comment", comment.unwrap_or_default()),
+        ("folders", Value::Object(folders).to_string()),
+    ];
+    if refuse_clash == Some(true) {
+        fields.push(("refuse_clash", "true".to_string()));
+    }
+    if refuse_same_name == Some(true) {
+        fields.push(("refuse_same_name", "true".to_string()));
+    }
     let cancel = new_upload(&state);
-    let progress = upload_progress_events(app);
+    let progress = upload_progress_events(app.clone());
     let transfer = Transfer {
         cancel: &cancel,
         progress: &progress,
     };
-    api.send_files(
-        &format!(
-            "/items/{}/revisions/{}/files",
-            workspace::enc(&item),
-            workspace::enc(&code)
-        ),
-        &item,
-        &code,
-        &files,
-        &[
-            ("comment", comment.unwrap_or_default()),
-            ("folders", Value::Object(folders).to_string()),
-        ],
-        &transfer,
-    )
-    .await
+    let result = api
+        .send_files(
+            &format!(
+                "/items/{}/revisions/{}/files",
+                workspace::enc(&item),
+                workspace::enc(&code)
+            ),
+            &item,
+            &code,
+            &files,
+            &fields,
+            &transfer,
+        )
+        .await?;
+    if track == Some(true) {
+        // best effort: the upload itself has succeeded
+        let root = workspace_root(&app, &state);
+        let _ =
+            workspace::record_uploaded(&api, &root, project.as_deref(), &item, &code, &files).await;
+    }
+    Ok(result)
+}
+
+/// The most files *New* takes at once.
+const MAX_NEW_ITEM_FILES: usize = 200;
+
+/// Where a file picked for *New* is (#359): in the working folder below a
+/// project group folder – then that group and the folder inside it are the
+/// item's place, taken from the file instead of typed – or elsewhere.
+#[derive(Clone, Debug, Serialize)]
+pub struct NewItemPlace {
+    pub path: PathBuf,
+    /// File name as the server stores it: composed, a Creo iteration under
+    /// its logical name.
+    pub name: String,
+    /// Below `<working folder>/<group>/`.
+    pub inside: bool,
+    /// The group folder the file is in (its code), when inside.
+    pub project: Option<String>,
+    /// Folder inside the group (`""` = its top); `""` when outside.
+    pub folder: String,
+    pub sha256: String,
+    pub size: u64,
+    /// `ITEM/REV` when the working folder tracks this file already.
+    pub tracked: Option<String>,
+    /// `ITEM/REV` when the file was added with *Add files…* and is not
+    /// checked in yet.
+    pub pending: Option<String>,
+}
+
+/// For each picked file: where it is, its SHA-256 and whether it belongs to
+/// an item already (`state.json`, `added.json`).
+#[tauri::command]
+pub async fn new_item_places(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    paths: Vec<PathBuf>,
+) -> CmdResult<Vec<NewItemPlace>> {
+    if paths.len() > MAX_NEW_ITEM_FILES {
+        return Err(ApiError::local(format!(
+            "Choose at most {MAX_NEW_ITEM_FILES} files."
+        )));
+    }
+    let root = workspace_root(&app, &state);
+    let known = layout::State::load(&root);
+    let added = addfiles::load(&root);
+    let mut out = Vec::with_capacity(paths.len());
+    for path in paths {
+        let meta = tokio::fs::metadata(&path).await?;
+        if !meta.is_file() {
+            return Err(ApiError::local(format!(
+                "{} is not a file.",
+                path.display()
+            )));
+        }
+        let disk = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+            ApiError::local(format!("{} has no usable file name.", path.display()))
+        })?;
+        let (logical, _) = workspace::logical_name(disk);
+        let name = layout::nfc(logical);
+        let rel = layout::rel_below(&root, &path);
+        let (inside, project, folder) = match rel.as_deref() {
+            Some(rel) => {
+                let parts: Vec<&str> = rel.split('/').collect();
+                if parts.len() >= 2 && !parts[0].starts_with('.') {
+                    let folder = parts[1..parts.len() - 1]
+                        .iter()
+                        .copied()
+                        .map(layout::nfc)
+                        .collect::<Vec<_>>()
+                        .join("/");
+                    (true, Some(layout::nfc(parts[0])), folder)
+                } else {
+                    (false, None, String::new())
+                }
+            }
+            None => (false, None, String::new()),
+        };
+        let key = rel.as_deref().map(layout::key_of);
+        let tracked = key
+            .as_ref()
+            .and_then(|k| known.files.get(k))
+            .map(|e| format!("{}/{}", e.item, e.revision));
+        let pending = key.as_ref().and_then(|k| {
+            added
+                .iter()
+                .find(|p| layout::key_of(&p.rel) == *k)
+                .map(|p| format!("{}/{}", p.item, p.revision))
+        });
+        out.push(NewItemPlace {
+            sha256: workspace::sha256_of(&path).await?,
+            size: meta.len(),
+            path,
+            name,
+            inside,
+            project,
+            folder,
+            tracked,
+            pending,
+        });
+    }
+    Ok(out)
+}
+
+/// Copies files picked from outside the working folder into
+/// `<working folder>/<project>/<folder>/` for *New* (#359): the originals are
+/// never moved or changed. Nothing is copied when a target exists already –
+/// no file in the working folder is ever overwritten. Returns the copies.
+#[tauri::command]
+pub async fn new_item_copy(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    project: String,
+    folder: String,
+    paths: Vec<PathBuf>,
+) -> CmdResult<Vec<PathBuf>> {
+    let group = project.trim();
+    if group.is_empty() {
+        return Err(ApiError::local("Choose a project group."));
+    }
+    if paths.len() > MAX_NEW_ITEM_FILES {
+        return Err(ApiError::local(format!(
+            "Choose at most {MAX_NEW_ITEM_FILES} files."
+        )));
+    }
+    let root = workspace_root(&app, &state);
+    let folder = layout::folder_for_upload(&folder);
+    // plan everything first: refuse before a single byte is copied
+    let mut plan: Vec<(PathBuf, PathBuf)> = Vec::with_capacity(paths.len());
+    for src in paths {
+        let disk = src.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+            ApiError::local(format!("{} has no usable file name.", src.display()))
+        })?;
+        let rel = layout::local_rel(Some(group), &folder, &layout::nfc(disk));
+        let dst = layout::join_rel(&root, &rel);
+        if dst == src {
+            plan.push((src, dst));
+            continue;
+        }
+        if tokio::fs::try_exists(&dst).await? {
+            return Err(ApiError::local(format!(
+                "{rel} exists in the working folder already – nothing was copied. \
+                 Choose that file instead, or rename the new one."
+            )));
+        }
+        if plan.iter().any(|(_, d)| {
+            layout::key_of(&d.to_string_lossy()) == layout::key_of(&dst.to_string_lossy())
+        }) {
+            return Err(ApiError::local(format!(
+                "Two of the chosen files would both become {rel} – nothing was copied."
+            )));
+        }
+        plan.push((src, dst));
+    }
+    let mut copied: Vec<PathBuf> = Vec::new();
+    for (src, dst) in &plan {
+        if src == dst {
+            continue;
+        }
+        let step = async {
+            if let Some(parent) = dst.parent() {
+                tokio::fs::create_dir_all(parent).await?;
+            }
+            tokio::fs::copy(src, dst).await?;
+            // the new item is checked out to the user: its files are writable
+            workspace::set_read_only(dst, false)?;
+            Ok::<_, std::io::Error>(())
+        };
+        if let Err(e) = step.await {
+            // leave nothing half done behind
+            for done in &copied {
+                let _ = tokio::fs::remove_file(done).await;
+            }
+            let _ = tokio::fs::remove_file(dst).await;
+            return Err(ApiError::local(format!(
+                "{} could not be copied: {e}",
+                src.display()
+            )));
+        }
+        copied.push(dst.clone());
+    }
+    Ok(plan.into_iter().map(|(_, dst)| dst).collect())
 }
 
 /// Largest attachment of a change request (the server enforces the same).

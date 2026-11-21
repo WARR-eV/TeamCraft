@@ -183,15 +183,21 @@ pub fn ensure_active(s: &mut Settings) -> Option<String> {
     Some(id)
 }
 
-/// Notes the account of the active connection after a sign-in.
-pub fn record_user(s: &mut Settings, username: &str, display_name: &str) {
+/// Notes the account of the active connection – after a sign-in, and
+/// whenever the server confirms the stored sign-in (`GET /me`), so that a
+/// sign-in kept from an app version before the connections (#322, #323)
+/// shows its account too (#356). Returns whether anything changed, so the
+/// caller saves the settings only then.
+pub fn record_user(s: &mut Settings, username: &str, display_name: &str) -> bool {
+    let before = (s.profiles.clone(), s.active_profile.clone());
     let Some(id) = ensure_active(s) else {
-        return;
+        return false;
     };
     if let Some(p) = s.profiles.iter_mut().find(|p| p.id == id) {
         p.username = Some(username.to_string()).filter(|u| !u.is_empty());
         p.display_name = Some(display_name.to_string()).filter(|d| !d.is_empty());
     }
+    (s.profiles.clone(), s.active_profile.clone()) != before
 }
 
 /// Parks the active token (or forgets a parked one when signed out).
@@ -422,6 +428,32 @@ mod tests {
         assert_eq!(s.profiles.len(), 1);
         // no server: nothing to save
         assert_eq!(ensure_active(&mut Settings::default()), None);
+    }
+
+    #[test]
+    fn a_kept_sign_in_gets_its_account_when_the_server_confirms_it() {
+        // a sign-in from before the connections: the connection is created
+        // without an account (#356) …
+        let mut s = Settings {
+            server_url: Some(A.into()),
+            token: Some("tc_pat_old".into()),
+            ..Settings::default()
+        };
+        ensure_active(&mut s).unwrap();
+        assert_eq!(list(&s)[0].username, None);
+        // … and the first GET /me records it – once
+        assert!(record_user(&mut s, "erika", "Erika Muster"));
+        let listed = list(&s);
+        assert_eq!(listed[0].username.as_deref(), Some("erika"));
+        assert_eq!(listed[0].display_name.as_deref(), Some("Erika Muster"));
+        assert!(
+            !record_user(&mut s, "erika", "Erika Muster"),
+            "unchanged: nothing to save"
+        );
+        // a changed display name is noted again
+        assert!(record_user(&mut s, "erika", "Erika M."));
+        // no server: nothing recorded
+        assert!(!record_user(&mut Settings::default(), "erika", "Erika"));
     }
 
     #[test]

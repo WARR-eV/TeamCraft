@@ -14,7 +14,7 @@ use crate::{layout, workspace};
 pub const MAX_FILES: usize = 20_000;
 
 /// Folders that never hold design data.
-const SKIPPED_DIRS: [&str; 7] = [
+pub(crate) const SKIPPED_DIRS: [&str; 7] = [
     "oldversions",
     ".git",
     ".svn",

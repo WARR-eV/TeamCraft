@@ -26,9 +26,10 @@ use crate::{
     preview::PreviewFormat,
     services::{
         access_log::{self, AccessCtx},
-        as_built, attributes, audit, bom, changes, files, impacts, interchange, items,
-        notifications, ownership, projects, references, requests, result_proposals, revisions,
-        similar, simulations, uploads,
+        as_built, attributes, audit, bom, changes,
+        file_check::ClashGuard,
+        files, impacts, interchange, items, notifications, ownership, projects, references,
+        requests, result_proposals, revisions, similar, simulations, uploads,
     },
     thumbnail, util, AppState,
 };
@@ -839,7 +840,21 @@ pub(crate) async fn receive_uploads(
         received.fields.get("folders").map(String::as_str),
     )?;
     files::apply_folders(&mut received.uploads, folder.as_deref(), &folders);
+    // The duplicate guard of new files (#359), off unless the client asks.
+    let guard = clash_guard(&received);
+    for upload in &mut received.uploads {
+        upload.guard = guard;
+    }
     Ok(received)
+}
+
+/// The duplicate guard of a multipart upload or check-in: the text fields
+/// `refuse_clash` and `refuse_same_name` (`services::file_check`).
+fn clash_guard(received: &Received) -> ClashGuard {
+    ClashGuard::from_fields(
+        received.fields.get("refuse_clash").map(String::as_str),
+        received.fields.get("refuse_same_name").map(String::as_str),
+    )
 }
 
 /// Upload into a revision that is checked out by the actor (new files or new
@@ -876,8 +891,9 @@ pub(crate) async fn upload_files(
 /// `/api/v1/uploads` sessions of the actor) to the received files, so large
 /// files join a multipart upload or check-in – stored in the same
 /// transaction. A session's own base and folder win over the `bases`,
-/// `folders` and `folder` fields. Returns the session ids, to be forgotten
-/// once the versions are stored.
+/// `folders` and `folder` fields; its duplicate guard and the one of the
+/// `refuse_clash` / `refuse_same_name` fields both apply. Returns the session
+/// ids, to be forgotten once the versions are stored.
 pub(crate) async fn take_session_uploads(
     st: &AppState,
     actor: &Actor,
@@ -896,6 +912,7 @@ pub(crate) async fn take_session_uploads(
         received.fields.get("folder").map(String::as_str),
         received.fields.get("folders").map(String::as_str),
     )?;
+    let guard = clash_guard(received);
     for id in &ids {
         let mut upload = uploads::complete_in(&st.db, &st.vault, actor, *id, scope).await?;
         let key = files::stored_name(&upload.filename).to_lowercase();
@@ -905,6 +922,7 @@ pub(crate) async fn take_session_uploads(
         if upload.folder.is_none() {
             upload.folder = folders.get(&key).cloned().or_else(|| folder.clone());
         }
+        upload.guard = upload.guard.or(guard);
         received.uploads.push(upload);
     }
     Ok(ids)

@@ -25,6 +25,7 @@ pub mod deactivation;
 pub mod desktop;
 pub mod duplicates;
 pub mod explorer;
+pub mod file_check;
 pub mod files;
 pub mod folders;
 pub mod impacts;

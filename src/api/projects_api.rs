@@ -442,6 +442,27 @@ pub(super) async fn project_files(
 }
 
 #[derive(Deserialize)]
+pub(super) struct FileCheckBody {
+    /// The files to check (1 to `file_check::MAX_FILES`).
+    files: Vec<file_check::Wanted>,
+}
+
+/// `POST /api/v1/projects/{code}/file-check` – read-only: what the group
+/// already has for files that are about to become new items – a current file
+/// at the same place, of the same name, with the same content (issue #359,
+/// see `services::file_check`).
+pub(super) async fn project_file_check(
+    State(st): State<AppState>,
+    ApiUser(me): ApiUser,
+    Path(code): Path<String>,
+    ApiJson(body): ApiJson<FileCheckBody>,
+) -> AppResult<Json<Value>> {
+    let project = projects::get_by_code(&st.db, &me, &code).await?;
+    let checked = file_check::check(&st.db, &me, project.id, &body.files).await?;
+    Ok(Json(json!({ "files": checked })))
+}
+
+#[derive(Deserialize)]
 pub(super) struct SetDefaultCad {
     /// Format family (`inventor`, `solidworks`, …); empty or absent = none.
     #[serde(default)]

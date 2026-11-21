@@ -814,6 +814,20 @@ needs an issue with a reason first (see *Direction*).
 
 ## Done
 
+- [x] **New items from files on this computer (#359):** *New* takes group and folder from where a file is in the
+  working folder (every file keeps its folder, files from elsewhere are copied into the item's folder), refuses
+  duplicates before anything is created (tracked or added files, the same place – `POST /projects/{code}/file-check`
+  –, the same name elsewhere unless *Create anyway*; the same content warns), uploads with the server's atomic guard
+  (`refuse_clash`, `refuse_same_name`), repeats safely (idempotency key from the main file) and records the files in
+  `state.json`; the worklist section *New on this computer* suggests untracked parts and assemblies
+  (`desktop/src/newfiles.rs`, ignore list `.teamcraft/ignored.json`, *Create items…* after a summary); *Check in…*
+  offers a second model file of a revision unticked. Tests: `scripts/desktop-new-files.test.mjs`, the module tests of
+  `newfiles.rs`, `layout.rs` (`rel_below`), the server tests of the file check and the guard. The ignore list loses
+  the entries of files that are gone after a complete scan. Left: ordering the suggestions by the assemblies of the
+  user's check-outs that reference them (the references of a locally changed assembly are not on the server yet).
+- [x] **Desktop: Get project groups defaults to the latest revision (#355)**, the app version above the logo in the
+  rail (#357), the account of a kept sign-in in *Settings → Connections* (#356); CI: the macOS server build runs in
+  the weekly run and on *Run workflow* only, no longer per push to `main` (#358).
 - [x] **Create an item in a folder** (user report: no way to choose a folder when creating an item): `items.folder`
   (migration `0075`), set by the web *New item* form (*Folder*, `?folder=`, *More → New item in this folder…*), the
   desktop *New* dialog and *New item here* on the folders of Home → *Files*, `POST /items` `folder`; new files without

@@ -107,6 +107,7 @@ src/services/      business logic – the only code that writes to the database
                     notifications.rs: in-app notifications, watch lists, settings – created in the event's transaction;
                     imports.rs: BOM import – one plan for preview and import, one transaction; staged_imports for the web flow;
                     insights.rs: read-only BOM health check and duplicate files;
+                    file_check.rs: duplicates of new files – read-only check per group and the upload guard (#359);
                     attributes.rs: custom attribute definitions (admins), values per revision in revisions.attributes;
                     mass_properties.rs: material library, mass settings of revisions/files, mass/CG/inertia roll-up;
                     offboarding (#173): offboarding.rs = holdings report per user + idle SSO users, checkouts.rs =
@@ -204,6 +205,7 @@ desktop/           TeamCraft Desktop (Tauri 2, own Cargo project – never part 
                    (plain ES modules, no build step): graph.js = the *Graph* tab (navigable BOM/reference graph, SVG +
                    HTML card layer, checked by scripts/desktop-graph-check.mjs), files-view.js = Home *Files* view,
                    crash.js = crash reports; desktop/src/workspace.rs + layout.rs = working folder, park, local changes;
+                   new-files.js + desktop/src/newfiles.rs = new items from local files, worklist *New on this computer* (#359);
                    desktop/src/localserver.rs = *Try TeamCraft on this computer* (starts the bundled teamcraft-server local);
                    tauri.local-server.conf.json = the *with local server* installers (externalBin teamcraft-server + postgresql/)
 ```

@@ -6,7 +6,28 @@ files, structure, where used, references, graph, changes, history, 3D viewer), a
 check-outs and reviews, and a **local working folder**:
 
 * *New* (`Ctrl/Cmd+N`) creates an item together with its files: choose the
-  CAD files first, name and type follow from the first one;
+  CAD files first, name and type follow from the first one. Files in the
+  working folder bring their place (#359): a part saved in the CAD program as
+  `<working folder>/GRAKSLER/Design/Struktur/Bracket.ipt` becomes an item of
+  the group `GRAKSLER` in the folder `Design/Struktur`, every file keeps its
+  own folder (a drawing in `Zeichnungen/`, a STEP export next to the model),
+  and group and folder are shown, not typed – to put the item elsewhere, save
+  its files there. Files picked from elsewhere are **copied** into the item's
+  folder (the originals stay untouched; an existing file is never
+  overwritten). Before anything is created the dialog refuses duplicates – a
+  file that belongs to an item already (tracked, or added with *Add files…*),
+  a file another item has at the same place in the group – and asks before a
+  file name that exists in another folder of the group (CAD programs find
+  parts by file name; *Create anyway* for the rare intended case, such as
+  standard parts in two languages); the same content as a stored file is a
+  warning. A summary says what will happen (*Creates a new item in GRAKSLER /
+  Design/Struktur, uploads 2 files – it stays checked out to you*). The
+  server checks the same group, folder and name again while it stores the
+  files, so two people creating the same new file at the same moment cannot
+  both succeed, and *Create* after a lost answer or a failed upload finds the
+  item made the first time (an idempotency key from the main file) instead of
+  creating a second one. The uploaded files are recorded in the working
+  folder, so no other check-out and no worklist suggestion offers them again;
 * *Check out* takes the lock, copies the files into the working folder and
   makes them writable. For an assembly it also downloads every part of its
   structure that is missing (latest version, read-only) – only the assembly is
@@ -24,7 +45,11 @@ check-outs and reviews, and a **local working folder**:
   reference – so the assembly opens in the CAD program (see below);
 * the download icon next to *Projects* in the navigator (*Tools → Get Project Groups…*) copies the files of every item
   of
-  chosen project groups into the working folder – for new team members;
+  chosen project groups into the working folder – for new team members. It
+  takes the **latest revision, also in work**, unless *Latest released
+  revision* is chosen (#355): most items of a team that releases only before
+  manufacturing are in work, and *released* would leave the working folder
+  almost empty and the assemblies without their parts;
 * the folder icon next to it (*Tools → Import CAD Folder…*) brings an existing CAD folder in:
   scan first (nothing is uploaded), then one item per part or assembly with
   its drawings and exports; every file keeps its folder, so the working
@@ -100,10 +125,35 @@ check-outs and reviews, and a **local working folder**:
   the request with the small files. Nothing is stored then, the revision
   stays checked out to you and your local files are untouched. Once every
   byte is sent the server finishes the check-in on its own; the dialog says
-  so (*too late to cancel*);
+  so (*too late to cancel*). A new file that is a part or assembly while the
+  revision has a model already (a new `Bracket.iam` next to the checked-out
+  `Bracket.ipt` – the same name stem makes it a candidate) is offered
+  **unticked**, with *New item from this file*: it is usually an item of its
+  own (#359);
 * the worklist in the navigator follows what you do in the tabs: checking
   out, cancelling a check-out, checking in or acknowledging a dependent
   updates it at once, while it stays open on the left;
+* **New on this computer** (worklist, #359) lists the parts and assemblies in
+  the working folder that belong to no item yet – typically the ones just
+  created in the CAD program – one suggestion per model file with its
+  drawing and exports of the same name in the same folder, newest first, the
+  count is part of the worklist count on the rail. A click opens *New*
+  prefilled; *Create items…* creates one item for each ticked suggestion in
+  its folder, after a summary that names what is refused and why (a refused
+  file can still be created one by one with *New*, where a duplicate name can
+  be confirmed); *×* ignores a file for good (`.teamcraft/ignored.json`,
+  *Show ignored* brings it back; the entries of files that are gone –
+  deleted, moved or part of an item meanwhile – are dropped after a scan that
+  read the whole working folder). Left out: files that are tracked, added
+  with *Add files…*, a companion of a tracked file (the STEP export next to
+  a tracked model goes into that item's check-in), lock, backup and
+  temporary files, `OldVersions` and hidden folders, files directly in the
+  working folder and other files than CAD models (under *Other new files*).
+  The folder is looked at when the worklist opens or is refreshed and when
+  the app window gets the focus back (at most every 15 s); one scan visits at
+  most 50 000 entries and reports at most 2 000 files, so a huge folder never
+  blocks the app. Nothing is uploaded from the worklist without the dialog or
+  the confirmed summary. Viewers do not see the section;
 * *Check in all* in the worklist first lists the check-outs with local
   changes (modified or new files) and offers to **check them in first**
   with their files; *Only the others* checks in just the check-outs without
@@ -205,13 +255,18 @@ second account there), never inside another one, because two servers can use
 the same item numbers and project codes; the first connection keeps the
 folder it had. *Remove* forgets a connection and its sign-in; its working
 folder stays on your disk. Check-outs belong to the connection they were made
-in – switch back to check them in.
+in – switch back to check them in. The list names the account of every
+connection; a sign-in kept from an app version before the connections gets
+its account the first time the server confirms it at the start (#356).
 
 The window is built for daily work: object tabs on top, under them the
 toolbar of the open object with its one next step filled (see
 [The toolbar](#the-toolbar)) and the rare tools under *More*. The navigator shows a state as its symbol (a check:
 released, a ring: in review, a half-filled ring: in work, – obsolete, the
-name in the tooltip); the search field is `Ctrl+F` (`⌘F`).
+name in the tooltip); the search field is `Ctrl+F` (`⌘F`). Above the logo
+at the bottom of the rail the app shows its own version (`0.2.10`), always –
+which app runs is one look at a screenshot away (#357); the desktop app
+should match the server's version.
 
 **Moving tabs:** drag an object tab to a new place (a bar shows where it
 lands; the tab keeps its state, and a plain click still just selects it).

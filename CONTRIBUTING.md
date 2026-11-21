@@ -77,8 +77,8 @@ must never be committed.
 
 CI runs these checks on pull requests: the tests against PostgreSQL 16
 and 18 on Linux (with coverage on one leg), the server build on Windows, the
-desktop app on Linux, macOS and Windows; `main` adds the macOS server build and
-more desktop runners (`.github/workflows/`) – each only when a file it checks
+desktop app on Linux, macOS and Windows; `main` adds more desktop runners, and the
+weekly run adds the macOS server build (`.github/workflows/`) – each only when a file it checks
 changed (see [What CI runs for a change](#what-ci-runs-for-a-change)). A pull request that changes a
 pure module also gets a mutation-testing report for the changed lines (report-only for now, see
 [mutation testing](docs/src/dev/mutation-testing.md)).
@@ -133,7 +133,7 @@ base) and starts only the jobs that need it.
 
 | Changed files                                                                                                                                                                                               | Jobs that run                                                                                    |
 |-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
-| server: `src/`, `tests/`, `migrations/`, `templates/`, `static/`, `shared/`, `vendor/`, `media/logos/`, `media/icons/`, `fuzz/seeds/`, `Cargo.toml`/`Cargo.lock`, `build.rs`, lint and nextest configuration | CI: fmt and clippy, tests on PostgreSQL 16 and 18, Windows build (`main`: also macOS)            |
+| server: `src/`, `tests/`, `migrations/`, `templates/`, `static/`, `shared/`, `vendor/`, `media/logos/`, `media/icons/`, `fuzz/seeds/`, `Cargo.toml`/`Cargo.lock`, `build.rs`, lint and nextest configuration | CI: fmt and clippy, tests on PostgreSQL 16 and 18, Windows build (weekly: also macOS)            |
 | the desktop files server tests compare with: `desktop/ui/app.css`, `desktop/ui/index.html`, `desktop/ui/js/{core,settings,shell}.js`, `desktop/src/compat.rs`                                               | the server jobs as well                                                                          |
 | `docs/src/`, `deploy/teamcraft.env.example`, `deploy/docker-compose.yml`, `packaging/linux/teamcraft.env`                                                                                                   | CI: *docs and config guards* – `config::tests` and `tests/architecture_guards.rs`, no database   |
 | `Cargo.toml`/`Cargo.lock`, `desktop/Cargo.*`, `deny.toml`, `vendor/`                                                                                                                                        | CI: `cargo deny` for the lock file concerned                                                     |
@@ -496,10 +496,13 @@ another pull request changed, formatting after a conflict resolution.
 * **CI result** is the one check that sums up the CI workflow: it is green
   when every job passed or was skipped on purpose (a job runs only for the
   files it checks, see [What CI runs for a change](#what-ci-runs-for-a-change)),
-  red when one failed or was cancelled. The macOS build (`build (macos-latest)`, on
-  `main` only) is advisory and not part of it: GitHub's hosted macOS
-  runners are often unavailable, and a job that never got a runner is
-  cancelled – that is no fault of the code. CI also runs on `merge_group`, so a merge
+  red when one failed or was cancelled. The macOS build (`build (macos-latest)`)
+  runs only in the weekly run and on *Run workflow*, and it is advisory, not
+  part of it: GitHub's hosted macOS runners are often unavailable, a job that
+  never got a runner is cancelled – no fault of the code – and a cancelled job
+  turns the whole run red. Per push it would mark commits on `main` red
+  (#358); the nightly Release run builds the server for macOS anyway, so a
+  real macOS compile failure still shows within a day. CI also runs on `merge_group`, so a merge
   queue (Settings → Rules) tests each pull request against the `main` it
   lands on.
 * Release builds do not run per push to `main` (see "Releases and

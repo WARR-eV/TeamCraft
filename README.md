@@ -305,7 +305,10 @@ end-to-end tests against a real PostgreSQL.
   project group (with *New item here* on every folder, starting in a favourite folder, e.g. the one with the
   Inventor project file, if you like), a navigable *Graph* of every revision (BOM children,
   references and where-used, coloured by state, with quantities and preview
-  images), *Park* of work in progress, an Agent view, crash reports the user
+  images), *Park* of work in progress, new items straight from the files
+  saved in the working folder (group and folder taken from where they are,
+  duplicates refused, the worklist suggesting the parts and assemblies that
+  belong to no item yet), an Agent view, crash reports the user
   decides about and an update notice (never installs anything itself). The
   download *with local server* also runs a private test server with its own
   database on the laptop (*Try TeamCraft on this computer*).

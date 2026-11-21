@@ -170,7 +170,7 @@ fn path_of(root: &Path) -> PathBuf {
     root.join(STATE_DIR).join(ADDED_FILE)
 }
 
-fn load(root: &Path) -> Vec<Pending> {
+pub(crate) fn load(root: &Path) -> Vec<Pending> {
     std::fs::read(path_of(root))
         .ok()
         .and_then(|b| serde_json::from_slice(&b).ok())
