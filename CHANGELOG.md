@@ -13,6 +13,8 @@ see the notices in the README.
 
 ## [Unreleased]
 
+## [0.2.11] - 2026-11-21
+
 ### Added
 
 - **New items from files on this computer** (#359). *New* in the desktop app
@@ -1189,7 +1191,8 @@ Changes since the `v0.2.0` tag.
   app keeps the private file and shows a warning. Server addresses with plain
   `http://` to another computer get a warning.
 
-[Unreleased]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.10...HEAD
+[Unreleased]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.11...HEAD
+[0.2.11]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.10...v0.2.11
 [0.2.10]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.9...v0.2.10
 [0.2.9]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.7...v0.2.8
