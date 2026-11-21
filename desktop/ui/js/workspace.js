@@ -111,6 +111,21 @@ export function revWorkspace(tab, el) {
         } }
       }, "STEP");
     }
+    // SolidCraft designs of my check-out: the item number, revision and name
+    // into the design's properties (solidcraft-cli, #369)
+    function itemDataButton(f) {
+      if (!rev.checked_out_by || lockedByOther || exportProgram(f.name, programs) !== "solidcraft") return null;
+      if (f.state === "missing" || f.state === "clash") return null;
+      return h("button.small", {
+        type: "button", title: "Write " + rev.item_number + ", revision " + rev.code + " and the item name into the design's properties in SolidCraft",
+        on: { click: function () {
+          run("Writing the item data into " + f.name, function () {
+            return call("solidcraft_write_item_data", { project: rev.project_code, item: rev.item_number, code: rev.code, file: f.name,
+              data: { item_number: rev.item_number, revision: rev.code, name: rev.name, item_id: String(rev.item_id || ""), revision_id: String(rev.id) } });
+          }).then(function () { toast(f.name + " now carries " + rev.item_number + "/" + rev.code + " – check it in to keep it"); renderActive(); }, function () {});
+        } }
+      }, "Item data");
+    }
     el.appendChild(h("section.panel", null, [
       h("div.panel-head", null, [
         h("h2", { text: "Working folder" }),
@@ -158,6 +173,7 @@ export function revWorkspace(tab, el) {
               h("span.row", null, [
                 f.state !== "missing" && f.state !== "clash" ? h("button.small", { type: "button", on: { click: function () { openLocalFile(tab, f); } } }, "Open") : null,
                 f.state !== "missing" && f.state !== "clash" ? stepButton(f) : null,
+                itemDataButton(f),
                 h("button.small", { type: "button", title: "Request a change to " + f.name + " (change request)", on: { click: function () { requestChangeDialog(rev, f.name); } } }, "Request…")
               ])]
           };

@@ -18,6 +18,7 @@
 //! feature is not exported – SolidCraft writes nothing then and says why.
 
 use std::{
+    ffi::OsStr,
     path::{Path, PathBuf},
     process::Child,
     time::Duration,
@@ -201,13 +202,37 @@ fn wait_for(mut child: Child, program: CadProgram) -> Result<(), String> {
 
 /// `solidcraft-cli run --in <design> --out <output>` – no shell, no window.
 fn run_solidcraft(cli: &Path, input: &Path, output: &Path) -> Result<(), String> {
+    let args = [
+        OsStr::new("run"),
+        OsStr::new("--in"),
+        input.as_os_str(),
+        OsStr::new("--out"),
+        output.as_os_str(),
+    ];
+    run_cli(cli, &args)
+}
+
+/// `solidcraft-cli run <script> --in <design> --save <design>`: runs a
+/// command script on the design and saves it in place (SolidCraft keeps a
+/// `.bak` of the previous file).
+pub fn run_solidcraft_script(cli: &Path, script: &Path, design: &Path) -> Result<(), String> {
+    let args = [
+        OsStr::new("run"),
+        script.as_os_str(),
+        OsStr::new("--in"),
+        design.as_os_str(),
+        OsStr::new("--save"),
+        design.as_os_str(),
+    ];
+    run_cli(cli, &args)
+}
+
+/// Runs `solidcraft-cli` with `args` – no shell, no window, no input – and
+/// waits for it ([`wait_for`]).
+fn run_cli(cli: &Path, args: &[&OsStr]) -> Result<(), String> {
     let mut command = std::process::Command::new(cli);
     command
-        .arg("run")
-        .arg("--in")
-        .arg(input)
-        .arg("--out")
-        .arg(output)
+        .args(args)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::piped());

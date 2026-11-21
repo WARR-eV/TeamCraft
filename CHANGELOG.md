@@ -37,6 +37,11 @@ see the notices in the README.
   (`SOLIDCRAFT_CLI`, `PATH` or the default install folders). A failed export
   – any program – no longer stops the check-in: the file is checked in
   without its STEP and the result says why.
+- **Desktop: item data into SolidCraft designs** (#369). *Item data* in the
+  Workspace tab writes the item number, revision and name into a checked-out
+  SolidCraft design's properties (and TeamCraft's ids and server under
+  `teamcraft.pdm`) through `solidcraft-cli`; refused while the design is
+  read-only or open in SolidCraft.
 
 ## [0.2.11] - 2026-11-21
 
