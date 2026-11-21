@@ -232,6 +232,9 @@ from CAD…* reads the counts from the file and works without it).
 
 `.prt` and `.asm` are told apart by content (Creo's `#UGC:` header, Solid
 Edge's OLE container); `.sc` must be a SolidCraft ZIP or JSON design.
+A SolidCraft ZIP design shows the picture it embeds (`cache/thumbnail.png`)
+when its key (`cache/thumbnail.json`, `solidcraft-thumbnail/1`) names the
+SHA-256 of this `document.json` and of the PNG; otherwise none.
 
 ## BIM / architecture
 

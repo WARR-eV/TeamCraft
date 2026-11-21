@@ -162,6 +162,7 @@ src/nxpart.rs      NX part stream container (SPLMSSTR): directory, reference str
 src/nxasm.rs       NX assemblies: components + placements from /Root/FastLoad/Structure (OM objects, hash map instance→record);
                    services/assemblies.rs composes the assembly preview from the parts' previews (found by file name)
 src/fusion.rs      Fusion design archives (.f3d): ZIP with Zstandard entries (ruzstd), size/CRC-checked; sample archives for tests
+src/scdesign.rs    SolidCraft designs (.sc): ZIP design container (bounded, size/CRC-checked, unknown versions = nothing found), embedded thumbnail
 src/swpart.rs      SOLIDWORKS 2015+ section container: Deflate sections (bounded, CRC-checked), PreviewPNG, component tree (COMPINSTANCETREE):
                    referenced files and placements (assembly previews, also via services/assemblies.rs)
 src/invpart.rs     Inventor files: OLE storage RSeStorage, zlib or Zstandard segments (meta stream: section lengths + class UUID table),

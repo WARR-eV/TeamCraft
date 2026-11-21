@@ -20,6 +20,7 @@ examine_globs = [
     "src/cadformat.rs",
     "src/cadrefs.rs",
     "src/stepbom.rs",
+    "src/scdesign.rs",
     # the 3D readers: pure, untrusted input, unit tests per format
     "src/mesh.rs",
     "src/mesh/**/*.rs",

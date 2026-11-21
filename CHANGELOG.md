@@ -13,6 +13,14 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Added
+
+- **SolidCraft designs show their picture** (#364). The preview image of a
+  `.sc` design is the PNG SolidCraft embeds when saving with its model, read
+  from the ZIP container with size and CRC checks and shown only when its key
+  names the SHA-256 of this document and of the picture; unknown versions or
+  damaged archives simply show none (`src/scdesign.rs`).
+
 ## [0.2.11] - 2026-11-21
 
 ### Added
