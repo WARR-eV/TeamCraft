@@ -96,6 +96,11 @@ pub(super) struct CreateItem {
     unit: Option<String>,
     /// Project code.
     project: Option<String>,
+    /// Folder inside the project group (`chassis/brackets`; empty = the top):
+    /// where the file browser lists the item while it has no file, and the
+    /// folder of its new files whose upload names none.
+    #[serde(default)]
+    folder: String,
     #[serde(default)]
     description: String,
     #[serde(default)]
@@ -162,6 +167,12 @@ pub(super) async fn create_item(
             body.classification,
             body.attributes
         ]);
+        // the folder only when given: keys stored before it existed keep their hash
+        let fields = if body.folder.trim().is_empty() {
+            fields
+        } else {
+            json!([fields, body.folder])
+        };
         hex::encode(Sha256::digest(fields.to_string().as_bytes()))
     };
     let input = items::NewItem {
@@ -177,6 +188,7 @@ pub(super) async fn create_item(
         classification: domain::Classification::parse_field(body.classification.as_deref())?
             .unwrap_or_default(),
         attributes: attribute_changes(&body.attributes)?,
+        folder: body.folder,
     };
     if let Some(basis) = &body.basis {
         if body.idempotency_key.is_some() {
@@ -236,10 +248,12 @@ pub(super) struct UpdateItem {
     project: Option<String>,
     unit: Option<String>,
     classification: Option<String>,
+    /// The item's folder in its group (`""` = the top); missing keeps it.
+    folder: Option<String>,
 }
 
-/// Item master data: project group, unit (before the first release) and
-/// classification.
+/// Item master data: project group, unit (before the first release),
+/// classification and folder.
 pub(super) async fn update_item(
     State(st): State<AppState>,
     ApiUser(me): ApiUser,
@@ -258,6 +272,7 @@ pub(super) async fn update_item(
         project_id,
         body.unit.as_deref().unwrap_or(&item.unit),
         domain::Classification::parse_field(body.classification.as_deref())?,
+        body.folder.as_deref(),
     )
     .await?;
     Ok(Json(json!(updated)))

@@ -52,6 +52,7 @@
       <div class="menu-pop menu-right">
         {% if me.role != "viewer" and rev.item_type in ["part", "assembly"] %}<a href="/items/new?type=simulation&amp;basis={{ rev.id }}" title="A new simulation prefilled from this revision, with it as its basis">New simulation…</a>{% endif %}
         {% if me.role != "viewer" %}<a href="/revisions/{{ rev.id }}/save-as" title="A new item with the attributes, files and BOM of this revision">Save as…</a>{% endif %}
+        {% if me.role != "viewer" and rev.project_id %}{% set here = ((files|first).folder if files else rev.item_folder) or "" %}<a href="/items/new?project={{ rev.project_id }}&amp;folder={{ here|urlencode }}" title="A new item in {{ rev.project_code }}{% if here %}/{{ here }}{% else %} (top of the group){% endif %}, next to {{ rev.item_number }}">New item in this folder…</a>{% endif %}
         {% if can.add_to_change %}<a href="/changes/new?revision={{ rev.id }}">Release via new change…</a>{% endif %}
         <a href="/requests/new?revision={{ rev.id }}" title="Report a problem or propose a change to {{ rev.item_number }}/{{ rev.code }} (change request)">Request change…{% if open_requests %}<span class="badge badge-count" title="{{ open_requests|length }} open change request(s)">{{ open_requests|length }}</span>{% endif %}</a>
         <a href="/revisions/{{ rev.id }}/package.zip" title="This revision with all files of its structure (BOM), bom.csv and manifest.json">Pack and Go (ZIP)</a>
@@ -199,6 +200,9 @@
           <select name="classification">
             {% for c in classifications %}<option value="{{ c.value }}" {% if item.classification == c.value %}selected{% endif %}>{{ c.label }}</option>{% endfor %}
           </select>
+        </label>
+        <label>Folder <span class="hint">in the group, for the item without files and its new files – files keep theirs (Move to folder)</span>
+          <input class="mono" type="text" name="folder" value="{{ item.folder }}" maxlength="400" placeholder="(top of the group)">
         </label>
       </div>
       <div class="actions"><button class="primary" type="submit">Save master data</button></div>

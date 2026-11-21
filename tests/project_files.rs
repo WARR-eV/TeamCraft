@@ -1,8 +1,9 @@
 //! The file browser of a project group (`GET /projects/{code}/files`): one
 //! folder level per request – its sub-folders with their file counts and its
 //! files by name, each with the item it belongs to; the latest revision
-//! decides; items without files are at the top of the group; what outsiders
-//! may not see.
+//! decides; items without files are listed in their own folder (`items.folder`,
+//! the top by default), which is also where their new files go; what
+//! outsiders may not see.
 
 mod common;
 
@@ -204,7 +205,7 @@ async fn one_folder_level_with_subfolders_files_and_loose_items() {
     assert_eq!(brackets["entries"][0]["item_number"], bracket.as_str());
     assert_eq!(brackets["entries"][1]["item_number"], bracket.as_str());
 
-    // a folder nothing is in: empty, not an error (items without files are only at the top)
+    // a folder nothing is in: empty, not an error
     let none = level(&app, &erika, "?folder=chassis/nothing").await;
     assert_eq!(subfolders(&none), []);
     assert_eq!(names(&none), Vec::<String>::new());
@@ -463,4 +464,198 @@ async fn refusals() {
     let member = get(&app, &erika, "/api/v1/projects/ROCKET/files").await;
     assert_eq!(member.status, StatusCode::OK, "{}", member.text());
     assert_eq!(member.json()["folders"][0]["name"], "engine");
+}
+
+/// An item gets a folder when it is created (API, web form): it is listed
+/// there while it has no file, its folder shows up in the level above, files
+/// uploaded without a folder go there, and PATCH moves it.
+#[tokio::test]
+async fn an_item_has_its_own_folder() {
+    let app = app_or_skip!();
+    let (_, erika) = app.user_in("erika", Role::Editor, &["ROVER"]).await;
+    let r = app
+        .api(
+            Method::POST,
+            "/api/v1/items",
+            &erika,
+            Some(
+                json!({ "item_type": "part", "name": "Gusset", "project": "ROVER",
+                         "folder": "\\chassis\\brackets\\" }),
+            ),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::CREATED, "{}", r.text());
+    let created = r.json();
+    let gusset = created["item_number"].as_str().unwrap().to_string();
+    // normalised like the folder of a file
+    assert_eq!(created["item_folder"], "chassis/brackets");
+    let r = get(&app, &erika, &format!("/api/v1/items/{gusset}")).await;
+    assert_eq!(
+        r.json()["item"]["folder"],
+        "chassis/brackets",
+        "{}",
+        r.text()
+    );
+
+    // without a file: in its folder, counted in the folders above it
+    let top = level(&app, &erika, "").await;
+    assert_eq!(subfolders(&top), [sub("chassis", "chassis", 1)], "{top}");
+    assert_eq!(names(&top), Vec::<String>::new(), "{top}");
+    let chassis = level(&app, &erika, "?folder=chassis").await;
+    assert_eq!(
+        subfolders(&chassis),
+        [sub("brackets", "chassis/brackets", 1)]
+    );
+    let brackets = level(&app, &erika, "?folder=chassis/brackets").await;
+    assert_eq!(names(&brackets), ["(Gusset)"], "{brackets}");
+    assert_eq!(brackets["entries"][0]["item_number"], gusset.as_str());
+
+    // the desktop app reads the folder from the file status
+    let r = get(
+        &app,
+        &erika,
+        &format!("/api/v1/items/{gusset}/revisions/A/file-status"),
+    )
+    .await;
+    assert_eq!(r.json()["item_folder"], "chassis/brackets", "{}", r.text());
+
+    // an upload without a folder puts the file into the item's folder; one with
+    // a folder wins
+    let r = app
+        .api_multipart(
+            &format!("/api/v1/items/{gusset}/revisions/A/files"),
+            &erika,
+            &[("Gusset.SLDPRT", b"\x00data".as_slice())],
+            &[],
+        )
+        .await;
+    assert!(r.status.is_success(), "{}", r.text());
+    let r = app
+        .api_multipart(
+            &format!("/api/v1/items/{gusset}/revisions/A/files"),
+            &erika,
+            &[("Gusset.pdf", b"%PDF-1.4".as_slice())],
+            &[("folder", "drawings")],
+        )
+        .await;
+    assert!(r.status.is_success(), "{}", r.text());
+    let brackets = level(&app, &erika, "?folder=chassis/brackets").await;
+    assert_eq!(names(&brackets), ["Gusset.SLDPRT"], "{brackets}");
+    assert_eq!(
+        names(&level(&app, &erika, "?folder=drawings").await),
+        ["Gusset.pdf"]
+    );
+
+    // the web form: the folder field (and ?folder= prefills it)
+    let cookie = app.login("erika").await;
+    let rover = app.project_id("ROVER").await.to_string();
+    let page = app
+        .get_page(
+            &format!("/items/new?project={rover}&folder=frame%2Frails"),
+            Some(&cookie),
+        )
+        .await;
+    assert_eq!(page.status, StatusCode::OK);
+    // MiniJinja may escape the slash inside the attribute value
+    let html = page.text();
+    assert!(
+        html.contains("value=\"frame/rails\"") || html.contains("value=\"frame&#x2f;rails\""),
+        "prefilled"
+    );
+    let r = app
+        .post_form(
+            "/items",
+            Some(&cookie),
+            Some("http://localhost:8080"),
+            &[
+                ("item_type", "part"),
+                ("name", "Rail"),
+                ("project_id", &rover),
+                ("folder", "frame/rails"),
+            ],
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::SEE_OTHER, "{}", r.text());
+    let rails = level(&app, &erika, "?folder=frame/rails").await;
+    assert_eq!(names(&rails), ["(Rail)"], "{rails}");
+    let rail = rails["entries"][0]["item_number"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // PATCH moves an item; the folders of its files stay (none here)
+    let r = app
+        .api(
+            Method::PATCH,
+            &format!("/api/v1/items/{rail}"),
+            &erika,
+            Some(json!({ "folder": "frame" })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert_eq!(r.json()["folder"], "frame");
+    assert_eq!(
+        names(&level(&app, &erika, "?folder=frame").await),
+        ["(Rail)"]
+    );
+    // a PATCH without a folder keeps it
+    let r = app
+        .api(
+            Method::PATCH,
+            &format!("/api/v1/items/{rail}"),
+            &erika,
+            Some(json!({ "classification": "purchased" })),
+        )
+        .await;
+    assert_eq!(r.json()["folder"], "frame", "{}", r.text());
+
+    // bad folders are refused and create nothing
+    for bad in ["../outside", "a|b", "CON"] {
+        let r = app
+            .api(
+                Method::POST,
+                "/api/v1/items",
+                &erika,
+                Some(json!({ "item_type": "part", "name": "Bad", "project": "ROVER", "folder": bad })),
+            )
+            .await;
+        assert_eq!(r.status, StatusCode::BAD_REQUEST, "{bad}: {}", r.text());
+        let r = app
+            .api(
+                Method::PATCH,
+                &format!("/api/v1/items/{rail}"),
+                &erika,
+                Some(json!({ "folder": bad })),
+            )
+            .await;
+        assert_eq!(r.status, StatusCode::BAD_REQUEST, "{bad}: {}", r.text());
+    }
+    let bad: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM revisions WHERE name = 'Bad'")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(bad, 0);
+
+    // the folder is part of an idempotent request
+    let body = |folder: &str| {
+        json!({ "item_type": "part", "name": "Clip", "project": "ROVER",
+                "folder": folder, "idempotency_key": "clip-1" })
+    };
+    let first = app
+        .api(Method::POST, "/api/v1/items", &erika, Some(body("clips")))
+        .await;
+    assert_eq!(first.status, StatusCode::CREATED, "{}", first.text());
+    let again = app
+        .api(Method::POST, "/api/v1/items", &erika, Some(body("clips")))
+        .await;
+    assert_eq!(again.status, StatusCode::OK, "{}", again.text());
+    let other = app
+        .api(
+            Method::POST,
+            "/api/v1/items",
+            &erika,
+            Some(body("elsewhere")),
+        )
+        .await;
+    assert_eq!(other.status, StatusCode::CONFLICT, "{}", other.text());
 }

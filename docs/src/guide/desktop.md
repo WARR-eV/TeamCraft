@@ -300,9 +300,12 @@ this computer.
   cuts the number, not the name. A folder opens its own level – a large group
   is never loaded as a whole, and a folder with more than 500 files offers *show … more*. The files are those of the
   latest revision of every item;
-  items without files are listed below the files at the top of the group.
+  items without files are listed below the files of their own folder (the top
+  of the group unless the item was given a folder).
   The number next to the order is the rows of the whole group. A click on a
-  file opens its item;
+  file opens its item. The **+** on a folder row (shown when the pointer is on
+  it) is **New item here**: the *New* dialog opens with the group and that
+  folder filled in;
 * *All items*: every item in one list, the name first (the first 500 by
   number);
 * *Structure*: the assemblies with their parts.
@@ -322,8 +325,11 @@ below the favourite folder.
 
 *Files* and *All items* are sorted by name (or by number, type or state – the
 choice is kept). *Change…* goes back to *Projects*. *New* and *Import CAD
-Folder…* start with the active group. With a server older than the *Files*
-view, Home shows *All items* instead.
+Folder…* start with the active group. *New* (and `Ctrl/Cmd+N`) also starts
+with the folder you last opened or clicked in in *Files*; its *Folder* field
+(e.g. `chassis/brackets`, empty = the top) is where the item and the files
+chosen in the dialog go – type a new path to start a new folder. With a
+server older than the *Files* view, Home shows *All items* instead.
 
 *Home*, *Projects*, *Refresh* and the dialogs that offer project groups (*New*, *Get Project Groups…*, *Import CAD
 Folder…*) load the groups and your
@@ -415,10 +421,10 @@ Documents/TeamCraft/                     ← the workspace (Settings → Workspa
 
 The folder of a file is stored with it on the server (*Folder* on the
 revision page, `folder` in the API). The folder import sets it from the
-scanned tree; uploads without a folder put new files at the top of the
-group, and a file keeps its folder when new versions arrive. While a
-revision is checked out, the revision page can move a file to another
-folder.
+scanned tree; uploads without a folder put new files into the item's folder
+(chosen in *New*, the top of the group by default), and a file keeps its
+folder when new versions arrive. While a revision is checked out, the
+revision page can move a file to another folder.
 
 **Umlauts and accents.** macOS hands out file names *decomposed* (Unicode
 NFD: `a` followed by a combining diaeresis for `ä`), Windows and the CAD
@@ -447,8 +453,8 @@ local changes*, *name clash*). Cancelling leaves no partial file. **Add files.**
 ▾* of a revision) takes
 files from a file picker, checks the revision out first if you have not,
 and **copies** them into its working folder – the originals are never moved
-or changed. New files go into the revision's main folder or a sub-folder of
-it. A file with the name of an existing file becomes its next version and
+or changed. New files go into the revision's main folder (for a revision
+without files yet: the item's folder) or a sub-folder of it. A file with the name of an existing file becomes its next version and
 asks first (unticked files are not added). The copies appear as *new*
 files in *Check in…* – also files with an unrelated name, which TeamCraft
 remembers in `.teamcraft/added.json` until they are checked in – or tick *Check in now*. The Files section explains why

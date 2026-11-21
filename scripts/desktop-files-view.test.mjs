@@ -14,8 +14,8 @@ import { fileURLToPath } from "node:url";
 const source = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../desktop/ui/js/files-view.js");
 const {
   compareNames, countText, entryIconType, entryName, entryRevision, entryTitle, folderKey,
-  favouriteKey, favouritePath, favouriteSuggestions, groupTotal, mergeEntries, normalizeFavourite, remaining,
-  sortEntries, sortFolders, suggestionKey
+  favouriteKey, favouritePath, favouriteSuggestions, groupTotal, mergeEntries, newItemFolder, normalizeFavourite,
+  parentFolder, remaining, sortEntries, sortFolders, suggestionKey
 } = await import("data:text/javascript;base64," + Buffer.from(fs.readFileSync(source, "utf8")).toString("base64"));
 
 let passed = 0;
@@ -134,6 +134,16 @@ test("counts read naturally", () => {
   assert.equal(countText(1, "file", "files"), "1 file");
   assert.equal(countText(0, "file", "files"), "0 files");
   assert.equal(countText(12, "file", "files"), "12 files");
+});
+
+test("New item starts in the folder last opened in the group", () => {
+  assert.equal(parentFolder("chassis/brackets"), "chassis");
+  assert.equal(parentFolder("chassis"), "");
+  assert.equal(parentFolder(""), "");
+  const remembered = { ROVER: "chassis/brackets" };
+  assert.equal(newItemFolder(remembered, "ROVER"), "chassis/brackets");
+  assert.equal(newItemFolder(remembered, "ROCKET"), "");
+  assert.equal(newItemFolder(undefined, "ROVER"), "");
 });
 
 test("the favourite folder is kept per server and group (#352)", () => {

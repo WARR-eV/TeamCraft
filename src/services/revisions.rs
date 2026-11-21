@@ -18,7 +18,7 @@ use crate::{
 
 pub(crate) const REVISION_SELECT: &str = "
     SELECT r.id, r.item_id, i.number AS item_number, i.item_type, i.unit,
-           i.project_id, rp.code AS project_code,
+           i.project_id, rp.code AS project_code, i.folder AS item_folder,
            r.seq, r.code, r.state, r.name, r.description, r.material,
            r.mass_kg, r.unit_cost, r.attributes, i.classification,
            r.checked_out_by, co.display_name AS checked_out_by_name, r.checked_out_at,

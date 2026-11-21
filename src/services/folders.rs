@@ -5,10 +5,11 @@
 //!
 //! A file belongs to the latest revision of its item, so the browser shows
 //! the group the way a new working folder would look. Items whose latest
-//! revision has no file are listed at the top of the group, after the files,
-//! so every item of the group can be reached from the browser. The top of a
-//! group also names the folders that hold an Inventor project file, the
-//! folders TeamCraft Desktop suggests to start its Home in (issue #352).
+//! revision has no file are listed in their own folder (`items.folder`, the
+//! top of the group by default), after the files, so every item of the group
+//! can be reached from the browser. The top of a group also names the folders
+//! that hold an Inventor project file, the folders TeamCraft Desktop suggests
+//! to start its Home in (issue #352).
 //!
 //! # Invariants
 //!
@@ -39,12 +40,14 @@ pub struct SubFolder {
     /// Path inside the group (`chassis/brackets`), the `folder` to ask for.
     #[sqlx(skip)]
     pub path: String,
-    /// Files in it and in the folders below it.
+    /// Files in it and in the folders below it, items without a file
+    /// counted as one each.
     pub files: i64,
 }
 
-/// A file of the listed folder with the item it belongs to – or, at the top
-/// of the group, an item without files (`file_id` and `filename` are null).
+/// A file of the listed folder with the item it belongs to – or an item
+/// without files whose folder (`items.folder`) is the listed one (`file_id`
+/// and `filename` are null).
 #[derive(Clone, Debug, Serialize, sqlx::FromRow)]
 pub struct Entry {
     pub file_id: Option<Uuid>,
@@ -108,15 +111,22 @@ pub async fn level(
     // $3 = the folder; a file is below it when its folder starts with
     // "<folder>/" (every folder is below the top). The comparison is on the
     // prefix itself, not a LIKE pattern: folder names may contain % and _.
+    // An item without files counts in its own folder (items.folder).
     let mut folders = sqlx::query_as::<_, SubFolder>(&format!(
         "SELECT sub.name, COUNT(*) AS files
-         FROM (SELECT split_part(CASE WHEN $3 = '' THEN f.folder
-                                      ELSE substr(f.folder, length($3) + 2) END, '/', 1) AS name
-               FROM items i {LATEST}
-               JOIN files f ON f.revision_id = lr.id
-               WHERE i.project_id = $1 AND {visible}
-                 AND CASE WHEN $3 = '' THEN f.folder <> ''
-                          ELSE left(f.folder, length($3) + 1) = $3 || '/' END) sub
+         FROM (SELECT split_part(CASE WHEN $3 = '' THEN p.folder
+                                      ELSE substr(p.folder, length($3) + 2) END, '/', 1) AS name
+               FROM (SELECT f.folder
+                     FROM items i {LATEST}
+                     JOIN files f ON f.revision_id = lr.id
+                     WHERE i.project_id = $1 AND {visible}
+                     UNION ALL
+                     SELECT i.folder
+                     FROM items i {LATEST}
+                     WHERE i.project_id = $1 AND {visible}
+                       AND NOT EXISTS (SELECT 1 FROM files f WHERE f.revision_id = lr.id)) p
+               WHERE CASE WHEN $3 = '' THEN p.folder <> ''
+                          ELSE left(p.folder, length($3) + 1) = $3 || '/' END) sub
          GROUP BY sub.name
          ORDER BY lower(sub.name), sub.name
          LIMIT {MAX_FOLDERS}"
@@ -154,7 +164,7 @@ pub async fn level(
                       i.number, i.item_type, lr.name, lr.code, lr.state, u.display_name
                FROM items i {LATEST}
                LEFT JOIN users u ON u.id = lr.checked_out_by
-               WHERE i.project_id = $1 AND {visible} AND $3 = ''
+               WHERE i.project_id = $1 AND {visible} AND i.folder = $3
                  AND NOT EXISTS (SELECT 1 FROM files f WHERE f.revision_id = lr.id)) e
          ORDER BY (e.filename IS NULL), lower(COALESCE(e.filename, e.name)), e.filename,
                   e.item_number

@@ -814,6 +814,13 @@ needs an issue with a reason first (see *Direction*).
 
 ## Done
 
+- [x] **Create an item in a folder** (user report: no way to choose a folder when creating an item): `items.folder`
+  (migration `0075`), set by the web *New item* form (*Folder*, `?folder=`, *More → New item in this folder…*), the
+  desktop *New* dialog and *New item here* on the folders of Home → *Files*, `POST /items` `folder`; new files without
+  a folder go there, the file browser lists file-less items in it, *Edit master data* / `PATCH /items/{number}` move
+  it; `tests/project_files.rs` (`an_item_has_its_own_folder`), desktop `addfiles` unit test,
+  `scripts/desktop-files-view.test.mjs`. Left: creating an empty folder without an item, and moving all files of an
+  item together with its folder in one step.
 - [x] **Desktop: favourite folder of a group (#352):** a folder's ☆ in *Home → Files* makes it the folder Home starts
   in, under an accent banner (*not the top of the group*, *Whole group*, *Remove favourite*); the folder of the group's
   Inventor project file is suggested (`project_folders` of `GET /projects/{code}/files`). Kept per computer, server
