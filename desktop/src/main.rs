@@ -13,6 +13,7 @@ mod api;
 mod autoallow;
 mod bomimport;
 mod cadexport;
+mod cadlock;
 mod cadlaunch;
 mod commands;
 mod compat;

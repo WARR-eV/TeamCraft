@@ -141,6 +141,11 @@ export function revWorkspace(tab, el) {
           var stateBadge = badge(f.state, SYNC_LABEL[f.state] || label(f.state));
           if (f.state === "clash") stateBadge.title = "Another file is at this place: " + f.clash_with + " – it is never overwritten.";
           if (lockedByOther && f.state !== "missing") stateBadge = h("span", null, [stateBadge, " ", badge("lock", "Locked by " + rev.checked_out_by_name)]);
+          if (f.open_in) {
+            var openBadge = badge("pending", "Open in " + f.open_in.program);
+            openBadge.title = openInText(f) + " – save there before checking in.";
+            stateBadge = h("span", null, [stateBadge, " ", openBadge]);
+          }
           return {
             cls: f.state === "conflict" ? "row-conflict" : f.state === "clash" ? "row-clash" : null,
             cells: [h("span", null, [
@@ -426,6 +431,12 @@ export function doCancelCheckout(tab) {
 /** Follows the check-in upload of the open check-in dialog (`upload-progress`). */
 export var uploadWatcher = null;
 
+/** "bracket.sc is open in SolidCraft on WS-12 (kim)" – from the lock file the program keeps (cadlock.rs). */
+function openInText(f) {
+  var o = f.open_in;
+  return f.name + " is open in " + o.program + " on " + o.computer + (o.user ? " (" + o.user + ")" : "");
+}
+
 /** "Check in…" (`park` false) or "Park…" (`park` true, issue #173 step 10):
  * the same dialog with both buttons; `park` only decides the default one. */
 export function checkinDialog(tab, park) {
@@ -463,6 +474,9 @@ export function checkinDialog(tab, park) {
           } } }, "New item from this file")
         ])]);
       })) : h("p.empty", { text: "No modified or new files – checking in only ends your check-out; the revision stays in work." }),
+      candidates.some(function (f) { return f.open_in; }) ? h("p.notice", { text: "Still open: " +
+        candidates.filter(function (f) { return f.open_in; }).map(openInText).join("; ") +
+        ". Unsaved changes there are not checked in – save first, or check in anyway." }) : null,
       boxes.some(function (b) { return b.state === "conflict"; }) ? h("p.notice.error", { text: "Conflict: these files changed on the server since you got them. " +
         "The server refuses to overwrite the newer version (nothing is stored) – save your copy under another name, get the current files and merge." }) : null,
       stepNote,

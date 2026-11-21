@@ -704,7 +704,7 @@ real files and belong to section 3 once such files are at hand.
 - [ ] Design properties read, shown, searchable, mismatches with the item flagged (#367)
 - [ ] Desktop: STEP export through `solidcraft-cli` at check-in, all OSes (#368)
 - [ ] Desktop: item number and revision written into the design properties (#369)
-- [ ] Desktop: designs open in SolidCraft (lock file) shown, warning at check-in (#370)
+- [x] Desktop: designs open in SolidCraft (lock file) shown, warning at check-in (#370)
 - [ ] (research first) 3D preview from the `.sc` file alone (#371)
 
 ### 5. Feature demand (backlog)

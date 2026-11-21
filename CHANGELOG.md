@@ -27,6 +27,10 @@ see the notices in the README.
   read from the ZIP or JSON document, unknown fields ignored. New fuzz target
   `scdesign`. Run `teamcraft rescan-references --format solidcraft-design`
   once for designs stored before.
+- **Desktop: designs open in SolidCraft** (#370). The Workspace tab marks a
+  SolidCraft design that SolidCraft has open (its `.~<file>.lock`, stale
+  locks ignored) with the computer and user, and the check-in dialog warns
+  that unsaved changes there are not checked in.
 
 ## [0.2.11] - 2026-11-21
 
