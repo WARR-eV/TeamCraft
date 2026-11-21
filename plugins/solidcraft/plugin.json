@@ -1,0 +1,53 @@
+{
+  "id": "teamcraft",
+  "name": "TeamCraft",
+  "version": "0.1.0",
+  "description": "TeamCraft item of the design, a check before checking it in to TeamCraft, and linking a design to a TeamCraft item. Works offline on the open design.",
+  "capabilities": ["commands@0.2"],
+  "runtime": {
+    "module": "plugin.wasm",
+    "entries": [
+      {
+        "name": "status",
+        "effect": "read",
+        "input_schema": {"type": "object", "properties": {}},
+        "slots": [{"kind": "ribbon", "name": "TeamCraft"}]
+      },
+      {
+        "name": "check",
+        "effect": "read",
+        "input_schema": {"type": "object", "properties": {}},
+        "slots": [{"kind": "ribbon", "name": "TeamCraft"}]
+      },
+      {
+        "name": "link",
+        "effect": "edit",
+        "input_schema": {
+          "type": "object",
+          "required": ["item_number", "revision"],
+          "properties": {
+            "item_number": {"type": "string", "title": "Item number", "maxLength": 256},
+            "revision": {"type": "string", "title": "Revision", "maxLength": 256},
+            "name": {"type": "string", "title": "Item name", "maxLength": 256},
+            "server": {"type": "string", "title": "TeamCraft server (https://…)", "maxLength": 256}
+          }
+        },
+        "slots": [{"kind": "ribbon", "name": "TeamCraft"}]
+      },
+      {
+        "name": "unlink",
+        "effect": "edit",
+        "input_schema": {"type": "object", "properties": {}},
+        "slots": [{"kind": "ribbon", "name": "TeamCraft"}]
+      }
+    ],
+    "commands": [
+      "document.metadata",
+      "document.metadata.set",
+      "document.metadata.remove",
+      "assembly.bom",
+      "component.links"
+    ],
+    "limits": {"fuel": 50000000, "memory_mib": 64, "deadline_ms": 10000}
+  }
+}
