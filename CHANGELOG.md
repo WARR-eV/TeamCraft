@@ -27,6 +27,11 @@ see the notices in the README.
   read from the ZIP or JSON document, unknown fields ignored. New fuzz target
   `scdesign`. Run `teamcraft rescan-references --format solidcraft-design`
   once for designs stored before.
+- **SolidCraft BOM CSV import** (part of #366). *Import BOM* recognises the
+  CSV SolidCraft's bill of materials writes: `definition` is the name, and
+  its counts – counted in all – become quantities per parent row (a count
+  that does not divide evenly is kept and reported); `revision` and the
+  amount column `quantity` are extra columns.
 
 ## [0.2.11] - 2026-11-21
 

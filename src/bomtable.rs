@@ -383,7 +383,7 @@ pub fn read(filename: &str, bytes: &[u8]) -> Result<BomTable, String> {
 fn parse(grid: Vec<Vec<String>>) -> Result<BomTable, String> {
     // The header is the first row (of the first 30) with two known columns,
     // one of them a number, a name, a description or a file name.
-    let (header_index, mapping) = grid
+    let (header_index, mut mapping) = grid
         .iter()
         .take(30)
         .enumerate()
@@ -405,6 +405,18 @@ fn parse(grid: Vec<Vec<String>>) -> Result<BomTable, String> {
         .get(header_index)
         .map(Vec::as_slice)
         .unwrap_or_default();
+    // SolidCraft's `assembly.bom` CSV: `definition` names the component,
+    // `count` is the quantity (in all), `quantity` an amount (a length) kept
+    // as an extra column; counts become per-parent quantities below.
+    let solidcraft = is_solidcraft_bom(header);
+    if solidcraft {
+        if let Some(f) = mapping.get_mut(5) {
+            *f = Some("name");
+        }
+        if let Some(f) = mapping.get_mut(7) {
+            *f = None;
+        }
+    }
     // a header cell, trimmed ("" past the end of the row)
     let head = |c: usize| header.get(c).map_or("", |s| s.trim());
     let mut warnings = Vec::new();
@@ -633,6 +645,9 @@ fn parse(grid: Vec<Vec<String>>) -> Result<BomTable, String> {
         ancestors.push(r.level);
         r.level = ancestors.len();
     }
+    if solidcraft {
+        per_parent_quantities(&mut rows, &mut warnings);
+    }
     Ok(BomTable {
         root,
         rows,
@@ -642,12 +657,104 @@ fn parse(grid: Vec<Vec<String>>) -> Result<BomTable, String> {
     })
 }
 
+/// The columns SolidCraft's `assembly.bom` writes, squashed (a column added
+/// later goes at the end; docs/src/research/solidcraft-design.md).
+const SOLIDCRAFT_BOM: [&str; 8] = [
+    "item",
+    "partnumber",
+    "description",
+    "revision",
+    "count",
+    "definition",
+    "material",
+    "quantity",
+];
+
+fn is_solidcraft_bom(header: &[String]) -> bool {
+    header.len() >= SOLIDCRAFT_BOM.len()
+        && header
+            .iter()
+            .zip(SOLIDCRAFT_BOM)
+            .all(|(h, expected)| squash(h) == expected)
+}
+
+/// SolidCraft counts every row in all (a part in a sub-assembly placed twice
+/// counts twice as often as in the sub-assembly); a BOM line holds the
+/// quantity in one of its parent. Divided by the parent row's count; a count
+/// that does not divide evenly stays and is reported.
+fn per_parent_quantities(rows: &mut [BomRow], warnings: &mut Vec<String>) {
+    // (level, count in all) of the rows above that are ancestors
+    let mut ancestors: Vec<(usize, f64)> = Vec::new();
+    for r in rows.iter_mut() {
+        while ancestors.last().is_some_and(|(l, _)| *l >= r.level) {
+            ancestors.pop();
+        }
+        let total = r.quantity;
+        if let Some((_, parent)) = ancestors.last().copied() {
+            let each = total / parent;
+            if parent > 0.0 && each.fract() == 0.0 {
+                r.quantity = each;
+            } else {
+                warnings.push(format!(
+                    "Row {}: {} in all is not a whole number per parent ({}) – kept as it is.",
+                    r.line, total, parent
+                ));
+            }
+        }
+        ancestors.push((r.level, total));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn levels(t: &BomTable) -> Vec<usize> {
         t.rows.iter().map(|r| r.level).collect()
+    }
+
+    /// SolidCraft's `assembly.bom` CSV (all levels): a frame placed twice
+    /// holding three bolts each, four feet, a profile with a length.
+    const SOLIDCRAFT_CSV: &str = "\"item\",\"part_number\",\"description\",\"revision\",\"count\",\"definition\",\"material\",\"quantity\"\n\
+        \"1\",\"TC-200\",\"Side frame\",\"B\",\"2\",\"Frame\",\"\",\"\"\n\
+        \"1.1\",\"ISO 4017 M6x20\",\"Bolt\",\"\",\"6\",\"Bolt\",\"Steel\",\"\"\n\
+        \"1.2\",\"TC-210\",\"Rail\",\"A\",\"2\",\"Rail\",\"6060\",\"1200 mm\"\n\
+        \"2\",\"TC-300\",\"Foot\",\"A\",\"4\",\"Foot; Foot left\",\"PA6\",\"\"\n";
+
+    #[test]
+    fn solidcraft_bom_csv_gives_per_parent_quantities() {
+        let t = read("frame-bom.csv", SOLIDCRAFT_CSV.as_bytes()).unwrap();
+        assert_eq!(levels(&t), vec![1, 2, 2, 1]);
+        let q: Vec<f64> = t.rows.iter().map(|r| r.quantity).collect();
+        assert_eq!(q, vec![2.0, 3.0, 1.0, 4.0], "counts in all → per parent");
+        let r = &t.rows[1];
+        assert_eq!(
+            (r.number.as_str(), r.name.as_str()),
+            ("ISO 4017 M6x20", "Bolt")
+        );
+        assert_eq!(r.description, "Bolt");
+        assert_eq!(r.material, "Steel");
+        assert_eq!(t.rows[3].name, "Foot; Foot left");
+        // `quantity` (an amount) and `revision` stay extra columns
+        assert_eq!(t.extra_columns, vec!["revision", "quantity"]);
+        assert!(t.warnings.is_empty(), "{:?}", t.warnings);
+    }
+
+    #[test]
+    fn a_solidcraft_count_that_does_not_divide_is_kept_and_reported() {
+        let csv = SOLIDCRAFT_CSV.replace(
+            "\"1.1\",\"ISO 4017 M6x20\",\"Bolt\",\"\",\"6\"",
+            "\"1.1\",\"ISO 4017 M6x20\",\"Bolt\",\"\",\"5\"",
+        );
+        let t = read("frame-bom.csv", csv.as_bytes()).unwrap();
+        assert_eq!(t.rows[1].quantity, 5.0);
+        assert_eq!(t.warnings.len(), 1, "{:?}", t.warnings);
+        // another table with a `count` column is not changed
+        let other = "Part Number,Count\nA,2\n";
+        assert_eq!(
+            read("x.csv", other.as_bytes()).unwrap().rows[0].quantity,
+            2.0
+        );
     }
 
     #[test]
