@@ -16,6 +16,7 @@
     clippy::unreachable
 )]
 
+use std::collections::{BTreeMap, HashMap};
 use std::io::{Read, Seek};
 
 use sha2::{Digest, Sha256};
@@ -110,6 +111,92 @@ impl<R: Read + Seek> Container<R> {
 /// Whether `hex_digest` is the SHA-256 of `data` (hex, either case).
 fn same_digest(hex_digest: &str, data: &[u8]) -> bool {
     hex_digest.eq_ignore_ascii_case(&hex::encode(Sha256::digest(data)))
+}
+
+/// Whether `head` (the first bytes of a file) starts a plain-JSON design
+/// (`"format": "solidcraft/N"`, early drafts `solvecraft/N`).
+pub fn is_json_design(head: &[u8]) -> bool {
+    let text = String::from_utf8_lossy(head);
+    text.trim_start().starts_with('{')
+        && (text.contains("\"solidcraft/") || text.contains("\"solvecraft/"))
+}
+
+/// The parametric document of a design file: `document.json` of a ZIP
+/// design container, or the whole file when it is a plain-JSON design.
+/// `None` for any other file and for a document larger than
+/// [`MAX_DOCUMENT`]. Reads from the start of `file`.
+pub fn document<R: Read + Seek>(file: &mut R) -> Option<Vec<u8>> {
+    file.rewind().ok()?;
+    let mut head = Vec::new();
+    file.by_ref().take(1024).read_to_end(&mut head).ok()?;
+    file.rewind().ok()?;
+    if is_zip(&head) {
+        return Container::open(&mut *file)?.read("document.json", MAX_DOCUMENT);
+    }
+    if !is_json_design(&head) {
+        return None;
+    }
+    let mut data = Vec::new();
+    file.by_ref()
+        .take(MAX_DOCUMENT.saturating_add(1))
+        .read_to_end(&mut data)
+        .ok()?;
+    (data.len() as u64 <= MAX_DOCUMENT).then_some(data)
+}
+
+/// Longest file name taken from a link (as `cadrefs` accepts).
+const MAX_NAME: usize = 160;
+
+/// The designs an assembly links (*Insert Design*, `links` of the
+/// document): the file name each link's path ends in, with how often the
+/// components linked to it are placed – each placement is an occurrence; a
+/// component without one counts once. Several links to one file add up.
+/// Standard parts (`parts`) are no files and are not listed. `None` when
+/// `document` is not a readable document.
+pub fn linked_designs(document: &[u8]) -> Option<BTreeMap<String, u32>> {
+    #[derive(serde::Deserialize)]
+    struct Doc {
+        #[serde(default)]
+        links: HashMap<String, Link>,
+        #[serde(default)]
+        occurrences: Vec<Occurrence>,
+    }
+    #[derive(serde::Deserialize)]
+    struct Link {
+        #[serde(default)]
+        path: String,
+    }
+    #[derive(serde::Deserialize)]
+    struct Occurrence {
+        #[serde(default)]
+        component: Option<u64>,
+    }
+    let doc: Doc = serde_json::from_slice(document).ok()?;
+    let mut placed: HashMap<u64, u32> = HashMap::new();
+    for component in doc.occurrences.iter().filter_map(|o| o.component) {
+        let n = placed.entry(component).or_default();
+        *n = n.saturating_add(1);
+    }
+    let mut found: BTreeMap<String, u32> = BTreeMap::new();
+    for (id, link) in &doc.links {
+        let Some(name) = link
+            .path
+            .rsplit(['/', '\\'])
+            .next()
+            .map(str::trim)
+            .filter(|n| !n.is_empty() && n.len() <= MAX_NAME)
+        else {
+            continue;
+        };
+        let count = id
+            .parse::<u64>()
+            .ok()
+            .and_then(|id| placed.get(&id).copied())
+            .unwrap_or(1);
+        let total = found.entry(name.to_string()).or_default();
+        *total = total.saturating_add(count);
+    }
+    Some(found)
 }
 
 /// Builders for small design containers, for the tests and the fuzz corpus.
@@ -258,5 +345,60 @@ mod tests {
             ("cache/thumbnail.png", &png),
         ]);
         assert_eq!(thumbnail(bytes), None);
+    }
+
+    /// An assembly linking `plate.sc` (placed three times) and `bolt.sc`
+    /// through two components (one placed twice, one without placement),
+    /// and a standard part, which is no file.
+    const ASSEMBLY: &str = r#"{
+        "format": "solidcraft/40",
+        "components": [{"id": 1, "name": "Plate"}, {"id": 2, "name": "Bolt"},
+                       {"id": 3, "name": "Bolt long"}, {"id": 4, "name": "Nut"}],
+        "occurrences": [
+            {"id": 10, "component": 1, "name": "Plate:1"},
+            {"id": 11, "component": 1, "name": "Plate:2"},
+            {"id": 12, "component": 1, "name": "Plate:3"},
+            {"id": 13, "component": 2, "name": "Bolt:1"},
+            {"id": 14, "component": 2, "name": "Bolt:2"},
+            {"id": 15, "component": 4, "name": "Nut:1"}
+        ],
+        "links": {
+            "1": {"path": "plate.sc", "feature": 7},
+            "2": {"path": "../lib/bolt.sc", "feature": 8, "configuration": 3},
+            "3": {"path": "C:\\parts\\lib\\bolt.sc", "feature": 9}
+        },
+        "parts": {"4": {"standard": "iso4032", "size": "M5"}},
+        "unknown_future_field": [1, 2, 3]
+    }"#;
+
+    #[test]
+    fn linked_designs_are_counted_by_placement() {
+        let links = linked_designs(ASSEMBLY.as_bytes()).unwrap();
+        assert_eq!(
+            links.into_iter().collect::<Vec<_>>(),
+            vec![("bolt.sc".to_string(), 3), ("plate.sc".to_string(), 3)]
+        );
+        assert_eq!(
+            linked_designs(DOC),
+            Some(BTreeMap::new()),
+            "a part links nothing"
+        );
+        assert_eq!(linked_designs(br#"{"links": 5}"#), None);
+        assert_eq!(linked_designs(b"not json"), None);
+    }
+
+    #[test]
+    fn the_document_comes_from_either_encoding() {
+        let json = ASSEMBLY.as_bytes().to_vec();
+        assert_eq!(document(&mut Cursor::new(json.clone())), Some(json.clone()));
+        let zipped = sample::design(&json, None);
+        assert_eq!(document(&mut Cursor::new(zipped)), Some(json));
+        let other = br#"{"format":"other/1"}"#.to_vec();
+        assert_eq!(document(&mut Cursor::new(other)), None);
+        assert_eq!(
+            document(&mut Cursor::new(sample::zip(&[("a.txt", b"x")]))),
+            None
+        );
+        assert_eq!(document(&mut Cursor::new(Vec::new())), None);
     }
 }

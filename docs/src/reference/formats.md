@@ -219,7 +219,10 @@ to a `DOCUMENT_FILE` – through `APPLIED_DOCUMENT_REFERENCE`,
 their own occurrences) and Inventor assemblies (the occurrences of each
 referenced file from the file descriptor table in `UFRxDoc`, suppressed
 occurrences left out – a file with only suppressed ones counts 0, see
-[the research note](../research/inventor-instance-counts.md))
+[the research note](../research/inventor-instance-counts.md)) and SolidCraft assemblies (the
+placements – `occurrences` – of the components linked to each design through
+`links`; a linked component without a placement counts once, see
+[the research note](../research/solidcraft-design.md))
 the scan also stores how often each referenced file is
 placed (`file_references.instances`, `instances` in `GET …/references`); the
 desktop folder import uses it as the BOM quantity, *Quantities from CAD…*
@@ -228,7 +231,9 @@ store no count (`null`): their references are found by name only. The current
 versions of SOLIDWORKS, NX and referencing STEP files stored before this are
 read again once at the next start; for Inventor assemblies stored before run
 `teamcraft rescan-references --format inventor-assembly` once (*Quantities
-from CAD…* reads the counts from the file and works without it).
+from CAD…* reads the counts from the file and works without it). SolidCraft designs
+stored before are scanned again with
+`teamcraft rescan-references --format solidcraft-design`.
 
 `.prt` and `.asm` are told apart by content (Creo's `#UGC:` header, Solid
 Edge's OLE container); `.sc` must be a SolidCraft ZIP or JSON design.
