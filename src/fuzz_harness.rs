@@ -114,7 +114,7 @@ pub fn thumbnail(data: &[u8]) {
 }
 
 /// SolidCraft designs: the document of a ZIP or JSON design, its linked
-/// designs, and the embedded thumbnail.
+/// designs, the embedded thumbnail and the bill of materials.
 pub fn scdesign(data: &[u8]) {
     let _ = crate::scdesign::linked_designs(data);
     if let Some(document) = crate::scdesign::document(&mut Cursor::new(data)) {
@@ -123,6 +123,7 @@ pub fn scdesign(data: &[u8]) {
     if let Some(mut design) = crate::scdesign::Container::open(Cursor::new(data)) {
         let _ = design.thumbnail();
     }
+    let _ = crate::scbom::read(data);
 }
 
 /// Text extraction for the full-text search.

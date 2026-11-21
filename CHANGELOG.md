@@ -32,6 +32,11 @@ see the notices in the README.
   its counts – counted in all – become quantities per parent row (a count
   that does not divide evenly is kept and reported); `revision` and the
   amount column `quantity` are extra columns.
+- **BOM import from a SolidCraft design** (#366). *Import BOM* (web and
+  desktop) also takes a `.sc` assembly: its components and placements become
+  the lines – part properties, placement counts, purchased/standard parts not
+  expanded, phantoms passed through, reference components left out
+  (`src/scbom.rs`, fuzzed by the `scdesign` target).
 
 ## [0.2.11] - 2026-11-21
 

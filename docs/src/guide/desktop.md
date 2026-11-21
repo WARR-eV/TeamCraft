@@ -71,7 +71,8 @@ check-outs and reviews, and a **local working folder**:
   names, check and release);
 * *Import BOM…* (in the *Structure* tab and the *More* menu of a revision you
   have checked out, or *Tools → Import BOM as New Assembly…*) reads a BOM
-  exported by the CAD program – CSV, Excel, ODS or a STEP assembly – with the
+  exported by the CAD program – CSV, Excel, ODS, a STEP assembly or a SolidCraft
+  design (`.sc`, its components and part properties) – with the
   same column recognition as the web import: the preview shows the lines,
   how many items are new or existing and the notes (for example a quantity
   that is not a number); *Import* adds the lines in one step, creating the
