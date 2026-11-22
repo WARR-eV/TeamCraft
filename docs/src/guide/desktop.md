@@ -155,7 +155,7 @@ check-outs and reviews, and a **local working folder**:
   blocks the app. Nothing is uploaded from the worklist without the dialog or
   the confirmed summary. Viewers do not see the section;
 * *Check in all* in the worklist first lists the check-outs with local
-  changes (modified or new files) and offers to **check them in first**
+  changes (modified or new files) and offers to **check them in** (*Check in*)
   with their files; *Only the others* checks in just the check-outs without
   local changes. Check-outs with a conflict always stay checked out – merge
   them in their Workspace tab. *Sign out* (and *Change server*) asks the

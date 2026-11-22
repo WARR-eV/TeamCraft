@@ -566,12 +566,12 @@ export function checkInAll() {
     dialog("Local changes before Check in all", h("div.stack", null, [
       h("p", { text: atRisk(report) + " of your " + checkouts.length + " check-outs have changes in the working folder that are not on the server yet:" }),
       localChangesList(report),
-      h("p.small.muted", { text: "Check them in first: their modified and new files become new versions and their locks are released too. " +
+      h("p.small.muted", { text: "Check in: their modified and new files become new versions and their locks are released too. " +
         "Check-outs with a conflict stay checked out. Only the others: just the check-outs without local changes are released." })
     ]), [
       { label: "Cancel", onClick: function (d) { d.close(); } },
       { label: "Only the others", onClick: function (d) { d.close(); releaseClean(checkouts.length, report, null); } },
-      { label: "Check them in first", primary: true, submit: true, onClick: function (d) {
+      { label: "Check in", primary: true, submit: true, onClick: function (d) {
         d.close();
         sendLocalChanges(report, false, "Checked in with Check in all").then(function (sent) {
           releaseClean(checkouts.length, report, sent);

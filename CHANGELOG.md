@@ -156,6 +156,9 @@ see the notices in the README.
   in the *Files* view and the *Structure* tree gets one marker in the lock
   colour – a bar at its left edge and a light tint of the row – whoever holds
   the lock; the text colour is unchanged.
+- **Desktop: shorter button in *Check in all*.** The main button of the
+  dialog *Local changes before Check in all* is now called *Check in*
+  (was *Check them in first*).
 
 ## [0.2.11] - 2026-11-21
 
