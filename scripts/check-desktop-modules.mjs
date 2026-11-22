@@ -30,10 +30,20 @@ function escapeRegExp(text) {
   return text.replace(/[\\^$.*+?()[\]{}|\/-]/g, "\\$&");
 }
 
-/** Source without comments and string/regex contents (rough, line-preserving). */
+/**
+ * Source without comments and string/regex contents (rough, line-preserving).
+ * A regex literal is a `/…/` where an expression starts (after `(`, `,`, `=`,
+ * `:`, `[`, `!`, `&`, `|`, `?`, `{`, `}`, `;`, `return` or at the start of a
+ * line) – its `$`, `^` and words are no uses of names (`/^\d+$/` is no `$`).
+ * Regexes go before strings, so a quote inside a regex starts no string.
+ */
 function code(text) {
   return text
     .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+    .replace(
+      /(^|[=(,:[!&|?{};]|\breturn)(\s*)\/(?![*/])(?:\\.|\[(?:\\.|[^\]\\\n])*\]|[^/\\\n[])+\/[dgimsuyv]*/gm,
+      (m, pre, space) => pre + space + "/" + " ".repeat(Math.max(0, m.length - pre.length - space.length - 2)) + "/"
+    )
     .replace(/"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`/g, (m) => '""' + " ".repeat(Math.max(0, m.length - 2)))
     .replace(/\/\/[^\n]*/g, "");
 }
@@ -122,8 +132,9 @@ for (const [f, m] of Object.entries(mods)) {
     if (!o || o === f || m.imports.has(n) || local.has(n)) continue;
     // a shared module can only use shared names (a desktop name is a word in a regex or text)
     if (m.shared && !mods[o].shared) continue;
-    // an object key ({ name: … }) is not a use
-    if (new RegExp(`(^|[^.\\w$])${escapeRegExp(n)}(?!\\s*:)`, "m").test(m.body)) {
+    // the whole name (`el` is no use inside `else`); an object key
+    // ({ name: … }) is not a use
+    if (new RegExp(`(^|[^.\\w$])${escapeRegExp(n)}(?![\\w$])(?!\\s*:)`, "m").test(m.body)) {
       errors.push(`${f}: uses ${n} of ${o} without importing it`);
     }
   }

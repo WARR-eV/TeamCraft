@@ -15,6 +15,11 @@ see the notices in the README.
 
 ### Fixed
 
+- CI: the import check of the desktop modules (`scripts/check-desktop-modules.mjs`)
+  reported uses that are none – a `$` inside a regular expression (`/^\d+$/`)
+  as a use of `core.js`'s `$`, and the start of `else` as a use of
+  `shared/js/dom.js`'s `el` – and failed the *desktop UI* job. It now skips
+  regex contents and compares whole names.
 - Desktop: `desktop/ui/js/revision.js` started with three stray lines (a
   copy of its data block, left by a merge), so the file did not parse – the
   Revision tab could not load, and the *desktop UI* check failed on `main`.
