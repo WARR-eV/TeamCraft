@@ -422,6 +422,16 @@ large check-ins, Pack and Go and backups.
   address and size the pool to the bouncer's `default_pool_size`; note the
   `options` startup parameter under [Sizing](#sizing).
 
+## Request ids
+
+Every answer carries an `x-request-id` header, and the server writes the same
+id as `request_id` into the log line of the request (with
+`TEAMCRAFT_LOG_FORMAT=json` as a field of the `http` span). The web UI's error
+pages show it under *Details for a bug report*, so a user's report leads to
+the matching log lines. A reverse proxy that sets its own `x-request-id`
+keeps its id, as long as it is 1–64 characters of `A–Z`, `a–z`, `0–9` and
+`-`; anything else is replaced by a new UUID (#381).
+
 ## Metrics for Prometheus
 
 Set `TEAMCRAFT_METRICS_TOKEN` (at least 16 characters, also as `_FILE`) and

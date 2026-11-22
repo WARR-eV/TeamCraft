@@ -11,6 +11,13 @@ curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/me
 curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8080/api/v1/items?q=bracket&system=solidworks"
 ```
 
+Every answer of the server (API, web pages, health checks) carries an
+**`x-request-id`** header (#381): a new UUID, or the request's own
+`x-request-id` when it is 1–64 characters of `A–Z`, `a–z`, `0–9` and `-`
+(set by a reverse proxy, for example). The same id is written to the
+request's log line (`request_id`) and shown on the web UI's error pages, so a
+bug report can be matched to the server log. JSON error bodies are unchanged.
+
 ## Token scopes
 
 A token has a scope that narrows what its user may do with it; it never

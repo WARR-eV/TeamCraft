@@ -16,6 +16,7 @@ import { incompleteGet, notOpenedText } from "./get-rules.js";
 import { formatKinds } from "./folder-import.js";
 import { isNewModelOfItsOwn, workspacePath } from "./new-files.js";
 import { newItemDialog } from "./dialogs.js";
+import { revisionInputs } from "./report-inputs.js";
 import { t } from "/static/shared/js/i18n.js";
 
 // ---------------------------------------------------------------- 3D viewer
@@ -51,10 +52,10 @@ export function revViewer(tab, el) {
       click: function () {
         var name = current.filename.replace(/\.[^.]+$/, "") + ".stl";
         var data;
-        try { data = new Uint8Array(state.viewer.exportStl()); } catch (e) { toast(errorText(e), "error"); return; }
+        try { data = new Uint8Array(state.viewer.exportStl()); } catch (e) { toast(errorText(e), "error", "Exporting " + name, previewInputs); return; }
         invoke("save_stl", data, { headers: { "x-file-name": encodeURIComponent(name) } }).then(function (path) {
           if (path) toast("Saved " + path);
-        }, function (e) { toast(errorText(e), "error"); });
+        }, function (e) { toast(errorText(e), "error", "Saving " + name, previewInputs); });
       }
     }
   }, "Export STL…");
@@ -70,15 +71,24 @@ export function revViewer(tab, el) {
   ]));
   // the server converts the file into a mesh (pure Rust) – the app only draws it
   var versionId = tab.viewerVersion;
+  // *Report…* of a failed preview (#381): the file, its format and version
+  var previewInputs = revisionInputs(tab.data.rev, [["file", current.filename], ["format", previewFormat(current)],
+    ["version", versionId ? "older version" : "v" + current.version]]);
   try {
-    state.viewer = window.TeamCraftViewer.mount(canvas, {
+    var viewer = state.viewer = window.TeamCraftViewer.mount(canvas, {
       statusEl: status,
       overlayEl: overlay,
       resetBtn: resetBtn,
       upBtn: upBtn,
       onReady: function () { if (stlBtn) stlBtn.disabled = false; },
       load: function () {
-        return invoke("file_bytes", versionId ? { kind: "version-mesh", id: versionId } : { kind: "mesh", id: current.id });
+        return invoke("file_bytes", versionId ? { kind: "version-mesh", id: versionId } : { kind: "mesh", id: current.id })
+          .catch(function (e) {
+            // only while this viewer is still on screen: a late failure of a viewer already
+            // replaced or disposed is not about the preview the user sees
+            if (state.viewer === viewer) toast(errorText(e), "error", "Loading the 3D preview of " + current.filename, previewInputs);
+            throw e;
+          });
       }
     });
   } catch (err) {
@@ -108,7 +118,8 @@ export function revWorkspace(tab, el) {
       return h("button.small", {
         type: "button", title: "Create a STEP export with " + PROGRAM_LABEL[program] + " next to the file – check it in with the model for the 3D preview",
         on: { click: function () {
-          run("Exporting " + f.name + " to STEP with " + PROGRAM_LABEL[program], function () { return exportStep(rev, f.name); })
+          run("Exporting " + f.name + " to STEP with " + PROGRAM_LABEL[program], function () { return exportStep(rev, f.name); },
+            revisionInputs(rev, [["file", f.name], ["program", program]]))
             .then(function (step) { toast("Created " + step + " – check it in together with " + f.name); renderActive(); }, function () {});
         } }
       }, "STEP");
@@ -124,7 +135,7 @@ export function revWorkspace(tab, el) {
           run("Writing the item data into " + f.name, function () {
             return call("solidcraft_write_item_data", { project: rev.project_code, item: rev.item_number, code: rev.code, file: f.name,
               data: { item_number: rev.item_number, revision: rev.code, name: rev.name, item_id: String(rev.item_id || ""), revision_id: String(rev.id) } });
-          }).then(function () { toast(f.name + " now carries " + rev.item_number + "/" + rev.code + " – check it in to keep it"); renderActive(); }, function () {});
+          }, revisionInputs(rev, [["file", f.name]])).then(function () { toast(f.name + " now carries " + rev.item_number + "/" + rev.code + " – check it in to keep it"); renderActive(); }, function () {});
         } }
       }, "Item data");
     }
@@ -135,7 +146,7 @@ export function revWorkspace(tab, el) {
           tool("Open folder", "folder", function () { openWorkspaceFolder(tab); }),
           tool("Get files", "download", function () {
             getting(call("workspace_download", { project: rev.project_code, item: rev.item_number, code: rev.code }))
-              .then(function (r) { reportDownload(r); renderActive(); }, function (e) { toast(errorText(e), "error"); });
+              .then(function (r) { reportDownload(r); renderActive(); }, function (e) { toast(errorText(e), "error", "Getting the files of " + rev.item_number + "/" + rev.code, revisionInputs(rev)); });
           }, { title: "Copy the current files of this revision into the working folder without checking out (read-only)" }),
           tool("Get with structure…", "download", function () { getStructureDialog(rev); },
             { title: "Copy this item and everything it consists of (BOM and referenced CAD files) into the working folder" }),
@@ -372,7 +383,7 @@ export function openLocalFile(tab, f) {
       { label: "Get latest and open", primary: true, submit: true, onClick: function (d) {
         d.close();
         getting(call("workspace_download", { project: rev.project_code, item: rev.item_number, code: rev.code }))
-          .then(function (r) { reportDownload(r); open(r); renderActive(); }, function (e) { toast(errorText(e), "error"); });
+          .then(function (r) { reportDownload(r); open(r); renderActive(); }, function (e) { toast(errorText(e), "error", "Getting the latest files to open " + f.name, revisionInputs(rev, [["file", f.name]])); });
       } }
     ]);
     return;
@@ -411,14 +422,14 @@ export function openFile(tab, filename, local, warned, got) {
       }
       return call("workspace_open", { project: rev.project_code, item: rev.item_number, code: rev.code, file: filename });
     });
-  }).catch(function (e) { if (e) toast(errorText(e), "error"); });
+  }).catch(function (e) { if (e) toast(errorText(e), "error", "Opening " + filename, revisionInputs(rev, [["file", filename]])); });
 }
 
 export function doCheckout(tab, then) {
   var rev = tab.data.rev;
   run("Checking out " + rev.item_number + "/" + rev.code, function () {
     return getting(call("workspace_checkout", { project: rev.project_code, item: rev.item_number, code: rev.code }));
-  }).then(function (r) {
+  }, revisionInputs(rev)).then(function (r) {
     // with structure: the parts came read-only, local files were never overwritten
     toast(r.summary || ("Checked out " + rev.item_number + "/" + rev.code + " – the files in " + r.dir + " are writable now"));
     if (r.kept.length || r.clashes.length || r.failed.length || r.unresolved.length) reportDownload(r);
@@ -439,7 +450,7 @@ export function doCancelCheckout(tab) {
   function release() {
     run("Releasing the check-out", function () {
       return api("POST", "/items/" + enc(rev.item_number) + "/revisions/" + enc(rev.code) + "/cancel-checkout");
-    }).then(function () {
+    }, revisionInputs(rev)).then(function () {
       toast("Released the check-out of " + rev.item_number + "/" + rev.code);
       call("usage_count", { action: "cancel_checkout" }).catch(function () {});
       // the unchanged local files become read-only again
@@ -520,7 +531,13 @@ export function checkinDialog(tab, park) {
     // check-in; during an export Cancel skips it (the CAD program it started
     // is ended), and the check-in follows with the STEP files written so far.
     var running = false, cancelled = false, phase = "", skipping = false;
-    var opts = { wide: true };
+    // *Report…* of a failure (#381): the revision, the ticked file names, STEP
+    function ticked() { return boxes.filter(function (b) { return b.input.checked; }).map(function (b) { return b.name; }); }
+    function checkinInputs() {
+      return revisionInputs(rev, [["files", ticked().join(", ")], ["park", park ? "yes" : ""],
+        ["step exports", stepNote && withStep.checked ? "yes" : ""]]);
+    }
+    var opts = { wide: true, inputs: checkinInputs };
     function stopped() { return { status: 499, message: "Cancelled." }; }
     dialog((park ? "Park " : "Check in ") + rev.item_number + "/" + rev.code, body, [
       { label: "Cancel", onClick: function (d) {
@@ -615,7 +632,8 @@ export function checkinDialog(tab, park) {
           // the chosen files are on the server already: never offer to send them again
           d.close();
           toast(files.join(", ") + " are on the server (parked) and " + ref + " is still checked out to you – " +
-            (cancelled || isCancelled(err) ? "the check-in was cancelled." : "the check-in failed: " + errorText(err)), cancelled || isCancelled(err) ? "info" : "error");
+            (cancelled || isCancelled(err) ? "the check-in was cancelled." : "the check-in failed: " + errorText(err)), cancelled || isCancelled(err) ? "info" : "error",
+            "Checking in " + ref, checkinInputs);
           reloadActive();
           refreshWorklistCount();
           return;
@@ -630,7 +648,7 @@ export function checkinDialog(tab, park) {
         d.fail(err);
       });
     }
-  }, function (err) { toast(errorText(err), "error"); });
+  }, function (err) { toast(errorText(err), "error", "Comparing the working folder of " + rev.item_number + "/" + rev.code, revisionInputs(rev)); });
 }
 
 /** `0:07`, `12:34` – how long an export has been running. */
@@ -794,7 +812,7 @@ export function reviseRevision(number, code) {
     if (!ok) return;
     run("Creating the next revision", function () {
       return api("POST", "/items/" + enc(number) + "/revisions/" + enc(code) + "/revise");
-    }).then(function (nr) {
+    }, [["item", number], ["revision", code]]).then(function (nr) {
       toast("Created " + nr.item_number + "/" + nr.code + " (in work, checked out to you)");
       openRevision(nr.item_number, nr.code, "workspace");
       refreshWorklistCount();
@@ -808,7 +826,7 @@ export function doObsolete(tab) {
     if (!ok) return;
     run("Marking obsolete", function () {
       return api("POST", "/items/" + enc(rev.item_number) + "/revisions/" + enc(rev.code) + "/obsolete");
-    }).then(function () { toast(rev.item_number + "/" + rev.code + " is now obsolete"); reloadActive(); }, function () {});
+    }, revisionInputs(rev)).then(function () { toast(rev.item_number + "/" + rev.code + " is now obsolete"); reloadActive(); }, function () {});
   });
 }
 
@@ -876,7 +894,7 @@ export function addFilesDialog(tab) {
         var confirmed = ticks.filter(function (t) { return t.input.checked; }).map(function (t) { return t.name; });
         var start = mine ? Promise.resolve() : run("Checking out " + rev.item_number + "/" + rev.code, function () {
           return getting(call("workspace_checkout", where));
-        });
+        }, revisionInputs(rev));
         start.then(function () {
           return call("workspace_add_files", Object.assign({ paths: paths, subfolder: subfolder.value.trim(), confirmed: confirmed }, where));
         }).then(function (r) {
@@ -887,6 +905,6 @@ export function addFilesDialog(tab) {
           if (checkNow.checked && r.copied.length) { reloadActive(); checkinDialog(tab); } else { tab.sub = "workspace"; reloadActive(); }
         }, function (e) { d.fail(e); reloadActive(); });
       } }
-    ], { wide: true });
+    ], { wide: true, inputs: function () { return revisionInputs(rev, [["files", paths.map(function (p) { return String(p).split(/[\\/]/).pop(); }).join(", ")]]); } });
   }, function (e) { toast(errorText(e), "error"); });
 }

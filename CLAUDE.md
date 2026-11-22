@@ -98,7 +98,8 @@ src/main.rs        CLI (clap): serve (default), local (test installation, src/lo
 src/localserver.rs `teamcraft local`: private PostgreSQL cluster (bundled postgresql/bin, --pg-bin or installed; initdb with a random
                    scram password, 127.0.0.1 + free port, no socket) + the server on 127.0.0.1 via a config overlay; stops PostgreSQL
                    after the server, port file against a second instance, --exit-with-stdin for the desktop app
-src/lib.rs         AppState, router (healthz/readyz, /api/v1, web UI), security headers, tracing
+src/lib.rs         AppState, router (healthz/readyz, /api/v1, web UI), security headers, request ids (x-request-id,
+                   outermost layer; RequestId extension read by web::html_errors), tracing
 src/config.rs      env configuration; every variable also as NAME_FILE; all optional for local use
 src/domain.rs      pure rules: Role, ItemType, LifecycleState, ChangeStatus, revision letters, numbering schemes, skins, validation
 src/services/      business logic – the only code that writes to the database
