@@ -15,6 +15,9 @@ see the notices in the README.
 
 ### Fixed
 
+- Desktop: `desktop/ui/js/revision.js` started with three stray lines (a
+  copy of its data block, left by a merge), so the file did not parse – the
+  Revision tab could not load, and the *desktop UI* check failed on `main`.
 - CI: `tests/checkin_bom.rs` (#407) compared with one-element arrays built
   by `[x.clone()]`, which clippy refuses (`cloned_ref_to_slice_refs`); it
   uses `std::slice::from_ref` now. Server and desktop are clippy-clean on
