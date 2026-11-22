@@ -40,6 +40,7 @@ fn main() {
             "svg" => "SVG",
             "woff2" => "WOFF2",
             "txt" => "TXT",
+            "json" => "JSON",
             _ => panic!(
                 "shared/{rel}: no content type for .{ext} (add it to build.rs and src/assets.rs)"
             ),

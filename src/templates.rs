@@ -63,11 +63,33 @@ pub const TEMPLATES: &[(&str, &str)] = embed![
     "assistant.html",
 ];
 
+/// `t(id, name=value, …)` in the templates (#379): the message in the
+/// page's language (`lang` of the context, English without one).
+fn template_t(
+    state: &minijinja::State,
+    id: String,
+    kwargs: minijinja::value::Kwargs,
+) -> Result<String, minijinja::Error> {
+    let lang = state
+        .lookup("lang")
+        .and_then(|v| v.as_str().map(str::to_string))
+        .unwrap_or_else(|| "en".to_string());
+    let mut params = Vec::new();
+    for key in kwargs.args() {
+        let value: minijinja::Value = kwargs.get(key)?;
+        params.push((key.to_string(), value.to_string()));
+    }
+    kwargs.assert_all_used()?;
+    Ok(crate::i18n::t(&lang, &id, &params))
+}
+
 pub fn environment(instance_name: &str) -> Result<Environment<'static>, minijinja::Error> {
     let mut env = Environment::new();
     for (name, source) in TEMPLATES {
         env.add_template(name, source)?;
     }
+    // translated UI (#379): {{ t("nav.items") }}, {{ t("x", count=3) }}
+    env.add_function("t", template_t);
     env.add_filter("dt", filter_dt);
     env.add_filter("num", filter_num);
     env.add_filter("fixed", filter_fixed);
@@ -325,6 +347,25 @@ mod tests {
             problems.len(),
             problems.join("\n")
         );
+    }
+
+    /// The page language (#379): `lang` of the context picks the catalog.
+    #[test]
+    fn pages_follow_the_language() {
+        let env = environment("TeamCraft Test").expect("templates compile");
+        let mut data = with_common(json!({ "slots": [], "max_kib": 512, "max_pixels": 4096 }));
+        data["lang"] = json!("de");
+        data["unread_notifications"] = json!(1);
+        let html = render(&env, "admin/branding.html", data);
+        assert!(html.contains("<html lang=\"de\""), "{html}");
+        assert!(html.contains(">Artikel<") && html.contains("placeholder=\"Artikel suchen\""));
+        assert!(html.contains("1 ungelesene Benachrichtigung\""));
+        let html = render(
+            &env,
+            "admin/branding.html",
+            with_common(json!({ "slots": [], "max_kib": 512, "max_pixels": 4096 })),
+        );
+        assert!(html.contains("<html lang=\"en\"") && html.contains(">Items<"));
     }
 
     #[test]

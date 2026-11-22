@@ -781,7 +781,11 @@ needs an issue with a reason first (see *Direction*).
 - [ ] Administrator-configurable forms (hide unused fields), role-specific views, low-code validation rules
 - [ ] Same search, commands and navigation in web UI and desktop app; one-click actions (revise, approve, open
   related objects)
-- [ ] Keyboard-first operation, screen-reader checks, skip links and complete table headers; translated UI (i18n)
+- [ ] Keyboard-first operation, screen-reader checks, skip links and complete table headers. Translated UI (#379):
+  catalogs in `shared/i18n/` (English, German), `t()` in templates (`src/i18n.rs`) and JS (`shared/js/i18n.js`),
+  web language from `Accept-Language`, desktop *Settings → Language*, guard tests – done for the web header and the
+  desktop *Settings* dialog. Left: every other template and desktop view, server messages and flash texts, a
+  language field on the account (web), dates and numbers per language, API error messages by `Accept-Language`
 - [ ] Native mobile app
 - [ ] Finer notification rules per event and channel, digests for all notifications, Microsoft Teams and Slack
   delivery

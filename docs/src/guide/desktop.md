@@ -260,7 +260,11 @@ and *Loading* or the reason a model cannot be shown appears on the canvas of
 the *3D viewer* tab (see [Files](files.md)). *Settings → Appearance*: *TeamCraft* (the
 default) follows the light or dark
 appearance of the operating system and switches with it, *TeamCraft Light*
-and *TeamCraft Dark* stay fixed, the distribution skins are dark. *Settings → Change password…* changes the password of
+and *TeamCraft Dark* stay fixed, the distribution skins are dark. *Settings → Language*: *As the system* (the
+default: your operating system's language if TeamCraft has it, else English),
+*English* or *Deutsch* – from the next start; the header of the web UI
+follows your browser's language (#379, more views follow). Your data – item
+names, comments, file names – is never translated. *Settings → Change password…* changes the password of
 a local account (it
 asks for the current one; wrong ones count like failed sign-ins, and your web
 sessions end); single-sign-on accounts do not see it.

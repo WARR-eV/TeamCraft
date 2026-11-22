@@ -368,6 +368,31 @@ code base. These are the most important rules:
   security-relevant changes), `docs/OPEN_WORK.md`, `platforms/*.md` and, for
   the desktop app, `desktop/README.md` and `docs/src/guide/desktop.md`.
 
+### Translated UI: adding a message or a language
+
+User-facing text of the web header and the desktop *Settings* dialog comes
+from the message catalogs in `shared/i18n/` (#379; more views follow):
+
+* **A message:** add an ID (`area.what`, e.g. `settings.updates`) with the
+  English sentence to `shared/i18n/en.json`, then the same ID to every other
+  catalog (a missing one falls back to English). Use whole sentences with
+  named placeholders – `"{count} files"` – never pieces glued together;
+  plural forms as `{ "one": "…", "other": "…" }`, chosen by `count`. In a
+  template: `{{ t("area.what", count=n) }}`; in desktop JavaScript:
+  `t("area.what", { count: n })` from `/static/shared/js/i18n.js`.
+* **A language:** copy `en.json` to `<code>.json` and translate the values
+  (keep IDs and placeholders); add the code to `LANGUAGES` in `src/i18n.rs`
+  and `shared/js/i18n.js`, its CLDR plural rule to `plural_category`, the
+  file to the `CATALOGS` table and `language.<code>` (its own name) to every
+  catalog.
+* User data (item names, comments, file names), audit records, API field
+  names and error codes are never translated.
+
+The guard tests `src/i18n.rs` (`catalogs_match_english`,
+`every_id_used_exists_in_english`) and `scripts/shared-i18n.test.mjs` fail
+for an ID that is not in `en.json`, a catalog with an unknown ID or other
+placeholders, and an unknown plural category. Tests render in English.
+
 ## Dependencies, research and branding
 
 TeamCraft is licensed under the MPL-2.0, so new dependencies must be

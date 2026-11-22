@@ -95,6 +95,7 @@
     - [Read permissions for project groups](research/read-permissions.md)
     - [As-built records](research/as-built.md)
     - [Fluent, STAR-CCM+ and Simcenter 3D files](research/solver-files.md)
+    - [Translated UI: message catalogs](research/translated-ui.md)
     - [A sandboxed extension layer](research/extension-layer.md)
     - [SolidCraft designs](research/solidcraft-design.md)
     - [3D preview of SolidCraft designs without an export](research/solidcraft-3d-preview.md)

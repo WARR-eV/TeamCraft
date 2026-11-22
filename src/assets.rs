@@ -32,6 +32,7 @@ const JS: &str = "text/javascript; charset=utf-8";
 const SVG: &str = "image/svg+xml";
 const WOFF2: &str = "font/woff2";
 const TXT: &str = "text/plain; charset=utf-8";
+const JSON: &str = "application/json";
 
 /// URL prefix of the files from `shared/`.
 pub const SHARED_PREFIX: &str = "/static/shared/";

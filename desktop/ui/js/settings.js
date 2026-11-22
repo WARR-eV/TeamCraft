@@ -4,11 +4,43 @@
 
 import { $, SKINS, TAURI, api, call, confirmDialog, dialog, errorText, field, h, run, state, toast } from "./core.js";
 import { label } from "/static/shared/js/format.js";
+import { LANGUAGES, negotiate, t } from "/static/shared/js/i18n.js";
 import { applySkin } from "./skins.js";
 import { checkServerUrl, showConnect } from "./connect.js";
 import { atRisk, checkUpdate, checkoutsWithChanges, localChangesList, refreshWorklistCount, sendLocalChanges } from "./shell.js";
 import { resetCompanyAi } from "./assistant.js";
 import { agent, agentSettingsDialog, endAgentPermissions, localAgentsAllowed, localAgentsOffText } from "./agent.js";
+
+// ---------------------------------------------------------------- language (#379)
+
+var LANGUAGE_KEY = "tc.language";
+
+/** The language the app shows: the saved choice, else the system's
+ *  (navigator.languages: exactly, then by base language, then English). */
+export function preferredLanguage() {
+  var saved = null;
+  try { saved = localStorage.getItem(LANGUAGE_KEY); } catch (e) { saved = null; }
+  if (saved && LANGUAGES.indexOf(saved) !== -1) return saved;
+  return negotiate(navigator.languages || [navigator.language]);
+}
+
+/** Settings → Language: *As the system (…)* or a shipped language; the
+ *  choice applies at the next start, so no half-translated window. */
+function languageSelector() {
+  var saved = null;
+  try { saved = localStorage.getItem(LANGUAGE_KEY); } catch (e) { saved = null; }
+  var system = negotiate(navigator.languages || [navigator.language]);
+  var select = h("select", { on: { change: function () {
+    try {
+      if (select.value === "system") localStorage.removeItem(LANGUAGE_KEY);
+      else localStorage.setItem(LANGUAGE_KEY, select.value);
+    } catch (e) { /* storage blocked: the system language stays */ }
+    toast(t("settings.language.saved"));
+  } } }, [h("option", { value: "system", text: t("settings.language.system", { language: t("language." + system) }) })]
+    .concat(LANGUAGES.map(function (l) { return h("option", { value: l, text: t("language." + l) }); })));
+  select.value = saved && LANGUAGES.indexOf(saved) !== -1 ? saved : "system";
+  return select;
+}
 
 /** Managed deployment policies (#378): is this setting (`server`,
  *  `update_check`, `crash_prompt`, `usage_statistics`) fixed by the
@@ -30,6 +62,7 @@ function managedNote(key) {
 }
 
 export function openSettings() {
+  var languageSelect = languageSelector();
   var current = document.documentElement.getAttribute("data-skin");
   var ws = h("input", { type: "text", value: state.session.workspace_dir, spellcheck: "false" });
   var withParts = h("input", { type: "checkbox", checked: state.session.checkout_parts !== false, on: { change: function () {
@@ -74,10 +107,12 @@ export function openSettings() {
   }));
   var body = h("div.stack", null, [
     managedText() ? h("p.notice.small.managed", { text: managedText() + " – settings marked “Set by your organization” cannot be changed here." }) : null,
-    h("h3", { text: "Appearance" }),
-    h("p.hint", { text: "Choose how TeamCraft Desktop looks. The distribution skins are dark." }),
+    h("h3", { text: t("settings.appearance") }),
+    h("p.hint", { text: t("settings.appearance.hint") }),
+    field(t("settings.language"), languageSelect),
+    h("p.hint", { text: t("settings.language.hint") }),
     skins,
-    h("h3", { text: "Workspace" }),
+    h("h3", { text: t("settings.workspace") }),
     field("Folder for checked-out files", h("div.row", null, [ws,
       TAURI.dialog ? h("button", { type: "button", on: { click: function () {
         TAURI.dialog.open({ directory: true, defaultPath: ws.value }).then(function (dir) { if (dir) ws.value = dir; });
@@ -86,27 +121,27 @@ export function openSettings() {
     h("p.hint", { text: "Only the assembly is locked. Its parts are copied read-only into your working folder, so it opens in the CAD program; parts you changed locally are never overwritten and are listed in the report. Switch off to copy only the assembly." }),
     // the administrator may have turned local agents off (TEAMCRAFT_LOCAL_AGENTS):
     // then only why, and where the company AI is
-    h("h3", { text: "Agents" }),
+    h("h3", { text: t("settings.agents") }),
     !localAgentsAllowed() ? h("p.hint", { text: localAgentsOffText() }) : null,
     localAgentsAllowed() ? h("div.row", null, [
       h("span.hint", { text: "Local AI agents (ACP) that work with TeamCraft's tools – none until you add one." }),
       h("button", { type: "button", on: { click: function () { dlg.close(); agentSettingsDialog(); } } }, "Agents…")
     ]) : null,
-    h("h3", { text: "Notifications" }),
+    h("h3", { text: t("settings.notifications") }),
     notifyBox,
-    h("h3", { text: "Updates" }),
+    h("h3", { text: t("settings.updates") }),
     h("label.check", null, [updateCheck, "Tell me when a new version is out"]),
     managedNote("update_check"),
     h("p.hint", { text: "Asks GitHub for the latest TeamCraft release at most once a day and shows a link in the status bar. Nothing is downloaded or installed by the app." }),
     h("h3", { text: "Privacy" }),
     h("p.hint", { text: "TeamCraft Desktop sends your TeamCraft server one anonymous report per day of use: a random id of this installation, the app version, operating system, package type, active minutes and counts of fixed actions (check-outs, check-ins, 3D previews …) – never names, numbers, paths, search terms or anything you type. Your administrator decides whether the server shares a summary with the TeamCraft developers (off unless they turn it on)." }),
     h("div.row", null, [h("button", { type: "button", on: { click: function () { showUsage(); } } }, "Show what is sent")]),
-    h("h3", { text: "Crash reports" }),
+    h("h3", { text: t("settings.crash_reports") }),
     h("label.check", null, [crashPrompt, "After a crash, ask at the next start whether to share the report"]),
     managedNote("crash_prompt"),
     h("p.hint", { text: "Crashes and uncaught errors are written to a report on this computer (in the app's settings folder, without your home folder, server addresses or tokens). It is only shared when you open the GitHub issue yourself. Switched off, the reports stay on this computer and are never shown." }),
     field("Report problems to", reportUrl, "empty = the TeamCraft issue form on GitHub; your help desk's form address, which gets title and body"),
-    h("h3", { text: "Account" }),
+    h("h3", { text: t("settings.account") }),
     h("p", null, ["Signed in to ", h("strong", { text: state.session.server_url }), " as ", h("strong", { text: state.me.display_name }), " (" + label(state.me.role) + ") on ", h("span", { text: state.session.device })]),
     state.session.token_storage === "file"
       ? h("p.notice.warn.small", { text: "No keychain available: the sign-in token is stored in a file in the app's settings folder that only your user account can read, not in the system keychain. On Linux, start a Secret Service (GNOME Keyring or KWallet) and restart the app – the token then moves into the keychain." })
@@ -118,13 +153,13 @@ export function openSettings() {
       state.me.auth_source === "oidc" ? null : h("button", { type: "button", on: { click: function () { dlg.close(); passwordDialog(); } } }, "Change password…"),
       fixedByPolicy("server") ? null : h("button", { type: "button", on: { click: function () { dlg.close(); showConnect("server"); } } }, "Switch server…")
     ]),
-    h("h3", { text: "Connections" }),
+    h("h3", { text: t("settings.connections") }),
     connectionsBox(function () { dlg.close(); })
   ]);
-  var dlg = dialog("Settings", body, [
-    { label: "Close", onClick: function (d) { d.close(); } },
+  var dlg = dialog(t("settings.title"), body, [
+    { label: t("settings.close"), onClick: function (d) { d.close(); } },
     {
-      label: "Save", primary: true, submit: true, onClick: function (d) {
+      label: t("settings.save"), primary: true, submit: true, onClick: function (d) {
         var workspaceChanged = ws.value.trim() !== String(state.session.workspace_dir);
         var saveWorkspace = workspaceChanged
           ? call("set_workspace_dir", { dir: ws.value.trim() }).then(function () {
