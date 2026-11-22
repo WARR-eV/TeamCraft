@@ -735,7 +735,7 @@
         if (!response.ok) throw new Error("HTTP " + response.status);
         return response.json();
       }).then(function (body) {
-        if (input.value.trim() !== q) return;
+        if (input.value.trim() !== q || document.activeElement !== input) return;
         render(body.items || []);
       }).catch(function (err) {
         if (err && err.name === "AbortError") return;
@@ -764,7 +764,15 @@
         close();
       }
     });
-    input.addEventListener("blur", function () { setTimeout(close, 100); });
+    input.addEventListener("blur", function () {
+      setTimeout(function () {
+        // a late answer must not reopen the list under a field without focus
+        clearTimeout(timer);
+        if (request) { request.abort(); request = null; }
+        lastQuery = null; // refocusing and typing searches again
+        close();
+      }, 100);
+    });
   });
 
   // BOM tree: every line with lines below it gets a toggle button that folds

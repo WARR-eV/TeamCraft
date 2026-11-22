@@ -49,7 +49,7 @@ export function addLineDialog(rev) {
   var search = h("input", { type: "text", autocomplete: "off", placeholder: "Number, name or file name", role: "combobox",
     "aria-autocomplete": "list", "aria-expanded": "false", "aria-controls": "add-line-suggestions" });
   var list = h("ul.picker-list.static", { id: "add-line-suggestions", role: "listbox", "aria-label": "Matching items" });
-  var info = h("p.hint", { text: "Type at least 2 characters." });
+  var info = h("p.hint", { text: "Type at least 2 characters.", role: "status", "aria-live": "polite" });
   var qty = h("input.qty", { type: "text", value: "1", inputmode: "decimal" });
   var find = h("input.find", { type: "text", placeholder: "auto", inputmode: "numeric" });
   var notes = h("input", { type: "text", placeholder: "optional", maxlength: "500" });
@@ -57,7 +57,12 @@ export function addLineDialog(rev) {
   function highlight(i) {
     active = i;
     rows.forEach(function (r, k) { r.el.setAttribute("aria-selected", k === i || (i < 0 && chosen === r.item) ? "true" : "false"); });
-    if (i >= 0 && rows[i]) rows[i].el.scrollIntoView({ block: "nearest" });
+    if (i >= 0 && rows[i]) {
+      search.setAttribute("aria-activedescendant", rows[i].el.id);
+      rows[i].el.scrollIntoView({ block: "nearest" });
+    } else {
+      search.removeAttribute("aria-activedescendant");
+    }
   }
   function choose(i) {
     var r = rows[i];
@@ -74,6 +79,7 @@ export function addLineDialog(rev) {
     list.replaceChildren();
     rows = [];
     active = -1;
+    search.removeAttribute("aria-activedescendant");
     items.forEach(function (item, i) {
       var li = h("li.picker-option", { id: "add-line-option-" + i, role: "option", "aria-selected": "false",
         on: { mousedown: function (e) { e.preventDefault(); choose(i); } } }, [
@@ -101,12 +107,19 @@ export function addLineDialog(rev) {
     suggestItems(q).then(function (items) { if (search.value.trim() === q) render(items); },
       function (err) { info.textContent = errorText(err); });
   }
-  search.addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(lookup, 200); });
+  search.addEventListener("input", function () {
+    // a typed change drops the earlier choice at once, not after the debounce
+    if (chosen && search.value.trim() !== chosen.number) chosen = null;
+    clearTimeout(timer);
+    timer = setTimeout(lookup, 200);
+  });
   search.addEventListener("keydown", function (e) {
     if (!rows.length) return;
     if (e.key === "ArrowDown") { e.preventDefault(); highlight(active < rows.length - 1 ? active + 1 : 0); }
     else if (e.key === "ArrowUp") { e.preventDefault(); highlight(active > 0 ? active - 1 : rows.length - 1); }
     else if (e.key === "Enter" && active >= 0) { e.preventDefault(); e.stopPropagation(); choose(active); }
+    // Escape closes the suggestions only, not the whole dialog
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); render([]); info.textContent = ""; }
   });
 
   var body = h("div.stack", null, [

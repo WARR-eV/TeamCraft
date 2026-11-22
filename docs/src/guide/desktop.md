@@ -89,7 +89,7 @@ check-outs and reviews, and a **local working folder**:
 * *Add line…* (also in the *Structure* tab of a revision you have checked
   out) adds a single component: type part of its number, name or file name
   and choose one of the matching items – shown with the preview image from
-  the CAD file, revision, state and project group (↑/↓ and Enter work too);
+  the CAD file, revision, state and project group (↑/↓ and Enter work too, Esc closes the list);
   enter quantity, find number (empty = next free one) and notes, *Add*. An
   exact item number works without choosing. Only items you may read are
   offered (restricted groups you are not in stay hidden). Under your

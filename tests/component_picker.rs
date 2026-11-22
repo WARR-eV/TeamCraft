@@ -291,6 +291,17 @@ async fn a_line_needs_my_check_out_through_the_web_form_and_the_api() {
         }
     };
 
+    // A new item is checked out to its author: release it first.
+    let r = app
+        .api(
+            Method::POST,
+            &format!("{rev_uri}/cancel-checkout"),
+            &erika,
+            None,
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+
     // not checked out by anyone: refused
     let r = api_add(erika.clone()).await;
     assert_eq!(r.status, StatusCode::CONFLICT, "{}", r.text());
