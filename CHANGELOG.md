@@ -13,6 +13,15 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Security
+
+- Client address: `X-Forwarded-For` is read only from trusted proxies (`TEAMCRAFT_TRUSTED_PROXIES`, default loopback; the Docker install trusts the Docker networks while the port is published on loopback), walked from the right (GHSA-98v7-pm3r-5934, F20).
+- OIDC: the ID token signature is checked against the provider's `jwks_uri` (RS/PS 256–512, ES256/ES384, HS256–512 with the client secret); `http://` issuers and provider endpoints are refused except on loopback (GHSA-864x-fmpf-4p73, F6).
+- BOM and result imports: spreadsheets are read in the isolated `text-extract` child (`--format sheet`) with memory and time limits, ZIP containers capped at 256 MiB unpacked; CSV, STEP and designs on a blocking thread (GHSA-54vc-vgp2-8whr, F13).
+- Windows: parser children get a memory limit through a job object (GHSA-7q9q-g6rr-pc58, F11).
+- Malware scan: files larger than `TEAMCRAFT_CLAMD_MAX_MB` are refused (413, chunked uploads at the start) unless `TEAMCRAFT_CLAMD_OVERSIZE=store` (GHSA-qw27-m6gj-m6wm).
+- Dependencies: `url` 2.5.9 in the server and the desktop app (RUSTSEC-2026-0592, stack overflow in `Url::origin()` on nested `blob:` URLs).
+
 ### Added
 
 - **Check-outs of a project group as a graph** (#428): administrators and

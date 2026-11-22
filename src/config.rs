@@ -91,6 +91,7 @@ pub const KNOWN_VARIABLES: &[&str] = &[
     "TEAMCRAFT_BOOTSTRAP_ADMIN_USERNAME",
     "TEAMCRAFT_CLAMD_ADDR",
     "TEAMCRAFT_CLAMD_MAX_MB",
+    "TEAMCRAFT_CLAMD_OVERSIZE",
     "TEAMCRAFT_COOKIE_SECURE",
     "TEAMCRAFT_DATABASE_URL",
     "TEAMCRAFT_DB_HOST",
@@ -141,6 +142,7 @@ pub const KNOWN_VARIABLES: &[&str] = &[
     "TEAMCRAFT_SMTP_URL",
     "TEAMCRAFT_TOKEN",
     "TEAMCRAFT_TOKEN_MAX_DAYS",
+    "TEAMCRAFT_TRUSTED_PROXIES",
     "TEAMCRAFT_UPLOAD_CHUNK_MB",
     "TEAMCRAFT_USAGE_STATISTICS",
     "TEAMCRAFT_USAGE_STATISTICS_URL",
@@ -306,6 +308,10 @@ pub struct Config {
     /// is refused (`TEAMCRAFT_SIGNIN_MAX_FAILURES`; five times as many per
     /// client address; 0 = off). See [`crate::auth::SignInThrottle`].
     pub signin_max_failures: u32,
+    /// Reverse proxies whose `X-Forwarded-For` entries are believed
+    /// (`TEAMCRAFT_TRUSTED_PROXIES`; default loopback only, `none` = no
+    /// proxy). See [`crate::auth::client_address`].
+    pub trusted_proxies: Vec<crate::services::membership_conditions::Network>,
     /// Idle lifetime in days of new API and desktop tokens of single sign-on
     /// users (`TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS`; default 90, 0 = off): a token
     /// without an expiry or with a longer one expires after that many days
@@ -465,6 +471,39 @@ impl LocalAgents {
     pub fn allowed(self) -> bool {
         self == LocalAgents::Allowed
     }
+}
+
+/// Parses `TEAMCRAFT_TRUSTED_PROXIES`: addresses or ranges (`10.0.0.0/8`,
+/// `192.168.2.10`, `fd00::/8`), comma or space separated. Unset means
+/// loopback only (a reverse proxy on the same computer); `none` trusts no
+/// proxy, so `X-Forwarded-For` is never read.
+fn parse_trusted_proxies(
+    raw: Option<&str>,
+) -> Result<Vec<crate::services::membership_conditions::Network>> {
+    use crate::services::membership_conditions::Network;
+    let Some(raw) = raw else {
+        return Ok(["127.0.0.0/8", "::1"]
+            .iter()
+            .filter_map(|r| Network::parse(r).ok())
+            .collect());
+    };
+    if raw.trim().eq_ignore_ascii_case("none") {
+        return Ok(Vec::new());
+    }
+    let mut proxies = Vec::new();
+    for entry in raw.split([',', ' ', '\n', '\t']).map(str::trim) {
+        if entry.is_empty() {
+            continue;
+        }
+        let net = Network::parse(entry).map_err(|e| anyhow!("TEAMCRAFT_TRUSTED_PROXIES: {e}"))?;
+        if !proxies.contains(&net) {
+            proxies.push(net);
+        }
+    }
+    if proxies.is_empty() {
+        bail!("TEAMCRAFT_TRUSTED_PROXIES: no address given (use 'none' to trust no proxy)");
+    }
+    Ok(proxies)
 }
 
 /// Parses `TEAMCRAFT_WEBHOOK_ALLOWED_HOSTS` (comma or space separated).
@@ -1028,6 +1067,12 @@ impl Config {
         if !(1..=4096).contains(&clamd_max_mb) {
             bail!("TEAMCRAFT_CLAMD_MAX_MB must be between 1 and 4096");
         }
+        let clamd_oversize = match env.get("TEAMCRAFT_CLAMD_OVERSIZE")? {
+            Some(raw) => crate::malware::Oversize::parse(&raw).with_context(|| {
+                format!("TEAMCRAFT_CLAMD_OVERSIZE must be 'refuse' or 'store', got '{raw}'")
+            })?,
+            None => crate::malware::Oversize::default(),
+        };
         let clamd = match env
             .get("TEAMCRAFT_CLAMD_ADDR")?
             .map(|a| a.trim().to_string())
@@ -1044,6 +1089,7 @@ impl Config {
                     addr,
                     max_bytes: clamd_max_mb * 1024 * 1024,
                     timeout: Duration::from_secs(120),
+                    oversize: clamd_oversize,
                 })
             }
             None => None,
@@ -1065,6 +1111,8 @@ impl Config {
         }
 
         let signin_max_failures = env.parse_or("TEAMCRAFT_SIGNIN_MAX_FAILURES", 10u32)?;
+        let trusted_proxies =
+            parse_trusted_proxies(env.get("TEAMCRAFT_TRUSTED_PROXIES")?.as_deref())?;
         let metrics_token = env
             .get("TEAMCRAFT_METRICS_TOKEN")?
             .map(|t| t.trim().to_string())
@@ -1316,6 +1364,7 @@ impl Config {
             audit_retention_days,
             retention_latest_grace_days,
             signin_max_failures,
+            trusted_proxies,
             oidc_token_idle_days,
             token_max_days,
             metrics_token,
@@ -1375,14 +1424,22 @@ impl Config {
     /// Password-free summary for the startup log.
     pub fn summary(&self) -> String {
         format!(
-            "bind={} public_url={} database={} vault={} max_upload={}MiB upload_chunk={}MiB malware_scan={} session_ttl={}h cookie_secure={} oidc={} local_login={} mattermost_errors={} smtp={} request_digest={}h mattermost_notifications={} assistant={} local_agents={} webhook_targets={}",
+            "bind={} public_url={} database={} vault={} max_upload={}MiB upload_chunk={}MiB malware_scan={} session_ttl={}h cookie_secure={} oidc={} local_login={} mattermost_errors={} smtp={} request_digest={}h mattermost_notifications={} assistant={} local_agents={} webhook_targets={} trusted_proxies={}",
             self.bind_addr,
             self.public_url,
             self.database_display,
             self.vault_dir.display(),
             self.max_upload_bytes / (1024 * 1024),
             self.upload_chunk_bytes / (1024 * 1024),
-            self.clamd.as_ref().map_or("off", |c| c.addr.as_str()),
+            self.clamd.as_ref().map_or_else(
+                || "off".to_string(),
+                |c| format!(
+                    "{}(max={}MiB,oversize={})",
+                    c.addr,
+                    c.max_bytes / (1024 * 1024),
+                    c.oversize.as_str()
+                )
+            ),
             self.session_ttl.as_secs() / 3600,
             self.cookie_secure,
             self.oidc.as_ref().map(|o| o.issuer_url.as_str()).unwrap_or("disabled"),
@@ -1412,6 +1469,15 @@ impl Config {
                 (false, false) => "allow-list",
                 (false, true) => "allow-list+private",
             },
+            if self.trusted_proxies.is_empty() {
+                "none".to_string()
+            } else {
+                self.trusted_proxies
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(",")
+            },
         )
     }
 }
@@ -1420,8 +1486,13 @@ fn oidc_config<F: Fn(&str) -> Option<String>>(env: &Env<F>) -> Result<Option<Oid
     let Some(issuer_url) = env.get("TEAMCRAFT_OIDC_ISSUER_URL")? else {
         return Ok(None);
     };
-    if !(issuer_url.starts_with("https://") || issuer_url.starts_with("http://")) {
-        bail!("TEAMCRAFT_OIDC_ISSUER_URL must be an http(s) URL");
+    if !crate::oidc::secure_endpoint(issuer_url.trim()) {
+        // GHSA-864x-fmpf-4p73 (F6): over plain HTTP anyone on the way to the
+        // provider could hand out ID tokens; loopback stays for local tests
+        bail!(
+            "TEAMCRAFT_OIDC_ISSUER_URL must be an https:// URL \
+             (http:// only for localhost, 127.0.0.1 or [::1])"
+        );
     }
     let client_id = env
         .get("TEAMCRAFT_OIDC_CLIENT_ID")?
@@ -1669,6 +1740,29 @@ mod tests {
         assert_eq!(clamd.addr, "clamav:3310");
         assert_eq!(clamd.max_bytes, 100 * 1024 * 1024);
         assert!(cfg.summary().contains("malware_scan=clamav:3310"));
+        // GHSA-qw27-m6gj-m6wm: files too large to scan are refused by default
+        assert_eq!(clamd.oversize, crate::malware::Oversize::Refuse);
+        assert!(
+            cfg.summary().contains("oversize=refuse"),
+            "{}",
+            cfg.summary()
+        );
+        let store = config_from(&[
+            ("TEAMCRAFT_DB_PASSWORD", "secret"),
+            ("TEAMCRAFT_CLAMD_ADDR", "clamav:3310"),
+            ("TEAMCRAFT_CLAMD_OVERSIZE", "store"),
+        ])
+        .unwrap();
+        assert_eq!(
+            store.clamd.unwrap().oversize,
+            crate::malware::Oversize::Store
+        );
+        assert!(config_from(&[
+            ("TEAMCRAFT_DB_PASSWORD", "secret"),
+            ("TEAMCRAFT_CLAMD_ADDR", "clamav:3310"),
+            ("TEAMCRAFT_CLAMD_OVERSIZE", "skip"),
+        ])
+        .is_err());
         let unix = config_from(&[
             ("TEAMCRAFT_DB_PASSWORD", "secret"),
             ("TEAMCRAFT_CLAMD_ADDR", "unix:/run/clamav/clamd.ctl"),
@@ -1917,7 +2011,14 @@ mod tests {
         for line in compose.lines().map(str::trim) {
             if let Some((key, value)) = line.split_once(": ") {
                 if key.starts_with("TEAMCRAFT_") {
-                    vars.insert(key.to_string(), value.trim_matches('"').to_string());
+                    let value = value.trim_matches('"');
+                    // `${NAME:-default}` from .env: what compose uses without one
+                    let value = value
+                        .strip_prefix("${")
+                        .and_then(|v| v.strip_suffix('}'))
+                        .and_then(|v| v.split_once(":-"))
+                        .map_or(value, |(_, default)| default);
+                    vars.insert(key.to_string(), value.to_string());
                     from_compose += 1;
                 }
             }
@@ -1938,6 +2039,10 @@ mod tests {
         assert_eq!(cfg.vault_dir, PathBuf::from("/var/lib/teamcraft/vault"));
         assert!(cfg.local_login);
         assert!(!cfg.summary().contains("generated-password"));
+        // without .env (install.sh writes it): loopback only
+        assert!(cfg
+            .summary()
+            .contains("trusted_proxies=127.0.0.0/8,::1/128"));
         std::fs::remove_dir_all(dir).ok();
     }
 
@@ -2007,6 +2112,51 @@ mod tests {
             ("TEAMCRAFT_OIDC_CLIENT_ID", "client"),
         ])
         .is_err());
+    }
+
+    #[test]
+    fn trusted_proxies_default_to_loopback() {
+        let defaults = config_from(&[("TEAMCRAFT_DB_PASSWORD", "x")]).unwrap();
+        let shown: Vec<String> = defaults
+            .trusted_proxies
+            .iter()
+            .map(|n| n.to_string())
+            .collect();
+        assert_eq!(shown, ["127.0.0.0/8", "::1/128"]);
+        assert!(defaults
+            .summary()
+            .contains("trusted_proxies=127.0.0.0/8,::1/128"));
+        let none = config_from(&[
+            ("TEAMCRAFT_DB_PASSWORD", "x"),
+            ("TEAMCRAFT_TRUSTED_PROXIES", " None "),
+        ])
+        .unwrap();
+        assert!(none.trusted_proxies.is_empty());
+        assert!(none.summary().contains("trusted_proxies=none"));
+        let listed = config_from(&[
+            ("TEAMCRAFT_DB_PASSWORD", "x"),
+            (
+                "TEAMCRAFT_TRUSTED_PROXIES",
+                "127.0.0.1, 192.168.2.10 10.0.0.0/8,10.0.0.0/8",
+            ),
+        ])
+        .unwrap();
+        let shown: Vec<String> = listed
+            .trusted_proxies
+            .iter()
+            .map(|n| n.to_string())
+            .collect();
+        assert_eq!(shown, ["127.0.0.1/32", "192.168.2.10/32", "10.0.0.0/8"]);
+        for bad in ["10.0.0.1/8", "proxy.example.org", "10.0.0.0/33", ",,"] {
+            assert!(
+                config_from(&[
+                    ("TEAMCRAFT_DB_PASSWORD", "x"),
+                    ("TEAMCRAFT_TRUSTED_PROXIES", bad)
+                ])
+                .is_err(),
+                "{bad}"
+            );
+        }
     }
 
     #[test]

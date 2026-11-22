@@ -8,8 +8,10 @@
 //! The result is bounded as well – [`MAX_PAGES`] pages, [`MAX_CHARS`]
 //! characters. There is no OCR: a scanned PDF has no text.
 //!
-//! The same child reads HTML reports (`--format html`, see [`crate::htmltext`]);
-//! `extract_isolated` runs either.
+//! The same child reads HTML reports (`--format html`, see [`crate::htmltext`])
+//! and spreadsheets of BOM and result imports (`--format sheet`, see
+//! [`crate::bomtable::run_sheet_job`], GHSA-54vc-vgp2-8whr); `extract_isolated`
+//! and `run_isolated_bytes` run them.
 
 use std::{
     path::Path,
@@ -142,6 +144,9 @@ pub enum TextFormat {
     Pdf,
     /// See [`crate::htmltext`].
     Html,
+    /// A spreadsheet (XLSX, XLSM, XLSB, XLS, ODS): its first worksheet as JSON,
+    /// see [`crate::bomtable::run_sheet_job`].
+    Sheet,
 }
 
 impl TextFormat {
@@ -150,6 +155,7 @@ impl TextFormat {
         match self {
             TextFormat::Pdf => "pdf",
             TextFormat::Html => "html",
+            TextFormat::Sheet => "sheet",
         }
     }
 
@@ -157,6 +163,7 @@ impl TextFormat {
         match s {
             "pdf" => Some(TextFormat::Pdf),
             "html" => Some(TextFormat::Html),
+            "sheet" => Some(TextFormat::Sheet),
             _ => None,
         }
     }
@@ -166,6 +173,7 @@ impl TextFormat {
         match self {
             TextFormat::Pdf => MAX_PDF_BYTES,
             TextFormat::Html => crate::htmltext::MAX_HTML_BYTES,
+            TextFormat::Sheet => crate::services::imports::MAX_TABLE_BYTES as u64,
         }
     }
 
@@ -173,6 +181,7 @@ impl TextFormat {
         match self {
             TextFormat::Pdf => "PDF",
             TextFormat::Html => "HTML file",
+            TextFormat::Sheet => "spreadsheet",
         }
     }
 }
@@ -188,6 +197,7 @@ pub fn run_job_as(
     match format {
         TextFormat::Pdf => run_job(input, output, max_input_bytes),
         TextFormat::Html => crate::htmltext::run_job(input, output, max_input_bytes),
+        TextFormat::Sheet => crate::bomtable::run_sheet_job(input, output, max_input_bytes),
     }
 }
 
@@ -211,7 +221,7 @@ pub(crate) async fn extract_isolated(file: tokio::fs::File, format: TextFormat) 
     let Ok(_slot) = SLOTS.acquire().await else {
         return String::new();
     };
-    let file = file.into_std().await;
+    let file = Input::File(file.into_std().await);
     let outcome = match crate::preview::worker_exe() {
         Some(exe) => run_worker(&exe, file, format).await,
         None => run_in_process(file, format).await,
@@ -225,48 +235,101 @@ pub(crate) async fn extract_isolated(file: tokio::fs::File, format: TextFormat) 
     }
 }
 
-async fn run_worker(
-    exe: &Path,
-    input: std::fs::File,
+/// What the child reads on its standard input.
+enum Input {
+    /// A stored file, handed over as it is (no path travels).
+    File(std::fs::File),
+    /// An upload held in memory, written to a pipe.
+    Bytes(Vec<u8>),
+}
+
+/// Runs one job of the `text-extract` child on `bytes` held in memory and
+/// returns what it wrote, or the child's error message (a spreadsheet the
+/// user has to fix). Same slots, time and memory limits as
+/// [`extract_isolated`]; on a blocking thread in tests.
+pub(crate) async fn run_isolated_bytes(
+    bytes: Vec<u8>,
     format: TextFormat,
 ) -> Result<String, String> {
-    let child = tokio::process::Command::new(exe)
+    let _slot = SLOTS.acquire().await.map_err(|e| e.to_string())?;
+    match crate::preview::worker_exe() {
+        Some(exe) => run_worker(&exe, Input::Bytes(bytes), format).await,
+        None => run_in_process(Input::Bytes(bytes), format).await,
+    }
+}
+
+async fn run_worker(exe: &Path, input: Input, format: TextFormat) -> Result<String, String> {
+    let memory = MEMORY_BYTES.load(Ordering::Relaxed);
+    let (stdin, bytes) = match input {
+        Input::File(file) => (std::process::Stdio::from(file), None),
+        Input::Bytes(bytes) => (std::process::Stdio::piped(), Some(bytes)),
+    };
+    let mut child = tokio::process::Command::new(exe)
         .arg("text-extract")
         .arg("--format")
         .arg(format.as_str())
         .arg("--max-input-bytes")
         .arg(format.max_input_bytes().to_string())
         .arg("--max-memory-bytes")
-        .arg(MEMORY_BYTES.load(Ordering::Relaxed).to_string())
+        .arg(memory.to_string())
         .env_clear()
         .env("RUST_LOG", "error")
-        .stdin(std::process::Stdio::from(input))
+        .stdin(stdin)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .kill_on_drop(true)
         .spawn()
         .map_err(|e| format!("the text extractor could not be started: {e}"))?;
+    if let (Some(bytes), Some(mut pipe)) = (bytes, child.stdin.take()) {
+        // a child that stops early (too large, unreadable) closes the pipe:
+        // its exit status and message tell what happened
+        tokio::spawn(async move {
+            use tokio::io::AsyncWriteExt as _;
+            let _ = pipe.write_all(&bytes).await;
+        });
+    }
     match tokio::time::timeout(TIME_LIMIT, child.wait_with_output()).await {
         Err(_) => Err(format!("no result within {} s", TIME_LIMIT.as_secs())),
         Ok(Err(e)) => Err(e.to_string()),
         Ok(Ok(out)) if out.status.success() => {
             Ok(String::from_utf8_lossy(&out.stdout).into_owned())
         }
-        Ok(Ok(out)) => Err(String::from_utf8_lossy(&out.stderr)
-            .lines()
-            .rev()
-            .find(|l| !l.trim().is_empty())
-            .unwrap_or("the extractor stopped unexpectedly")
-            .to_string()),
+        Ok(Ok(out)) => {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            // the allocator's message before it aborts, or a signal
+            #[cfg(unix)]
+            let killed = std::os::unix::process::ExitStatusExt::signal(&out.status).is_some();
+            #[cfg(not(unix))]
+            let killed = false;
+            if memory > 0 && (stderr.contains("memory allocation") || killed) {
+                return Err(format!(
+                    "it needs more memory than allowed ({} MB)",
+                    memory / (1024 * 1024)
+                ));
+            }
+            Err(stderr
+                .lines()
+                .rev()
+                .find(|l| !l.trim().is_empty())
+                .unwrap_or("the extractor stopped unexpectedly")
+                .trim_start_matches("Error: ")
+                .chars()
+                .take(500)
+                .collect())
+        }
     }
 }
 
-async fn run_in_process(input: std::fs::File, format: TextFormat) -> Result<String, String> {
+async fn run_in_process(input: Input, format: TextFormat) -> Result<String, String> {
     let task = tokio::task::spawn_blocking(move || {
         let mut text = Vec::new();
-        run_job_as(format, input, &mut text, format.max_input_bytes())
-            .map(|_| String::from_utf8_lossy(&text).into_owned())
-            .map_err(|e| e.to_string())
+        let max = format.max_input_bytes();
+        match input {
+            Input::File(file) => run_job_as(format, file, &mut text, max),
+            Input::Bytes(bytes) => run_job_as(format, std::io::Cursor::new(bytes), &mut text, max),
+        }
+        .map(|_| String::from_utf8_lossy(&text).into_owned())
+        .map_err(|e| e.to_string())
     });
     match tokio::time::timeout(TIME_LIMIT, task).await {
         Err(_) => Err("timed out".into()),

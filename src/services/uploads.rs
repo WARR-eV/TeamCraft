@@ -290,6 +290,7 @@ pub async fn create(
             max_bytes / (1024 * 1024)
         )));
     }
+    vault.check_scannable(new.size)?;
     let total = i64::try_from(new.size)
         .map_err(|_| AppError::PayloadTooLarge("The file is too large.".into()))?;
     let sha256 = clean_sha256(new.sha256.as_deref())?;

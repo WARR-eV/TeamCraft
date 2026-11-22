@@ -7,11 +7,13 @@
 //! 2. The provider redirects back to `/auth/oidc/callback?code=…&state=…`.
 //! 3. The code is exchanged for tokens at the token endpoint (back channel,
 //!    authenticated with the client secret, over TLS).
-//! 4. Claims are taken from the ID token and the userinfo endpoint. Because
-//!    the ID token is received directly from the token endpoint over TLS,
-//!    TLS server validation substitutes signature validation (OpenID Connect
-//!    Core 1.0, section 3.1.3.7, step 6). `iss`, `aud`, `exp` and `nonce`
-//!    are still verified.
+//! 4. Claims are taken from the ID token and the userinfo endpoint. The ID
+//!    token's signature is checked against the provider's keys (`jwks_uri`;
+//!    RS/PS 256–512, ES256/ES384, or HS256–512 with the client secret;
+//!    `none` refused), then `iss`, `aud`, `exp` and `nonce`. TLS alone was
+//!    not enough: an `http://` issuer was accepted (GHSA-864x-fmpf-4p73, F6).
+//!    The issuer and the provider's endpoints must be `https://` (plain
+//!    HTTP only on loopback, see [`secure_endpoint`]).
 //! 5. Groups are mapped to a TeamCraft role (see [`role_for_groups`]).
 
 use std::time::{Duration, Instant};
@@ -47,7 +49,8 @@ struct Discovery {
     jwks_uri: Option<String>,
 }
 
-/// One public key of the provider (RFC 7517), as far as RS256 and ES256 need.
+/// One public key of the provider (RFC 7517), as far as the RSA and EC
+/// algorithms of [`signature_ok`] need.
 #[derive(Clone, Debug, Default, Deserialize)]
 pub(crate) struct Jwk {
     #[serde(default)]
@@ -66,6 +69,33 @@ pub(crate) struct Jwk {
     pub x: Option<String>,
     #[serde(default)]
     pub y: Option<String>,
+    /// `sig` or `enc`; an encryption key never checks a signature.
+    #[serde(default, rename = "use")]
+    pub use_: Option<String>,
+}
+
+/// Whether `url` may be talked to with the client secret and trusted for
+/// tokens: `https://`, or `http://` to a loopback host (a provider on the
+/// same computer, the tests). GHSA-864x-fmpf-4p73 (F6).
+pub fn secure_endpoint(url: &str) -> bool {
+    let Ok(parsed) = reqwest::Url::parse(url) else {
+        return false;
+    };
+    let Some(host) = parsed.host_str().filter(|h| !h.is_empty()) else {
+        return false;
+    };
+    match parsed.scheme() {
+        "https" => true,
+        "http" => {
+            host.eq_ignore_ascii_case("localhost")
+                || host
+                    .trim_start_matches('[')
+                    .trim_end_matches(']')
+                    .parse::<std::net::IpAddr>()
+                    .is_ok_and(|ip| ip.is_loopback())
+        }
+        _ => false,
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -127,7 +157,8 @@ impl OidcClient {
         let discovery = self.discovery().await?;
         let Some(uri) = discovery.jwks_uri else {
             return Err(AppError::Other(anyhow::anyhow!(
-                "the identity provider publishes no jwks_uri; back-channel logout needs it"
+                "the identity provider publishes no jwks_uri; TeamCraft needs its keys to check \
+                 ID tokens and back-channel logout tokens"
             )));
         };
         let set: JwkSet = self
@@ -156,10 +187,34 @@ impl OidcClient {
         };
         let result = match check(&self.signing_keys(false).await?) {
             // a key the cache does not know yet: the provider may have rotated
-            Err(LogoutTokenError::UnknownKey) => check(&self.signing_keys(true).await?),
+            Err(TokenError::UnknownKey) => check(&self.signing_keys(true).await?),
             other => other,
         };
         result.map_err(|e| AppError::BadRequest(format!("Invalid logout token: {e}.")))
+    }
+
+    /// Checks the signature of an ID token from the token endpoint and
+    /// returns its claims (GHSA-864x-fmpf-4p73, F6). Asymmetric algorithms
+    /// use the provider's keys (fetched again once for an unknown key id),
+    /// HS256–512 the client secret. The claims are validated afterwards.
+    async fn verify_id_token(&self, token: &str) -> AppResult<Value> {
+        let secret = self.config.client_secret.as_bytes();
+        let check = |keys: &[Jwk]| verified_payload(token, keys, Some(secret));
+        let result = if hmac_algorithm(&token_alg(token)).is_some() {
+            check(&[])
+        } else {
+            match check(&self.signing_keys(false).await?) {
+                // a key the cache does not know yet: the provider may have rotated
+                Err(TokenError::UnknownKey) => check(&self.signing_keys(true).await?),
+                other => other,
+            }
+        };
+        result.map_err(|e| {
+            tracing::warn!(error = %e, "refused an ID token from the token endpoint");
+            AppError::BadRequest(format!(
+                "Single sign-on failed: the ID token was refused ({e}). Please try again."
+            ))
+        })
     }
 
     pub fn display_name(&self) -> &str {
@@ -193,6 +248,23 @@ impl OidcClient {
                 "OIDC issuer mismatch: configured '{}', provider reports '{}'",
                 self.config.issuer_url,
                 discovery.issuer
+            )));
+        }
+        // the client secret, the tokens and the keys travel only over TLS
+        // (plain HTTP only on loopback)
+        let endpoints = [
+            Some(&discovery.authorization_endpoint),
+            Some(&discovery.token_endpoint),
+            discovery.userinfo_endpoint.as_ref(),
+            discovery.jwks_uri.as_ref(),
+        ];
+        if let Some(insecure) = endpoints
+            .into_iter()
+            .flatten()
+            .find(|u| !secure_endpoint(u))
+        {
+            return Err(AppError::Other(anyhow::anyhow!(
+                "the identity provider reports an endpoint without https: '{insecure}'"
             )));
         }
         *self.discovery.write().await = Some((Instant::now(), discovery.clone()));
@@ -343,7 +415,7 @@ impl OidcClient {
         let id_token = tokens.id_token.ok_or_else(|| {
             AppError::Other(anyhow::anyhow!("token response contains no id_token"))
         })?;
-        let mut claims = decode_jwt_claims(&id_token)?;
+        let mut claims = self.verify_id_token(&id_token).await?;
         validate_id_token_claims(
             &claims,
             &discovery.issuer,
@@ -405,22 +477,31 @@ fn normalize_issuer(issuer: &str) -> &str {
     issuer.trim().trim_end_matches('/')
 }
 
-/// Decodes the payload of a compact JWS without verifying the signature.
-fn decode_jwt_claims(jwt: &str) -> AppResult<Value> {
-    let payload = jwt
+/// The `alg` of a compact JWS header (empty when unreadable).
+fn token_alg(token: &str) -> String {
+    token
+        .trim()
         .split('.')
-        .nth(1)
-        .ok_or_else(|| AppError::Other(anyhow::anyhow!("malformed id_token")))?;
-    let bytes = URL_SAFE_NO_PAD
-        .decode(payload.trim_end_matches('='))
-        .map_err(|e| AppError::Other(anyhow::anyhow!("id_token is not base64url: {e}")))?;
-    serde_json::from_slice(&bytes)
-        .map_err(|e| AppError::Other(anyhow::anyhow!("id_token payload is not JSON: {e}")))
+        .next()
+        .and_then(|h| b64_json(h).ok())
+        .and_then(|h| h.get("alg").and_then(Value::as_str).map(str::to_string))
+        .unwrap_or_default()
 }
 
-/// Why a back-channel logout token was refused.
+/// The HMAC of `HS256`, `HS384` or `HS512` (keyed with the client secret,
+/// OpenID Connect Core 1.0, 10.1).
+fn hmac_algorithm(alg: &str) -> Option<ring::hmac::Algorithm> {
+    match alg {
+        "HS256" => Some(ring::hmac::HMAC_SHA256),
+        "HS384" => Some(ring::hmac::HMAC_SHA384),
+        "HS512" => Some(ring::hmac::HMAC_SHA512),
+        _ => None,
+    }
+}
+
+/// Why an ID token or a back-channel logout token was refused.
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum LogoutTokenError {
+pub(crate) enum TokenError {
     Malformed,
     /// No key of the provider has the token's key id.
     UnknownKey,
@@ -428,69 +509,127 @@ pub(crate) enum LogoutTokenError {
     Claim(&'static str),
 }
 
-impl std::fmt::Display for LogoutTokenError {
+impl std::fmt::Display for TokenError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LogoutTokenError::Malformed => f.write_str("malformed token"),
-            LogoutTokenError::UnknownKey => f.write_str("unknown signing key"),
-            LogoutTokenError::BadSignature => f.write_str("bad signature"),
-            LogoutTokenError::Claim(what) => f.write_str(what),
+            TokenError::Malformed => f.write_str("malformed token"),
+            TokenError::UnknownKey => f.write_str("unknown signing key"),
+            TokenError::BadSignature => f.write_str("bad signature"),
+            TokenError::Claim(what) => f.write_str(what),
         }
     }
 }
 
-fn b64_json(part: &str) -> Result<Value, LogoutTokenError> {
+fn b64_json(part: &str) -> Result<Value, TokenError> {
     let bytes = URL_SAFE_NO_PAD
         .decode(part.trim_end_matches('='))
-        .map_err(|_| LogoutTokenError::Malformed)?;
-    serde_json::from_slice(&bytes).map_err(|_| LogoutTokenError::Malformed)
+        .map_err(|_| TokenError::Malformed)?;
+    serde_json::from_slice(&bytes).map_err(|_| TokenError::Malformed)
 }
 
 fn b64_bytes(part: Option<&str>) -> Option<Vec<u8>> {
     URL_SAFE_NO_PAD.decode(part?.trim_end_matches('=')).ok()
 }
 
-/// Whether `signature` over `message` is valid with `key` for `alg` – only
-/// RS256 and ES256 (P-256); anything else (`none` included) is refused.
+/// Whether `signature` over `message` is valid with `key` for `alg`:
+/// RS256/384/512, PS256/384/512 (RSA keys of 2048 bits and more), ES256
+/// (P-256) and ES384 (P-384). Anything else (`none` included) is refused; an
+/// encryption key (`use: enc`) never signs.
 fn signature_ok(key: &Jwk, alg: &str, message: &[u8], sig: &[u8]) -> bool {
     use ring::signature as rs;
-    if key.alg.as_deref().is_some_and(|a| a != alg) {
+    if key.alg.as_deref().is_some_and(|a| a != alg) || key.use_.as_deref() == Some("enc") {
         return false;
     }
-    match (alg, key.kty.as_str()) {
-        ("RS256", "RSA") => {
-            let n = b64_bytes(key.n.as_deref());
-            let e = b64_bytes(key.e.as_deref());
-            let (Some(n), Some(e)) = (n, e) else {
-                return false;
-            };
-            rs::RsaPublicKeyComponents { n, e }
-                .verify(&rs::RSA_PKCS1_2048_8192_SHA256, message, sig)
-                .is_ok()
+    let rsa: Option<&'static rs::RsaParameters> = match alg {
+        "RS256" => Some(&rs::RSA_PKCS1_2048_8192_SHA256),
+        "RS384" => Some(&rs::RSA_PKCS1_2048_8192_SHA384),
+        "RS512" => Some(&rs::RSA_PKCS1_2048_8192_SHA512),
+        "PS256" => Some(&rs::RSA_PSS_2048_8192_SHA256),
+        "PS384" => Some(&rs::RSA_PSS_2048_8192_SHA384),
+        "PS512" => Some(&rs::RSA_PSS_2048_8192_SHA512),
+        _ => None,
+    };
+    if let Some(params) = rsa {
+        if key.kty != "RSA" {
+            return false;
         }
-        ("ES256", "EC") if key.crv.as_deref() == Some("P-256") => {
-            let x = b64_bytes(key.x.as_deref());
-            let y = b64_bytes(key.y.as_deref());
-            let (Some(x), Some(y)) = (x, y) else {
-                return false;
-            };
-            if x.len() != 32 || y.len() != 32 {
-                return false;
-            }
-            // SEC 1 uncompressed point: 0x04 ‖ x ‖ y
-            let mut point = vec![4u8];
-            point.extend_from_slice(&x);
-            point.extend_from_slice(&y);
-            rs::UnparsedPublicKey::new(&rs::ECDSA_P256_SHA256_FIXED, point)
-                .verify(message, sig)
-                .is_ok()
-        }
-        _ => false,
+        let (Some(n), Some(e)) = (b64_bytes(key.n.as_deref()), b64_bytes(key.e.as_deref())) else {
+            return false;
+        };
+        return rs::RsaPublicKeyComponents { n, e }
+            .verify(params, message, sig)
+            .is_ok();
     }
+    let (curve, size, verify): (&str, usize, &'static rs::EcdsaVerificationAlgorithm) = match alg {
+        "ES256" => ("P-256", 32, &rs::ECDSA_P256_SHA256_FIXED),
+        "ES384" => ("P-384", 48, &rs::ECDSA_P384_SHA384_FIXED),
+        _ => return false,
+    };
+    if key.kty != "EC" || key.crv.as_deref() != Some(curve) {
+        return false;
+    }
+    let (Some(x), Some(y)) = (b64_bytes(key.x.as_deref()), b64_bytes(key.y.as_deref())) else {
+        return false;
+    };
+    if x.len() != size || y.len() != size {
+        return false;
+    }
+    // SEC 1 uncompressed point: 0x04 ‖ x ‖ y
+    let mut point = vec![4u8];
+    point.extend_from_slice(&x);
+    point.extend_from_slice(&y);
+    rs::UnparsedPublicKey::new(verify, point)
+        .verify(message, sig)
+        .is_ok()
+}
+
+/// Checks the signature of a compact JWS and returns its payload: with one
+/// of `keys` (by `kid` when the header names one) or – for HS256–512 – with
+/// `secret`. A header with `crit` (extensions TeamCraft does not know) is
+/// refused (RFC 7515, 4.1.11).
+pub(crate) fn verified_payload(
+    token: &str,
+    keys: &[Jwk],
+    secret: Option<&[u8]>,
+) -> Result<Value, TokenError> {
+    let parts: Vec<&str> = token.trim().split('.').collect();
+    let [header_part, payload_part, signature] = parts.as_slice() else {
+        return Err(TokenError::Malformed);
+    };
+    let header = b64_json(header_part)?;
+    if header.get("crit").is_some() {
+        return Err(TokenError::Malformed);
+    }
+    let alg = header.get("alg").and_then(Value::as_str).unwrap_or("");
+    let kid = header.get("kid").and_then(Value::as_str);
+    let sig = b64_bytes(Some(*signature)).ok_or(TokenError::Malformed)?;
+    let message = format!("{header_part}.{payload_part}");
+    if let Some(hmac) = hmac_algorithm(alg) {
+        let secret = secret
+            .filter(|s| !s.is_empty())
+            .ok_or(TokenError::BadSignature)?;
+        let key = ring::hmac::Key::new(hmac, secret);
+        ring::hmac::verify(&key, message.as_bytes(), &sig).map_err(|_| TokenError::BadSignature)?;
+        return b64_json(payload_part);
+    }
+    let candidates: Vec<&Jwk> = keys
+        .iter()
+        .filter(|k| kid.is_none() || k.kid.as_deref() == kid)
+        .collect();
+    if candidates.is_empty() {
+        return Err(TokenError::UnknownKey);
+    }
+    let signed = candidates
+        .iter()
+        .any(|k| signature_ok(k, alg, message.as_bytes(), &sig));
+    if !signed {
+        return Err(TokenError::BadSignature);
+    }
+    b64_json(payload_part)
 }
 
 /// Checks a back-channel logout token (OpenID Connect Back-Channel Logout
-/// 1.0, 2.6): a JWS signed with one of `keys` (RS256 or ES256), issued by
+/// 1.0, 2.6): a JWS signed with one of `keys` (see [`signature_ok`]), issued by
 /// `issuer` for `client_id`, at most [`LOGOUT_TOKEN_MAX_AGE_SECS`] old, with
 /// the logout event, a subject and no nonce. Returns the subject.
 pub(crate) fn verify_logout_token(
@@ -499,33 +638,13 @@ pub(crate) fn verify_logout_token(
     issuer: &str,
     client_id: &str,
     now: i64,
-) -> Result<String, LogoutTokenError> {
-    let parts: Vec<&str> = token.trim().split('.').collect();
-    let [header, payload, signature] = parts.as_slice() else {
-        return Err(LogoutTokenError::Malformed);
-    };
-    let header = b64_json(header)?;
-    let alg = header.get("alg").and_then(Value::as_str).unwrap_or("");
-    let kid = header.get("kid").and_then(Value::as_str);
-    let sig = b64_bytes(Some(*signature)).ok_or(LogoutTokenError::Malformed)?;
-    let message = format!("{}.{}", parts[0], parts[1]);
-    let candidates: Vec<&Jwk> = keys
-        .iter()
-        .filter(|k| kid.is_none() || k.kid.as_deref() == kid)
-        .collect();
-    if candidates.is_empty() {
-        return Err(LogoutTokenError::UnknownKey);
-    }
-    let signed = candidates
-        .iter()
-        .any(|k| signature_ok(k, alg, message.as_bytes(), &sig));
-    if !signed {
-        return Err(LogoutTokenError::BadSignature);
-    }
-    let claims = b64_json(payload)?;
+) -> Result<String, TokenError> {
+    // asymmetric keys only: a logout token signed with the client secret is
+    // not accepted (as before)
+    let claims = verified_payload(token, keys, None)?;
     let iss = claims.get("iss").and_then(Value::as_str).unwrap_or("");
     if normalize_issuer(iss) != normalize_issuer(issuer) {
-        return Err(LogoutTokenError::Claim("unexpected issuer"));
+        return Err(TokenError::Claim("unexpected issuer"));
     }
     let aud_ok = match claims.get("aud") {
         Some(Value::String(a)) => a == client_id,
@@ -533,16 +652,16 @@ pub(crate) fn verify_logout_token(
         _ => false,
     };
     if !aud_ok {
-        return Err(LogoutTokenError::Claim("issued for another application"));
+        return Err(TokenError::Claim("issued for another application"));
     }
     let iat = claims.get("iat").and_then(Value::as_i64);
     match iat {
         Some(at) if at <= now + CLOCK_SKEW_SECS && now - at <= LOGOUT_TOKEN_MAX_AGE_SECS => {}
-        _ => return Err(LogoutTokenError::Claim("too old or from the future")),
+        _ => return Err(TokenError::Claim("too old or from the future")),
     }
     if let Some(exp) = claims.get("exp").and_then(Value::as_i64) {
         if exp + CLOCK_SKEW_SECS < now {
-            return Err(LogoutTokenError::Claim("expired"));
+            return Err(TokenError::Claim("expired"));
         }
     }
     let event = claims
@@ -550,16 +669,14 @@ pub(crate) fn verify_logout_token(
         .and_then(Value::as_object)
         .is_some_and(|e| e.contains_key(BACKCHANNEL_LOGOUT_EVENT));
     if !event {
-        return Err(LogoutTokenError::Claim("no logout event"));
+        return Err(TokenError::Claim("no logout event"));
     }
     if claims.get("nonce").is_some() {
-        return Err(LogoutTokenError::Claim("a logout token carries no nonce"));
+        return Err(TokenError::Claim("a logout token carries no nonce"));
     }
     match claims.get("sub").and_then(Value::as_str).map(str::trim) {
         Some(sub) if !sub.is_empty() => Ok(sub.to_string()),
-        _ => Err(LogoutTokenError::Claim(
-            "no subject (only sid is not supported)",
-        )),
+        _ => Err(TokenError::Claim("no subject (only sid is not supported)")),
     }
 }
 

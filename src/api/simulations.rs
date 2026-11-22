@@ -198,7 +198,9 @@ pub(super) async fn import_results(
             "Send the result table (CSV or Excel) in the multipart field 'file'.".into(),
         )
     })?;
-    let rows = simulations::parse_results_table(&filename, &bytes).map_err(AppError::BadRequest)?;
+    let rows = simulations::parse_results_upload(&filename, &bytes)
+        .await
+        .map_err(AppError::BadRequest)?;
     let replace = fields
         .get("replace")
         .is_some_and(|v| matches!(v.trim(), "true" | "1" | "on" | "yes"));

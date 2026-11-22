@@ -1534,9 +1534,27 @@ pub(crate) fn table_number(raw: &str) -> Option<f64> {
 /// `name,value,unit,limit_low,limit_high,load_case` (further columns:
 /// `solver`, `solver_version`, `note`; German names and `min`/`max` work
 /// too). Rows without a name are skipped; a value that is not a number is
-/// an error naming the row.
+/// an error naming the row. In this process – for CSV exchange files and
+/// tests; uploads go through [`parse_results_upload`].
 pub fn parse_results_table(filename: &str, bytes: &[u8]) -> Result<Vec<ResultInput>, String> {
-    let grid = bomtable::read_grid(filename, bytes)?;
+    results_from_grid(filename, bomtable::read_grid(filename, bytes)?)
+}
+
+/// [`parse_results_table`] for an uploaded table, without parsing in the
+/// async task: a spreadsheet in the isolated `text-extract` child with memory
+/// and time limits (GHSA-54vc-vgp2-8whr, F13).
+pub async fn parse_results_upload(
+    filename: &str,
+    bytes: &[u8],
+) -> Result<Vec<ResultInput>, String> {
+    let grid = bomtable::read_grid_isolated(filename, bytes).await?;
+    let name = filename.to_string();
+    tokio::task::spawn_blocking(move || results_from_grid(&name, grid))
+        .await
+        .map_err(|e| format!("{filename} could not be read: {e}"))?
+}
+
+fn results_from_grid(filename: &str, grid: Vec<Vec<String>>) -> Result<Vec<ResultInput>, String> {
     let header_at = grid
         .iter()
         .take(30)

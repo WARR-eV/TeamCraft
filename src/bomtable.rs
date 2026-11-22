@@ -73,7 +73,7 @@ pub struct Column {
 }
 
 /// The rows of a table and how its columns were understood.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct BomTable {
     /// The assembly itself, if the table lists it (one first row on level 0).
     pub root: Option<BomRow>,
@@ -199,24 +199,171 @@ fn cell_text(cell: &calamine::Data) -> String {
     }
 }
 
-/// The cells of the first worksheet or of the CSV file.
+/// Unpacked size of a spreadsheet's ZIP container (XLSX, XLSM, XLSB, ODS),
+/// all entries together (GHSA-54vc-vgp2-8whr, F13): a BOM of
+/// [`MAX_ROWS`] rows unpacks to a few dozen MiB.
+pub const MAX_UNPACKED_BYTES: u64 = 256 * 1024 * 1024;
+/// Entries of a spreadsheet's ZIP container.
+const MAX_ZIP_ENTRIES: usize = 10_000;
+/// Rows of the grid handed on: enough for the header search and the
+/// [`MAX_ROWS`] check of [`parse`].
+const MAX_GRID_ROWS: usize = MAX_ROWS + 64;
+/// Columns of the grid handed on (a BOM export has a few dozen).
+const MAX_GRID_COLUMNS: usize = 512;
+/// Characters of one cell handed on.
+const MAX_CELL_CHARS: usize = 10_000;
+
+/// Refuses a ZIP-based spreadsheet that unpacks to more than
+/// [`MAX_UNPACKED_BYTES`] (a zip bomb, GHSA-54vc-vgp2-8whr): the declared
+/// sizes first, then the real ones while unpacking into nothing – the
+/// declared sizes can lie, the unpacked bytes cannot, and unpacking is
+/// deterministic, so the spreadsheet reader afterwards meets the same bytes.
+/// XLS files (OLE, not ZIP) are not compressed.
+fn check_unpacked(filename: &str, bytes: &[u8]) -> Result<(), String> {
+    check_unpacked_within(filename, bytes, MAX_UNPACKED_BYTES)
+}
+
+/// [`check_unpacked`] with the cap `max` (smaller in tests).
+fn check_unpacked_within(filename: &str, bytes: &[u8], max: u64) -> Result<(), String> {
+    use std::io::Read as _;
+    if !bytes.starts_with(b"PK") {
+        return Ok(());
+    }
+    let unreadable =
+        |e: &dyn std::fmt::Display| format!("{filename} is not a readable spreadsheet: {e}");
+    let too_big = || {
+        format!(
+            "{filename} unpacks to more than {} MiB – save it again or export the BOM as CSV.",
+            max / 1024 / 1024
+        )
+    };
+    let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).map_err(|e| unreadable(&e))?;
+    if archive.len() > MAX_ZIP_ENTRIES {
+        return Err(unreadable(&format!("more than {MAX_ZIP_ENTRIES} entries")));
+    }
+    let mut declared: u64 = 0;
+    for i in 0..archive.len() {
+        let entry = archive.by_index_raw(i).map_err(|e| unreadable(&e))?;
+        declared = declared.saturating_add(entry.size());
+    }
+    if declared > max {
+        return Err(too_big());
+    }
+    let mut unpacked: u64 = 0;
+    for i in 0..archive.len() {
+        let entry = archive.by_index(i).map_err(|e| unreadable(&e))?;
+        let budget = max - unpacked;
+        let n = std::io::copy(
+            &mut entry.take(budget.saturating_add(1)),
+            &mut std::io::sink(),
+        )
+        .map_err(|e| unreadable(&e))?;
+        unpacked = unpacked.saturating_add(n);
+        if unpacked > max {
+            return Err(too_big());
+        }
+    }
+    Ok(())
+}
+
+/// At most [`MAX_GRID_ROWS`] rows of [`MAX_GRID_COLUMNS`] cells of
+/// [`MAX_CELL_CHARS`] characters.
+fn bounded_cell(text: String) -> String {
+    if text.len() <= MAX_CELL_CHARS {
+        text
+    } else {
+        text.chars().take(MAX_CELL_CHARS).collect()
+    }
+}
+
+/// The cells of the first worksheet of a spreadsheet, in this process. The
+/// server never calls it itself: [`read_grid_isolated`] runs it in the
+/// `text-extract` child with the memory and time limits of the previews
+/// (GHSA-54vc-vgp2-8whr) – a spreadsheet can also ask for a huge dense cell
+/// range with two cells far apart.
+fn read_spreadsheet(filename: &str, bytes: &[u8]) -> Result<Vec<Vec<String>>, String> {
+    use calamine::Reader;
+    check_unpacked(filename, bytes)?;
+    let mut workbook = calamine::open_workbook_auto_from_rs(Cursor::new(bytes.to_vec()))
+        .map_err(|e| format!("{filename} is not a readable spreadsheet: {e}"))?;
+    let sheet = workbook
+        .sheet_names()
+        .first()
+        .cloned()
+        .ok_or_else(|| format!("{filename} has no worksheet."))?;
+    let range = workbook
+        .worksheet_range(&sheet)
+        .map_err(|e| format!("Worksheet '{sheet}' cannot be read: {e}"))?;
+    Ok(range
+        .rows()
+        .take(MAX_GRID_ROWS)
+        .map(|r| {
+            r.iter()
+                .take(MAX_GRID_COLUMNS)
+                .map(|c| bounded_cell(cell_text(c)))
+                .collect()
+        })
+        .collect())
+}
+
+/// One job of the `text-extract` child (`--format sheet`): the spreadsheet
+/// on `input` (at most `max_input_bytes`), its first worksheet as a JSON
+/// array of rows of cell texts on `output`. Returns the number of rows.
+pub fn run_sheet_job(
+    input: impl std::io::Read,
+    mut output: impl std::io::Write,
+    max_input_bytes: u64,
+) -> anyhow::Result<usize> {
+    use std::io::Read as _;
+    let mut bytes = Vec::new();
+    input
+        .take(max_input_bytes.saturating_add(1))
+        .read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > max_input_bytes {
+        anyhow::bail!(
+            "The spreadsheet is larger than {} MiB.",
+            max_input_bytes / (1024 * 1024)
+        );
+    }
+    let grid = read_spreadsheet("The spreadsheet", &bytes).map_err(anyhow::Error::msg)?;
+    serde_json::to_writer(&mut output, &grid)?;
+    output.flush()?;
+    Ok(grid.len())
+}
+
+/// The cells of the first worksheet or of the CSV file, read without
+/// blocking the server: a spreadsheet in the isolated `text-extract` child
+/// (memory and time limits; on a blocking thread in tests), a CSV file on a
+/// blocking thread (GHSA-54vc-vgp2-8whr, F13).
+pub async fn read_grid_isolated(filename: &str, bytes: &[u8]) -> Result<Vec<Vec<String>>, String> {
+    if is_spreadsheet(filename) {
+        let json =
+            crate::pdftext::run_isolated_bytes(bytes.to_vec(), crate::pdftext::TextFormat::Sheet)
+                .await
+                .map_err(|e| format!("{filename} could not be read: {e}"))?;
+        return serde_json::from_str(&json)
+            .map_err(|e| format!("{filename} could not be read: {e}"));
+    }
+    let (name, bytes) = (filename.to_string(), bytes.to_vec());
+    tokio::task::spawn_blocking(move || read_grid(&name, &bytes))
+        .await
+        .map_err(|e| format!("{filename} could not be read: {e}"))?
+}
+
+/// Reads a BOM table without blocking the server (see [`read_grid_isolated`]).
+pub async fn read_isolated(filename: &str, bytes: &[u8]) -> Result<BomTable, String> {
+    let grid = read_grid_isolated(filename, bytes).await?;
+    tokio::task::spawn_blocking(move || parse(grid))
+        .await
+        .map_err(|e| format!("{filename} could not be read: {e}"))?
+}
+
+/// The cells of the first worksheet or of the CSV file, in this process (the
+/// child job, tests and the fuzz harness; the server uses
+/// [`read_grid_isolated`]).
 pub(crate) fn read_grid(filename: &str, bytes: &[u8]) -> Result<Vec<Vec<String>>, String> {
     if is_spreadsheet(filename) {
-        use calamine::Reader;
-        let mut workbook = calamine::open_workbook_auto_from_rs(Cursor::new(bytes.to_vec()))
-            .map_err(|e| format!("{filename} is not a readable spreadsheet: {e}"))?;
-        let sheet = workbook
-            .sheet_names()
-            .first()
-            .cloned()
-            .ok_or_else(|| format!("{filename} has no worksheet."))?;
-        let range = workbook
-            .worksheet_range(&sheet)
-            .map_err(|e| format!("Worksheet '{sheet}' cannot be read: {e}"))?;
-        return Ok(range
-            .rows()
-            .map(|r| r.iter().map(cell_text).collect())
-            .collect());
+        return read_spreadsheet(filename, bytes);
     }
     let text = decode_text(bytes);
     let mut reader = csv::ReaderBuilder::new()
@@ -375,7 +522,8 @@ fn file_stem(name: &str) -> &str {
     }
 }
 
-/// Reads a BOM table.
+/// Reads a BOM table in this process (tests, the fuzz harness); the server
+/// uses [`read_isolated`], which never parses a spreadsheet in its own process.
 pub fn read(filename: &str, bytes: &[u8]) -> Result<BomTable, String> {
     parse(read_grid(filename, bytes)?)
 }
@@ -849,6 +997,135 @@ mod tests {
         assert_eq!(levels(&t), vec![1, 2, 2, 2], "B and C are siblings below A");
         assert_eq!(t.rows[0].name, "A", "the component name");
         assert_eq!(t.warnings.len(), 1, "{:?}", t.warnings);
+    }
+
+    /// A ZIP with one Deflate entry of `len` zero bytes that claims
+    /// `declared` bytes (with the right CRC-32 of the zeros).
+    fn zip_of_zeros(name: &str, len: usize, declared: u32) -> Vec<u8> {
+        use std::io::Write as _;
+        let mut enc = flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::best());
+        let chunk = vec![0u8; 1 << 20];
+        let mut left = len;
+        while left > 0 {
+            let n = left.min(chunk.len());
+            enc.write_all(&chunk[..n]).unwrap();
+            left -= n;
+        }
+        let data = enc.finish().unwrap();
+        let mut crc = crc32fast::Hasher::new();
+        let mut left = len;
+        while left > 0 {
+            let n = left.min(chunk.len());
+            crc.update(&chunk[..n]);
+            left -= n;
+        }
+        let crc = crc.finalize();
+        let (n, c) = (name.len() as u16, data.len() as u32);
+        let mut out = Vec::new();
+        // local file header
+        out.extend_from_slice(&0x0403_4b50u32.to_le_bytes());
+        out.extend_from_slice(&[20, 0, 0, 0, 8, 0, 0, 0, 0, 0]);
+        out.extend_from_slice(&crc.to_le_bytes());
+        out.extend_from_slice(&c.to_le_bytes());
+        out.extend_from_slice(&declared.to_le_bytes());
+        out.extend_from_slice(&n.to_le_bytes());
+        out.extend_from_slice(&0u16.to_le_bytes());
+        out.extend_from_slice(name.as_bytes());
+        out.extend_from_slice(&data);
+        let central = out.len() as u32;
+        // central directory
+        out.extend_from_slice(&0x0201_4b50u32.to_le_bytes());
+        out.extend_from_slice(&[20, 0, 20, 0, 0, 0, 8, 0, 0, 0, 0, 0]);
+        out.extend_from_slice(&crc.to_le_bytes());
+        out.extend_from_slice(&c.to_le_bytes());
+        out.extend_from_slice(&declared.to_le_bytes());
+        out.extend_from_slice(&n.to_le_bytes());
+        out.extend_from_slice(&[0; 12]); // extra, comment, disk, attributes
+        out.extend_from_slice(&0u32.to_le_bytes()); // offset of the local header
+        out.extend_from_slice(name.as_bytes());
+        let size = out.len() as u32 - central;
+        // end of central directory
+        out.extend_from_slice(&0x0605_4b50u32.to_le_bytes());
+        out.extend_from_slice(&[0, 0, 0, 0, 1, 0, 1, 0]);
+        out.extend_from_slice(&size.to_le_bytes());
+        out.extend_from_slice(&central.to_le_bytes());
+        out.extend_from_slice(&0u16.to_le_bytes());
+        out
+    }
+
+    /// GHSA-54vc-vgp2-8whr (F13): a spreadsheet that unpacks to more than
+    /// the cap is refused before the spreadsheet reader sees it (a 1 MiB cap
+    /// here; the real one is [`MAX_UNPACKED_BYTES`]).
+    #[test]
+    fn zip_bombs_are_refused_before_parsing() {
+        const CAP: u64 = 1 << 20;
+        let len = 4 << 20;
+        // honest sizes: refused from the directory alone
+        let honest = zip_of_zeros("xl/worksheets/sheet1.xml", len, len as u32);
+        assert!(honest.len() < 64 * 1024, "a few KiB unpack to 4 MiB");
+        let err = check_unpacked_within("bomb.xlsx", &honest, CAP).unwrap_err();
+        assert!(err.contains("unpacks to more than 1 MiB"), "{err}");
+        // a directory that lies: refused while unpacking
+        let lying = zip_of_zeros("xl/worksheets/sheet1.xml", len, 1000);
+        assert!(check_unpacked_within("lie.xlsx", &lying, CAP).is_err());
+        // within the cap: fine
+        let small = zip_of_zeros("xl/worksheets/sheet1.xml", 1000, 1000);
+        assert!(check_unpacked_within("small.xlsx", &small, CAP).is_ok());
+        // the real cap in the reader
+        const { assert!(MAX_UNPACKED_BYTES >= 128 << 20) };
+        // not a ZIP at all (XLS is OLE): left to the reader
+        assert!(check_unpacked("old.xls", b"\xD0\xCF\x11\xE0junk").is_ok());
+        assert!(read_grid("junk.xlsx", b"PK\x03\x04junk").is_err());
+    }
+
+    /// The child's job: the first worksheet as JSON rows, bounded.
+    #[test]
+    fn sheet_job_writes_bounded_json_rows() {
+        let mut book = rust_xlsxwriter::Workbook::new();
+        let sheet = book.add_worksheet();
+        sheet.write_string(0, 0, "Part Number").unwrap();
+        sheet.write_string(0, 1, "QTY").unwrap();
+        sheet.write_string(1, 0, "A-1").unwrap();
+        sheet.write_number(1, 1, 3.0).unwrap();
+        // a cell far to the right and a very long text are cut
+        sheet.write_string(1, 900, "far right").unwrap();
+        sheet
+            .write_string(2, 0, "x".repeat(MAX_CELL_CHARS + 50))
+            .unwrap();
+        let bytes = book.save_to_buffer().unwrap();
+        let mut out = Vec::new();
+        let rows = run_sheet_job(&bytes[..], &mut out, 1 << 20).unwrap();
+        assert_eq!(rows, 3);
+        let grid: Vec<Vec<String>> = serde_json::from_slice(&out).unwrap();
+        assert_eq!(grid[1][0], "A-1");
+        assert_eq!(grid[1][1], "3");
+        assert!(grid.iter().all(|r| r.len() <= MAX_GRID_COLUMNS));
+        assert_eq!(grid[2][0].chars().count(), MAX_CELL_CHARS);
+        // too large for the limit
+        assert!(run_sheet_job(&bytes[..], &mut Vec::new(), 100).is_err());
+    }
+
+    /// Read through the isolated path (a blocking thread in tests): the same
+    /// table as in this process.
+    #[tokio::test]
+    async fn isolated_reading_matches_in_process_reading() {
+        let mut book = rust_xlsxwriter::Workbook::new();
+        let sheet = book.add_worksheet();
+        sheet.write_string(0, 0, "Part Number").unwrap();
+        sheet.write_string(0, 1, "Name").unwrap();
+        sheet.write_string(1, 0, "B-2").unwrap();
+        sheet.write_string(1, 1, "Bracket").unwrap();
+        let bytes = book.save_to_buffer().unwrap();
+        let isolated = read_isolated("bom.xlsx", &bytes).await.unwrap();
+        assert_eq!(isolated, read("bom.xlsx", &bytes).unwrap());
+        let csv = b"Part Number,Name\nC-3,Cover\n";
+        assert_eq!(
+            read_isolated("bom.csv", csv).await.unwrap(),
+            read("bom.csv", csv).unwrap()
+        );
+        assert!(read_isolated("broken.xlsx", b"PK\x03\x04junk")
+            .await
+            .is_err());
     }
 
     #[test]
