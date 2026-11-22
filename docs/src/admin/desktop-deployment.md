@@ -34,7 +34,8 @@ Registry values under `Software\Policies\TeamCraft` in
 
 * **Group Policy:** copy `TeamCraft.admx` to `%SystemRoot%\PolicyDefinitions`
   (or the central store `\\<domain>\SYSVOL\<domain>\Policies\PolicyDefinitions`)
-  and `en-US\TeamCraft.adml` to its `en-US` folder. The policies are under
+  and `en-US\TeamCraft.adml` to its `en-US` folder (for German editors also
+  `de-DE\TeamCraft.adml` to its `de-DE` folder). The policies are under
   *Administrative Templates → TeamCraft Desktop*, for the computer and the user.
 * **Intune:** *Devices → Configuration → Import ADMX* with the same two files.
 * **By hand or script:** `reg add "HKLM\Software\Policies\TeamCraft" /v ServerUrl /t REG_SZ /d https://plm.example.org`.

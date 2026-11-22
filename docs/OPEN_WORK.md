@@ -170,7 +170,7 @@ feature milestone – the features in *What works* are enough; what is missing i
   test script per install type for each RC
 - [x] Desktop: managed deployment policies (#378) – Windows registry with ADMX/ADML templates, macOS configuration
   profile, `/etc/teamcraft/policies.json`; fixed server, updates, crash prompts, working folder, organisation name,
-  `UsageStatistics` (read for #383), `ReportUrl` (the problem-report tracker, #381). Left: a manual test per OS (Group Policy, Intune, an MDM profile), a German ADML,
+  `UsageStatistics` (read for #383), `ReportUrl` (the problem-report tracker, #381), English and German ADML. Left: a manual test per OS (Group Policy, Intune, an MDM profile),
   a per-machine MSI checked for silent installs
 - [ ] Desktop app run and tested on Windows x64/ARM64, macOS and Linux for each RC (a short manual test script in
   `docs/src/dev/release-checklist.md`)
