@@ -13,6 +13,12 @@ is kept in **revisions** `A, B, …, Y, AA, …` (I, O, Q, S, X and Z are
 skipped, as in ASME Y14.35). A revision carries the attributes (name,
 description, material, mass, unit cost), the files and the bill of materials.
 
+Under the title block of the revision page, a bar of links jumps to each
+card – *Overview*, *Lifecycle*, *Revisions*, *Files*, *Structure* (the BOM),
+*References*, *Where used*, *Changes*, *History* and the cards only some items
+have (similar parts, simulation results, as-built records, alternates). It
+stays at the top while you scroll and marks the card in view (#421).
+
 Next to the number on the revision page, *Copy number* puts the item number
 on the clipboard (the item list has a small copy button per row), and *Label* opens a printable label with a QR code.
 The code holds the short link

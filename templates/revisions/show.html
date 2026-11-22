@@ -151,9 +151,35 @@
 </section>
 {% endif %}
 
+{#- Section nav (#421): every card one click from the top, in page order; the
+    optional sections share their condition with the card itself. app.js marks
+    the section in view (aria-current). -#}
+{% set show_similar = similar and similar.status != "no_shape_file" %}
+{% set show_bom = not simulation or lines %}
+{% set show_simulations = not simulation and (based_simulations or rev.item_type in ["part", "assembly"]) %}
+<nav class="section-nav" aria-label="Sections of {{ rev.item_number }}/{{ rev.code }}" data-section-nav>
+  <ul>
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#lifecycle">Lifecycle</a></li>
+    <li><a href="#revisions">Revisions <span class="count">{{ revisions|length }}</span></a></li>
+    <li><a href="#files">Files <span class="count">{{ files|length }}</span></a></li>
+    {% if show_similar %}<li><a href="#similar">Similar parts</a></li>{% endif %}
+    {% if simulation %}<li><a href="#simulation-basis">Based on</a></li><li><a href="#simulation-results">Results</a></li>{% endif %}
+    {% if as_built %}<li><a href="#as-built">Built to</a></li><li><a href="#deviations">Deviations</a></li>{% endif %}
+    {% if show_bom %}<li><a href="#bom" title="Bill of materials">Structure <span class="count">{{ lines|length }}</span></a></li>{% endif %}
+    <li><a href="#references">References</a></li>
+    {% if can_be_built_to %}<li><a href="#built-units">Built units</a></li>{% endif %}
+    {% if show_simulations %}<li><a href="#simulations">Simulations</a></li>{% endif %}
+    <li><a href="#where-used">Where used</a></li>
+    <li><a href="#changes">Changes</a></li>
+    {% if interchange %}<li><a href="#interchange">Alternates</a></li>{% endif %}
+    <li><a href="#history">History</a></li>
+  </ul>
+</nav>
+
 <div class="with-rail">
 <div>
-  <section class="card">
+  <section class="card" id="overview">
     <h2>Attributes</h2>
     <dl class="props">
       <dt>Name</dt><dd>{{ rev.name }}</dd>
@@ -434,7 +460,7 @@
   {% endif %}
 </section>
 
-{% if similar and similar.status != "no_shape_file" %}
+{% if show_similar %}
 <section class="card" id="similar">
   <div class="card-head">
     <h2>{% if revisions|length == 1 and rev.state == "in_work" %}Similar existing parts{% else %}Similar parts{% endif %}</h2>
@@ -774,7 +800,7 @@
 </section>
 {% endif %}
 
-{% if not simulation or lines %}
+{% if show_bom %}
 <section class="card" id="bom">
   <div class="card-head">
     <h2>Bill of materials (single level)</h2>
@@ -1003,7 +1029,7 @@
 </section>
 {% endif %}
 
-{% if not simulation and (based_simulations or rev.item_type in ["part", "assembly"]) %}
+{% if show_simulations %}
 <section class="card" id="simulations">
   <h2>Simulations</h2>
   {% if based_simulations %}
@@ -1031,7 +1057,7 @@
 {% endif %}
 
 <div class="grid grid-2">
-  <section class="card">
+  <section class="card" id="where-used">
     <h2>Where used</h2>
     {% if where_used %}
     <table>
@@ -1053,7 +1079,7 @@
     <p class="hint"><a href="/items/{{ item.id }}/where-used">All levels{% if me.role != "viewer" %} and replace in assemblies{% endif %} →</a></p>
   </section>
 
-  <section class="card">
+  <section class="card" id="changes">
     <h2>Changes</h2>
     {% if changes %}
     <table>
@@ -1161,7 +1187,7 @@
 </section>
 {% endif %}
 
-<section class="card">
+<section class="card" id="history">
   <h2>History</h2>
   {{ m.history(history) }}
 </section>

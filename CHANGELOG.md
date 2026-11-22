@@ -25,6 +25,11 @@ see the notices in the README.
   - **Glossary** (#410): `docs/src/guide/glossary.md` explains items,
     revisions, versions, states, check out / get / park / check in, change
     requests and change orders in CAD terms.
+  - **Section nav on the revision page** (#421): a bar under the title block
+    links every card of the page – Overview, Lifecycle, Revisions, Files,
+    Structure, References, Where used, Changes, History and the cards only
+    some items have – with counts; it stays under the top bar while you
+    scroll and marks the section in view.
   - **Get TeamCraft Desktop** (#411): the dashboard and the revision page link
     the desktop app; `TEAMCRAFT_DESKTOP_DOWNLOAD_URL` points the links at
     your own download page (`off` hides them; default: the project's release

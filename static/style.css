@@ -1521,3 +1521,17 @@ pre.json { max-height: 24rem; overflow: auto; white-space: pre-wrap; overflow-wr
   .head-with-preview { flex-wrap: wrap; }
   .head-preview img { width: 100%; max-width: 240px; height: auto; max-height: none; aspect-ratio: 4 / 3; }
 }
+
+/* revision page: section nav (#421) – sticky under the top bar, scrolls sideways on narrow screens */
+.section-nav { position: sticky; top: var(--topbar-h); z-index: 5; margin: 0 0 var(--space-4); background: var(--bg);
+  border-bottom: 1px solid var(--border); }
+.section-nav ul { display: flex; gap: 2px; margin: 0; padding: 0; list-style: none; overflow-x: auto; white-space: nowrap;
+  scrollbar-width: thin; }
+.section-nav a { display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 2px solid transparent;
+  color: var(--text-muted); font-size: 13px; font-weight: 500; text-decoration: none; }
+.section-nav a:hover { color: var(--text); }
+.section-nav a:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.section-nav a[aria-current="true"] { color: var(--text); border-bottom-color: var(--link); }
+.section-nav .count { color: var(--text-dim); font-size: 12px; font-weight: 400; }
+/* anchors land below the top bar and the section nav */
+.section-nav ~ * section.card[id], .section-nav ~ section.card[id] { scroll-margin-top: calc(var(--topbar-h) + 52px); }
