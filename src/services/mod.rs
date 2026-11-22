@@ -61,6 +61,7 @@ pub mod similar;
 pub mod simulations;
 pub mod stats;
 pub mod structure;
+pub mod thumbnails;
 pub mod uploads;
 pub mod usage;
 pub mod users;

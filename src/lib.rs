@@ -235,12 +235,67 @@ pub fn router(state: AppState) -> Router {
             // strings can carry one-time OIDC codes and search terms.
             TraceLayer::new_for_http()
                 .make_span_with(|req: &axum::http::Request<axum::body::Body>| {
-                    tracing::info_span!("http", method = %req.method(), path = %req.uri().path())
+                    let id = req
+                        .extensions()
+                        .get::<RequestId>()
+                        .map(|r| r.0.as_str())
+                        .unwrap_or("");
+                    tracing::info_span!(
+                        "http",
+                        method = %req.method(),
+                        path = %req.uri().path(),
+                        request_id = %id
+                    )
                 })
                 .on_request(())
                 .on_response(DefaultOnResponse::new().level(Level::INFO)),
         )
+        // outermost: the id is known to the trace span, the error pages and
+        // every response header (#381)
+        .layer(axum::middleware::from_fn(assign_request_id))
         .with_state(state)
+}
+
+/// Name of the header that carries the id of a request (#381).
+pub const REQUEST_ID_HEADER: &str = "x-request-id";
+
+/// Id of one HTTP request (#381): sent back as `x-request-id`, written to
+/// the request's log line and shown on error pages, so a bug report can be
+/// matched to the server log.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RequestId(pub String);
+
+/// Whether an incoming `x-request-id` (from a reverse proxy) is taken over:
+/// 1–64 characters of `[A-Za-z0-9-]`, nothing that could break a log line
+/// or a header.
+pub fn valid_request_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 64
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+}
+
+/// Gives every request an id: a valid incoming `x-request-id` or a new
+/// UUID. Stored in the request extensions and set on the response.
+async fn assign_request_id(
+    mut request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    let name = HeaderName::from_static(REQUEST_ID_HEADER);
+    let id = request
+        .headers()
+        .get(&name)
+        .and_then(|v| v.to_str().ok())
+        .filter(|v| valid_request_id(v))
+        .map(str::to_string)
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    let value = HeaderValue::from_str(&id).expect("an id of [A-Za-z0-9-] is a header value");
+    request.headers_mut().insert(name.clone(), value.clone());
+    request.extensions_mut().insert(RequestId(id));
+    let mut response = next.run(request).await;
+    response.headers_mut().insert(name, value);
+    response
 }
 
 /// Liveness probe: the process is up and serving HTTP.
@@ -459,5 +514,56 @@ mod tests {
         );
         assert!(text.contains("teamcraft_http_requests_total{class=\"2xx\"} 1"));
         assert!(text.contains("teamcraft_http_request_duration_seconds_count 2"));
+    }
+
+    #[test]
+    fn only_short_plain_request_ids_are_taken_over() {
+        assert!(valid_request_id("3f2a-77b0"));
+        assert!(valid_request_id(&"a".repeat(64)));
+        assert!(!valid_request_id(""));
+        assert!(!valid_request_id(&"a".repeat(65)));
+        assert!(!valid_request_id("abc def"));
+        assert!(!valid_request_id("abc\nINFO forged"));
+        assert!(!valid_request_id("<script>"));
+    }
+
+    async fn echo_id(axum::Extension(id): axum::Extension<RequestId>) -> String {
+        id.0
+    }
+
+    /// The handler sees the id that the response header carries; a valid
+    /// incoming id is kept, an invalid one replaced by a new UUID.
+    #[tokio::test]
+    async fn every_response_carries_the_request_id() {
+        let app = Router::new()
+            .route("/id", get(echo_id))
+            .layer(axum::middleware::from_fn(assign_request_id));
+        let call = |incoming: Option<&str>| {
+            let mut b = axum::http::Request::builder().uri("/id");
+            if let Some(v) = incoming {
+                b = b.header(REQUEST_ID_HEADER, v);
+            }
+            let app = app.clone();
+            let request = b.body(axum::body::Body::empty()).unwrap();
+            async move {
+                let answer = app.oneshot(request).await.unwrap();
+                let header = answer.headers()[REQUEST_ID_HEADER]
+                    .to_str()
+                    .unwrap()
+                    .to_string();
+                let body = axum::body::to_bytes(answer.into_body(), 1024)
+                    .await
+                    .unwrap();
+                (header, String::from_utf8(body.to_vec()).unwrap())
+            }
+        };
+        let (header, body) = call(None).await;
+        assert_eq!(header, body);
+        assert!(uuid::Uuid::parse_str(&header).is_ok(), "{header}");
+        let (header, body) = call(Some("proxy-42")).await;
+        assert_eq!((header.as_str(), body.as_str()), ("proxy-42", "proxy-42"));
+        let (header, body) = call(Some("bad id")).await;
+        assert_eq!(header, body);
+        assert!(uuid::Uuid::parse_str(&header).is_ok(), "{header}");
     }
 }

@@ -23,6 +23,8 @@
 html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 body { background: var(--bg); color: var(--text); }
 .hidden { display: none !important; }
+/* read by screen readers, not shown (e.g. the step status of Getting started) */
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* Distro skins paint their glow and texture here, behind the page; the house
    skins set both to none. Nothing else reads --glow or --pattern. */
@@ -62,6 +64,13 @@ kbd {
 /* empty states: one quiet line inside the frame */
 .empty { margin: 0; padding: 6px 0; color: var(--text-muted); }
 .navigator .empty { padding: 2px 8px 6px; color: var(--text-dim); }
+/* an empty state with its next step (#423): the line, buttons, a viewer note */
+.empty-hint { padding: 2px 8px 6px; }
+.navigator .empty-hint .empty { padding: 0 0 4px; }
+.empty-hint .row { flex-wrap: wrap; gap: 6px; }
+.empty-hint .small { margin: 4px 0 0; }
+.navigator .viewer-note { margin: 0 8px 8px; padding: 6px 8px; border-left: 3px solid var(--accent); }
+.welcome .viewer-note { padding: 6px 8px; border-left: 3px solid var(--accent); }
 
 /* Item, change and revision numbers: the text face with tabular figures. */
 h1 .mono, .node .label .mono, table.grid td:first-child > .mono, .impact-group .mono, button.link.mono, .thread-meta .mono {
@@ -492,6 +501,15 @@ tr.row-conflict td:first-child, tr.row-clash td:first-child { box-shadow: inset 
 .node .ico { width: 16px; flex: none; color: var(--text-dim); text-align: center; font-size: 11px; }
 .node .ico.warn { color: var(--st-impact-fg); }
 .node .ico.dim { color: var(--text-dim); }
+/* the preview image of a row (list-thumbs.js, #420): over the type icon once loaded,
+   positioned so the row keeps its height */
+.node .ico { position: relative; }
+.node .ico.has-thumb { width: 22px; }
+.node .ico.has-thumb .ico-glyph { visibility: hidden; }
+.node .ico .row-thumb {
+  position: absolute; left: 0; top: 50%; width: 22px; height: 22px; margin-top: -11px;
+  object-fit: contain; background: #fff; border: 1px solid var(--border); border-radius: 3px;
+}
 .node .label { overflow: hidden; text-overflow: ellipsis; min-width: 0; color: var(--text-muted); }
 .node .label .mono, .node .label strong { color: var(--text); font-weight: 600; }
 .node .label .dim { color: var(--text-dim); }
@@ -883,6 +901,28 @@ canvas.viewer-measuring { cursor: crosshair; }
 .dialog h3:first-child { margin-top: 0; }
 .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap; }
 .dialog .error-text { color: var(--st-danger-fg); margin: 8px 0 0; }
+
+/* Getting started (#422, js/onboarding.js): the steps on the left, the
+   current one on the right; narrow windows stack them. */
+.onboarding { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 20px; }
+.onboarding-steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; align-content: start; counter-reset: onboarding; }
+.onboarding-steps li {
+  counter-increment: onboarding;
+  display: grid; gap: 2px; padding: 6px 8px 6px 28px; position: relative;
+  border-radius: var(--radius); color: var(--text-dim);
+}
+.onboarding-steps li::before { content: counter(onboarding); position: absolute; left: 8px; top: 6px; font-variant-numeric: tabular-nums; }
+.onboarding-steps li.current { color: var(--text); background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); font-weight: 600; }
+.onboarding-steps li.done { color: var(--text); }
+.onboarding-steps li.done::before { content: "\2713"; color: var(--st-ok-fg); }
+.onboarding-steps li.skipped::before { content: "\2013"; }
+.onboarding-body h3 { margin: 0; }
+.onboarding-body p { margin: 0; }
+.onboarding-path { display: block; padding: 6px 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); overflow-wrap: anywhere; }
+.onboarding-cad { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+@media (max-width: 640px) {
+  .onboarding { grid-template-columns: minmax(0, 1fr); }
+}
 
 /* Appearance: the three house cards (System, Light, Dark) first and larger,
    the distribution skins after them. Each card renders its own tokens. */
@@ -1352,3 +1392,14 @@ pre.release-notes {
 
 /* right-click menu of an item (#417, item-menu.js): busy while its revision loads */
 body.menu-loading, body.menu-loading * { cursor: progress; }
+
+/* Structure tab: Add line… component picker and editable BOM lines (#419, js/bom-lines.js) */
+.picker-list { list-style: none; margin: 4px 0 0; padding: 4px 0; max-height: 18rem; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: var(--radius-xs); background: var(--surface); }
+.picker-list:empty { display: none; }
+.picker-option { display: flex; gap: 8px; align-items: center; padding: 4px 8px; cursor: pointer; }
+.picker-option:hover, .picker-option[aria-selected="true"] { background: var(--selected); }
+.picker-thumb { flex: none; width: 36px; height: 36px; object-fit: contain; border-radius: var(--radius-xs); background: var(--surface-sunken); }
+.picker-main { display: flex; flex-direction: column; min-width: 0; }
+.picker-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+td input.qty { width: 6.5em; text-align: right; }

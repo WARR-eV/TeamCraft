@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: MPL-2.0 – German texts of TeamCraft.admx (#378); same string and presentation IDs as en-US -->
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>TeamCraft Desktop</displayName>
+  <description>Richtlinien der Desktop-App TeamCraft Desktop.</description>
+  <resources>
+    <stringTable>
+      <string id="TeamCraft">TeamCraft Desktop</string>
+      <string id="SUPPORTED_TeamCraft_0_2_12">TeamCraft Desktop 0.2.12 und neuer</string>
+      <string id="ServerUrl">TeamCraft-Server</string>
+      <string id="ServerUrl_Explain">Die Adresse des TeamCraft-Servers (https://…). Die App startet mit diesem Server, die Verbindungsmaske ist vorausgefüllt und schreibgeschützt, und andere Server können weder hinzugefügt noch ausgewählt werden – außer „Andere Server zulassen“ ist aktiviert. Eine Adresse, die nicht mit http(s) beginnt, gilt als nicht gesetzt.</string>
+      <string id="AllowOtherServers">Andere Server zulassen</string>
+      <string id="AllowOtherServers_Explain">Aktiviert: Benutzer dürfen weitere Server hinzufügen, obwohl „TeamCraft-Server“ gesetzt ist (er ist dann nur die Voreinstellung). Deaktiviert oder nicht konfiguriert: Nur der konfigurierte Server kann verwendet werden.</string>
+      <string id="CheckForUpdates">Nach Updates suchen</string>
+      <string id="CheckForUpdates_Explain">Aktiviert: Die App sucht einmal täglich nach einer neueren Version, und Benutzer können das nicht abschalten. Deaktiviert: Es wird nie nach Updates gesucht. Nicht konfiguriert: Jeder Benutzer entscheidet selbst (Einstellungen → Updates).</string>
+      <string id="CrashReportPrompt">Absturzberichte zum Teilen anbieten</string>
+      <string id="CrashReportPrompt_Explain">Deaktiviert: Absturzberichte bleiben nur auf dem Computer und werden nie zum Teilen angeboten. Aktiviert: Die App fragt nach jedem Absturz. Nicht konfiguriert: Jeder Benutzer entscheidet selbst (Einstellungen → Absturzberichte). Berichte werden nie gesendet, ohne dass der Benutzer das Formular für die Meldung öffnet.</string>
+      <string id="UsageStatistics">Anonyme Nutzungsstatistik</string>
+      <string id="UsageStatistics_Explain">Deaktiviert: Es wird keine Nutzungsstatistik gesendet oder gespeichert, kein Hinweis angezeigt, und Benutzer können sie nicht einschalten. Aktiviert: Die Statistik wird gesendet, und Benutzer können sie nicht ausschalten. Nicht konfiguriert: Jeder Benutzer entscheidet selbst. (Gelesen von App-Versionen mit Nutzungsstatistik, #383.)</string>
+      <string id="WorkspaceRoot">Standard-Arbeitsordner</string>
+      <string id="WorkspaceRoot_Explain">Der Ordner, in dem neue Arbeitsordner angelegt werden (ein absoluter Pfad wie D:\CAD oder \\fileserver\cad; Umgebungsvariablen werden nicht aufgelöst). Benutzer können in den Einstellungen trotzdem einen anderen Ordner wählen.</string>
+      <string id="ReportUrl">Probleme melden an</string>
+      <string id="ReportUrl_Explain">Die Adresse des Meldeformulars Ihres Helpdesks (https://…). *Problem melden* in der Desktop-App öffnet es mit dem geprüften Bericht in den Parametern title und body, statt des TeamCraft-Meldeformulars auf GitHub. Benutzer können sie nicht ändern.</string>
+      <string id="OrganizationName">Name der Organisation</string>
+      <string id="OrganizationName_Explain">Wird in den Einstellungen und im Dialog „About TeamCraft“ als „Managed by …“ angezeigt (die Desktop-App zeigt diesen Text bisher nur auf Englisch; eine Zeile, höchstens 64 Zeichen).</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="ServerUrl"><textBox refId="ServerUrl"><label>Serveradresse:</label></textBox></presentation>
+      <presentation id="WorkspaceRoot"><textBox refId="WorkspaceRoot"><label>Ordner:</label></textBox></presentation>
+      <presentation id="ReportUrl"><textBox refId="ReportUrl"><label>Adresse:</label></textBox></presentation>
+      <presentation id="OrganizationName"><textBox refId="OrganizationName"><label>Name:</label></textBox></presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

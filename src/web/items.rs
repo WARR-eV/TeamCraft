@@ -285,6 +285,41 @@ pub struct NewQuery {
     basis: Option<String>,
 }
 
+#[derive(Deserialize, Default)]
+pub struct SuggestQuery {
+    q: Option<String>,
+    limit: Option<i64>,
+}
+
+/// `GET /items/suggest?q=&limit=`: suggestions of the component picker of
+/// the BOM (JSON for static/app.js, #419) – the item search with the
+/// signed-in user's read rights, at most 10 rows, nothing for fewer than 2
+/// characters. Session cookie only; the REST twin is `GET /api/v1/items/suggest`.
+pub async fn suggest(
+    State(st): State<AppState>,
+    crate::auth::WebUser(me): crate::auth::WebUser,
+    Query(q): Query<SuggestQuery>,
+) -> AppResult<Response> {
+    let found = items::suggest(&st.db, &me, q.q.as_deref().unwrap_or(""), q.limit).await?;
+    let rows: Vec<Value> = found
+        .iter()
+        .map(|s| {
+            let mut row = json!(s);
+            row["thumbnail_url"] = match s.thumbnail_file_id {
+                Some(id) => json!(format!("/files/{id}/thumbnail")),
+                None => Value::Null,
+            };
+            row
+        })
+        .collect();
+    let mut response = axum::Json(json!({ "items": rows })).into_response();
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        header::HeaderValue::from_static("no-store"),
+    );
+    Ok(response)
+}
+
 pub async fn new_form(
     State(st): State<AppState>,
     ctx: WebCtx,
@@ -420,9 +455,21 @@ pub async fn create(State(st): State<AppState>, ctx: WebCtx, req: Request) -> Ap
         Err(e) => return Err(e),
     };
     let mut form: NewItemForm = serde_json::from_value(json!(received.fields)).unwrap_or_default();
+    // Empty fields are filled from the files: the description of a
+    // SolidCraft design (its design properties, #367), else the file name.
+    let design_description = received
+        .uploads
+        .iter()
+        .find_map(|u| u.properties.as_ref().and_then(|p| p.description.clone()));
     if form.name.trim().is_empty() {
         if let Some(first) = received.uploads.first() {
-            form.name = file_stem(&first.filename).to_string();
+            form.name = design_description
+                .clone()
+                .unwrap_or_else(|| file_stem(&first.filename).to_string());
+        }
+    } else if form.description.trim().is_empty() {
+        if let Some(description) = design_description {
+            form.description = description;
         }
     }
     // A basis the user may not read is a plain 404 (nothing is echoed).

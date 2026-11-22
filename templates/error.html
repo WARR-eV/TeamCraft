@@ -23,7 +23,8 @@
 Error {{ status }} {{ reason }}
 {{ message }}
 Page: {{ path }}
-Time: {{ time }}</pre>
+Time: {{ time }}{% if request_id %}
+Request id: {{ request_id }}{% endif %}</pre>
       <button type="button" data-copy="error-details">Copy details</button>
     </details>
     {% endif %}
