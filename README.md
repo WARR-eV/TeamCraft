@@ -351,7 +351,8 @@ there is no separate enterprise edition.
       read-only or MCP-only; SSO users' tokens can expire after a number of
       idle days.
     - [Offboarding](https://warr-ev.github.io/TeamCraft/admin/users.html#when-someone-leaves)
-      for high-turnover teams: a holdings report per user, *Offboard and
+      for high-turnover teams: a holdings report per user, the check-outs of
+      a group as a graph (web and desktop), *Offboard and
       deactivate*, season handover per group, groups without an active
       manager, OpenID Connect back-channel logout and a report of SSO users
       who stopped signing in.

@@ -145,6 +145,17 @@ from the group's member list (*holds…*) and sees only what lies in the
 groups they manage, without the tokens. Each list shows at most 200 entries
 next to the full count.
 
+**Check-outs of a group** (#428). The other way round – per project group
+instead of per user: *Check-outs* on the group's page (`/projects/{id}/checkouts`,
+`GET /api/v1/projects/{code}/checkouts`, in the desktop app the lock button
+next to the group under *Projects*) shows who has what checked out right now,
+as a **graph** – the people on the left, the revisions they hold on the right,
+one line per check-out, green for today, amber for 1–7 days, red for longer;
+a deactivated holder has a dashed red box – and as a list per person. Only
+administrators and the group's managers see it (others get 403; a group they
+cannot see answers 404, also for an administrator whose need-to-know policy
+hides it). It is read-only: a lock is released on the revision page.
+
 **Offboard in one step.** *Users → user → Offboard and deactivate* (or
 `POST /api/v1/users/{id}/offboard`, or `teamcraft user deactivate --username
 lena` on the server) deactivates the user and, in the same step:

@@ -15,6 +15,19 @@ see the notices in the README.
 
 ### Added
 
+- **Check-outs of a project group as a graph** (#428): administrators and
+  the group's managers see who has what checked out right now – *Check-outs*
+  on the group page (`/projects/{id}/checkouts`) and a lock button next to
+  the group under *Projects* in the desktop app (a *Check-outs* tab). The
+  graph puts the people on the left and the revisions they hold on the right,
+  one line per check-out, coloured by how long it has been held (today,
+  1–7 days, longer); a deactivated holder is marked. A list per person
+  follows; a click opens the revision. `GET /api/v1/projects/{code}/checkouts`
+  gives the same data, `GET /api/v1/me` names the groups a user manages
+  (`managed_projects`). Web and desktop draw the same layout
+  (`services::lock_overview::graph`, `desktop/ui/js/lock-layout.js`), styled
+  once in `shared/css/components.css`.
+
 - **UX for CAD users, first quick wins** (#408):
   - **Preview at the top of the revision page** (#412): the picture of the
     main model – the assembly before the part before a model file before the

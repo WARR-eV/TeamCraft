@@ -4,6 +4,7 @@
 
 import { $, ICONS, api, append, badge, call, clear, dialog, enc, errorText, field, h, lockIcon, setStatus, state, svgIcon, toast } from "./core.js";
 import { fmtDate, label } from "/static/shared/js/format.js";
+import { canSeeLocks, openLockOverview } from "./lock-overview.js";
 import { canEdit, checkInAll, fetchWorklist, refreshWorklistCount, reloadProjects, renderNotifications, rescanNewFiles, scanNewFiles, showWorklistCount } from "./shell.js";
 import { assistantContextChanged } from "./assistant.js";
 import { agent, renderAgentView } from "./agent.js";
@@ -229,7 +230,15 @@ function pickNode(p, active) {
     h("span.twisty", { text: active ? "✓" : "" }),
     h("span.ico", { text: "▦" }),
     h("span.label", null, [h("strong", { text: p.code }), h("span.dim", { text: " " + p.name })]),
-    h("span.meta", null, p.visibility === "restricted" ? h("span.dim", { text: "restricted" }) : null)
+    h("span.meta", null, [
+      p.visibility === "restricted" ? h("span.dim", { text: "restricted" }) : null,
+      // the check-out overview (#428): administrators and the group's managers
+      canSeeLocks(p) ? h("button.icon.small", {
+        type: "button", title: "Check-outs of " + p.code + " – who has what checked out, as a graph",
+        "aria-label": "Check-outs of " + p.code,
+        on: { click: function (ev) { ev.stopPropagation(); openLockOverview(p.code); } }
+      }, svgIcon(ICONS.checkout)) : null
+    ])
   ]));
 }
 

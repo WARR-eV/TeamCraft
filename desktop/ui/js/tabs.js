@@ -3,6 +3,7 @@
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
 import { $, ICONS, append, clear, errorText, h, state, svgIcon, tool } from "./core.js";
+import { loadLocks, renderLocks } from "./lock-overview.js";
 import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
 import { canEdit, checkInAll, refreshWorklistCount } from "./shell.js";
 import { selectView } from "./navigator.js";
@@ -103,7 +104,7 @@ export function renderTabs() {
       tabindex: t.key === stop ? "0" : "-1", "data-key": t.key,
       on: { click: function () { if (state.active !== t.key) activate(t.key); } }
     }, [
-      h("span.ico", { text: t.kind === "change" ? "⇄" : t.kind === "request" ? "✎" : t.kind === "agent" ? "✦" : "◆" }),
+      h("span.ico", { text: t.kind === "change" ? "⇄" : t.kind === "request" ? "✎" : t.kind === "agent" ? "✦" : t.kind === "locks" ? "⚿" : "◆" }),
       h("span.tab-label", { text: t.title }),
       h("button.close", { type: "button", tabindex: "-1", title: "Close (Ctrl+W)", "aria-label": "Close " + t.title, on: { click: function (e) { e.stopPropagation(); closeTab(t.key); } } }, "×")
     ]);
@@ -375,13 +376,15 @@ export function renderActive() {
     return;
   }
   body.appendChild(h("p.loading", { text: "Loading " + tab.title }));
-  var load = tab.kind === "change" ? loadChange(tab) : tab.kind === "request" ? loadRequest(tab) : loadRevision(tab);
+  var load = tab.kind === "change" ? loadChange(tab) : tab.kind === "request" ? loadRequest(tab) :
+    tab.kind === "locks" ? loadLocks(tab) : loadRevision(tab);
   load.then(function () {
     if (state.active !== tab.key) return;
     clear(body);
     clear(toolbar);
     if (tab.kind === "change") renderChange(tab, body, toolbar);
     else if (tab.kind === "request") renderRequest(tab, body, toolbar);
+    else if (tab.kind === "locks") renderLocks(tab, body, toolbar);
     else renderRevision(tab, body, toolbar);
     if (state.view === "agent" && agent.contextKey === tab.key) schedulePaint(true);
   }).catch(function (err) {

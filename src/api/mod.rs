@@ -101,6 +101,7 @@ pub fn router(state: &AppState) -> Router<AppState> {
             get(project_policy_get).put(project_policy_set),
         )
         .route("/projects/{code}/access-log", get(project_access_log))
+        .route("/projects/{code}/checkouts", get(project_checkouts))
         .route(
             "/projects/{code}/access-review",
             get(project_access_review).post(project_access_review_confirm),
@@ -786,6 +787,9 @@ async fn me(
     // its own groups are restricted (for a badge).
     let mut body = json!(me);
     body["restricted_projects"] = json!(projects::restricted_memberships(&st.db, &me).await?);
+    // the groups this user manages (administrators manage all): the desktop
+    // app offers their check-out overview (#428)
+    body["managed_projects"] = json!(projects::managed_memberships(&st.db, &me).await?);
     body["token_scope"] = json!(scope);
     // "local" or "oidc": a client offers "Change password" only for local accounts
     body["auth_source"] = json!(users::get(&st.db, me.id).await?.auth_source);

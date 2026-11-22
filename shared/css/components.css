@@ -44,3 +44,27 @@
   white-space: normal;
   text-align: left;
 }
+
+/* Check-out graph of a project group (issue 428) – web: projects/checkouts.html,
+ * desktop: js/lock-overview.js. Holders on the left, checked-out revisions on
+ * the right; the line and the revision's edge say how long the lock is held. */
+.lock-graph { display: block; width: 100%; max-width: 860px; height: auto; font-size: 12px; }
+.lock-graph .lg-edge { fill: none; stroke-width: 1.5; stroke: var(--border-strong); }
+.lock-graph .lg-edge.lg-week { stroke: var(--warn); }
+.lock-graph .lg-edge.lg-old { stroke: var(--danger); stroke-width: 2; }
+.lock-graph .lg-node rect { fill: var(--surface); stroke: var(--border-strong); stroke-width: 1; }
+.lock-graph .lg-holder rect { fill: var(--accent-soft); stroke: var(--accent); }
+.lock-graph .lg-holder.lg-inactive rect { fill: var(--danger-soft); stroke: var(--danger); stroke-dasharray: 4 3; }
+.lock-graph .lg-lock.lg-today rect { stroke: var(--ok); }
+.lock-graph .lg-lock.lg-week rect { stroke: var(--warn); }
+.lock-graph .lg-lock.lg-old rect { stroke: var(--danger); stroke-width: 2; }
+.lock-graph text { fill: var(--text); dominant-baseline: middle; }
+.lock-graph .lg-count, .lock-graph .lg-sub { fill: var(--text-muted); }
+.lock-graph a:hover rect, .lock-graph a:focus rect { fill: var(--surface-hover); }
+.lock-graph a:focus-visible { outline: 2px solid var(--focus); }
+.lock-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 12px; color: var(--text-muted); }
+.lock-legend li::before { content: ""; display: inline-block; width: 18px; height: 0; margin-right: 6px; vertical-align: middle;
+  border-top: 2px solid var(--border-strong); }
+.lock-legend .lg-week::before { border-top-color: var(--warn); }
+.lock-legend .lg-old::before { border-top-color: var(--danger); }
+.lock-legend .lg-inactive::before { border-top: 2px dashed var(--danger); }
