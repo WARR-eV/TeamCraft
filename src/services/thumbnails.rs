@@ -41,7 +41,7 @@ pub fn rank(format: &str) -> Option<u8> {
 /// The file whose picture stands for a revision: the best [`rank`], the
 /// first by name (case-insensitive) on a tie. `key` gives a file's stored
 /// format id and its name.
-pub fn pick_main<'a, T>(files: &'a [T], key: impl Fn(&T) -> (&str, &str)) -> Option<&'a T> {
+pub fn pick_main<T>(files: &[T], key: impl Fn(&T) -> (&str, &str)) -> Option<&T> {
     files
         .iter()
         .filter_map(|f| {
