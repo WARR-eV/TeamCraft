@@ -23,7 +23,6 @@
 html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 body { background: var(--bg); color: var(--text); }
 .hidden { display: none !important; }
-::selection { background: var(--selected); color: var(--text); }
 
 /* Distro skins paint their glow and texture here, behind the page; the house
    skins set both to none. Nothing else reads --glow or --pattern. */
