@@ -672,7 +672,8 @@ real files and belong to section 3 once such files are at hand.
   inside the CAD program (the desktop app already asks before opening)
 - [ ] Check-in takes dependent files along automatically (from the reference scan)
 - [ ] Create viewables (STEP) in the background without blocking the check-in
-- [ ] Sync file properties with item attributes: part number, name, material, mass
+- [ ] Sync file properties with item attributes: part number, name, material, mass – SolidCraft designs done
+  read-only (#367: shown, searchable, mismatches flagged, prefill of new items); left: other CAD formats, material
 - [ ] Recognise standard and library parts (Content Center, Toolbox, Standard Parts) and treat them as purchased parts
   instead of importing them again and again
 - [ ] Workspace setup wizard (first start or when getting a project group): optional CAD settings to tick – Inventor
@@ -730,7 +731,8 @@ real files and belong to section 3 once such files are at hand.
 - [x] Preview image from the embedded thumbnail (#364); left: rendered pictures for designs saved without one (#368)
 - [x] Linked designs as file references with quantities (#365); left: rewriting link paths after a rename (with #369)
 - [x] BOM import from SolidCraft's BOM CSV and from the design (#366); left: lengths and expressions in `bom_quantity`, keeping the `.sc` with a new assembly (as STEP)
-- [ ] Design properties read, shown, searchable, mismatches with the item flagged (#367)
+- [x] Design properties read, shown, searchable, mismatches with the item flagged (#367); left: reading the
+  properties of designs stored before (next version), component properties (`material`) of assemblies
 - [x] Desktop: STEP export through `solidcraft-cli` at check-in, all OSes (#368); left: a rendered thumbnail (`solidcraft-cli snapshot`) for designs saved without one
 - [x] Desktop: item number and revision written into the design properties (#369); left: automatically at check-out (a setting), link paths after a rename
 - [x] Desktop: designs open in SolidCraft (lock file) shown, warning at check-in (#370)

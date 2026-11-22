@@ -13,6 +13,10 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Added
+
+- SolidCraft design properties (#367): part number, revision, description, project, author, organisation and licence are read from `.sc` designs at upload and check-in (bounded, text values only, migration `0078_file_properties`), listed under the file on the revision page and in the desktop app, returned as `properties`/`properties_line` with the file in the REST API (and `design_properties` in the MCP file briefs), and found by the full-text search. The revision page shows a notice when they differ from the item number, revision code or name – worked out on every view, nothing is changed automatically. A new item created in the web UI with a design and no name takes the design's description; *Import a CAD folder* fills an imported item's empty description from it.
+
 ## [0.2.12] - 2026-11-22
 
 ### Security

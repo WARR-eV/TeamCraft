@@ -230,7 +230,40 @@ For the rest TeamCraft shows what other PLM systems show:
 The item search ranks matches in numbers, names, materials, descriptions and
 file names, and in the text inside STEP and IGES files (product names,
 authors, organisations), plain-text files (with their decimal numbers), the
-text layer of PDF reports and the text of HTML reports (table rows as lines;
-scripts, styles and hidden elements skipped). PDFs and HTML files are read in an
+text layer of PDF reports, the text of HTML reports (table rows as lines;
+scripts, styles and hidden elements skipped) and the design properties of
+SolidCraft designs (see below). PDFs and HTML files are read in an
 isolated child process with size, time and memory limits; scanned PDFs have no
 text layer (there is no OCR).
+
+## Design properties of SolidCraft designs
+
+SolidCraft keeps *design properties* in every design: project, part number,
+revision, author, organisation, description and licence. TeamCraft reads them
+when a `.sc` design is uploaded or checked in (ZIP and JSON designs; only
+these text values, each cut at 500 characters – other tools' data and values
+that are not text are left out) and stores them with the file version:
+
+* They are listed under the file name on the revision page and in the desktop
+  app (*Part number BR-7731 · Revision B · Description Mounting bracket …*),
+  and returned as `properties` with the file in the REST API.
+* They are found by the full-text search, like the text inside other files.
+  Only the current version counts.
+* When the part number differs from the item number, the revision from the
+  revision code, or the description from the revision's name (and its
+  description), the revision page shows a notice *Design properties differ
+  from this revision*. Case and runs of spaces do not count. The notice is
+  worked out on every view, so it disappears as soon as the revision or the
+  design is changed. Nothing is changed automatically – edit the revision, or
+  the design (the desktop app can write the item number and revision into
+  it).
+* A new item created with a design and no name takes the design's
+  description as its name; with a name but no description, the description
+  is filled in. *Import a CAD folder* in the desktop app fills an imported
+  item's empty description the same way (the name stays the file name).
+
+A design whose document cannot be read (an unknown container, a damaged
+archive, a document above 16 MiB) is stored like any other file, without
+properties. Designs stored before TeamCraft read the properties get them with
+their next version. The properties come from the file and are data – they
+are not the item's attributes.

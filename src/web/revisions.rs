@@ -314,6 +314,21 @@ pub async fn show(
             .collect(),
     )
     .to_string();
+    // Design properties (SolidCraft) that differ from this revision: a hint
+    // computed on every view, so it goes away as soon as the item or the
+    // file is changed – nothing is changed automatically (#367).
+    let property_mismatches: Vec<serde_json::Value> = file_list
+        .iter()
+        .filter_map(|f| {
+            let props = f
+                .properties
+                .as_ref()
+                .and_then(crate::scdesign::DesignProperties::from_json)?;
+            let found = props.mismatches(&rev.item_number, &rev.code, &rev.name, &rev.description);
+            (!found.is_empty())
+                .then(|| json!({ "id": f.id, "filename": f.filename, "mismatches": found }))
+        })
+        .collect();
     // "Fill with AI…": report files to choose from, and whether the button
     // is offered (assistant configured, editor of the group, group has not
     // switched the assistant off).
@@ -522,6 +537,7 @@ pub async fn show(
             "file_groups": super::file_groups(&me.preferred_cad, &attachments),
             "files": attachments,
             "file_bases": file_bases,
+            "property_mismatches": property_mismatches,
             "native_without_preview": native_without_preview,
             "main_thumbnail": main_thumbnail,
             "similar": similar_parts,
@@ -1659,6 +1675,8 @@ mod tests {
             retention: "all".into(),
             solver_summary: None,
             solver_line: None,
+            properties: None,
+            properties_line: None,
             format_info: crate::cadformat::info(format),
         }
     }

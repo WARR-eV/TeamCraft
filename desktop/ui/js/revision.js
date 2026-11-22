@@ -488,11 +488,15 @@ export function revFiles(tab, el) {
   var groups = groupByFamily(d.files, state.me && state.me.preferred_cad);
   var rowOf = function (f) {
     var fmt = previewFormat(f);
+    // design properties read from a SolidCraft design (#367): data from the file
+    var props = f.properties_line
+      ? h("div.small.muted", { text: f.properties_line, title: "Design properties read from the file – not the item's attributes" })
+      : null;
     return {
       cells: [
         f.format_info && f.format_info.thumbnail
-          ? h("span.file-cell", null, [thumbImage(f), h("span", null, [f.filename, " ", formatChip(f)])])
-          : h("span", null, [f.filename, " ", formatChip(f)]),
+          ? h("span.file-cell", null, [thumbImage(f), h("span", null, [f.filename, " ", formatChip(f), props])])
+          : h("span", null, [f.filename, " ", formatChip(f), props]),
         h("span.badge", { text: "v" + f.version, title: "Version " + f.version + " – " + VERSION_HELP + " SHA-256 " + f.sha256 }),
         fmtSize(f.size_bytes),
         fmtDate(f.uploaded_at) + " · " + f.uploaded_by_name,

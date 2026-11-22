@@ -171,7 +171,8 @@ src/nxasm.rs       NX assemblies: components + placements from /Root/FastLoad/St
                    services/assemblies.rs composes the assembly preview from the parts' previews (found by file name)
 src/fusion.rs      Fusion design archives (.f3d): ZIP with Zstandard entries (ruzstd), size/CRC-checked; sample archives for tests
 src/scdesign.rs    SolidCraft designs (.sc): ZIP design container (bounded, size/CRC-checked, unknown versions = nothing found), embedded thumbnail,
-                   document of ZIP or JSON designs, linked designs with placement counts (cadrefs)
+                   document of ZIP or JSON designs, linked designs with placement counts (cadrefs),
+                   design properties (metadata text keys → file_versions.properties, mismatches with the item, #367)
 src/scbom.rs       BOM of a SolidCraft assembly from its design (components, placements, BOM types) → BomTable for the BOM import
 src/swpart.rs      SOLIDWORKS 2015+ section container: Deflate sections (bounded, CRC-checked), PreviewPNG, component tree (COMPINSTANCETREE):
                    referenced files and placements (assembly previews, also via services/assemblies.rs)
