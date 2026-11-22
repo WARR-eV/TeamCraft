@@ -2,7 +2,7 @@
 /* Small components of both apps (shared/README.md, rule 10): a class styled
  * here is styled nowhere else. Tokens only – the colours come from skins.css. */
 
-/* "?" next to a term (#414) – web: templates/macros.html `help`, desktop:
+/* "?" next to a term (issue 414) – web: templates/macros.html `help`, desktop:
  * js/revision.js `helpTip`. The text is the accessible name and the tooltip,
  * shown on hover and on keyboard focus. */
 .help-tip {
