@@ -63,6 +63,13 @@ export function sortEntries(entries, by) {
   });
 }
 
+/** The class a checked-out row gets (issue #362): one marker in one colour,
+ *  whoever holds the lock – the text colour stays as it is. `""` for a row
+ *  nobody has checked out. */
+export function checkedOutClass(e) {
+  return e && e.checked_out_by_name ? ".checked-out" : "";
+}
+
 /** The tooltip of a row: everything the dense row leaves out. */
 export function entryTitle(e, labelOf) {
   var parts = [entryRevision(e) + " – " + (e.name || "")];
