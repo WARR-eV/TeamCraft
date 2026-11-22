@@ -1,17 +1,23 @@
 # Builds and publishes TeamCraft:
 #
 # * a tag `v<version>` (e.g. `v0.2.0`) → GitHub Release with the server
-#   binaries (Linux x86_64/aarch64, Windows x64), the desktop installers
+#   binaries (Linux x86_64/aarch64), the desktop installers
 #   (Linux deb/rpm/AppImage and Flatpak bundles, macOS dmg/app, Windows x64
-#   and arm64 msi/setup.exe plus portable zips), the desktop installers
-#   *with local server* (Windows x64 setup.exe, macOS dmg, Linux x86_64
-#   AppImage: app + server + PostgreSQL, job local-server) and
+#   and arm64 msi/setup.exe plus portable zips) and
 #   SHA256SUMS.txt; 0.x versions and
 #   versions with a suffix (`v1.0.0-rc.1`) are marked as pre-release;
 # * main every night (when it changed since the last good build: code, not
 #   only *.md/docs/platforms), "Run workflow", or a pull request that changes
 #   this file or the packaging → the same files as workflow artifacts (kept
 #   14 days), no release.
+#
+# PAUSED (2026-11-22, to make releases faster): the desktop installers
+# *with local server* (job local-server: Windows x64 setup.exe, macOS dmg,
+# Linux x86_64 AppImage with server + PostgreSQL) and the server builds only
+# they needed – Windows x64 (also no longer a release download) and the
+# macOS sidecar – are not built. To bring them back: drop `false &&` from
+# the `if:` of local-server, uncomment the two server matrix rows and add
+# local-server to the `needs` of publish again (CONTRIBUTING.md, "Releases").
 #
 # A push to main does not run this workflow. It used to, with a newer push
 # cancelling the running build: on a day with several merges about half of
@@ -170,13 +176,11 @@ jobs:
         include:
           - { os: ubuntu-24.04, target: x86_64-unknown-linux-gnu, platform: linux-x86_64 }
           - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, platform: linux-aarch64 }
-          - { os: windows-latest, target: x86_64-pc-windows-msvc, platform: windows-x64 }
-          # Not released (no macOS server download, #66): only the sidecar of
-          # the macOS installer *with local server*. Built here, in parallel,
-          # instead of inside the local-server job after the slowest server
-          # build – that put 9 minutes of macOS compiling after the 12 of
-          # Windows (29 → about 18 minutes per release).
-          - { os: macos-latest, target: aarch64-apple-darwin, platform: macos-aarch64, artifact: sidecar }
+          # Paused with the local-server job (see the top of this file): the
+          # Windows x64 server download and the macOS sidecar of the installer
+          # *with local server* (not released itself, #66).
+          # - { os: windows-latest, target: x86_64-pc-windows-msvc, platform: windows-x64 }
+          # - { os: macos-latest, target: aarch64-apple-darwin, platform: macos-aarch64, artifact: sidecar }
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -371,7 +375,9 @@ jobs:
     # the server binaries of the server job are reused instead of built again
     # (20 minutes on Windows); macOS's is the job's unreleased sidecar artifact
     needs: [version, server]
-    if: needs.version.outputs.artifacts == 'true'
+    # paused for the next releases (see the top of this file): `false &&`
+    # switches the job off; its server inputs are not built meanwhile
+    if: false && needs.version.outputs.artifacts == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     strategy:
@@ -604,7 +610,9 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     # After the image: install.sh installs the newest release, whose image
     # must already be on ghcr.io.
-    needs: [version, server, desktop, flatpak, local-server, image-manifest]
+    # local-server is paused (see the top of this file) – a skipped job in
+    # `needs` would skip the release too
+    needs: [version, server, desktop, flatpak, image-manifest]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:

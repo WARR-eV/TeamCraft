@@ -1,5 +1,10 @@
 # Try it on your computer
 
+> **Paused for the next releases** (since 2026-11-22, to make releases faster): the
+> installers *with local server* and the Windows x64 server download are not built.
+> Until they are back, use `teamcraft local` (below) with the Linux server archive or a server you
+> build yourself, or the live demo.
+
 You can try TeamCraft on your own laptop without a server, Docker or a
 database administrator. Two ways lead to the same result: a private
 PostgreSQL database and the TeamCraft server, both running only on your

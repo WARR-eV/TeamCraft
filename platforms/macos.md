@@ -5,7 +5,10 @@ silicon or Intel). Releases contain the desktop app for Apple silicon
 (`.dmg`, `.app.zip`) but no macOS server binary: build the server as below
 or run the Docker image.
 
-**Just try it:** `TeamCraft-with-local-server_<version>_aarch64.dmg` from the
+**Paused for the next releases** (since 2026-11-22): the installer *with local server* is not
+built.
+
+**Just try it** (when the installer is back): `TeamCraft-with-local-server_<version>_aarch64.dmg` from the
 [Releases page](https://github.com/WARR-eV/TeamCraft/releases) (Apple
 silicon) installs *TeamCraft Local*, an app of its own next to the desktop
 app, with the server and PostgreSQL: open it with *right-click → Open* the

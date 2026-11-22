@@ -2,6 +2,11 @@
 
 ## Try it on your laptop
 
+> **Paused for the next releases** (since 2026-11-22, to make releases faster): the
+> installers *with local server* and the Windows x64 server download are not built.
+> Until they are back, use `teamcraft local` ([Try it on your computer](local-server.md)) or the
+> live demo.
+
 Download the desktop app **with local server** from the
 [Releases page](https://github.com/WARR-eV/TeamCraft/releases) (Windows x64,
 macOS Apple silicon, Linux x86_64) and start *TeamCraft Local*, an app of its
