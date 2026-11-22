@@ -90,6 +90,23 @@ export function nextStep(wizard, facts) {
   return at + 1 < shown.length ? shown[at + 1] : null;
 }
 
+/**
+ * The project group the last step opens in Home (*Finish and open <group>*):
+ * the first of the user's groups that a Get already fetched into this working
+ * folder, else the first of the user's groups; null without groups (the step
+ * then offers the Projects page). Returns the code as given in `facts.groups`.
+ */
+export function startGroup(facts) {
+  facts = facts || {};
+  var mine = (Array.isArray(facts.groups) ? facts.groups : []).filter(function (c) {
+    return typeof c === "string" && c.trim() !== "";
+  });
+  if (!mine.length) return null;
+  var onDisk = codes(facts.groupsOnDisk);
+  var fetched = mine.filter(function (c) { return onDisk.indexOf(c.trim().toLowerCase()) !== -1; });
+  return (fetched[0] || mine[0]).trim();
+}
+
 /** `Step 2 of 4` of a shown step; "" for one that is skipped. */
 export function stepPosition(step, facts) {
   var shown = visibleSteps(facts);
@@ -153,12 +170,16 @@ export function stepSummary(step, facts) {
         "Some CAD programs find the parts of an assembly through a project file or search paths. Point them at your working folder.",
         "A later version of TeamCraft Desktop will offer to create these files for you – nothing ticked by default and never overwriting yours. Nothing is created now."
       ] };
-    case "loop":
+    case "loop": {
+      var start = startGroup(facts);
       return { title: "Your daily loop in 3 steps", text: [
         "1. Check out and open – on an item or in its Workspace tab: locks the item for you, copies its files (and the parts of an assembly) and opens the main file in your CAD program.",
         "2. Save in your CAD program – into the working folder, as always.",
-        "3. Check in… – sends the changed files to the server with a comment and releases the lock. Your worklist shows what you have checked out."
+        "3. Check in… – sends the changed files to the server with a comment and releases the lock. Your worklist shows what you have checked out.",
+        start ? "Start now: Finish and open " + start + " shows the files of the group in Home – right-click the assembly → Check out and open."
+          : "Start now: Finish and show Projects lists the project groups – choose one, then right-click an assembly in its files → Check out and open."
       ] };
+    }
     default:
       return { title: "", text: [] };
   }

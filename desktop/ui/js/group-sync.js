@@ -37,7 +37,8 @@ export function gotGroups() {
   } catch (e) { return []; }
 }
 
-/** Remembers the groups of a Get that ran to its end (not stopped). */
+/** Remembers the groups of a Get that ran to its end without a problem
+ *  (not stopped, no failed item or name clash, rule *Latest revision*). */
 export function rememberGotGroups(list) {
   var all = gotGroups();
   (list || []).forEach(function (c) { if (all.indexOf(c) === -1) all.push(c); });
@@ -106,7 +107,8 @@ export function openGetProjectsDialog() {
           }, Promise.resolve());
         }).then(function () {
           running = false;
-          if (!stop) rememberGotGroups(codes);
+          // only a complete copy: no problems, no clashes, the latest revision of every item
+          if (!stop && !done.errors.length && rule.value === "latest") rememberGotGroups(codes);
           var text = (stop ? "Stopped. " : "Done. ") + done.items + " items, " + done.files + " files copied" +
             (done.kept ? ", " + done.kept + " locally modified files kept" : "") +
             (done.skipped ? ", " + done.skipped + " items without a released revision skipped" : "") +

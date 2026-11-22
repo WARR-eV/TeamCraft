@@ -23,6 +23,8 @@
 html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 body { background: var(--bg); color: var(--text); }
 .hidden { display: none !important; }
+/* read by screen readers, not shown (e.g. the step status of Getting started) */
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* Distro skins paint their glow and texture here, behind the page; the house
    skins set both to none. Nothing else reads --glow or --pattern. */

@@ -680,7 +680,7 @@ real files and belong to section 3 once such files are at hand.
   created automatically, existing files never overwritten without asking; can be opened again from the settings.
   The wizard frame exists (#422: *Getting started* in the desktop app, also *Help → Getting Started…*); its *CAD
   setup* step only lists what would be created. Left: creating the files themselves (needs the CAD programs to
-  verify the generated `.ipj`, load options and search paths)
+  verify the generated `.ipj`, load options and search paths); issue #422 stays open for this step 5 of its plan
 
 **Autodesk Inventor**
 

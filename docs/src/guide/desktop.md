@@ -655,16 +655,23 @@ you from the sign-in to your first opened assembly:
 4. **Project group** – the groups you are a member of and *Get project
    groups…*, which copies their files into the working folder (latest
    revision, also in work). Skipped when you are in no group yet, or when a
-   finished *Get project groups* on this computer already fetched all of
+   complete *Get project groups* on this computer (no failed item or name
+   clash, *Latest revision*) already fetched all of
    them into this working folder.
 5. **CAD setup** – for information only: the Inventor project file
    (`.ipj`), the NX load options and the Solid Edge search paths that a later
    version will offer to create. The wizard creates none of them.
 6. **Your daily loop in 3 steps** – *Check out and open* → save in your CAD
-   program → *Check in…*; *Finish and show Projects* or *Finish and open my
-   worklist* takes you to where the loop starts.
+   program → *Check in…*. *Finish and open* with the group code makes one of your
+   groups the active one (a group you already fetched first) and shows its
+   files in *Home* – right-click the assembly → *Check out and open*. Without
+   a group, *Finish and show Projects* lists the groups instead; *Finish and
+   open my worklist* shows what you have checked out.
 
-Every step has *Skip*, *Back*, *Next* and *Don't show again*. The wizard
+Every step has *Don't show again*; *Back*, *Skip* and *Next* move between
+the steps, and the last step has *Finish*. The step list on the left ticks
+the steps you went through with *Next* and marks the ones you skipped with
+a dash (also read out by screen readers). The wizard
 itself creates no file or folder – only the app's own actions it opens do,
 after you confirm them (the folder picker, *Get files*). Once you finish it
 or choose *Don't show again* it no longer opens by itself; an app that

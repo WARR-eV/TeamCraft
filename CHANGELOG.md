@@ -22,7 +22,9 @@ see the notices in the README.
   groups or when they are already fetched), the CAD setup for information
   (the Inventor `.ipj`, NX load options and Solid Edge search paths a later
   version will create – nothing is created now) and the daily loop *Check out
-  and open* → save in CAD → *Check in…*. Every step can be skipped; *Finish*
+  and open* → save in CAD → *Check in…*, ending in *Finish and open* with
+  one of your groups: its files open in Home, ready for *Check out and open*
+  on the assembly. Every step but the last can be skipped; *Finish*
   or *Don't show again* is kept in the settings (`onboarding`), and *Help →
   Getting Started…* opens it again. The wizard creates no file or folder by
   itself. Step rules in `desktop/ui/js/onboarding-rules.js`, tested by

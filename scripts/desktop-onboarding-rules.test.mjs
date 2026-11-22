@@ -16,7 +16,7 @@ const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../desk
 const src = fs.readFileSync(file, "utf8");
 const {
   ONBOARDING_STEPS, ONBOARDING_DONE, ONBOARDING_DISMISSED, CAD_SETUP_PREVIEW, STEP_NAMES,
-  shouldShow, skipReason, visibleSteps, nextStep, stepPosition, stepSummary
+  shouldShow, skipReason, visibleSteps, nextStep, stepPosition, stepSummary, startGroup
 } = await import("data:text/javascript;base64," + Buffer.from(src).toString("base64"));
 
 let n = 0;
@@ -164,9 +164,22 @@ test("the CAD step promises nothing is created now", () => {
 
 test("the loop step has the three steps", () => {
   const text = stepSummary("loop", fresh).text;
-  assert.equal(text.length, 3);
+  assert.equal(text.length, 4);
   assert.match(text[0], /Check out and open/);
   assert.match(text[2], /Check in…/);
+  // the next action: open the group, then Check out and open on the assembly
+  assert.match(text[3], /Finish and open ROVER/);
+  assert.match(text[3], /Check out and open/);
+  assert.match(stepSummary("loop", { ...fresh, groups: [] }).text[3], /Finish and show Projects/);
+});
+
+test("the group the last step opens: a fetched one first, none without groups", () => {
+  assert.equal(startGroup(fresh), "ROVER");
+  assert.equal(startGroup({ groups: ["ROVER", "ARM"], groupsOnDisk: ["arm"] }), "ARM");
+  assert.equal(startGroup({ groups: ["ROVER", "ARM"], groupsOnDisk: [] }), "ROVER");
+  assert.equal(startGroup({ groups: [], groupsOnDisk: ["arm"] }), null);
+  assert.equal(startGroup({ groups: ["", 3] }), null);
+  assert.equal(startGroup({}), null);
 });
 
 console.log(`${n} tests passed`);

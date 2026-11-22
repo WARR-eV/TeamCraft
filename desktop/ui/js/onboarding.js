@@ -10,14 +10,18 @@
 // groups*), and stores `done` or `dismissed` in the settings.
 
 import { $, TAURI, call, dialog, errorText, h, state, toast } from "./core.js";
-import { CAD_SETUP_PREVIEW, ONBOARDING_DISMISSED, ONBOARDING_DONE, ONBOARDING_STEPS, STEP_NAMES, nextStep, shouldShow, skipReason, stepPosition, stepSummary } from "./onboarding-rules.js";
+import { CAD_SETUP_PREVIEW, ONBOARDING_DISMISSED, ONBOARDING_DONE, ONBOARDING_STEPS, STEP_NAMES, nextStep, shouldShow, skipReason, startGroup, stepPosition, stepSummary } from "./onboarding-rules.js";
 import { fixedByPolicy } from "./settings.js";
 import { getProjectsDialog, gotGroups } from "./group-sync.js";
-import { selectView } from "./navigator.js";
+import { selectView, setActiveProject } from "./navigator.js";
 import { openWorkspaceFolder } from "./workspace.js";
 
 /** The open wizard's dialog (one at a time). */
 var wizardDialog = null;
+
+/** Steps the user passed with *Skip* in this run of the wizard (the step
+ *  list marks them skipped, not done). */
+var skippedSteps = new Set();
 
 /** What the step rules need to know, read from the session now. */
 function onboardingFacts() {
@@ -55,6 +59,7 @@ export function maybeStartOnboarding() {
 export function openOnboarding(fromHelp) {
   if (!shouldShow(state.session || {}, { fromHelp: !!fromHelp, signedInThisRun: state.signedInAtStart === false })) return;
   if (wizardDialog) return;
+  skippedSteps = new Set();
   showStep(nextStep({ current: null }, onboardingFacts()));
 }
 
@@ -63,16 +68,21 @@ function closeWizard() {
   wizardDialog = null;
 }
 
-/** The list of all steps on the left: done, current, skipped (with why). */
+/** The list of all steps on the left: done, current, skipped (with why).
+ *  The status is also spoken (a visually hidden text), not only the CSS
+ *  tick or dash. */
 function stepList(current, facts) {
   var passed = true;
   return h("ol.onboarding-steps", { "aria-label": "Steps" }, ONBOARDING_STEPS.map(function (s) {
     if (s === current) passed = false;
     var why = skipReason(s, facts);
-    // the sign-in is skipped because it is done: a tick, not a dash
-    var cls = s === current ? ".current" : s === "signin" && why ? ".done" : why ? ".skipped" : passed ? ".done" : "";
-    return h("li" + cls, { title: why || null, "aria-current": s === current ? "step" : null }, [
+    // the sign-in is skipped because it is done: a tick, not a dash;
+    // a step passed with *Skip* is skipped, not done
+    var status = s === current ? "current" : s === "signin" && why ? "done" : why ? "skipped"
+      : passed && skippedSteps.has(s) ? "skipped" : passed ? "done" : "";
+    return h("li" + (status ? "." + status : ""), { title: why || null, "aria-current": s === current ? "step" : null }, [
       h("span", { text: STEP_NAMES[s] }),
+      status === "done" || status === "skipped" ? h("span.visually-hidden", { text: " (" + status + ")" }) : null,
       why ? h("span.small.muted", { text: why }) : null
     ]);
   }));
@@ -101,12 +111,18 @@ function stepExtras(step, facts) {
           h("span.small.muted", { text: "(not created)" })
         ]);
       }));
-    case "loop":
+    case "loop": {
+      // finish here and go where the loop starts: the files of the group in
+      // Home (as choosing it on the Projects page does), or the group picker
+      // for a user without groups
+      var start = startGroup(facts);
       return h("div.row", null, [
-        // finish here and go where the loop starts: an item of the group, or a check-out
-        h("button", { type: "button", on: { click: function () { showStep(null); selectView("projects"); } } }, "Finish and show Projects"),
+        start
+          ? h("button", { type: "button", on: { click: function () { showStep(null); setActiveProject(start); selectView("home"); } } }, "Finish and open " + start)
+          : h("button", { type: "button", on: { click: function () { showStep(null); selectView("projects"); } } }, "Finish and show Projects"),
         h("button", { type: "button", on: { click: function () { showStep(null); selectView("worklist"); } } }, "Finish and open my worklist")
       ]);
+    }
     default:
       return null;
   }
@@ -143,11 +159,13 @@ function showStep(step) {
     ])
   ]);
   function go() { showStep(nextStep({ current: step }, onboardingFacts())); }
+  function skip() { skippedSteps.add(step); go(); }
+  function next() { skippedSteps.delete(step); go(); }
   var actions = [
     { label: "Don't show again", onClick: function () { closeWizard(); saveOnboarding(ONBOARDING_DISMISSED); } },
     back ? { label: "Back", onClick: function () { showStep(back); } } : null,
-    last ? null : { label: "Skip", onClick: go },
-    { label: last ? "Finish" : "Next", primary: true, submit: true, onClick: go }
+    last ? null : { label: "Skip", onClick: skip },
+    { label: last ? "Finish" : "Next", primary: true, submit: true, onClick: next }
   ].filter(Boolean);
   wizardDialog = dialog("Getting started", body, actions, { wide: true, modal: true });
   wizardDialog.step = step;
