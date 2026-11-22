@@ -794,7 +794,7 @@ needs an issue with a reason first (see *Direction*).
 - [ ] Code-signed installers, Flathub and AUR packages
 - [ ] Operations: complete metrics, outbox/queue observability, documented alerts, dependency updates, SBOM and build
   provenance, fuzzing of the remaining parsers, preview limits (F11), hash re-check on download (F8)
-- [ ] Upgrades: proven upgrade chain per release, restore-based rollback guide, a plugin/extension layer
+- [ ] Upgrades: proven upgrade chain per release, restore-based rollback guide, a plugin/extension layer (design: research page *A sandboxed extension layer*, #382)
 - [ ] CAD clone workflows: clone an assembly with selective reuse, Save As / revise per component over a whole
   structure, shown as an indented tree
 - [ ] Interactive onboarding and contextual help

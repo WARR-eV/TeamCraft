@@ -250,3 +250,13 @@ fixed ones are struck through and name the change.
 Fixed while writing this model: a password change kept the user's other
 sessions alive (`users::change_own_password`, test
 `changing_the_own_password_ends_the_other_sessions`).
+
+## Planned: extensions (not built yet)
+
+A sandboxed extension layer is designed in the research page
+[A sandboxed extension layer](../research/extension-layer.md) (#382): admin-
+installed WebAssembly components, approved by a SHA-256 over manifest and
+module, without WASI, network or file access, under fuel, memory and
+wall-time limits, reading data only with the acting user's rights and
+writing only through `services::*`. Nothing of it is built yet; this page
+gets the real entry when it is.
