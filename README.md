@@ -322,7 +322,7 @@ end-to-end tests against a real PostgreSQL.
 - **SolidCraft and FieldCraft** – [SolidCraft](https://github.com/tangency-labs/solidcraft)
   designs (`.sc`, checked by content) and
   [FieldCraft](https://github.com/tangency-labs/fieldcraft) models (`.fieldcraft`) are recognised, SolidCraft's embedded picture is the preview image, linked designs are
-  file references with quantities, the desktop app exports designs to STEP with `solidcraft-cli`, a TeamCraft plugin for SolidCraft shows and checks the design's TeamCraft item inside SolidCraft, and their STEP and 3MF
+  file references with quantities, SolidCraft's BOM CSV imports as it is, the desktop app exports designs to STEP with `solidcraft-cli`, a TeamCraft plugin for SolidCraft shows and checks the design's TeamCraft item inside SolidCraft, and their STEP and 3MF
   exports previewed –
   design, export and analysis in one revision ([more](https://warr-ev.github.io/TeamCraft/reference/interop.html)).
 

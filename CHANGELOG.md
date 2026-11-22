@@ -47,6 +47,11 @@ see the notices in the README.
   TeamCraft* (part numbers, BOM rows, linked designs), *Link to TeamCraft
   item* and *Unlink*; works offline on the open design. Built and tested by
   the new workflow *SolidCraft plugin*.
+- **SolidCraft BOM CSV import** (part of #366). *Import BOM* recognises the
+  CSV SolidCraft's bill of materials writes: `definition` is the name, and
+  its counts – counted in all – become quantities per parent row (a count
+  that does not divide evenly is kept and reported); `revision` and the
+  amount column `quantity` are extra columns.
 
 ## [0.2.11] - 2026-11-21
 
