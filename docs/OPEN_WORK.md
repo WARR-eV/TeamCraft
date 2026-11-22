@@ -700,7 +700,7 @@ real files and belong to section 3 once such files are at hand.
 - [x] Research page on the `.sc` design container and its sources (#363)
 - [x] Preview image from the embedded thumbnail (#364); left: rendered pictures for designs saved without one (#368)
 - [x] Linked designs as file references with quantities (#365); left: rewriting link paths after a rename (with #369)
-- [ ] BOM import from SolidCraft's BOM CSV and from the design (#366); done: the CSV; left: the BOM read from the design itself
+- [x] BOM import from SolidCraft's BOM CSV and from the design (#366); left: lengths and expressions in `bom_quantity`, keeping the `.sc` with a new assembly (as STEP)
 - [ ] Design properties read, shown, searchable, mismatches with the item flagged (#367)
 - [x] Desktop: STEP export through `solidcraft-cli` at check-in, all OSes (#368); left: a rendered thumbnail (`solidcraft-cli snapshot`) for designs saved without one
 - [x] Desktop: item number and revision written into the design properties (#369); left: automatically at check-out (a setting), link paths after a rename

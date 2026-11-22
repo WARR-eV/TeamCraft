@@ -1502,7 +1502,10 @@ pub async fn pick_bom_file(app: AppHandle) -> CmdResult<Option<PathBuf>> {
         app.dialog()
             .file()
             .set_title("BOM to import")
-            .add_filter("BOM tables and STEP assemblies", bomimport::EXTENSIONS)
+            .add_filter(
+                "BOM tables, STEP assemblies and SolidCraft designs",
+                bomimport::EXTENSIONS,
+            )
             .blocking_pick_file()
             .and_then(|p| p.into_path().ok())
     })
