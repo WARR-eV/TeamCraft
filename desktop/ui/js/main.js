@@ -9,7 +9,7 @@
 // Every server call goes through the Rust commands (src/commands.rs); data
 // from the server is only ever inserted as text, never as HTML.
 //
-// Modules: core.js, skins.js, connect.js, shell.js, navigator.js, tabs.js, assistant.js, agent.js, revision.js, references.js, workspace.js, change.js, requests.js, dialogs.js, bom-import.js, group-sync.js, folder-import.js, settings.js, onboarding-rules.js, onboarding.js, crash.js, main.js.
+// Modules: core.js, skins.js, connect.js, shell.js, navigator.js, tabs.js, assistant.js, agent.js, revision.js, references.js, workspace.js, change.js, requests.js, dialogs.js, bom-import.js, bom-lines.js, group-sync.js, folder-import.js, settings.js, onboarding-rules.js, onboarding.js, crash.js, main.js.
 
 import { $, TAURI, call, errorText, h, invoke, setStatus, state, toast } from "./core.js";
 import { applySkin } from "./skins.js";
@@ -154,8 +154,10 @@ export function boot() {
     call("workspace_cancel").catch(function () {});
   });
   // translated UI (#379): the saved choice, else the system's language
-  loadLanguage(preferredLanguage()).catch(function () {});
-  call("session").then(function (s) {
+  // – loaded before the first view draws, so the texts of the catalogs (the
+  // empty states of #423) never show their IDs; a failure leaves English
+  var languageReady = loadLanguage(preferredLanguage()).catch(function () {});
+  languageReady.then(function () { return call("session"); }).then(function (s) {
     state.session = s;
     // signed in already: no first-start wizard (onboarding.js)
     state.signedInAtStart = !!s.signed_in;

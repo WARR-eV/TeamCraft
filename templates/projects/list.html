@@ -52,7 +52,7 @@
     </tbody>
   </table>
   </div>
-  {% else %}<p class="empty">No project groups yet{% if me.role != "viewer" %} – create the first one below{% endif %}.</p>{% endif %}
+  {% else %}<p class="empty">{% if me.role != "viewer" %}{{ t("empty.no_groups.editor") }} <a href="#new-project">{{ t("empty.action.create_group") }}</a>{% else %}{{ t("empty.no_groups.viewer") }}{% endif %}</p>{% endif %}
 </div>
 
 {% if me.role != "viewer" %}

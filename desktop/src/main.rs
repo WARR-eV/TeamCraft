@@ -265,6 +265,7 @@ fn main() {
             commands::assistant_cancel,
             commands::file_bytes,
             commands::workspace_checkout,
+            commands::workspace_checkout_many,
             commands::workspace_download,
             commands::workspace_get,
             commands::workspace_cancel,

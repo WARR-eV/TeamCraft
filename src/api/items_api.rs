@@ -462,6 +462,25 @@ pub(super) async fn item_duplicates(
     Ok(Json(json!(found)))
 }
 
+#[derive(Deserialize)]
+pub(super) struct SuggestQuery {
+    #[serde(default)]
+    q: String,
+    limit: Option<i64>,
+}
+
+/// `GET /api/v1/items/suggest?q=&limit=`: the component picker of the BOM
+/// (desktop *Add line*, #419) – readable items matching number, name or file
+/// name, with the latest revision and a file with a preview image.
+pub(super) async fn item_suggest(
+    State(st): State<AppState>,
+    ApiUser(me): ApiUser,
+    Query(q): Query<SuggestQuery>,
+) -> AppResult<Json<Value>> {
+    let found = items::suggest(&st.db, &me, &q.q, q.limit).await?;
+    Ok(Json(json!({ "items": found })))
+}
+
 pub(super) async fn get_item(
     State(st): State<AppState>,
     ApiUser(me): ApiUser,
@@ -550,10 +569,13 @@ pub(super) async fn get_revision(
     let lines = bom::lines(&st.db, &me, rev.id).await?;
     let (rev_changes, hidden_changes) = changes::for_revision(&st.db, &me, rev.id).await?;
     let open_requests = requests::open_for_item(&st.db, &me, rev.item_id).await?;
+    // design properties that differ from the revision (#367), as on the web page
+    let property_mismatches = files::property_mismatches(&rev, &attachments);
     Ok(Json(json!({
         "revision": rev, "files": attachments, "bom": lines, "changes": rev_changes,
         "hidden_changes": hidden_changes,
         "open_requests": open_requests,
+        "property_mismatches": property_mismatches,
     })))
 }
 

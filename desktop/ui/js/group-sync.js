@@ -46,16 +46,21 @@ export function rememberGotGroups(list) {
 }
 
 /** For new team members or a fresh computer: copies the files of every item
- * of the chosen project groups into the workspace, one folder per group. */
-export function getProjectsDialog() { freshProjects().then(openGetProjectsDialog); }
+ * of the chosen project groups into the workspace, one folder per group.
+ * `opts.project` (a group code) ticks only that group – the *Get…* of an
+ * empty state starts with the active group (#423); without it, the groups
+ * the user is a member of are ticked. */
+export function getProjectsDialog(opts) { freshProjects().then(function () { openGetProjectsDialog(opts); }); }
 
-export function openGetProjectsDialog() {
+export function openGetProjectsDialog(opts) {
+  var preselect = opts && opts.project;
   function member(p) { return state.me.projects.indexOf(p.id) !== -1; }
+  function ticked(p) { return preselect ? p.code === preselect : member(p); }
   var groups = state.projects.filter(function (p) { return p.active; }).sort(function (a, b) {
     return (member(b) - member(a)) || a.code.localeCompare(b.code);
   });
   var boxes = groups.map(function (p) {
-    return { code: p.code, input: h("input", { type: "checkbox", checked: member(p) }), label: p.code + " – " + p.name + (member(p) ? " (member)" : "") };
+    return { code: p.code, input: h("input", { type: "checkbox", checked: ticked(p) }), label: p.code + " – " + p.name + (member(p) ? " (member)" : "") };
   });
   // Latest first (#355): in a team that releases only before manufacturing,
   // most items are still in work – "released" would leave the working folder

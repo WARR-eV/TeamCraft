@@ -11,7 +11,8 @@ use crate::{
     error::{AppError, AppResult},
     models::{Item, ItemSummary, Revision, WhereUsed, WhereUsedLevel},
     services::{
-        access, attributes, audit, files, notifications, projects, revisions, simulations, Page,
+        access, attributes, audit, files, notifications, projects, revisions, simulations,
+        thumbnails, Page,
     },
 };
 
@@ -346,7 +347,92 @@ pub async fn search(
             .await?
         }
     };
-    Ok((rows.into_iter().map(|r| r.item).collect(), total))
+    let mut items: Vec<ItemSummary> = rows.into_iter().map(|r| r.item).collect();
+    with_thumbnails(pool, &mut items).await?;
+    Ok((items, total))
+}
+
+/// Fills the main thumbnail of each row's latest revision, in one query for
+/// the whole page (#420).
+async fn with_thumbnails(pool: &PgPool, items: &mut [ItemSummary]) -> AppResult<()> {
+    let ids: Vec<Uuid> = items.iter().map(|i| i.latest_revision_id).collect();
+    let thumbs = thumbnails::main_for_revisions(pool, &ids).await?;
+    for item in items.iter_mut() {
+        if let Some(thumb) = thumbs.get(&item.latest_revision_id) {
+            item.thumbnail_file_id = Some(thumb.file_id);
+            item.thumbnail_sha256 = Some(thumb.sha256.clone());
+        }
+    }
+    Ok(())
+}
+
+/// Most suggestions the component picker shows (#419).
+pub const SUGGEST_MAX: i64 = 10;
+/// Shortest search text the component picker answers (shorter: nothing).
+pub const SUGGEST_MIN_CHARS: usize = 2;
+/// Longest search text the component picker takes (longer: cut).
+const SUGGEST_MAX_CHARS: usize = 200;
+
+/// One suggestion of the component picker: an item the actor may read whose
+/// number, name, description, attributes or file name matched (#419).
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct Suggestion {
+    pub id: Uuid,
+    pub number: String,
+    pub item_type: String,
+    pub unit: String,
+    pub name: String,
+    pub latest_code: String,
+    pub latest_state: String,
+    pub project_code: Option<String>,
+    /// The file whose name or content matched, if that was the match.
+    pub matched_file: Option<String>,
+    /// A file of the latest revision with an embedded preview image
+    /// (`/files/{id}/thumbnail`), if there is one.
+    pub thumbnail_file_id: Option<Uuid>,
+}
+
+/// Suggestions of the component picker of the BOM (web *Add component*,
+/// desktop *Add line*): the item search ([`search`]) with the actor's read
+/// rights – restricted groups the actor does not belong to stay invisible –
+/// at most [`SUGGEST_MAX`] rows, nothing for a text shorter than
+/// [`SUGGEST_MIN_CHARS`] characters.
+pub async fn suggest(
+    pool: &PgPool,
+    actor: &Actor,
+    query: &str,
+    limit: Option<i64>,
+) -> AppResult<Vec<Suggestion>> {
+    let query: String = query.trim().chars().take(SUGGEST_MAX_CHARS).collect();
+    if query.chars().count() < SUGGEST_MIN_CHARS {
+        return Ok(Vec::new());
+    }
+    let filter = ItemFilter {
+        query: Some(query),
+        ..ItemFilter::default()
+    };
+    let page = Page {
+        limit: limit.unwrap_or(SUGGEST_MAX).clamp(1, SUGGEST_MAX),
+        offset: 0,
+    };
+    let (rows, _) = search(pool, actor, &filter, page).await?;
+    let revision_ids: Vec<Uuid> = rows.iter().map(|r| r.latest_revision_id).collect();
+    let thumbs = crate::services::similar::thumbnails(pool, &revision_ids).await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| Suggestion {
+            thumbnail_file_id: thumbs.get(&r.latest_revision_id).copied(),
+            id: r.id,
+            number: r.number,
+            item_type: r.item_type,
+            unit: r.unit,
+            name: r.name,
+            latest_code: r.latest_code,
+            latest_state: r.latest_state,
+            project_code: r.project_code,
+            matched_file: r.matched_file,
+        })
+        .collect())
 }
 
 pub(crate) async fn get_unchecked(pool: impl sqlx::PgExecutor<'_>, id: Uuid) -> AppResult<Item> {

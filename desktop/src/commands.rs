@@ -522,6 +522,10 @@ pub async fn assistant_send(state: State<'_, AppState>, body: Value) -> CmdResul
         .lock()
         .expect("assistant lock")
         .take();
+    if result.is_ok() {
+        // usage statistics (#383): one per answered question, never its text
+        usage(&state, |u| u.count("assistant"));
+    }
     result
 }
 
@@ -746,6 +750,22 @@ pub async fn workspace_checkout(
         &mut progress,
     )
     .await
+}
+
+/// *Check out parts…* (issue #415): checks out the ticked revisions of an
+/// assembly in one server call and makes their files in the working folder
+/// writable; the result lists what the server refused and why.
+#[tauri::command]
+pub async fn workspace_checkout_many(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    revisions: Vec<workspace::CheckoutPick>,
+) -> CmdResult<workspace::CheckedOutMany> {
+    usage(&state, |u| u.count("checkout"));
+    let api = signed_in_api(&state)?;
+    let (cancel, mut progress) = progress_events(&app, &state);
+    let root = workspace_root(&app, &state);
+    workspace::checkout_many(&api, &root, &revisions, &cancel, &mut progress).await
 }
 
 /// Copies the current files of a revision into the working folder without
@@ -1760,7 +1780,12 @@ pub async fn import_bom(
     dry_run: bool,
 ) -> CmdResult<Value> {
     let api = signed_in_api(&state)?;
-    bomimport::send(&api, &path, &request, dry_run).await
+    let result = bomimport::send(&api, &path, &request, dry_run).await?;
+    if !dry_run {
+        // usage statistics (#383): the import itself, never the preview
+        usage(&state, |u| u.count("import_bom"));
+    }
+    Ok(result)
 }
 
 /// `(name on the server, local path)` for every path.

@@ -197,7 +197,9 @@ end-to-end tests against a real PostgreSQL.
 **Files and versions**
 
 - **Check-out / check-in** – exclusive locks per revision; a check-in based on
-  an outdated version is refused instead of overwriting it.
+  an outdated version is refused instead of overwriting it. Several parts of an
+  assembly can be checked out in one step to edit them in its context
+  (`POST /api/v1/checkouts`, a result per part).
 - **Versions and rollback** – every upload is a new version; download or
   restore any of them, history is never rewritten.
 - **Vault explorer** – project groups as folders with lock owners, files and
@@ -219,7 +221,10 @@ end-to-end tests against a real PostgreSQL.
   and more.
 - **CAD thumbnails** – the preview images stored in Inventor drawings and Solid
   Edge files; NX, SOLIDWORKS, Inventor, CATIA, Creo, Rhino, SketchUp, JT and
-  Fusion files get a sharper thumbnail rendered from their 3D preview.
+  Fusion files get a sharper thumbnail rendered from their 3D preview. The
+  picture of the main model heads the revision page and every row of the item
+  list, the search results, the vault explorer and the desktop app's Home views
+  (lazy-loaded, cached by content hash).
 - **FEA/CFD results** – VTK, VTU/VTP and CalculiX results coloured by a result
   field, with legend.
 - **Search** – ranked full-text search over numbers, names, materials, file
@@ -230,7 +235,8 @@ end-to-end tests against a real PostgreSQL.
 **Structure**
 
 - **Multi-level BOM** – mass and cost roll-up, revision rules, comparison of
-  two revisions, CSV/Excel export.
+  two revisions, CSV/Excel export; components are picked by searching their
+  number, name or file name (web and desktop).
 - **Mass properties** – mass, centre of gravity and inertia tensor of a whole
   assembly or vehicle from the exported meshes of its parts, a material
   library of densities and measured masses of bought parts; CSV/JSON export.
@@ -303,8 +309,9 @@ end-to-end tests against a real PostgreSQL.
 
 - **Web UI** – light and dark design that follows the operating system, plus
   distribution skins; responsive down to phone width. English and German (first
-  part, #379): the header follows the browser's language, the desktop app has
-  *Settings → Language*.
+  part, #379): the header and the empty states follow the browser's language, the desktop app has
+  *Settings → Language*. Empty lists name the next step, by role – viewers
+  learn why they see no editing buttons (#423).
 - **Desktop app** – Linux, macOS and Windows client with a local working
   folder, a *Getting started* wizard after the first sign-in (working folder,
   *Get* of your project groups, the daily loop), *Get* of whole assemblies, an import wizard, a *Files* view of each
@@ -315,7 +322,8 @@ end-to-end tests against a real PostgreSQL.
   saved in the working folder (group and folder taken from where they are,
   duplicates refused, the worklist suggesting the parts and assemblies that
   belong to no item yet), an Agent view, crash reports the user
-  decides about and an update notice (never installs anything itself). The
+  decides about, *Report…* on every error (a reviewed, redacted report with
+  the action and its key inputs; nothing is sent without a click) and an update notice (never installs anything itself). The
   download *with local server* also runs a private test server with its own
   database on the laptop (*Try TeamCraft on this computer*).
 - **REST API** – everything the UI does, with personal access tokens.
@@ -328,7 +336,7 @@ end-to-end tests against a real PostgreSQL.
 - **SolidCraft and FieldCraft** – [SolidCraft](https://github.com/tangency-labs/solidcraft)
   designs (`.sc`, checked by content) and
   [FieldCraft](https://github.com/tangency-labs/fieldcraft) models (`.fieldcraft`) are recognised, SolidCraft's embedded picture is the preview image, linked designs are
-  file references with quantities, SolidCraft's BOM CSV and the design itself import as a BOM, the desktop app exports designs to STEP with `solidcraft-cli`, a TeamCraft plugin for SolidCraft shows and checks the design's TeamCraft item inside SolidCraft – and, through a folder shared with the desktop app, its live state and requests to check out, check in or open it – and their STEP and 3MF
+  file references with quantities, SolidCraft's BOM CSV and the design itself import as a BOM, the design properties (part number, revision, description) are shown with the file, searchable and compared with the item, the desktop app exports designs to STEP with `solidcraft-cli`, a TeamCraft plugin for SolidCraft shows and checks the design's TeamCraft item inside SolidCraft – and, through a folder shared with the desktop app, its live state and requests to check out, check in or open it – and their STEP and 3MF
   exports previewed –
   design, export and analysis in one revision ([more](https://warr-ev.github.io/TeamCraft/reference/interop.html)).
 

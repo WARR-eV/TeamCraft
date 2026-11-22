@@ -6,6 +6,7 @@ import { showConnect } from "./connect.js";
 import { agent } from "./agent.js";
 import { projectItems } from "./group-sync.js";
 import { label } from "/static/shared/js/format.js";
+import { failureOf } from "./report-inputs.js";
 
 export var TAURI = window.__TAURI__;
 export var invoke = TAURI.core.invoke;
@@ -290,15 +291,26 @@ function rememberError(text) {
   state.recentErrors = (state.recentErrors || []).concat([new Date().toISOString().slice(11, 19) + " " + text]).slice(-50);
 }
 
-/** A message at the bottom; `action` names what failed, for *Report…*. */
-export function toast(text, kind, action) {
+/** `inputs` as given to run()/dialog(): a list of [name, value] or a function returning one. */
+function inputsNow(inputs) {
+  if (typeof inputs !== "function") return inputs;
+  try { return inputs(); } catch (e) { return []; }
+}
+
+/**
+ * A message at the bottom; `action` names what failed and `inputs` are its
+ * key inputs (as for run()), both for *Report…*.
+ */
+export function toast(text, kind, action, inputs) {
   var el = h("div.toast" + (kind ? "." + kind : ""), { role: kind === "error" ? "alert" : "status" }, [h("span", { text: text })]);
   if (kind === "error") {
     rememberError((action ? action + ": " : "") + text);
     if (reportHook.open) {
+      // the key inputs of the action (#381), taken when the error is shown
+      var failure = failureOf(action, text, inputsNow(inputs));
       el.appendChild(h("button.link.small", { type: "button", on: { click: function () {
         el.remove();
-        reportHook.open({ action: action || "", error: text });
+        reportHook.open(failure);
       } } }, "Report…"));
     }
   }
@@ -326,15 +338,20 @@ export function api(method, path, body) {
 
 export function enc(s) { return encodeURIComponent(s); }
 
-/** Runs an action with status text and error toast; returns its promise. */
-export function run(statusText, fn) {
+/**
+ * Runs an action with status text and error toast; returns its promise.
+ * `inputs` (optional): the key inputs of the action as [[name, value], …]
+ * (or a function returning them) – names and short values only, never file
+ * contents or item data; they go into a *Report…* of the error (#381).
+ */
+export function run(statusText, fn, inputs) {
   setStatus(statusText + " …");
   return Promise.resolve().then(fn).then(function (v) {
     setStatus("");
     return v;
   }, function (err) {
     setStatus("");
-    toast(errorText(err), "error", statusText);
+    toast(errorText(err), "error", statusText, inputs);
     throw err;
   });
 }
@@ -370,7 +387,9 @@ export function dialog(title, body, actions, opts) {
     rememberError(title + ": " + text);
     // *Report…* (#381): the dialog's title is the action that failed
     if (reportHook.open) {
-      errorEl.append(" ", h("button.link.small", { type: "button", on: { click: function () { reportHook.open({ action: title, error: text }); } } }, "Report…"));
+      // opts.inputs: the key inputs of the dialog's action, as for run()
+      var failure = failureOf(title, text, inputsNow(opts.inputs));
+      errorEl.append(" ", h("button.link.small", { type: "button", on: { click: function () { reportHook.open(failure); } } }, "Report…"));
     }
     errorEl.classList.remove("hidden");
   }

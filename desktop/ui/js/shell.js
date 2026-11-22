@@ -294,6 +294,8 @@ export function initShell() {
   $("search-form").addEventListener("submit", function (e) {
     e.preventDefault();
     state.query = $("search-input").value.trim();
+    // usage statistics (#383): one per submitted search, never the terms
+    if (state.query) call("usage_count", { action: "search" }).catch(function () {});
     selectView("search");
   });
   $("open-settings").addEventListener("click", openSettings);
