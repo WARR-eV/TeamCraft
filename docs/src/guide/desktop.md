@@ -372,7 +372,10 @@ this computer.
 * *Files* (the view Home starts with): the **folders** of the group and the **files** in them, as in its working
   folder – folders first, then the files
   by name the way a file manager orders them (without regard to case, `Part2`
-  before `Part10`), each with the state and the lock of its item. The file
+  before `Part10`), each with the state and the lock of its item. A checked-out file is marked
+  with a bar in the lock colour at the left edge of its row and a light tint
+  of the row (the same for your check-outs and other people's; also in
+  *Structure*). The file
   name comes first and the number and revision after it, so a narrow navigator
   cuts the number, not the name. A folder opens its own level – a large group
   is never loaded as a whole, and a folder with more than 500 files offers *show … more*. The files are those of the

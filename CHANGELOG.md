@@ -79,6 +79,13 @@ see the notices in the README.
   rejects while busy are retried for a minute, and the whole error output of
   a failed export is kept in `export-logs/` (named in the message).
 
+### Changed
+
+- **Desktop: checked-out files stand out in Home** (#362). A checked-out row
+  in the *Files* view and the *Structure* tree gets one marker in the lock
+  colour – a bar at its left edge and a light tint of the row – whoever holds
+  the lock; the text colour is unchanged.
+
 ## [0.2.11] - 2026-11-21
 
 ### Added
