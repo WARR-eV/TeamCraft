@@ -1,0 +1,1 @@
+{"entry": "live", "design": "linked.sc", "grants": {"folders": [{"name": "teamcraft", "read": true, "write": true, "from": "bridge-fresh"}]}, "expect": {"reply": {"result": {"live": true, "desktop_running": true, "state": {"latest_revision": "B"}}}}}

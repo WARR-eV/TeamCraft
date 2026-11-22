@@ -8,6 +8,7 @@
 //! `entry.execute`. The bindings exist only in the WebAssembly build, so the
 //! logic's tests run on the build machine.
 
+pub mod bridge;
 pub mod logic;
 
 #[cfg(target_arch = "wasm32")]
@@ -35,6 +36,24 @@ mod component {
                 .map_err(|e| describe(&e))?;
             serde_json::from_str(&reply)
                 .map_err(|e| format!("{command} answered with no JSON: {e}"))
+        }
+
+        fn read_file(&mut self, path: &str) -> Result<Option<Vec<u8>>, String> {
+            match craft::plugin::files::read_file(super::bridge::GRANT, path) {
+                Ok(bytes) => Ok(Some(bytes)),
+                // a file that is not there is an answer, not a failure (SolidCraft #17899)
+                Err(PluginError::InvalidInput(f)) if f.reason.contains("no such file") => Ok(None),
+                Err(e) => Err(describe(&e)),
+            }
+        }
+
+        fn write_file(&mut self, path: &str, data: &[u8]) -> Result<(), String> {
+            craft::plugin::files::write_file(super::bridge::GRANT, path, data)
+                .map_err(|e| describe(&e))
+        }
+
+        fn now(&mut self) -> u64 {
+            craft::plugin::clock::now()
         }
     }
 

@@ -66,14 +66,18 @@ the design.
 A **bridge folder** `<working folder>/.teamcraft/solidcraft/` that both sides
 read and write, JSON files of at most 4 KiB, versioned:
 
+One flat folder: a write into a subfolder that does not exist ends the
+plugin's run, a missing file does not. Times are Unix seconds (the plugin's
+`clock.now`).
+
 - `desktop.json` – the desktop app's heartbeat (`schema
-  "teamcraft.solidcraft.desktop"`, `version 1`, `written_at` in ms, whether
-  the server is reachable), rewritten every 30 s.
-- `state/<revision_id>.json` – the state of one revision in the working
+  "teamcraft.solidcraft.desktop"`, `version 1`, `written_at`, whether the
+  server is reachable), rewritten every 30 s.
+- `state-<revision_id>.json` – the state of one revision in the working
   folder: item number, revision, who has it checked out (display name, and
   whether it is me), the latest revision on the server, the local state and
   lifecycle state, the actions offered.
-- `requests/<revision_id>-<ms>-<action>.json` – an intent from the plugin:
+- `request-<revision_id>-<time>-<action>.json` – an intent from the plugin:
   `check_out`, `check_in`, `open` or `refresh`. The desktop app deletes it
   when handled; the result shows in the state file.
 

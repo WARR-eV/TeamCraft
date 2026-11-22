@@ -2,7 +2,7 @@
   "id": "teamcraft",
   "name": "TeamCraft",
   "version": "0.1.0",
-  "description": "TeamCraft item of the design, a check before checking it in to TeamCraft, and linking a design to a TeamCraft item. Works offline on the open design.",
+  "description": "TeamCraft item of the design, a check before checking it in to TeamCraft, linking a design to a TeamCraft item, and – through a folder shared with the TeamCraft desktop app – its live state and requests to check out, check in or open it.",
   "capabilities": ["commands@0.2"],
   "runtime": {
     "module": "plugin.wasm",
@@ -39,6 +39,30 @@
         "effect": "edit",
         "input_schema": {"type": "object", "properties": {}},
         "slots": [{"kind": "ribbon", "name": "Unlink from TeamCraft"}]
+      },
+      {
+        "name": "live",
+        "effect": "edit",
+        "input_schema": {"type": "object", "properties": {}},
+        "slots": [{"kind": "ribbon", "name": "TeamCraft live status"}]
+      },
+      {
+        "name": "check-out",
+        "effect": "edit",
+        "input_schema": {"type": "object", "properties": {}},
+        "slots": [{"kind": "ribbon", "name": "Check out in TeamCraft"}]
+      },
+      {
+        "name": "check-in",
+        "effect": "edit",
+        "input_schema": {"type": "object", "properties": {}},
+        "slots": [{"kind": "ribbon", "name": "Check in with TeamCraft"}]
+      },
+      {
+        "name": "open",
+        "effect": "edit",
+        "input_schema": {"type": "object", "properties": {}},
+        "slots": [{"kind": "ribbon", "name": "Open in TeamCraft"}]
       }
     ],
     "commands": [
@@ -48,6 +72,10 @@
       "assembly.bom",
       "component.links"
     ],
-    "limits": {"fuel": 50000000, "memory_mib": 64, "deadline_ms": 10000}
+    "limits": {"fuel": 50000000, "memory_mib": 64, "deadline_ms": 10000},
+    "permissions": {
+      "files": [{"name": "teamcraft", "read": true, "write": true}],
+      "clock": true
+    }
   }
 }

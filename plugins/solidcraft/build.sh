@@ -25,4 +25,9 @@ fi
 cp plugin.json README.md "$out/"
 cp ../../LICENSE "$out/LICENSE"
 (cd "$out" && sha256sum plugin.json plugin.wasm > SHA256SUMS)
+# the .zip SolidCraft installs (Preferences › Plugins › Install plugin…), without the tests
+if command -v zip >/dev/null; then
+    (cd "$out" && rm -f ../teamcraft.zip && zip -q ../teamcraft.zip plugin.json plugin.wasm README.md LICENSE SHA256SUMS)
+    echo "Install: target/package/teamcraft.zip"
+fi
 echo "Package: $out"

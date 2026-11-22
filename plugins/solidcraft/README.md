@@ -24,8 +24,12 @@ table) and a row in the Plugins menu.
 | **check** – *Check for TeamCraft* | edit¹ | What keeps the design from going into TeamCraft cleanly: no part number, a part number or revision that differs from the linked item, BOM rows without a part number, one part number with two descriptions, quantities SolidCraft cannot add up, linked designs with an absolute path or two linked designs with the same file name. `ready` is true when only notes are left. |
 | **link** – *Link to TeamCraft item* | edit | Writes item number, revision and (optional) name into the design properties (*Part number*, *Revision*, *Description*) and TeamCraft's object – for designs edited without the desktop app. Ids written by the desktop app are kept while the item stays the same. One undo step; save the design afterwards. |
 | **unlink** – *Unlink from TeamCraft* | edit | Removes TeamCraft's object; part number and revision stay. |
+| **live** – *TeamCraft live status* | edit¹ | What the TeamCraft desktop app last shared about this revision: who has it checked out, the latest revision on the server, local changes – and whether the desktop app runs and reaches the server. Needs the folder (below). |
+| **check-out** – *Check out in TeamCraft* | edit | Asks the desktop app to check out this revision; it asks you before it does. Needs the folder. |
+| **check-in** – *Check in with TeamCraft* | edit | Asks the desktop app to open its check-in dialog for this revision. Save the design first. Needs the folder. |
+| **open** – *Open in TeamCraft* | edit | Asks the desktop app to show this revision. Needs the folder. |
 
-¹ *status* and *check* only read. They are declared `edit` because SolidCraft
+¹ *status*, *check* and *live* only read. They are declared `edit` because SolidCraft
 classes `document.metadata`, `assembly.bom` and `component.links` as edit
 commands and refuses them from a read entry (*permission denied: edit command
 document.metadata from read entry*).
@@ -33,6 +37,28 @@ document.metadata from read entry*).
 SolidCraft commands it calls (declared in `plugin.json`, none of them reads
 or writes files): `document.metadata`, `document.metadata.set`,
 `document.metadata.remove`, `assembly.bom`, `component.links`.
+
+## The folder shared with the desktop app
+
+SolidCraft plugins have no network, so *live*, *check-out*, *check-in* and
+*open* talk to the TeamCraft desktop app through one folder:
+`<working folder>/.teamcraft/solidcraft` (by default
+`~/Documents/TeamCraft/.teamcraft/solidcraft`). The desktop app creates it
+while it runs, writes its heartbeat and the state of each revision it shows
+there, and picks up the plugin's requests every few seconds
+(`desktop/src/scbridge.rs`; format and reasons in
+`docs/src/research/solidcraft-bridge.md`).
+
+When installing the plugin, SolidCraft asks for the folder `teamcraft`: pick
+that folder, with reading and writing. Without it, *status*, *check*, *link*
+and *unlink* work as before; the four others end with SolidCraft's message
+that the folder `teamcraft` is not granted.
+
+The desktop app not running is never an error: *live* says so and shows what
+it knew when it last ran, and a request is kept for 10 minutes and carried out
+when the desktop app starts. Nothing secret is in the folder (display names
+and states), and the desktop app treats each request as a wish: it asks before
+a check-out and opens its own dialog for a check-in.
 
 ## When something fails
 
@@ -57,8 +83,10 @@ not running never makes it fail. What it says when something does go wrong:
 ```sh
 rustup target add wasm32-unknown-unknown
 cargo install wasm-tools
-./build.sh            # → target/package/teamcraft/ (plugin.json, plugin.wasm, SHA256SUMS)
+./build.sh            # → target/package/teamcraft/ (plugin.json, plugin.wasm, SHA256SUMS) and teamcraft.zip
 cargo test            # the entries against a fake design, on this computer
+# the entries on the real SolidCraft, with the cases in tests/:
+cp -r tests target/package/teamcraft/ && solidcraft-cli plugin test target/package/teamcraft --require-cases
 ```
 
 `build.sh` checks that the component imports nothing but `craft:plugin@0.2.0`

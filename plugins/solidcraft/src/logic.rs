@@ -18,7 +18,16 @@ pub trait Host {
     /// Runs `command` with `args` and returns its JSON result, or why it
     /// failed.
     fn run(&mut self, command: &str, args: Value) -> Result<Value, String>;
+    /// A file of the bridge folder ([`bridge::GRANT`]); `None` when it is not
+    /// there.
+    fn read_file(&mut self, path: &str) -> Result<Option<Vec<u8>>, String>;
+    /// Writes a file of the bridge folder (it appears when the run succeeds).
+    fn write_file(&mut self, path: &str, data: &[u8]) -> Result<(), String>;
+    /// Unix seconds; 0 without the clock grant.
+    fn now(&mut self) -> u64;
 }
+
+use crate::bridge::{self, Read};
 
 /// Why an entry failed.
 #[derive(Debug, PartialEq)]
@@ -85,7 +94,16 @@ fn call(host: &mut dyn Host, command: &str, args: Value) -> Result<Value, EntryE
 }
 
 /// The entries of the manifest (`plugin.json`).
-pub const ENTRIES: [&str; 4] = ["status", "check", "link", "unlink"];
+pub const ENTRIES: [&str; 8] = [
+    "status",
+    "check",
+    "link",
+    "unlink",
+    "live",
+    "check-out",
+    "check-in",
+    "open",
+];
 
 /// Runs the entry `entry` with its `params`.
 pub fn execute(host: &mut dyn Host, entry: &str, params: &Value) -> Result<Value, EntryError> {
@@ -94,6 +112,10 @@ pub fn execute(host: &mut dyn Host, entry: &str, params: &Value) -> Result<Value
         "check" => check(host),
         "link" => link(host, params),
         "unlink" => unlink(host),
+        "live" => live(host),
+        "check-out" => ask_desktop(host, "check_out"),
+        "check-in" => ask_desktop(host, "check_in"),
+        "open" => ask_desktop(host, "open"),
         other => Err(EntryError::Unsupported(format!(
             "The TeamCraft plugin has no entry `{other}`."
         ))),
@@ -469,6 +491,146 @@ pub fn unlink(host: &mut dyn Host) -> Result<Value, EntryError> {
     }))
 }
 
+/// The item number and revision of a linked design, or the message why
+/// there are none.
+fn identity(metadata: &Map<String, Value>) -> Result<(String, String), &'static str> {
+    if damaged(metadata) {
+        return Err(DAMAGED);
+    }
+    let tc = teamcraft(metadata).ok_or(
+        "This design is not linked to a TeamCraft item. Check it out in the TeamCraft desktop \
+         app and use *Item data*, or use *Link to TeamCraft item* here.",
+    )?;
+    let (item, revision) = (text(tc, "item_number"), text(tc, "revision"));
+    if item.is_empty() || revision.is_empty() {
+        return Err(DAMAGED);
+    }
+    Ok((item.to_string(), revision.to_string()))
+}
+
+const UPDATE_PLUGIN: &str = "The TeamCraft desktop app is newer than this plugin. Install the \
+                             TeamCraft plugin that comes with it.";
+
+/// *TeamCraft live status*: what the desktop app last shared about this
+/// revision (bridge folder). Never fails because the desktop app is not
+/// running: it says so, and what it knew when it last ran.
+pub fn live(host: &mut dyn Host) -> Result<Value, EntryError> {
+    let (metadata, _) = properties(host)?;
+    let (item, revision) = match identity(&metadata) {
+        Ok(id) => id,
+        Err(message) => return Ok(json!({"live": false, "message": message})),
+    };
+    let now = host.now();
+    let beat = read_bridge(host, "desktop.json", "teamcraft.solidcraft.desktop")?;
+    let state = read_bridge(
+        host,
+        &bridge::state_file(&item, &revision),
+        "teamcraft.solidcraft.state",
+    )?;
+    let mut out = json!({
+        "item_number": item,
+        "revision": revision,
+        "desktop_running": false,
+        "live": false,
+    });
+    if matches!(beat, Read::Newer(_)) || matches!(state, Read::Newer(_)) {
+        out["message"] = json!(UPDATE_PLUGIN);
+        return Ok(out);
+    }
+    let alive = bridge::desktop_alive(&beat, now);
+    out["desktop_running"] = json!(alive.is_some());
+    out["server_reachable"] = json!(alive == Some(true));
+    let message = match (&state, alive) {
+        (Read::Missing, None) => format!(
+            "The TeamCraft desktop app is not running, and it has shared nothing about {item} \
+             revision {revision} yet. Start it – it shares the state of the revisions in your \
+             working folder."
+        ),
+        (Read::Missing, Some(_)) => format!(
+            "The TeamCraft desktop app runs, but has shared nothing about {item} revision \
+             {revision} yet. Open the revision in the desktop app's Workspace once, or check that \
+             this design is in its working folder."
+        ),
+        (Read::Damaged, _) => format!(
+            "The state TeamCraft shared about {item} revision {revision} cannot be read. The \
+             desktop app writes it again the next time it shows the revision."
+        ),
+        (Read::Ok(s), alive) => {
+            out["state"] = s.clone();
+            let since = bridge::age(now, s["written_at"].as_u64().unwrap_or(0));
+            let said = bridge::describe_state(s);
+            match alive {
+                Some(true) => {
+                    out["live"] = json!(true);
+                    format!("{item} revision {revision}: {said}. (as of {since})")
+                }
+                Some(false) => format!(
+                    "The TeamCraft desktop app has no connection to the server. As of {since}: \
+                     {said}."
+                ),
+                None => format!("The TeamCraft desktop app is not running. As of {since}: {said}."),
+            }
+        }
+        (Read::Newer(_), _) => unreachable!("handled above"),
+    };
+    out["message"] = json!(message);
+    Ok(out)
+}
+
+/// Reads and checks a bridge file.
+fn read_bridge(host: &mut dyn Host, path: &str, schema: &str) -> Result<Read, EntryError> {
+    let bytes = host.read_file(path).map_err(|reason| EntryError::Command {
+        command: format!("files.read-file {}/{path}", bridge::GRANT),
+        reason: format!(
+            "The TeamCraft plugin could not read its folder ({reason}). Install the plugin \
+                 again and allow the folder <working folder>/.teamcraft/solidcraft as \
+                 `teamcraft`."
+        ),
+    })?;
+    Ok(bridge::parse(bytes.as_deref(), schema))
+}
+
+/// *Check out in TeamCraft*, *Check in with TeamCraft*, *Open in TeamCraft*:
+/// leaves a request for the desktop app. It carries it out when it runs (or
+/// when it starts, within 10 minutes); a check-in always opens the desktop
+/// app's own check-in dialog, never runs by itself.
+pub fn ask_desktop(host: &mut dyn Host, action: &str) -> Result<Value, EntryError> {
+    let (metadata, _) = properties(host)?;
+    let (item, revision) =
+        identity(&metadata).map_err(|m| EntryError::Unsupported(m.to_string()))?;
+    let now = host.now();
+    let beat = read_bridge(host, "desktop.json", "teamcraft.solidcraft.desktop")?;
+    let request = bridge::request(&item, &revision, action, now);
+    let file = bridge::request_file(&item, &revision, now, action);
+    host.write_file(&file, request.to_string().as_bytes())
+        .map_err(|reason| EntryError::Command {
+            command: format!("files.write-file {}/{file}", bridge::GRANT),
+            reason: format!(
+                "The TeamCraft plugin could not write to its folder ({reason}). Install the \
+                 plugin again and allow the folder <working folder>/.teamcraft/solidcraft as \
+                 `teamcraft`, with writing."
+            ),
+        })?;
+    let what = match action {
+        "check_out" => format!("check out {item} revision {revision}"),
+        "check_in" => format!("open the check-in of {item} revision {revision}"),
+        _ => format!("show {item} revision {revision}"),
+    };
+    let save = if action == "check_in" {
+        " Save the design first."
+    } else {
+        ""
+    };
+    let message = match bridge::desktop_alive(&beat, now) {
+        Some(_) => format!("Sent to the TeamCraft desktop app: it will {what}.{save}"),
+        None => format!(
+            "The TeamCraft desktop app is not running. The request is kept: it will {what} when \
+             it starts within 10 minutes.{save}"
+        ),
+    };
+    Ok(json!({"requested": action, "file": file, "message": message}))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -482,6 +644,9 @@ mod tests {
         calls: Vec<(String, Value)>,
         /// Commands that fail, with SolidCraft's reason.
         fail: Vec<(&'static str, &'static str)>,
+        /// The bridge folder.
+        files: std::collections::BTreeMap<String, Vec<u8>>,
+        clock: u64,
     }
 
     impl Host for Fake {
@@ -530,6 +695,18 @@ mod tests {
                 "component.links" => Ok(json!({"links": self.links})),
                 other => Err(format!("unknown command {other}")),
             }
+        }
+        fn read_file(&mut self, path: &str) -> Result<Option<Vec<u8>>, String> {
+            self.calls.push(("read-file".into(), json!(path)));
+            Ok(self.files.get(path).cloned())
+        }
+        fn write_file(&mut self, path: &str, data: &[u8]) -> Result<(), String> {
+            self.calls.push(("write-file".into(), json!(path)));
+            self.files.insert(path.into(), data.to_vec());
+            Ok(())
+        }
+        fn now(&mut self) -> u64 {
+            self.clock
         }
     }
 
@@ -752,6 +929,118 @@ mod tests {
         let params = json!({"item_number": "TC-1042", "revision": "B"});
         link(&mut f, &params).unwrap();
         assert_eq!(status(&mut f).unwrap()["managed"], true);
+    }
+
+    fn heartbeat(at: u64, online: bool) -> Vec<u8> {
+        json!({"schema": "teamcraft.solidcraft.desktop", "version": 1,
+               "written_at": at, "server_reachable": online})
+        .to_string()
+        .into_bytes()
+    }
+
+    fn state(at: u64) -> Vec<u8> {
+        json!({"schema": "teamcraft.solidcraft.state", "version": 1, "written_at": at,
+               "item_number": "TC-1042", "revision": "B", "latest_revision": "C",
+               "lifecycle": "In work", "checked_out": {"me": true}})
+        .to_string()
+        .into_bytes()
+    }
+
+    /// The entries that worked before the bridge never touch files, so they
+    /// keep working without the folder grant.
+    #[test]
+    fn the_old_entries_need_no_folder() {
+        let mut f = linked();
+        status(&mut f).unwrap();
+        check(&mut f).unwrap();
+        link(&mut f, &json!({"item_number": "TC-1042", "revision": "B"})).unwrap();
+        unlink(&mut f).unwrap();
+        assert!(
+            f.calls.iter().all(|(c, _)| !c.ends_with("-file")),
+            "{:?}",
+            f.calls
+        );
+    }
+
+    #[test]
+    fn live_says_whether_the_desktop_app_runs() {
+        let state_file = bridge::state_file("TC-1042", "B");
+        // never ran
+        let mut f = linked();
+        f.clock = 10_000;
+        let l = live(&mut f).unwrap();
+        assert_eq!(l["desktop_running"], false);
+        assert!(l["message"].as_str().unwrap().contains("not running"));
+        // runs, shared the state
+        f.files
+            .insert("desktop.json".into(), heartbeat(9_990, true));
+        f.files.insert(state_file.clone(), state(9_900));
+        let l = live(&mut f).unwrap();
+        assert_eq!(l["live"], true);
+        let m = l["message"].as_str().unwrap();
+        assert!(
+            m.contains("Checked out by you") && m.contains("latest on the server C"),
+            "{m}"
+        );
+        // stopped an hour ago: what it knew then
+        f.clock = 10_000 + 3_600;
+        let l = live(&mut f).unwrap();
+        assert_eq!(l["live"], false);
+        assert!(l["message"]
+            .as_str()
+            .unwrap()
+            .starts_with("The TeamCraft desktop app is not running. As of"));
+        // offline from the server
+        f.clock = 10_000;
+        f.files
+            .insert("desktop.json".into(), heartbeat(9_990, false));
+        assert!(live(&mut f).unwrap()["message"]
+            .as_str()
+            .unwrap()
+            .contains("no connection"));
+        // damaged state, newer desktop app
+        f.files.insert(state_file.clone(), b"{".to_vec());
+        assert!(live(&mut f).unwrap()["message"]
+            .as_str()
+            .unwrap()
+            .contains("cannot be read"));
+        f.files.insert(
+            state_file,
+            br#"{"schema":"teamcraft.solidcraft.state","version":9}"#.to_vec(),
+        );
+        assert_eq!(live(&mut f).unwrap()["message"], UPDATE_PLUGIN);
+        // not linked: no file is read
+        let mut plain = Fake::default();
+        assert_eq!(live(&mut plain).unwrap()["live"], false);
+        assert!(plain.calls.iter().all(|(c, _)| c != "read-file"));
+    }
+
+    #[test]
+    fn requests_are_left_for_the_desktop_app() {
+        let mut f = linked();
+        f.clock = 1_700_000_000;
+        let r = ask_desktop(&mut f, "check_in").unwrap();
+        let file = "request-TC_2D1042.B.1700000000.check_in.json";
+        assert_eq!(r["file"], file);
+        assert!(r["message"].as_str().unwrap().contains("when it starts"));
+        let written: Value = serde_json::from_slice(&f.files[file]).unwrap();
+        assert_eq!(written["action"], "check_in");
+        assert_eq!(written["item_number"], "TC-1042");
+        assert_eq!(written["schema"], "teamcraft.solidcraft.request");
+        f.files
+            .insert("desktop.json".into(), heartbeat(1_700_000_000 - 5, true));
+        let r = ask_desktop(&mut f, "check_out").unwrap();
+        assert!(r["message"]
+            .as_str()
+            .unwrap()
+            .starts_with("Sent to the TeamCraft desktop app"));
+        // a design without TeamCraft data writes nothing and says why
+        let mut plain = Fake::default();
+        assert!(matches!(
+            ask_desktop(&mut plain, "open"),
+            Err(EntryError::Unsupported(m)) if m.contains("not linked")
+        ));
+        assert!(plain.files.is_empty());
     }
 
     #[test]

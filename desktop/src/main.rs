@@ -26,6 +26,7 @@ mod policy;
 mod profiles;
 mod report;
 mod resume;
+mod scbridge;
 mod scprops;
 mod settings;
 mod signin;
@@ -224,6 +225,8 @@ fn main() {
                 get_cancel: Arc::new(AtomicBool::new(false)),
                 local_server: Mutex::new(None),
             });
+            // the SolidCraft plugin's bridge folder: heartbeat, state, requests
+            tauri::async_runtime::spawn(commands::solidcraft_bridge(app.handle().clone()));
             build_menu(app)?;
             if let Some(window) = app.get_webview_window("main") {
                 if let Some(zoom) = zoom {
