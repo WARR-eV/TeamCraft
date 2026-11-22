@@ -358,7 +358,10 @@ mod tests {
         data["unread_notifications"] = json!(1);
         let html = render(&env, "admin/branding.html", data);
         assert!(html.contains("<html lang=\"de\""), "{html}");
-        assert!(html.contains(">Artikel<") && html.contains("placeholder=\"Artikel suchen\""));
+        assert!(
+            html.contains(">Artikel<")
+                && html.contains("placeholder=\"Nummern, Namen, Dateien suchen …\"")
+        );
         assert!(html.contains("1 ungelesene Benachrichtigung\""));
         let html = render(
             &env,

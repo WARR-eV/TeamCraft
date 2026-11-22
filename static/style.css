@@ -1501,16 +1501,6 @@ td.row-actions details.menu { display: inline-block; text-align: left; }
 pre.json { max-height: 24rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
 .usage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 16px; align-items: start; }
 
-/* "?" next to a term (#414, macros.html help): tooltip on hover and on keyboard focus */
-.help-tip { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 1.15em; height: 1.15em;
-  margin-left: .3em; border: 1px solid var(--border-strong); border-radius: 50%; font-size: .75em; font-weight: 600; line-height: 1;
-  color: var(--text-muted); cursor: help; vertical-align: middle; }
-.help-tip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.help-tip:hover::after, .help-tip:focus::after { content: attr(data-help); position: absolute; z-index: 20; left: 50%; top: calc(100% + 6px);
-  transform: translateX(-50%); width: max-content; max-width: 32ch; padding: .45em .6em; border: 1px solid var(--border);
-  border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: .85rem; font-weight: 400; line-height: 1.35;
-  white-space: normal; text-align: left; box-shadow: 0 4px 14px rgba(0, 0, 0, .15); }
-
 /* revision page: the main model's picture next to the title block (#412) */
 .head-with-preview { display: flex; gap: 12px; align-items: stretch; margin: 0 0 var(--space-4); }
 .head-with-preview > .titleblock { flex: 1 1 auto; min-width: 0; margin: 0; }
