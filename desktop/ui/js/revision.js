@@ -206,7 +206,7 @@ export function renderRevision(tab, body, toolbar) {
     toolGroup("Lock", lock),
     toolGroup("Open", cadOpen),
     toolGroup("Work", [
-      act("edit", "Edit", "edit", function () { editDialog(tab); }, "Edit the attributes"),
+      act("edit", "Edit attributes", "edit", function () { editDialog(tab); }, "Edit the attributes (name, description, material, mass …) under your check-out"),
       tool("Get…", "download", function () { getStructureDialog(rev); }, { title: "Copy this item and everything it consists of (BOM, referenced CAD files) into your working folder" }),
       tool("Open folder", "folder", function () { openWorkspaceFolder(tab); }, { title: "Open the working folder of this revision" })
     ]),
@@ -305,7 +305,7 @@ export function revOverview(tab, el) {
   var d = tab.data, rev = d.rev;
   var props = h("dl.props", null, [
     dt("Item number"), dd(h("span.mono", { text: rev.item_number })),
-    dt("Revision"), dd(rev.code),
+    h("dt", null, ["Revision", helpTip(REVISION_HELP)]), dd(rev.code),
     dt("Name"), dd(rev.name),
     dt("Type"), dd(label(rev.item_type)),
     dt("Project group"), dd(rev.project_code || "—"),
@@ -412,6 +412,17 @@ export function revGlance(tab) {
 }
 
 export function dt(t) { return h("dt", { text: t }); }
+
+// The two levels CAD users mix up (#414) – the same sentences as the web UI
+// (templates/macros.html, revision_help / version_help).
+export var REVISION_HELP = "A revision (A, B …) is a state of the item that gets released. Released revisions never change – Revise starts the next one.";
+export var VERSION_HELP = "Every check-in or park stores a new version (v1, v2 …) of a file – the history inside a revision.";
+
+/** A small "?" that explains a term in place: tooltip on hover and on
+ *  keyboard focus (app.css .help-tip), the text is its accessible name. */
+export function helpTip(text) {
+  return h("span.help-tip", { tabindex: "0", role: "img", "aria-label": text, title: text, "data-help": text, text: "?" });
+}
 export function dd(v) { var e = h("dd"); append(e, v); return e; }
 
 // ------------------------------------------- previews of native CAD files
@@ -482,10 +493,9 @@ export function revFiles(tab, el) {
         f.format_info && f.format_info.thumbnail
           ? h("span.file-cell", null, [thumbImage(f), h("span", null, [f.filename, " ", formatChip(f)])])
           : h("span", null, [f.filename, " ", formatChip(f)]),
-        h("span.badge", { text: "v" + f.version }),
+        h("span.badge", { text: "v" + f.version, title: "Version " + f.version + " – " + VERSION_HELP + " SHA-256 " + f.sha256 }),
         fmtSize(f.size_bytes),
         fmtDate(f.uploaded_at) + " · " + f.uploaded_by_name,
-        h("span.mono.small.dim", { text: f.sha256.slice(0, 12) + "…", title: f.sha256 }),
         h("span.row", null, [
           fmt ? h("button.small", { type: "button", on: { click: function () { tab.sub = "viewer"; tab.viewerFile = f.id; renderActive(); } } }, "3D") : null,
           h("button.small", { type: "button", title: "Copy into the workspace and open – CAD files in the CAD program chosen for them, other files with the default application", on: { click: function () { openFile(tab, f.filename); } } }, "Open"),
@@ -495,17 +505,18 @@ export function revFiles(tab, el) {
       ]
     };
   };
-  var columns = ["File", "Version", "Size", "Uploaded", "SHA-256", ""];
+  // a function: the header holds an element, and each table needs its own
+  var columns = function () { return ["File", h("span", null, ["Version", helpTip(VERSION_HELP)]), "Size", "Uploaded", ""]; };
   var n = groups.other.length;
   el.appendChild(h("section.panel", null, [
     h("div.panel-head", null, [h("h2", { text: "Files (datasets)" }),
       h("div.row", null, [
         h("span.hint", { text: filesHint(d).text }),
         h("button.small", { type: "button", disabled: !filesHint(d).ok, title: filesHint(d).text, on: { click: function () { addFilesDialog(tab); } } }, "Add files…")])]),
-    table(columns, groups.shown.map(rowOf), { numeric: [2] }),
+    table(columns(), groups.shown.map(rowOf), { numeric: [2] }),
     n ? h("details.other-formats", null, [
       h("summary", { text: n + " file" + (n === 1 ? "" : "s") + " in other CAD formats (" + groups.families.join(", ") + ")" }),
-      table(columns, groups.other.map(rowOf), { numeric: [2] })
+      table(columns(), groups.other.map(rowOf), { numeric: [2] })
     ]) : null
   ]));
 }

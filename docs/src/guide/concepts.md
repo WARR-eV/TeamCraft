@@ -1,5 +1,7 @@
 # Concepts
 
+The words used here are explained in short in the [Glossary](glossary.md).
+
 ## Items and revisions
 
 An **item** is a part, assembly, document, software component, simulation
@@ -38,12 +40,11 @@ data never changes – further work happens in a new revision (*Revise*).
 
 ## Project groups and roles
 
-| Role | May |
-| Viewer | read internal project groups and the restricted groups they belong to, raise and discuss change requests |
-| Viewer | read everything, raise and discuss change requests |
-| CAD editor | create and change items of the project groups they belong to, create project groups, review changes,
-triage and decide change requests on their groups |
-| Admin | everything, plus users, all project groups and lock overrides |
+| Role       | May                                                                                                                                      |
+|------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| Viewer     | read internal project groups and the restricted groups they belong to, raise and discuss change requests                                 |
+| CAD editor | create and change items of the project groups they belong to, create project groups, review changes, triage and decide change requests on their groups |
+| Admin      | everything, plus users, all project groups and lock overrides                                                                            |
 
 Every item belongs to a **project group** – a product or product line, a
 machine, a customer project, a building, a vehicle or a rover. CAD editors start their own groups and become their

@@ -31,7 +31,7 @@
     {% if can.checkin %}
     <button class="primary" type="button" data-toggle="checkin-form" aria-controls="checkin-form" aria-expanded="false" title="Upload new file versions and end your check-out – the revision stays in work">Check in…</button>
     {% elif can.checkout %}
-    <form method="post" action="/revisions/{{ rev.id }}/checkout"><button class="primary" type="submit" title="Take the exclusive edit lock">Check out</button></form>
+    <form method="post" action="/revisions/{{ rev.id }}/checkout"><button class="primary" type="submit" title="Take the exclusive edit lock – in the browser no files are copied; TeamCraft Desktop's Check out and open copies them and opens the CAD program">Check out</button></form>
     {% elif open_change and rev.state == "in_review" %}
     <a class="button primary" href="/changes/{{ open_change.id }}">Open change</a>
     {% elif can.revise %}
@@ -53,7 +53,7 @@
         {% if me.role != "viewer" and rev.item_type in ["part", "assembly"] %}<a href="/items/new?type=simulation&amp;basis={{ rev.id }}" title="A new simulation prefilled from this revision, with it as its basis">New simulation…</a>{% endif %}
         {% if me.role != "viewer" %}<a href="/revisions/{{ rev.id }}/save-as" title="A new item with the attributes, files and BOM of this revision">Save as…</a>{% endif %}
         {% if me.role != "viewer" and rev.project_id %}{% set here = ((files|first).folder if files else rev.item_folder) or "" %}<a href="/items/new?project={{ rev.project_id }}&amp;folder={{ here|urlencode }}" title="A new item in {{ rev.project_code }}{% if here %}/{{ here }}{% else %} (top of the group){% endif %}, next to {{ rev.item_number }}">New item in this folder…</a>{% endif %}
-        {% if can.add_to_change %}<a href="/changes/new?revision={{ rev.id }}">Release via new change…</a>{% endif %}
+        {% if can.add_to_change %}<a href="/changes/new?revision={{ rev.id }}" title="Create a change order with this revision – add reviewers and submit it for review">Release…</a>{% endif %}
         <a href="/requests/new?revision={{ rev.id }}" title="Report a problem or propose a change to {{ rev.item_number }}/{{ rev.code }} (change request)">Request change…{% if open_requests %}<span class="badge badge-count" title="{{ open_requests|length }} open change request(s)">{{ open_requests|length }}</span>{% endif %}</a>
         <a href="/revisions/{{ rev.id }}/package.zip" title="This revision with all files of its structure (BOM), bom.csv and manifest.json">Pack and Go (ZIP)</a>
         {% if can.cancel_checkout or can.release_with_reason or can.obsolete or can.delete %}<div class="menu-sep" role="separator"></div>{% endif %}
@@ -91,15 +91,23 @@
     </details>
   </div>
 </div>
+<div class="head-with-preview">
 <dl class="titleblock">
   <div><dt>Type</dt><dd>{{ rev.item_type|label }}</dd></div>
-  <div><dt>Revision</dt><dd>{{ m.revbox(rev.code) }}{% if not is_latest %} <a class="small" href="/revisions/{{ latest_id }}">latest</a>{% endif %}</dd></div>
+  <div><dt>Revision{{ m.revision_help() }}</dt><dd>{{ m.revbox(rev.code) }}{% if not is_latest %} <a class="small" href="/revisions/{{ latest_id }}">latest</a>{% endif %}</dd></div>
   <div><dt>State</dt><dd>{{ m.badge(rev.state) }}</dd></div>
   <div><dt>Lock</dt><dd>{% if rev.checked_out_by_name %}{{ m.lock(rev.checked_out_by_name, rev.checked_out_by == me.id) }} <span class="dim" title="Checked out {{ rev.checked_out_at|dt }}">for {{ rev.checked_out_at|age }}</span>{% else %}<span class="dim">Not checked out</span>{% endif %}</dd></div>
   <div><dt>Project</dt><dd>{% if item.project_id %}<a href="/projects/{{ item.project_id }}">{{ item.project_code }}</a>{% else %}<span class="dim">—</span>{% endif %}</dd></div>
   <div><dt>Modified</dt><dd title="Created {{ rev.created_at|dt }} by {{ rev.created_by_name }}">{{ m.time(rev.updated_at) }}</dd></div>
   <div><dt>Released</dt><dd>{{ m.time(rev.released_at) }}</dd></div>
 </dl>
+{%- if main_thumbnail %}
+<a class="head-preview" href="/files/{{ main_thumbnail.id }}/{% if main_thumbnail.preview %}preview{% else %}thumbnail{% endif %}"
+   title="{% if main_thumbnail.preview %}3D preview of {{ main_thumbnail.filename }}{% else %}Preview image of {{ main_thumbnail.filename }}{% endif %}">
+  <img src="/files/{{ main_thumbnail.id }}/thumbnail?v={{ main_thumbnail.sha256 }}" alt="Preview of {{ main_thumbnail.filename }}" loading="lazy" data-hide-broken>
+</a>
+{%- endif %}
+</div>
 
 {% if not is_latest %}
 <div class="notice">You are looking at an older revision. <a href="/revisions/{{ latest_id }}">Go to the latest revision.</a></div>
@@ -118,7 +126,9 @@
 {% if rev.state == "in_work" and rev.checked_out_by and rev.checked_out_by != me.id %}
 <div class="notice">Checked out by {{ rev.checked_out_by_name }} since {{ m.time(rev.checked_out_at) }} ({{ rev.checked_out_at|age }}) – only they can modify it right now.{% if me.is_admin %} If they are unavailable, an administrator can force-unlock it; they are notified, and changes they check in later against an older version are refused instead of overwriting newer work.{% endif %}</div>
 {% elif rev.state == "in_work" and can.checkout %}
-<div class="notice">Check out this revision to change attributes, files or the BOM.</div>
+<div class="notice">Check out this revision to change attributes, files or the BOM. In the browser, <em>Check out</em> only takes the lock – no files are copied to your computer.
+  To edit the CAD files, use TeamCraft Desktop: <em>Check out and open</em> takes the lock, copies the files into your working folder and opens them in your CAD program.{% if desktop_download_url %}
+  <a href="{{ desktop_download_url }}" rel="noopener">Get TeamCraft Desktop</a>{% endif %}</div>
 {% endif %}
 {% if impact_groups %}<h2 class="visually-hidden">Checks needed</h2>{% endif %}
 {% for g in impact_groups %}{{ m.impact_group(g, back, can.acknowledge, true) }}{% endfor %}
@@ -289,7 +299,7 @@
   <div class="table-wrap">
   <table class="dense files-table">
     {% if group.collapsed %}<caption class="visually-hidden">Files in other CAD formats</caption>{% endif %}
-    <thead><tr><th scope="col">File</th><th scope="col" title="Place inside the project group – the desktop working folder mirrors it">Folder</th><th scope="col">Version</th><th scope="col" class="num">Size</th><th scope="col">Uploaded</th><th scope="col">SHA-256</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+    <thead><tr><th scope="col">File</th><th scope="col" title="Place inside the project group – the desktop working folder mirrors it">Folder</th><th scope="col">Version{{ m.version_help() }}</th><th scope="col" class="num">Size</th><th scope="col">Uploaded</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
     <tbody>
     {% for f in group.files %}
       <tr>
@@ -304,14 +314,13 @@
           {% if f.folder %}<span class="mono" title="{{ rev.project_code or '' }}/{{ f.folder }}/{{ f.filename }} in the desktop working folder">{{ f.folder }}/</span>
           {% else %}<span class="dim" title="At the top of the project group in the desktop working folder">—</span>{% endif %}
         </td>
-        <td class="nowrap">
+        <td class="nowrap" title="SHA-256 {{ f.sha256 }}">
           v{{ f.version }}
           {% if f.versions|length > 1 %}<button class="xs ghost" type="button" data-toggle="versions-{{ f.id }}" aria-expanded="false">History</button>{% endif %}
           {% if f.retention == 'latest' %}<span class="badge" title="Only the latest version is kept; older versions are removed after the grace period.">latest only</span>{% endif %}
         </td>
         <td class="num">{{ f.size_bytes|filesize }}</td>
         <td class="nowrap muted">{{ m.time(f.uploaded_at) }} · {{ f.uploaded_by_name }}</td>
-        <td class="mono small" title="{{ f.sha256 }}">{{ f.sha256[:8] }}</td>
         <td class="row-actions">
           <details class="menu">
             <summary class="button xs ghost" aria-label="Actions for {{ f.filename }}" title="Actions">⋯</summary>
@@ -338,6 +347,7 @@
               <div class="menu-sep" role="separator"></div>
               {% endif %}
               <a href="/requests/new?revision={{ rev.id }}&amp;file={{ f.filename|urlencode }}" title="Request a change to {{ f.filename }}">Request change…</a>
+              <button type="button" class="small" data-copy-text="{{ f.sha256 }}" title="SHA-256 of v{{ f.version }}: {{ f.sha256 }}">Copy SHA-256</button>
               {% if can.edit %}
               <form method="post" action="/files/{{ f.id }}/delete" data-confirm="Remove {{ f.filename }} and all its versions from this revision?{{ f.used_by }}">
                 <input type="hidden" name="back" value="{{ back }}#files">
@@ -350,7 +360,7 @@
       </tr>
       {% if f.versions|length > 1 %}
       <tr id="versions-{{ f.id }}" class="hidden">
-        <td colspan="7">
+        <td colspan="6">
           <table>
             <thead><tr><th scope="col">Version</th><th scope="col">Comment</th><th scope="col" class="num">Size</th><th scope="col">Uploaded</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
             <tbody>
@@ -387,7 +397,7 @@
   {% else %}<p class="empty">No files attached.</p>{% endif %}
   <p class="hint">Downloads in the browser are for single files and for viewing. For CAD work use the
     TeamCraft desktop app: it keeps one working folder per project group with the folder structure shown here
-    (<span class="mono">TeamCraft/{% if rev.project_code %}{{ rev.project_code }}{% else %}&lt;group&gt;{% endif %}/&lt;folder&gt;/&lt;file&gt;</span>), gets whole assemblies and keeps files you have not checked out read-only.</p>
+    (<span class="mono">TeamCraft/{% if rev.project_code %}{{ rev.project_code }}{% else %}&lt;group&gt;{% endif %}/&lt;folder&gt;/&lt;file&gt;</span>), gets whole assemblies and keeps files you have not checked out read-only.{% if desktop_download_url %} <a href="{{ desktop_download_url }}" rel="noopener">Get TeamCraft Desktop</a>{% endif %}</p>
   {% set fh = files_hint %}
   {% if fh.kind == "upload" %}
   <form class="inline files-upload" id="add-files" method="post" action="/revisions/{{ rev.id }}/files" enctype="multipart/form-data" data-chunked="{{ rev.id }}" data-dropzone>

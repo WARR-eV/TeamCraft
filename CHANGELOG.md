@@ -15,6 +15,21 @@ see the notices in the README.
 
 ### Added
 
+- **UX for CAD users, first quick wins** (#408):
+  - **Preview at the top of the revision page** (#412): the picture of the
+    main model – the assembly before the part before a model file before the
+    drawing – stands next to the title block and opens its 3D view.
+  - **Revision and version explained in place** (#414): a **?** next to
+    *Revision* and *Version* (web UI and desktop app) says in one sentence
+    what each level is – on hover and on keyboard focus.
+  - **Glossary** (#410): `docs/src/guide/glossary.md` explains items,
+    revisions, versions, states, check out / get / park / check in, change
+    requests and change orders in CAD terms.
+  - **Get TeamCraft Desktop** (#411): the dashboard and the revision page link
+    the desktop app; `TEAMCRAFT_DESKTOP_DOWNLOAD_URL` points the links at
+    your own download page (`off` hides them; default: the project's release
+    page).
+
 - **SolidCraft plugin: answers you can see.** SolidCraft shows the result of a
   plugin entry only for read entries, so *TeamCraft status*, *Check for
   TeamCraft* and *TeamCraft live status* are read entries again, over
@@ -132,6 +147,24 @@ see the notices in the README.
 
 ### Fixed
 
+- **Same words in the web UI and the desktop app** (#410): the desktop
+  toolbar says *Edit attributes* like the web UI, the web UI's *More* menu
+  says *Release…* like the desktop toolbar (was *Release via new change…*),
+  and both search fields read *Search numbers, names, files …*.
+- **Web check-out says that it copies no files** (#411): the notice and the
+  button's tooltip explain that the browser only takes the lock, and that
+  TeamCraft Desktop's *Check out and open* copies the files and opens them.
+- **Desktop: the check-in icon no longer looks like the download icon**
+  (#409): *Check in…* and *Check in all* show an arrow up out of the tray;
+  *Get…* keeps the arrow down into it.
+- **No SHA-256 column in the file lists** (#413): the hash moved into the
+  tooltip of the version and *⋯ → Copy SHA-256* (web), into the tooltip of
+  the version (desktop) – the space goes to file name and folder.
+- **Stale tooltips and broken doc passages** (#426): the desktop update
+  notice (it opens the update window, not the release page), the worklist's
+  *Check in all* (it offers to check in local changes first), the roles table
+  of *Concepts* (one *Viewer* row, renders as a table again) and a garbled
+  sentence in the desktop guide.
 - **Desktop: problem reports name the server version** (#381). *Report a
   problem* always left it out (nothing set it); the app now asks the server
   (`GET /api/v1`) once per run and per server switch.

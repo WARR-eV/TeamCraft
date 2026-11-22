@@ -28,6 +28,11 @@ program, drop the changed files into *Check in*, done.
 > per project group with the original folder structure, *Get* for whole
 > assemblies, read-only files until you check out – see
 > [How files appear on your computer](desktop.md#how-files-appear-on-your-computer).
+> *Check out* in the browser therefore only takes the lock – no files are
+> copied; the revision page says so and links *Get TeamCraft Desktop*
+> (`TEAMCRAFT_DESKTOP_DOWNLOAD_URL`, see
+> [Configuration](../admin/configuration.md)), whose *Check out and open*
+> takes the lock, copies the files and opens them in the CAD program (#411).
 
 ## Adding files to an existing item
 

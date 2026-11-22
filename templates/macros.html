@@ -248,3 +248,18 @@
   </form>
 </section>
 {%- endmacro %}
+
+{#- A small "?" that explains a term in place (#414): the text is its accessible
+    name and its tooltip, also shown on keyboard focus (style.css .help-tip). -#}
+{% macro help(text) -%}
+<span class="help-tip" tabindex="0" role="img" aria-label="{{ text }}" title="{{ text }}" data-help="{{ text }}">?</span>
+{%- endmacro %}
+
+{#- The two levels CAD users mix up (#414), one sentence each; the desktop app
+    says the same (desktop/ui/js/revision.js, REVISION_HELP / VERSION_HELP). -#}
+{% macro revision_help() -%}
+{{ help("A revision (A, B …) is a state of the item that gets released. Released revisions never change – Revise starts the next one.") }}
+{%- endmacro %}
+{% macro version_help() -%}
+{{ help("Every check-in or park stores a new version (v1, v2 …) of a file – the history inside a revision.") }}
+{%- endmacro %}

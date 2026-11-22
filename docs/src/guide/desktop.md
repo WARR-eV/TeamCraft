@@ -254,7 +254,7 @@ plain `http://` to another computer gets a warning when you connect: the token
 and all data would cross the network unencrypted – use the `https://` address
 of the server. On a hosted live demo the app signs in to the public
 account under a random computer name and can look at everything but change
-nothing. of the server. The app uses the same skins
+nothing. The app uses the same skins
 and 3D viewer as the web interface; the models are converted by the server,
 and *Loading* or the reason a model cannot be shown appears on the canvas of
 the *3D viewer* tab (see [Files](files.md)). *Settings → Appearance*: *TeamCraft* (the
@@ -325,7 +325,7 @@ back, and *Check in…* is highlighted.
 * revision tab: **Lock** (*Check out*, or *Check in…* and *Cancel check-out*
   / *Force unlock* while checked out) · **Open** (*Check out and open*, or *Open in CAD* for your own
   check-out, with the CAD program that will open the file next to it – see
-  [Check out and open](#check-out-and-open)) · **Work** (*Edit*, *Get…*, *Open
+  [Check out and open](#check-out-and-open)) · **Work** (*Edit attributes*, *Get…*, *Open
   folder*) · **Lifecycle** (*Release…*, *Revise*) · **Collaborate**
   (*Request change…*, *Watch*, *Agent*);
 * change tab: **Review** (*Approve change* highlighted, *Reject* – the comment field
@@ -351,6 +351,13 @@ duties](changes.md#separation-of-duties)). If a revision or a reviewer is
 refused, the half-made draft is cancelled again and nothing is left behind;
 only a refused submit (for example an unreleased dependency) keeps the
 complete draft and opens it.
+
+*Check in…* (and *Check in all* in the worklist) shows an arrow **up out of
+the tray** – your files go to the server; *Get…* keeps the arrow down into
+it (#409). A **?** next to *Revision* (Overview) and *Version* (Files tab)
+explains the two levels in one sentence, on hover and on keyboard focus
+(#414; the words are in the [Glossary](glossary.md)); the SHA-256 of a file
+is in the tooltip of its version.
 
 Rare actions are in **More ▾** at the end: *Pack and Go…*, *Open in browser*, *Refresh* (`F5`) and *Mark obsolete…*. The
 menu works with the keyboard:

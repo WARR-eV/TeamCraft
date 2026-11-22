@@ -1,7 +1,7 @@
 # Open work
 
 The to-do list of TeamCraft, in order of priority, then what is done, then details on the open features.
-Tick an entry (`[x]`) when it is done and move it to *Done*. Last update: 2026-11-08.
+Tick an entry (`[x]`) when it is done and move it to *Done*. Last update: 2026-11-22.
 
 ## Direction
 
@@ -748,7 +748,10 @@ needs an issue with a reason first (see *Direction*).
 
 #### Core data, CAD and vault
 
-- [ ] Modern, quieter UI: fewer clicks, modal dialogs and legacy patterns on the common paths
+- [ ] Modern, quieter UI: fewer clicks, modal dialogs and legacy patterns on the common paths – the CAD-user
+  review is #408: quick wins done (#409 check-in icon, #410 one vocabulary + glossary, #411 web check-out wording
+  and *Get TeamCraft Desktop*, #412 preview at the top of the revision page, #413 no hash column, #414 revision vs
+  version explained); left: the daily CAD loop (#415–#421) and onboarding (#422–#424)
 - [ ] Responsive pages on large data (1M files, 100k items, 10k-line BOMs – see the scale targets)
 - [ ] Faster opening of large CAD files and assemblies
 - [ ] Configurable lifecycle states and site-specific allowed transitions instead of one built-in state machine

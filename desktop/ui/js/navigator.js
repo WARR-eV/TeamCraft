@@ -354,7 +354,7 @@ export function drawWorklist(w) {
   var top = nav.scrollTop;
   clear(nav);
   nav.appendChild(navHead("My worklist", [
-    w.checkouts.length ? h("button.small", { type: "button", title: "Check in every check-out without local changes (releases the locks)",
+    w.checkouts.length ? h("button.small", { type: "button", title: "Check in all your check-outs – the ones with local changes are listed first, to check them in with their files",
       on: { click: function () { checkInAll(); } } }, [svgIcon(ICONS.checkin), " Check in all"]) : null,
     h("button.icon", { type: "button", title: "Refresh", "aria-label": "Refresh", on: { click: function () { selectView("worklist"); } } }, svgIcon(ICONS.refresh))
   ]));

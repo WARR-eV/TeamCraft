@@ -466,7 +466,9 @@ export function table(headers, rows, opts) {
   opts = opts || {};
   return h("div.table-wrap", null, h("table.grid", null, [
     h("thead", null, h("tr", null, headers.map(function (t, i) {
-      return h("th" + (opts.numeric && opts.numeric.indexOf(i) !== -1 ? ".num" : ""), { text: t });
+      // a header is text or an element (e.g. a label with a help tip)
+      var text = typeof t === "string";
+      return h("th" + (opts.numeric && opts.numeric.indexOf(i) !== -1 ? ".num" : ""), text ? { text: t } : null, text ? null : t);
     }))),
     h("tbody", null, rows.map(function (r) {
       return h("tr" + (r.open ? ".clickable" : "") + (r.cls ? "." + r.cls : ""), {
