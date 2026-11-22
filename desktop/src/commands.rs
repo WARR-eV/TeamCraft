@@ -918,7 +918,8 @@ pub async fn workspace_local_changes(
 /// missing files of every revision in the working folder – a local pass over
 /// the state, then the Workspace status of at most
 /// [`localchanges::MAX_REVISIONS`] revisions (`src/localchanges.rs`). Unlike
-/// [`workspace_status`] it writes no SolidCraft bridge state per revision.
+/// [`workspace_status`] it writes nothing: no SolidCraft bridge state, no
+/// read-only flags, no `state.json` (`workspace::status_with(.., false)`).
 #[tauri::command]
 pub async fn local_changes_scan(
     app: AppHandle,

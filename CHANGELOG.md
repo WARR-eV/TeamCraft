@@ -27,9 +27,15 @@ see the notices in the README.
   (`local_changes_scan`, `desktop/src/localchanges.rs`) compares
   `state.json` with the disk first (no network; unchanged files are never
   read, at most 512 MiB hashed per scan) and then the Workspace status of at
-  most 100 revisions (local changes first, then own check-outs); it runs when
-  the worklist opens, when the window gets the focus back (at most every
-  15 s) and after a check-out, check-in or Get. The list rules are in
+  most 100 revisions (local changes first, then own check-outs, then a window
+  over the rest that moves on with every scan, so outdated files anywhere in
+  the folder are found over successive scans). The scan only compares: it
+  sets no read-only flags and writes no state. A check-in from the list takes
+  every changed file of the revision along (the check-in releases the
+  check-out; the dialog names the unticked ones and offers *Park* instead).
+  It runs when the worklist opens or is refreshed and when the window gets
+  the focus back (at most every 15 s), and at once after a check-out,
+  check-in, park, cancelled check-out or Get. The list rules are in
   `desktop/ui/js/local-changes.js`, tested by
   `scripts/desktop-local-changes.test.mjs`.
 

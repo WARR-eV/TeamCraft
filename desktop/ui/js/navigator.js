@@ -5,13 +5,13 @@
 import { $, ICONS, api, append, badge, call, clear, dialog, enc, errorText, field, h, lockIcon, setStatus, state, svgIcon, toast } from "./core.js";
 import { fmtDate, label } from "/static/shared/js/format.js";
 import { canSeeLocks, openLockOverview } from "./lock-overview.js";
-import { canEdit, checkInAll, fetchWorklist, refreshWorklistCount, reloadProjects, renderNotifications, rescanNewFiles, scanLocalChanges, scanNewFiles, sendLocalChanges, showWorklistCount } from "./shell.js";
+import { canEdit, checkInAll, fetchWorklist, refreshWorklistCount, reloadProjects, renderNotifications, rescanLocalChanges, rescanNewFiles, scanLocalChanges, scanNewFiles, sendLocalChanges, showWorklistCount } from "./shell.js";
 import { assistantContextChanged } from "./assistant.js";
 import { agent, renderAgentView } from "./agent.js";
 import { openRevision } from "./revision.js";
 import { impactGroups, relationShort, relationText } from "./references.js";
 import { getting, lockAge, reportDownload } from "./workspace.js";
-import { LOCAL_LABEL, localSummaryText, localVersionText, selectionActions } from "./local-changes.js";
+import { LOCAL_LABEL, localSummaryText, localVersionText, revisionCheckin, selectionActions } from "./local-changes.js";
 import { openChange } from "./change.js";
 import { openRequest } from "./requests.js";
 import { checkNewItemFiles, createItemFromFiles, editableGroupOfFolder, newItemDialog } from "./dialogs.js";
@@ -425,7 +425,7 @@ function localChangesSection(nav) {
     on: { click: function () { localCheckout(selectionActions(plan, ticked).checkout); } } }, "Check out");
   var getBtn = h("button.small", { type: "button", title: "Get the latest files of the ticked revisions – local changes are kept",
     on: { click: function () { localGet(selectionActions(plan, ticked).get); } } }, "Get latest");
-  var checkinBtn = h("button.small", { type: "button", title: "Check in the ticked files of your check-outs",
+  var checkinBtn = h("button.small", { type: "button", title: "Check in your check-outs of the ticked files – every changed file of each revision goes along",
     on: { click: function () { localCheckin(selectionActions(plan, ticked).checkin); } } }, "Check in selected");
   function updateBar() {
     var sel = selectionActions(plan, ticked);
@@ -443,7 +443,7 @@ function localChangesSection(nav) {
     nav.appendChild(h("ul.tree", null, plan.items.map(function (it) {
       return h("li", null, [
         h("div.node", { title: it.project ? it.project + " / " + it.item : it.item }, [
-          h("span.twisty"), h("span.ico", { text: "◇" }),
+          h("span.twisty"), h("span.ico", { text: "◇", "aria-hidden": "true" }),
           h("span.label", null, [h("span.mono", { text: it.item }), it.project ? h("span.dim", { text: " " + it.project }) : null])
         ]),
         h("ul.tree", null, it.revisions.map(function (rev) { return localRevisionNode(rev, ticked, updateBar, editor); }))
@@ -466,10 +466,11 @@ function localChangesSection(nav) {
 
 /** One revision of *Local changes*: its line (opens the Workspace tab) and its files. */
 function localRevisionNode(rev, ticked, updateBar, editor) {
-  var head = h("div.node", { title: "Open the Workspace tab of " + rev.item + "/" + rev.code, "data-item": rev.item, "data-rev": rev.code,
-    on: { click: function () { openRevision(rev.item, rev.code, "workspace"); } } }, [
+  // the revision label is a button: the keyboard reaches the Workspace tab too
+  var head = h("div.node", { "data-item": rev.item, "data-rev": rev.code }, [
     h("span.twisty"), h("span.ico", null, rev.checked_out ? lockIcon(true) : null),
-    h("span.label", null, [h("span.mono", { text: rev.item + "/" + rev.code }),
+    h("span.label", null, [h("button.link.mono", { type: "button", title: "Open the Workspace tab of " + rev.item + "/" + rev.code,
+      on: { click: function () { openRevision(rev.item, rev.code, "workspace"); } } }, rev.item + "/" + rev.code),
       rev.inaccessible ? h("span.dim", { text: " – no longer accessible" }) : null,
       !rev.compared ? h("span.dim", { text: " – not compared with the server" }) : null])
   ]);
@@ -499,10 +500,8 @@ function localRef(rev) { return { project: rev.project || null, item: rev.item, 
 function localRowAction(action, rev, row) {
   if (action === "checkout") localCheckout([localRef(rev)]);
   else if (action === "get") localGet([localRef(rev)]);
-  else if (action === "checkin") localCheckin({ changed: [Object.assign(localRef(rev), {
-    upload: rev.rows.filter(function (r) { return r.actions.indexOf("checkin") >= 0 && r.key === row.key; }).map(function (r) { return r.name; }),
-    conflicts: rev.rows.filter(function (r) { return r.state === "conflict"; }).map(function (r) { return r.name; })
-  })], unreadable: [] });
+  // every changed file of the revision goes along: the check-in releases the check-out
+  else if (action === "checkin") localCheckin({ changed: [revisionCheckin(rev, [row])].filter(Boolean), unreadable: [] });
   else if (action === "merge") openRevision(rev.item, rev.code, "workspace");
   else call("workspace_open", Object.assign(localRef(rev), { file: null })).catch(function (e) { toast(errorText(e), "error"); });
 }
@@ -556,23 +555,31 @@ function localCheckin(report) {
   if (!report.changed.length) return;
   var comment = h("input", { type: "text", maxlength: "500", placeholder: "What changed?" });
   var names = report.changed.map(function (c) { return c.item + "/" + c.code + " (" + c.upload.join(", ") + ")"; });
+  var added = [];
+  report.changed.forEach(function (c) {
+    if (c.added && c.added.length) added.push(c.item + "/" + c.code + ": " + c.added.join(", "));
+  });
   dialog("Check in selected", h("div.stack", null, [
-    h("p", { text: "New versions of the ticked files; the check-outs are released:" }),
+    h("p", { text: "New versions of these files; the check-outs are released:" }),
     h("ul.small", null, names.map(function (t) { return h("li", { text: t }); })),
+    added.length ? h("p.notice", { text: "Also checked in, though not ticked – the check-in releases the check-out, so no changed file of " +
+      "these revisions is left behind (Park uploads them and keeps the check-out): " + added.join("; ") }) : null,
     field("Comment", comment)
   ]), [
     { label: "Cancel", onClick: function (d) { d.close(); } },
-    { label: "Check in", primary: true, submit: true, onClick: function (d) {
-      d.close();
-      sendLocalChanges(report, false, comment.value.trim() || "Checked in from Local changes").then(function (sent) {
-        var problems = sent.kept.concat(sent.failed);
-        toast((sent.done.length ? "Checked in " + sent.done.join(", ") : "Nothing checked in") +
-          (problems.length ? ". " + problems.join("; ") : "."), sent.failed.length ? "error" : null);
-        state.localTicked = {};
-        refreshWorklistCount();
-      });
-    } }
+    { label: "Park", onClick: function (d) { d.close(); send(true); } },
+    { label: "Check in", primary: true, submit: true, onClick: function (d) { d.close(); send(false); } }
   ]);
+  function send(park) {
+    sendLocalChanges(report, park, comment.value.trim() || (park ? "Parked from Local changes" : "Checked in from Local changes")).then(function (sent) {
+      var problems = sent.kept.concat(sent.failed);
+      toast((sent.done.length ? (park ? "Parked " : "Checked in ") + sent.done.join(", ") : park ? "Nothing parked" : "Nothing checked in") +
+        (problems.length ? ". " + problems.join("; ") : "."), sent.failed.length ? "error" : null);
+      state.localTicked = {};
+      refreshWorklistCount();
+      rescanLocalChanges();
+    });
+  }
 }
 
 // ------------------------------------------------ New on this computer (#359)

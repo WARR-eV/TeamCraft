@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 const source = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../desktop/ui/js/local-changes.js");
 const {
-  LOCAL_STATES, localRevKey, localRowActions, localRowKey, localSummaryText, localVersionText, planLocalChanges, selectionActions
+  LOCAL_STATES, localRevKey, localRowActions, localRowKey, localSummaryText, localVersionText, planLocalChanges, revisionCheckin, selectionActions
 } = await import("data:text/javascript;base64," + fs.readFileSync(source).toString("base64"));
 
 let passed = 0;
@@ -56,6 +56,7 @@ test("a conflict is merged in the Workspace tab, never checked in", () => {
   const sel = selectionActions(plan, ticked);
   assert.equal(sel.checkin.changed.length, 1);
   assert.deepEqual(sel.checkin.changed[0].upload, ["b.prt"]);
+  assert.deepEqual(sel.checkin.changed[0].added, []);
   assert.deepEqual(sel.checkin.changed[0].conflicts, ["a.prt"]);
   assert.deepEqual(sel.checkin.unreadable, []);
   assert.equal(sel.rows, 2);
@@ -87,10 +88,31 @@ test("own check-outs: modified and new files are checked in", () => {
   assert.deepEqual(rows.map((x) => x.state), ["modified", "new"]);
   rows.forEach((x) => assert.deepEqual(x.actions, ["checkin", "folder"]));
   const ticked = {};
+  ticked[rows[0].key] = true;
   ticked[rows[1].key] = true;
   const sel = selectionActions(plan, ticked);
-  assert.deepEqual(sel.checkin.changed, [{ project: "ROVER", item: "PRT-1", code: "A", upload: ["bracket.step"], conflicts: [] }]);
+  assert.deepEqual(sel.checkin.changed, [{ project: "ROVER", item: "PRT-1", code: "A", upload: ["bracket.prt", "bracket.step"], added: [], conflicts: [] }]);
   assert.deepEqual(selectionActions(plan, {}).checkin.changed, [], "nothing ticked, nothing to do");
+});
+
+test("a partial selection checks in every changed file of the revision and names the unticked ones", () => {
+  const r = rev({ checked_out: true, files: [file({}), file({ name: "bracket.step", path: "ROVER/PRT-1/bracket.step", state: "new" }),
+    file({ name: "old.prt", path: "ROVER/PRT-1/old.prt", state: "outdated", server_version: 3 })] });
+  const plan = planLocalChanges({ revisions: [r] });
+  const rows = plan.items[0].revisions[0].rows;
+  const step = rows.find((x) => x.name === "bracket.step");
+  const ticked = {};
+  ticked[step.key] = true;
+  const sel = selectionActions(plan, ticked);
+  assert.equal(sel.checkin.changed.length, 1);
+  assert.deepEqual(sel.checkin.changed[0].upload, ["bracket.prt", "bracket.step"], "the check-in releases the check-out: nothing changed stays behind");
+  assert.deepEqual(sel.checkin.changed[0].added, ["bracket.prt"]);
+  // the row action does the same
+  const one = revisionCheckin(plan.items[0].revisions[0], [step]);
+  assert.deepEqual(one.upload, ["bracket.prt", "bracket.step"]);
+  assert.deepEqual(one.added, ["bracket.prt"]);
+  // an outdated file alone has nothing to check in
+  assert.equal(revisionCheckin(plan.items[0].revisions[0], rows.filter((x) => x.state === "outdated")), null);
 });
 
 test("grouping by item, sorted; empty revisions and other states are left out", () => {

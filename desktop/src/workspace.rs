@@ -854,6 +854,21 @@ pub async fn status(
     item: &str,
     code: &str,
 ) -> Result<Status, ApiError> {
+    status_with(api, root, project, item, code, true).await
+}
+
+/// [`status`] without side effects when `apply` is false (the background
+/// scan of *Local changes*, #416): no read-only flags are set, no decomposed
+/// file names are renamed and `.teamcraft/state.json` is not written – a
+/// Get or check-in running in a tab at the same time is never disturbed.
+pub async fn status_with(
+    api: &Api,
+    root: &Path,
+    project: Option<&str>,
+    item: &str,
+    code: &str,
+    apply: bool,
+) -> Result<Status, ApiError> {
     let rev = match revision_files(api, project, item, code).await {
         Ok(rev) => rev,
         // A revision this working folder tracks answers "not found": the
@@ -870,7 +885,9 @@ pub async fn status(
     let mut renamed = false;
     for f in &rev.files {
         let rel = f.rel();
-        renamed |= adopt_into_state(&mut state, root, &rel);
+        if apply {
+            renamed |= adopt_into_state(&mut state, root, &rel);
+        }
         let dir = layout::join_rel(root, &rel);
         let dir = dir.parent().unwrap_or(root).to_path_buf();
         let entry = state.get(&rel).cloned();
@@ -956,7 +973,7 @@ pub async fn status(
             .filter(|n| !n.eq_ignore_ascii_case(&f.name));
         // Read-only rule for files that equal a server version: writable
         // only while checked out by me. Local changes are not touched.
-        if let (Some(path), "up_to_date" | "outdated") = (&f.path, state_name) {
+        if let (true, Some(path), "up_to_date" | "outdated") = (apply, &f.path, state_name) {
             if set_read_only(path, layout::read_only_wanted(rev.locked_by_me)).unwrap_or(false) {
                 state_changed = true;
             }

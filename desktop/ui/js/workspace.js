@@ -4,7 +4,7 @@
 
 import { $, api, badge, call, clear, confirmDialog, dialog, enc, errorText, field, h, invoke, lockBadge, materialField, run, setStatus, state, toast, tool } from "./core.js";
 import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
-import { isCancelled, refreshWorklistCount, uploadLine } from "./shell.js";
+import { isCancelled, refreshWorklistCount, rescanLocalChanges, uploadLine } from "./shell.js";
 import { reloadActive, renderActive, table } from "./tabs.js";
 import { PROGRAM_LABEL, cadPrograms, dd, exportProgram, exportStep, openRevision, previewFormat, revisionAbilities } from "./revision.js";
 import { openChange } from "./change.js";
@@ -233,7 +233,8 @@ export function getting(promise) {
   $("status-get-text").textContent = "Getting files …";
   $("status-get-bar").value = 0;
   function hide() { box.classList.add("hidden"); }
-  return promise.then(function (v) { hide(); return v; }, function (e) { hide(); throw e; });
+  // a Get changes the working folder: *Local changes* looks again (#416)
+  return promise.then(function (v) { hide(); rescanLocalChanges(); return v; }, function (e) { hide(); rescanLocalChanges(); throw e; });
 }
 
 export function onGetProgress(p) {
@@ -435,7 +436,7 @@ export function doCancelCheckout(tab) {
       toast("Released the check-out of " + rev.item_number + "/" + rev.code);
       // the unchanged local files become read-only again
       call("workspace_status", { project: rev.project_code, item: rev.item_number, code: rev.code }).catch(function () {}).then(function () {
-        reloadActive(); refreshWorklistCount();
+        reloadActive(); refreshWorklistCount(); rescanLocalChanges();
       });
     }, function () {});
   }
@@ -598,7 +599,7 @@ export function checkinDialog(tab, park) {
           (exportFailures.length ? ". No STEP export for " + exportFailures.join("; ") : ""),
           cancelled || exportFailures.length ? "info" : null);
         reloadActive();
-        refreshWorklistCount();
+        refreshWorklistCount(); rescanLocalChanges();
       }, function (err) {
         running = false; uploadWatcher = null; opts.modal = false; phase = "";
         setStatus("");
@@ -608,7 +609,7 @@ export function checkinDialog(tab, park) {
           toast(files.join(", ") + " are on the server (parked) and " + ref + " is still checked out to you – " +
             (cancelled || isCancelled(err) ? "the check-in was cancelled." : "the check-in failed: " + errorText(err)), cancelled || isCancelled(err) ? "info" : "error");
           reloadActive();
-          refreshWorklistCount();
+          refreshWorklistCount(); rescanLocalChanges();
           return;
         }
         if (cancelled || isCancelled(err)) {
@@ -873,7 +874,7 @@ export function addFilesDialog(tab) {
           d.close();
           toast((r.copied.length ? "Added " + r.copied.join(", ") + " to the working folder" : "Nothing added") +
             (r.skipped.length ? " – not replaced: " + r.skipped.join(", ") : ""), r.skipped.length ? "info" : null);
-          refreshWorklistCount();
+          refreshWorklistCount(); rescanLocalChanges();
           if (checkNow.checked && r.copied.length) { reloadActive(); checkinDialog(tab); } else { tab.sub = "workspace"; reloadActive(); }
         }, function (e) { d.fail(e); reloadActive(); });
       } }

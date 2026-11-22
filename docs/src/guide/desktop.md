@@ -166,19 +166,25 @@ check-outs and reviews, and a **local working folder**:
   the revision becomes yours to check in; **Get latest** for outdated and
   missing files (a changed file is never overwritten); **Check in selected**
   for the changed files of your own check-outs (a comment, then the same flow
-  as *Check in all*; a revision with a conflict stays checked out);
+  as *Check in all*; a revision with a conflict stays checked out). A
+  check-in releases the check-out, so it always takes **every** changed file
+  of the revision along – the dialog names the ones you did not tick, and
+  **Park** uploads them instead and keeps the check-out;
   **Merge…** opens the Workspace tab of a conflict; **Folder** opens the
-  folder. A click on a revision opens its Workspace tab. The count is part of
+  folder. A click on a revision (a button, also by keyboard) opens its Workspace tab. The count is part of
   the worklist count on the rail. Files that belong to no item yet stay in
   *New on this computer* (the link under the list jumps there). The list is
   made in two steps: the working folder is compared with what TeamCraft
   copied there (no network; unchanged files are not read again), then up to
-  100 revisions are compared with the server – the ones with local changes
-  first, then your check-outs. Only that second step knows *outdated* and
-  *conflict*; the note under the list says how many revisions were compared
-  on this computer only. It runs when the worklist opens, when the app window
-  gets the focus back (at most every 15 s) and after a check-out, check-in or
-  Get. Viewers see the list with *Get latest* and *Folder* only;
+  100 revisions per scan are compared with the server – the ones with local
+  changes first, then your check-outs, then the others in turns, so in a
+  larger working folder every revision is checked for outdated files over a
+  few scans. Only that second step knows *outdated* and *conflict*; the note
+  under the list says how many revisions were compared on this computer only
+  this time. The scan only compares – it changes no read-only flags and no
+  files. It runs when the worklist opens or is refreshed, when the app window
+  gets the focus back (at most every 15 s) and right after a check-out,
+  check-in, park, cancelled check-out or Get. Viewers see the list with *Get latest* and *Folder* only;
 * *Check in all* in the worklist first lists the check-outs with local
   changes (modified or new files) and offers to **check them in first**
   with their files; *Only the others* checks in just the check-outs without

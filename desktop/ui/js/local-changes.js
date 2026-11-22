@@ -16,7 +16,8 @@
 // * Get latest – outdated or missing files: `workspace_download` replaces
 //   unchanged copies and never overwrites a local change;
 // * Check in – modified and new files of my own check-outs: the Check in all
-//   flow (`sendLocalChanges` in shell.js) for the selection;
+//   flow (`sendLocalChanges` in shell.js) for the selection – always every
+//   changed file of a revision, since the check-in releases its check-out;
 // * Merge – a conflict (changed here and on the server) is opened in its
 //   Workspace tab, a check-in would be refused;
 // * Open folder – every row.
@@ -109,12 +110,35 @@ export function planLocalChanges(scan) {
 }
 
 /**
+ * The check-in of one revision when `chosen` (rows of `rev`) holds a file
+ * to check in, else null. A check-in releases the check-out, so every
+ * changed file of the revision goes up – not only the chosen ones – or the
+ * others would be left changed without a check-out; `added` names the ones
+ * that were not chosen (the dialog shows them). Conflicts are never checked
+ * in: they are named in `conflicts` so the flow keeps the revision checked
+ * out.
+ */
+export function revisionCheckin(rev, chosen) {
+  function can(r) { return r.actions.indexOf("checkin") >= 0; }
+  if (!chosen.some(can)) return null;
+  var picked = {};
+  chosen.forEach(function (r) { picked[r.key] = true; });
+  var all = rev.rows.filter(can);
+  return {
+    project: rev.project || null, item: rev.item, code: rev.code,
+    upload: all.map(function (r) { return r.name; }),
+    added: all.filter(function (r) { return !picked[r.key]; }).map(function (r) { return r.name; }),
+    conflicts: rev.rows.filter(function (r) { return r.state === "conflict"; }).map(function (r) { return r.name; })
+  };
+}
+
+/**
  * What a selection (`ticked`: row key → true) allows, one entry per
  * revision: `checkout` (revisions to check out, keeping the files), `get`
  * (revisions to get), and `checkin` in the shape of the Check in all report
- * (`{changed: [{project, item, code, upload, conflicts}], unreadable: []}`,
- * for `sendLocalChanges`). Conflicts are never checked in: they are named
- * in `conflicts` so the flow keeps the revision checked out.
+ * (`{changed: [{project, item, code, upload, added, conflicts}], unreadable:
+ * []}`, for `sendLocalChanges`; see revisionCheckin – a chosen file takes
+ * every changed file of its revision along).
  */
 export function selectionActions(plan, ticked) {
   var out = { checkout: [], get: [], checkin: { changed: [], unreadable: [] }, rows: 0 };
@@ -126,11 +150,8 @@ export function selectionActions(plan, ticked) {
       var ref = { project: rev.project || null, item: rev.item, code: rev.code };
       if (chosen.some(function (r) { return r.actions.indexOf("checkout") >= 0; })) out.checkout.push(ref);
       if (chosen.some(function (r) { return r.actions.indexOf("get") >= 0; })) out.get.push(ref);
-      var upload = chosen.filter(function (r) { return r.actions.indexOf("checkin") >= 0; }).map(function (r) { return r.name; });
-      if (upload.length) {
-        var conflicts = rev.rows.filter(function (r) { return r.state === "conflict"; }).map(function (r) { return r.name; });
-        out.checkin.changed.push(Object.assign({}, ref, { upload: upload, conflicts: conflicts }));
-      }
+      var c = revisionCheckin(rev, chosen);
+      if (c) out.checkin.changed.push(c);
     });
   });
   return out;

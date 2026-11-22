@@ -609,6 +609,7 @@ function releaseClean(total, report, sent) {
       lines("Problems:", failed.concat(sent ? sent.failed : []), ".notice.error")
     ]);
     dialog("Check in all my check-outs", body, [{ label: "Close", primary: true, submit: true, onClick: function (d) { d.close(); } }]);
+    rescanLocalChanges();
     refreshWorklistCount().then(function () { renderActive(); }, function () {});
   }, function () {});
 }
@@ -677,21 +678,23 @@ export function rescanNewFiles() {
 /** After anything that changes the worklist (check out, cancel check-out,
  * check in, a review …): the count on the rail, and the worklist navigator
  * when it is shown – an action in a tab on the right shows up on the left at
- * once (#347) – and *Local changes* is scanned again (#416). */
+ * once (#347). *Local changes* follows at most every 15 s from here; the
+ * actions that change the working folder (Get, check-out, check-in, park,
+ * cancel check-out) call rescanLocalChanges themselves (#416). */
 export function refreshWorklistCount() {
-  // a check-in, Get or check-out changes the working folder too (#416)
-  rescanLocalChanges();
+  scanLocalChanges(false).catch(function () {});
   return fetchWorklist().then(function (w) {
     if (state.view === "worklist") drawWorklist(w);
     return w;
   });
 }
 
-var localChangesScan = null;
+var localChangesScan = null, localRescan = null;
 /** *Local changes* (#416): the modified, outdated, conflicting, new and
  *  missing files of every revision in the working folder (desktop
  *  src/localchanges.rs). At most every 15 s unless `force`; one scan at a
- *  time. Only reads – the worklist section offers the actions. */
+ *  time. The scan compares like the Workspace status but writes nothing (no
+ *  read-only flags, no state); the worklist section offers the actions. */
 export function scanLocalChanges(force) {
   if (!state.me) { state.localChanges = null; return Promise.resolve(null); }
   if (!force && state.localChanges && Date.now() - state.localChanges.at < 15000) return Promise.resolve(state.localChanges);
@@ -709,10 +712,16 @@ export function scanLocalChanges(force) {
 }
 
 /** After a check-in, Get or check-out: scan again (once the running scan is
- *  done) and redraw the worklist when it is shown. */
+ *  done) and redraw the worklist when it is shown. Requests that arrive
+ *  while a rescan is waiting fold into that one. */
 export function rescanLocalChanges() {
+  if (localRescan) return localRescan;
   var running = localChangesScan || Promise.resolve();
-  return running.catch(function () {}).then(function () { return scanLocalChanges(true); }).then(function () {
+  localRescan = running.catch(function () {}).then(function () {
+    localRescan = null;
+    return scanLocalChanges(true);
+  }).then(function () {
     if (state.view === "worklist" && state.worklist) drawWorklist(state.worklist);
-  }, function () {});
+  }, function () { localRescan = null; });
+  return localRescan;
 }

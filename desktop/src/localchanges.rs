@@ -9,27 +9,33 @@
 //!    `.teamcraft/state.json` (at most `newfiles::MAX_ENTRIES`, the limits of *New on this computer*) is compared
 //!    with the disk. A file that is gone is *missing*; a file whose size
 //!    differs is *modified*; a file with the same size but another
-//!    modification time is hashed (at most [`MAX_HASH_BYTES`] per scan, the
-//!    rest counts as modified until the server pass looks) and *modified* if
-//!    its SHA-256 differs from the base. An unchanged file is never read.
+//!    modification time is hashed (at most [`MAX_HASH_BYTES`] per scan) and
+//!    *modified* if its SHA-256 differs from the base. A file beyond that
+//!    budget (or without a known base hash) is *unknown*: compared first by
+//!    the server pass, but never listed as modified on the local pass alone.
+//!    An unchanged file is never read.
 //! 2. A **server pass** ([`scan`]): the Workspace status of one revision
-//!    after the other (`workspace::status`, the same as the Workspace tab),
-//!    at most [`MAX_REVISIONS`] – revisions with a local change first, then
-//!    my check-outs, then the rest. Only this pass knows *outdated* (a newer
-//!    version on the server than the base) and *conflict* (changed here and
-//!    on the server). The first failing call (server unreachable, signed out)
-//!    stops the pass; the revisions not compared keep what the local pass
-//!    found and say so (`compared` false).
+//!    after the other (`workspace::status_with` without side effects – the
+//!    comparison of the Workspace tab, but no read-only flags, renames or
+//!    state writes), at most [`MAX_REVISIONS`] – revisions with a local change
+//!    first, then my check-outs, then a window over the rest that moves on
+//!    with every scan ([`pick`]), so in a folder with more revisions every
+//!    one is compared within a few scans. Only this pass knows *outdated* (a
+//!    newer version on the server than the base) and *conflict* (changed
+//!    here and on the server). The first failing call (server unreachable,
+//!    signed out) stops the pass; the revisions not compared keep what the
+//!    local pass found and say so (`compared` false).
 //!
 //! [`classify`] puts both together; it is pure and unit-tested. Nothing is
-//! uploaded or downloaded here: the actions of the list (*Check out (keep my
-//! file)*, *Get latest*, *Check in selected*) are the commands the Workspace
-//! tab uses (`ui/js/local-changes.js`).
+//! uploaded, downloaded or written here: the actions of the list (*Check out
+//! (keep my file)*, *Get latest*, *Check in selected*) are the commands the
+//! Workspace tab uses (`ui/js/local-changes.js`).
 
 use std::{
     collections::{BTreeMap, HashMap},
     io::Read,
     path::{Path, PathBuf},
+    sync::Mutex,
     time::UNIX_EPOCH,
 };
 
@@ -46,8 +52,13 @@ use crate::{
 /// Revisions the server pass compares at most per scan.
 pub const MAX_REVISIONS: usize = 100;
 /// Bytes the local pass hashes at most per scan (files with the same size
-/// but a new modification time); beyond it a file counts as modified.
+/// but a new modification time); beyond it a file is *unknown* until the
+/// server pass compares it.
 pub const MAX_HASH_BYTES: u64 = 512 * 1024 * 1024;
+
+/// Where the window over the revisions without a local change and without
+/// my check-out starts in the next scan ([`pick`]).
+static ROTATION: Mutex<usize> = Mutex::new(0);
 
 /// The file states the list shows (everything but `up_to_date`, `clash` and
 /// `inaccessible`).
@@ -69,8 +80,10 @@ fn key_of(project: Option<&str>, item: &str, revision: &str) -> RevKey {
 pub struct Disk {
     /// The file is in the working folder.
     pub exists: bool,
-    /// Its content differs from the base (or could not be checked).
-    pub modified: bool,
+    /// Its content differs from the base: `Some(true)`, equals it:
+    /// `Some(false)`, could not be checked (hash budget used up, no base
+    /// hash, unreadable): `None` – only the server pass decides then.
+    pub modified: Option<bool>,
     /// The file is writable (not read-only).
     pub writable: bool,
 }
@@ -160,8 +173,9 @@ pub struct RevisionChanges {
 pub struct LocalChangesScan {
     /// Sorted by item and revision.
     pub revisions: Vec<RevisionChanges>,
-    /// A limit was hit (entries, files, or [`MAX_REVISIONS`]): there may be
-    /// more changes than listed.
+    /// A limit was hit (entries or files): there may be more changes than
+    /// listed. More revisions than [`MAX_REVISIONS`] show in `compared` <
+    /// `tracked` instead.
     pub truncated: bool,
     /// Revisions the server pass compared.
     pub compared: usize,
@@ -215,19 +229,19 @@ pub(crate) fn disk_of(root: &Path, e: &Entry, budget: &mut u64) -> Disk {
         _ => {
             return Disk {
                 exists: false,
-                modified: false,
+                modified: Some(false),
                 writable: false,
             }
         }
     };
     let writable = !workspace::is_read_only(&path);
     let (size, mtime) = (meta.len(), modified_ms(&meta));
-    let modified = if size != e.size {
+    let modified = if size != e.size && e.size != 0 {
         // a known size that differs: changed for sure (no size known – an
         // old state – is decided by the hash)
-        e.size != 0 || hash_differs(&path, e, size, budget)
-    } else if mtime == e.modified_ms && mtime != 0 {
-        false
+        Some(true)
+    } else if size == e.size && mtime == e.modified_ms && mtime != 0 {
+        Some(false)
     } else {
         hash_differs(&path, e, size, budget)
     };
@@ -238,12 +252,14 @@ pub(crate) fn disk_of(root: &Path, e: &Entry, budget: &mut u64) -> Disk {
     }
 }
 
-fn hash_differs(path: &Path, e: &Entry, size: u64, budget: &mut u64) -> bool {
+/// `Some(differs)`, or `None` when the file cannot be checked here (no base
+/// hash, beyond the hash budget, unreadable).
+fn hash_differs(path: &Path, e: &Entry, size: u64, budget: &mut u64) -> Option<bool> {
     if e.sha256.is_empty() || size > *budget {
-        return true;
+        return None;
     }
     *budget -= size;
-    sha256_file(path).map(|s| s != e.sha256).unwrap_or(true)
+    sha256_file(path).ok().map(|s| s != e.sha256)
 }
 
 /// Compares the tracked files of `state` with the disk below `root`, at most
@@ -271,16 +287,17 @@ pub(crate) fn local_pass(root: &Path, state: &State, limits: Limits) -> LocalPas
 /// Sort key of a revision in the server pass: rank, item, revision order.
 type Rank = (u8, String, (usize, String));
 
-/// The revisions of `entries` in the order the server pass compares them:
-/// revisions with a local change (missing or modified) first, then the ones
-/// checked out by me, then the rest – each part by item and revision.
-pub fn server_order(entries: &[Entry], disk: &HashMap<String, Disk>) -> Vec<RevKey> {
+/// The revisions of `entries` in the order the server pass compares them,
+/// with their rank: revisions with a local change (missing, modified or not
+/// checkable here) first (0), then the ones checked out by me (1), then the
+/// rest (2) – each part by item and revision.
+pub fn server_order(entries: &[Entry], disk: &HashMap<String, Disk>) -> Vec<(RevKey, u8)> {
     // key → (rank, item, revision order)
     let mut ranks: BTreeMap<RevKey, Rank> = BTreeMap::new();
     for e in entries {
         let key = key_of(e.project.as_deref(), &e.item, &e.revision);
         let d = disk.get(&layout::key_of(&e.path));
-        let rank = if d.is_some_and(|d| !d.exists || d.modified) {
+        let rank = if d.is_some_and(|d| !d.exists || d.modified != Some(false)) {
             0
         } else if e.checked_out {
             1
@@ -296,7 +313,33 @@ pub fn server_order(entries: &[Entry], disk: &HashMap<String, Disk>) -> Vec<RevK
     }
     let mut keys: Vec<(RevKey, Rank)> = ranks.into_iter().collect();
     keys.sort_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.cmp(&b.0)));
-    keys.into_iter().map(|(k, _)| k).collect()
+    keys.into_iter().map(|(k, r)| (k, r.0)).collect()
+}
+
+/// The revisions one scan compares (at most `max`) and where the window
+/// starts next time: every revision of rank 0 and 1 (local changes, my
+/// check-outs) as far as `max` allows, then the rest from `cursor` on,
+/// wrapping around – so over successive scans every revision of a large
+/// working folder is compared for *outdated* files, not only the first ones.
+pub fn pick(order: &[(RevKey, u8)], cursor: usize, max: usize) -> (Vec<RevKey>, usize) {
+    let mut out: Vec<RevKey> = order
+        .iter()
+        .filter(|(_, r)| *r < 2)
+        .take(max)
+        .map(|(k, _)| k.clone())
+        .collect();
+    let rest: Vec<&RevKey> = order
+        .iter()
+        .filter(|(_, r)| *r >= 2)
+        .map(|(k, _)| k)
+        .collect();
+    if rest.is_empty() {
+        return (out, 0);
+    }
+    let room = max.saturating_sub(out.len()).min(rest.len());
+    let start = cursor % rest.len();
+    out.extend((0..room).map(|i| rest[(start + i) % rest.len()].clone()));
+    (out, (start + room) % rest.len())
 }
 
 /// The list: per revision of `entries` either the files of its server status
@@ -368,9 +411,12 @@ pub fn classify(
                 let Some(d) = disk.get(&layout::key_of(&e.path)) else {
                     continue;
                 };
+                // a file that could not be checked here (`None`) waits for
+                // the server pass: never "modified" – and never offered a
+                // check-out – on a guess
                 let state = if !d.exists {
                     "missing"
-                } else if d.modified {
+                } else if d.modified == Some(true) {
                     "modified"
                 } else {
                     continue;
@@ -407,7 +453,8 @@ pub fn classify(
 // ---------------------------------------------------------------------------
 
 /// The whole scan: local pass, then the server pass over at most
-/// [`MAX_REVISIONS`] revisions, then [`classify`].
+/// [`MAX_REVISIONS`] revisions ([`pick`], the window moves on with every
+/// scan), then [`classify`].
 pub async fn scan(api: &Api, root: &Path) -> Result<LocalChangesScan, ApiError> {
     if !root.is_dir() {
         return Ok(LocalChangesScan::default());
@@ -422,6 +469,12 @@ pub async fn scan(api: &Api, root: &Path) -> Result<LocalChangesScan, ApiError> 
     .map_err(|e| ApiError::local(format!("The scan for local changes stopped: {e}")))?;
     let order = server_order(&local.entries, &local.disk);
     let tracked = order.len();
+    let chosen = {
+        let mut cursor = ROTATION.lock().unwrap_or_else(|e| e.into_inner());
+        let (chosen, next) = pick(&order, *cursor, MAX_REVISIONS);
+        *cursor = next;
+        chosen
+    };
     let names: HashMap<RevKey, (Option<String>, String, String)> = local
         .entries
         .iter()
@@ -434,11 +487,12 @@ pub async fn scan(api: &Api, root: &Path) -> Result<LocalChangesScan, ApiError> 
         .collect();
     let mut server = HashMap::new();
     let mut errors = HashMap::new();
-    for key in order.iter().take(MAX_REVISIONS) {
+    for key in &chosen {
         let Some((project, item, code)) = names.get(key) else {
             continue;
         };
-        match workspace::status(api, root, project.as_deref(), item, code).await {
+        // compares only: no read-only flags, renames or state writes
+        match workspace::status_with(api, root, project.as_deref(), item, code, false).await {
             Ok(status) => {
                 server.insert(key.clone(), ServerRevision::from(&status));
             }
@@ -460,7 +514,9 @@ pub async fn scan(api: &Api, root: &Path) -> Result<LocalChangesScan, ApiError> 
     );
     Ok(LocalChangesScan {
         revisions,
-        truncated: local.truncated || cut || tracked > MAX_REVISIONS,
+        // more revisions than one scan compares is not "truncated": the
+        // window moves on and `tracked`/`compared` say it
+        truncated: local.truncated || cut,
         compared,
         tracked,
     })
@@ -489,7 +545,7 @@ mod tests {
     fn disk(exists: bool, modified: bool, writable: bool) -> Disk {
         Disk {
             exists,
-            modified,
+            modified: Some(modified),
             writable,
         }
     }
@@ -625,7 +681,54 @@ mod tests {
         .into_iter()
         .collect();
         let order = server_order(&[rest.clone(), mine.clone(), changed.clone()], &disk);
-        assert_eq!(order, vec![key(&changed), key(&mine), key(&rest)]);
+        assert_eq!(
+            order,
+            vec![(key(&changed), 0), (key(&mine), 1), (key(&rest), 2)]
+        );
+    }
+
+    fn rk(i: usize) -> RevKey {
+        ("rover".into(), format!("prt-{i}"), "a".into())
+    }
+
+    #[test]
+    fn pick_rotates_over_the_rest_and_keeps_changes_first() {
+        let mut order = vec![(rk(100), 0), (rk(101), 1)];
+        order.extend((0..5).map(|i| (rk(i), 2)));
+        // room for 2 of the rest per scan: 0,1 – 2,3 – 4,0 – …
+        let (a, next) = pick(&order, 0, 4);
+        assert_eq!(a, vec![rk(100), rk(101), rk(0), rk(1)]);
+        let (b, next) = pick(&order, next, 4);
+        assert_eq!(b, vec![rk(100), rk(101), rk(2), rk(3)]);
+        let (c, next) = pick(&order, next, 4);
+        assert_eq!(c, vec![rk(100), rk(101), rk(4), rk(0)]);
+        assert_eq!(next, 1);
+        // everything fits: each revision once, whatever the cursor
+        let (all, _) = pick(&order, 3, 100);
+        assert_eq!(all.len(), 7);
+        let unique: std::collections::BTreeSet<_> = all.iter().collect();
+        assert_eq!(unique.len(), 7);
+        // only changes: no room for the rest, the cursor stays in range
+        let (few, next) = pick(&order, 2, 1);
+        assert_eq!(few, vec![rk(100)]);
+        assert_eq!(next, 2);
+        assert_eq!(pick(&[], 9, 10), (vec![], 0));
+    }
+
+    #[test]
+    fn an_unchecked_file_is_compared_first_but_never_listed_on_a_guess() {
+        let e = entry("PRT-1", "A", "huge.prt", false);
+        let unknown = Disk {
+            exists: true,
+            modified: None,
+            writable: true,
+        };
+        let d: HashMap<String, Disk> = [(layout::key_of(&e.path), unknown.clone())]
+            .into_iter()
+            .collect();
+        assert_eq!(server_order(&[e.clone()], &d), vec![(key(&e), 0)]);
+        let out = run(&[e.clone()], &[(&e, unknown)], &[]);
+        assert!(out.is_empty(), "not modified, no check-out offered");
     }
 
     #[test]
@@ -684,8 +787,8 @@ mod tests {
         let pass = local_pass(root, &state, Limits::default());
         assert!(!pass.truncated);
         let get = |name: &str| pass.disk[&layout::key_of(&format!("ROVER/PRT-1/{name}"))].clone();
-        assert!(get("same.prt").exists && !get("same.prt").modified);
-        assert!(get("bigger.prt").modified);
+        assert!(get("same.prt").exists && get("same.prt").modified == Some(false));
+        assert_eq!(get("bigger.prt").modified, Some(true));
         assert!(!get("gone.prt").exists);
         let small = local_pass(
             root,

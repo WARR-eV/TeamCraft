@@ -220,6 +220,7 @@ desktop/           TeamCraft Desktop (Tauri 2, own Cargo project – never part 
                    HTML card layer, checked by scripts/desktop-graph-check.mjs), files-view.js = Home *Files* view,
                    crash.js = crash reports; desktop/src/workspace.rs + layout.rs = working folder, park, local changes;
                    new-files.js + desktop/src/newfiles.rs = new items from local files, worklist *New on this computer* (#359);
+                   local-changes.js + desktop/src/localchanges.rs = worklist *Local changes* over the whole working folder (#416);
                    desktop/src/localserver.rs = *Try TeamCraft on this computer* (starts the bundled teamcraft-server local);
                    desktop/src/policy.rs = managed deployment policies (registry / macOS profile / /etc/teamcraft, #378);
                    tauri.local-server.conf.json = the *with local server* installers (externalBin teamcraft-server + postgresql/)
