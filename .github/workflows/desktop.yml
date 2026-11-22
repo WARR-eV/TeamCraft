@@ -132,6 +132,10 @@ jobs:
       # models end in a message, not in an empty canvas (#290)
       - name: Test the 3D viewer's mesh check
         run: node scripts/viewer-mesh.test.mjs
+      # which mouse drag rotates and which pans in each scheme of the
+      # viewer's Mouse setting (#459)
+      - name: Test the 3D viewer's mouse schemes
+        run: node scripts/viewer-input.test.mjs
       # the shared rules (labels, numbers, sizes, ages, state glyphs,
       # markdown-lite) against shared/test-vectors – the same vectors
       # src/ui_vectors.rs pins the server's Rust side to
