@@ -13,6 +13,12 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Fixed
+
+- CI on `main` is green again: the comment of the shared text-selection rule
+  (#436) quoted two hex colours, which the no-literal-colours guard of
+  `shared/css/` counts as colours in the stylesheet.
+
 ## [0.2.12] - 2026-11-22
 
 ### Security
