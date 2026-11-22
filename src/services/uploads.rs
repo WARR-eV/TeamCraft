@@ -132,6 +132,8 @@ pub struct Finished {
     pub stored: Vec<files::Stored>,
     pub upload: files::Upload,
     pub revision: Option<Revision>,
+    /// What the check-in changed in the BOM (`bom_from_references`, #407).
+    pub bom: Option<crate::services::bom_references::CheckinBom>,
 }
 
 /// Checks a chunk against the session state and returns the new offset.
@@ -645,6 +647,9 @@ pub async fn forget(pool: &PgPool, vault: &Vault, ids: &[Uuid]) {
 ///   storing succeeded.
 /// * **Audit, notifications, webhooks:** those of [`files::check_in`] /
 ///   [`files::attach`] (`file.upload` / `file.version`, `revision.checkin`).
+/// * **BOM:** only with `check_in` and `options.bom_from_references`, in the
+///   check-in's transaction ([`files::check_in_with`], #407); never without
+///   `check_in`.
 pub async fn finish(
     pool: &PgPool,
     vault: &Vault,
@@ -652,6 +657,7 @@ pub async fn finish(
     id: Uuid,
     comment: &str,
     check_in: bool,
+    options: files::CheckInOptions,
 ) -> AppResult<Finished> {
     let session = get(pool, actor, id).await?;
     let revision_id = session.revision_id.ok_or_else(|| {
@@ -659,18 +665,21 @@ pub async fn finish(
     })?;
     let upload = complete(pool, vault, actor, id, None).await?;
     let uploads = std::slice::from_ref(&upload);
-    let (stored, revision) = if check_in {
-        let (rev, stored) = files::check_in(pool, actor, revision_id, uploads, comment).await?;
-        (stored, Some(rev))
+    let (stored, revision, bom) = if check_in {
+        let (rev, stored, bom) =
+            files::check_in_with(pool, actor, revision_id, uploads, comment, options).await?;
+        (stored, Some(rev), bom)
     } else {
+        // an upload without check-in (park) never touches the BOM
         let stored = files::attach(pool, actor, revision_id, uploads, comment).await?;
-        (stored, None)
+        (stored, None, None)
     };
     forget(pool, vault, &[id]).await;
     Ok(Finished {
         stored,
         upload,
         revision,
+        bom,
     })
 }
 

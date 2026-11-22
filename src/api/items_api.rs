@@ -607,7 +607,9 @@ pub(super) async fn checkout(
 
 /// Check-in. Without a body it just releases the lock; with a
 /// `multipart/form-data` body (fields `file` and optional `comment`) the files
-/// become new versions and the lock is released in the same transaction.
+/// become new versions and the lock is released in the same transaction; the
+/// field `bom_from_references=true` also updates the BOM from the CAD file
+/// there (#407, answered as `bom`).
 pub(super) async fn checkin(
     State(st): State<AppState>,
     ApiUser(me): ApiUser,
@@ -642,15 +644,30 @@ pub(super) async fn checkin(
         &mut received,
     )
     .await?;
-    let (rev, stored) =
-        files::check_in(&st.db, &me, rev.id, &received.uploads, &received.comment).await?;
+    let options = files::CheckInOptions::from_field(
+        received
+            .fields
+            .get("bom_from_references")
+            .map(String::as_str),
+    );
+    let (rev, stored, bom) = files::check_in_with(
+        &st.db,
+        &me,
+        rev.id,
+        &received.uploads,
+        &received.comment,
+        options,
+    )
+    .await?;
     uploads::forget(&st.db, &st.vault, &sessions).await;
     web::warm_previews(&st, &received.uploads);
     let changed: Vec<Value> = stored
         .iter()
         .map(|s| json!({ "file_id": s.file_id, "filename": s.filename, "version": s.version, "changed": s.changed }))
         .collect();
-    Ok(Json(json!({ "revision": rev, "files": changed })))
+    Ok(Json(
+        json!({ "revision": rev, "files": changed, "bom": bom }),
+    ))
 }
 
 #[derive(Deserialize)]

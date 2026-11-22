@@ -757,6 +757,9 @@ needs an issue with a reason first (see *Direction*).
   and *Get TeamCraft Desktop*, #412 preview at the top of the revision page, #413 no hash column, #414 revision vs
   version explained), #421 section nav of the revision page, #417 right-click menus in the desktop app; left: the
   daily CAD loop (#415, #416, #418–#420) and onboarding (#422–#424)
+- [x] Check-in: *Update the BOM from the CAD file*, ticked by default (#407) – web form, desktop *Check in…*, API
+  field `bom_from_references` (also on chunked `finish`), in the check-in's transaction, nothing removed, the result
+  says what changed; left: tried with real Inventor/SOLIDWORKS check-ins from the desktop app
 - [ ] Responsive pages on large data (1M files, 100k items, 10k-line BOMs – see the scale targets)
 - [ ] Faster opening of large CAD files and assemblies
 - [ ] Configurable lifecycle states and site-specific allowed transitions instead of one built-in state machine

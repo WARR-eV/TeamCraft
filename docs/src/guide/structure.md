@@ -64,7 +64,9 @@ the BOM is empty) shows what the BOM would be, one row per child:
 
 * item, name, **quantity** and where it comes from – *CAD instances* (NX:
   the placed instances of the component, hidden layers left out; SOLIDWORKS:
-  the instances in the component tree without *exclude from BOM*; STEP
+  the instances in the component tree without *exclude from BOM*; Inventor:
+  the occurrences of each part, suppressed ones left out; SolidCraft: the
+  placements of each linked design; STEP
   assemblies with external part files: the assembly occurrences of each
   file) or *assumed 1* (the file does not tell; the line gets the note *quantity not
   known from the CAD file – check it*);
@@ -73,8 +75,8 @@ the BOM is empty) shows what the BOM would be, one row per child:
   4 – changed only when you tick it and *Also change the quantity*), or *circular* (refused, as when adding a line by
   hand).
 
-Only assembly files count (NX files only when they have component
-instances, STEP files only when their occurrences lead to external part
+Only assembly files count (NX files and SolidCraft designs only when they
+have component instances, STEP files only when their occurrences lead to external part
 files); a drawing's link to its model stays a *drawing of* reference.
 Referenced files TeamCraft does not have are listed as *not in TeamCraft* and
 never created; parts in project groups you cannot see are only counted. *Add the ticked lines* needs the revision
@@ -83,6 +85,39 @@ offers *Check out and create*) and adds all lines in one transaction. The
 REST API has the same two steps: `GET …/bom/from-references` returns the
 plan, `POST …/bom/from-references` with
 `{"children": ["PRT-000004"], "update_quantities": false}` applies it.
+
+### At check-in: *Update the BOM from the CAD file*
+
+The check-in form of the web UI and the desktop app's *Check in…* have a
+box **Update the BOM from the CAD file**, ticked by default every time
+(#407). It is shown when the revision has an assembly (in the web UI: an
+assembly item or a revision whose CAD files lead to other items; in the
+desktop app: an Inventor `.iam`, a SOLIDWORKS assembly, an NX `.prt`, a STEP
+file or a SolidCraft `.sc`). With the box ticked, the plan above is applied
+to the version being checked in, **in the check-in's transaction** – the
+files and the BOM change together, or neither (a refused upload, 409, leaves
+the BOM as it was):
+
+* children with the status *new* are added;
+* a quantity that *differs* is corrected only where the CAD file counts it
+  (*CAD instances*); an *assumed 1* never replaces an existing quantity;
+* *circular* children are refused, as above;
+* lines whose part the CAD files no longer reference are **kept** (a BOM
+  carries lines without CAD geometry: glue, cable ties, bought parts) and
+  reported as *no longer in the CAD file*;
+* referenced files TeamCraft does not have are reported as *not in
+  TeamCraft*, never created.
+
+The check-in message says what changed – *BOM: 4 lines added, 1 quantity
+changed · not in TeamCraft: Lager.ipt · no longer in the CAD file:
+PRT-000012 (kept)* – and says nothing when nothing changed. The permission
+is that of the check-in (the holder of the check-out); the audit log gets
+`bom.add` / `bom.update` per line and one `bom.from_references` with
+`"source": "checkin"`. The counts are the ones the reference scan stored
+with the new version. Unticking the box keeps the BOM as it is for that one
+check-in; a park (upload without check-in) never changes it. On the REST API
+the field `bom_from_references` is off by default, so existing clients
+behave as before.
 
 ## Comparing BOMs
 

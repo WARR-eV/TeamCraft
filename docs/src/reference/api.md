@@ -146,6 +146,36 @@ curl -s -X POST -H "$H" -H "Content-Type: application/json" \
      $API/items/PRT-000001/revisions/A/cancel-checkout
 ```
 
+### Updating the BOM from the CAD file at check-in
+
+The multipart field `bom_from_references=true` on `POST …/checkin` (and
+`"bom_from_references": true` next to `"check_in": true` in the body of
+`POST /uploads/{id}/finish`) also updates the BOM of the revision from the
+CAD references of the version being checked in, **in the check-in's
+transaction** (#407; the plan of `GET …/bom/from-references`, see the
+[structure guide](../guide/structure.md#at-check-in-update-the-bom-from-the-cad-file)):
+new children are added, quantities that differ are corrected where the CAD
+file counts them (never from an *assumed 1*), circular children are refused,
+no line is removed. It is off by default, so clients that do not send it
+behave as before; a refused upload (409) changes neither files nor BOM. The
+answer adds `bom`:
+
+```sh
+curl -s -X POST -H "$H" -F file=@pump.stp -F bom_from_references=true \
+     $API/items/ASM-000001/revisions/A/checkin
+# {"revision": {…}, "files": […],
+#  "bom": {"added": ["PRT-000007"], "updated": ["PRT-000004"],
+#          "kept_not_in_cad": ["PRT-000012"], "not_in_teamcraft": ["Lager.ipt"],
+#          "refused": [{"child": "ASM-000002", "reason": "Adding … would create a circular BOM structure."}]}}
+```
+
+`added`, `updated`, `kept_not_in_cad` (lines whose child the CAD files no
+longer reference – kept) and `refused[].child` are item numbers,
+`not_in_teamcraft` referenced file names. `bom` is `null` without the field
+and when the revision has no file whose references describe a structure
+(an assembly, an NX part or SolidCraft design with component instances, a
+STEP assembly with external part files).
+
 ### Concurrency: base versions and file status
 
 A check-in or upload can name the version each file is **based on** in the
@@ -211,7 +241,7 @@ curl -s -X POST -H "$H" -H 'Content-Type: application/json' \
 | `POST /uploads`             | `{item, revision, filename, size, sha256?, content_type?, base?, folder?, refuse_clash?, refuse_same_name?}` → **201** with the session (`folder` = place in the project group, see below; omitted = keep the file's folder; `refuse_clash`/`refuse_same_name` = the [duplicate guard](#duplicates-of-new-files-check-and-guard), kept with the session and applied when the file is stored); 413 above `TEAMCRAFT_MAX_UPLOAD_MB`, 409 if the revision is not checked out by you, `base` is outdated or the guard refuses the new file already |
 | `PATCH /uploads/{id}`       | header `Upload-Offset`, body = the next chunk (≤ `chunk_bytes`) → the session with the new `offset`; **409** with the server's `Upload-Offset` header at any other offset, 400 beyond `size`                                                                                                         |
 | `HEAD`/`GET /uploads/{id}`  | headers `Upload-Offset`, `Upload-Length`; `GET` also as JSON (`offset`, `size`, `complete`, `expires_at`)                                                                                                                                                                                            |
-| `POST /uploads/{id}/finish` | body optional `{comment?, check_in?}`: verify size and SHA-256, store the new file or version (`check_in: true` also releases the check-out) → `{files, revision}`; 409 while incomplete, 400 if the content does not match (the upload is reset to offset 0)                                        |
+| `POST /uploads/{id}/finish` | body optional `{comment?, check_in?, bom_from_references?}`: verify size and SHA-256, store the new file or version (`check_in: true` also releases the check-out, with `bom_from_references: true` also updates the BOM from the CAD file) → `{files, revision, bom}`; 409 while incomplete, 400 if the content does not match (the upload is reset to offset 0)                                        |
 | `DELETE /uploads/{id}`      | cancel; the received data is deleted                                                                                                                                                                                                                                                                 |
 
 Instead of `finish`, complete uploads can join a multipart **check-in** or
@@ -475,7 +505,7 @@ the caller cannot read are left out; a successor there is a placeholder with
 | Uploads                 | `POST /uploads`, `PATCH/HEAD/GET/DELETE /uploads/{id}`, `POST /uploads/{id}/finish` – chunked, resumable uploads of large files                                                                                                                                                                                                                                                                                                                                                                                                              |
 | BOM                     | `GET/POST …/bom` (`rule=latest\|released\|as_released`, `expand=true`), `PATCH/DELETE /bom-lines/{id}`, `…/package` (Pack and Go ZIP); the expanded tree has `project_id` per line (`null` for restricted placeholders)                                                                                                                                                                                                                                                                                                                      |
 | BOM import              | `POST /bom-imports` (new assembly), `POST …/bom/import` (into a checked-out revision); multipart `file` = CSV/Excel table or STEP assembly, `dry_run=true` returns the plan (with `attribute_columns`, `unused_columns`, per item `classification` and `attributes`)                                                                                                                                                                                                                                                                         |
-| BOM from CAD references | `GET …/bom/from-references` (plan: children with instance-count quantities, status `new`/`already_in_bom`/`differs`/`circular`, `not_in_teamcraft`, `hidden`), `POST …/bom/from-references` `{children, update_quantities?}` (revision checked out by the caller; one transaction; `added`/`updated`/`skipped`/`refused`)                                                                                                                                                                                                                    |
+| BOM from CAD references | `GET …/bom/from-references` (plan: children with instance-count quantities, status `new`/`already_in_bom`/`differs`/`circular`, `not_in_teamcraft`, `hidden`), `POST …/bom/from-references` `{children, update_quantities?}` (revision checked out by the caller; one transaction; `added`/`updated`/`skipped`/`refused`); at check-in: `bom_from_references` (see above)                                                                                                                                                                                                                    |
 | References              | `GET/POST …/references`, `DELETE /references/{id}`, `GET /impacts`, `POST /impacts/{id}/acknowledge`, `POST …/impacts/acknowledge`                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Change requests         | `GET/POST /change-requests`, `GET/PATCH /change-requests/{number}`, `comments`, `items`, `triage`, `assign`, `decide`, `reopen`, `withdraw`, `create-change`, `link-change`, `attachments`, `watch`                                                                                                                                                                                                                                                                                                                                          |
 | Simulations             | `GET/POST /projects/{code}/result-templates`, `PUT/DELETE /result-templates/{id}`, `GET …/simulation`, `GET/POST …/simulation/bases`, `DELETE /simulation-bases/{id}`, `GET/POST/PUT …/simulation/results`, `…/results/import`, `PATCH/DELETE /simulation-results/{id}`, `…/simulation/compare`, `GET /items/{number}/simulations`                                                                                                                                                                                                           |

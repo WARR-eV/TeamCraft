@@ -61,6 +61,9 @@ results, reports; CAD model, drawing, STEP). The desktop app has *Add files…*
 * **Check in** with files: files with the same name become the next version (Creo's iteration suffixes `bracket.prt.7`
   are folded into versions);
   identical content is recognised and not stored again.
+  For an assembly, *Update the BOM from the CAD file* (ticked by default)
+  also adds the parts it uses to the BOM in the same step – see
+  [Structure](structure.md#at-check-in-update-the-bom-from-the-cad-file).
 * Every file has a **folder** inside its project group (`chassis/brackets`;
   empty = the top of the group). It is the file's place in the desktop
   working folder, so assemblies find their parts. The folder import sets it

@@ -21,7 +21,7 @@ use crate::{
     error::{AppError, AppResult},
     models::{FileRecord, FileVersion, Revision},
     services::{
-        access, audit,
+        access, audit, bom_references,
         file_check::{self, ClashGuard},
         references, revisions,
     },
@@ -1286,6 +1286,9 @@ pub async fn attach(
 /// * **Webhooks:** none.
 /// * **Atomic:** one transaction (`tests/atomic_processes.rs`); two check-ins
 ///   at once give one winner and a 409.
+///
+/// The BOM is never touched; [`check_in_with`] can update it from the CAD
+/// file in the same transaction.
 pub async fn check_in(
     pool: &PgPool,
     actor: &Actor,
@@ -1293,6 +1296,64 @@ pub async fn check_in(
     uploads: &[Upload],
     comment: &str,
 ) -> AppResult<(Revision, Vec<Stored>)> {
+    let (rev, stored, _) = check_in_with(
+        pool,
+        actor,
+        revision_id,
+        uploads,
+        comment,
+        CheckInOptions::default(),
+    )
+    .await?;
+    Ok((rev, stored))
+}
+
+/// Options of a check-in ([`check_in_with`]).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CheckInOptions {
+    /// *Update the BOM from the CAD file* (#407): off by default on the API.
+    pub bom_from_references: bool,
+}
+
+impl CheckInOptions {
+    /// From the text field `bom_from_references` of a multipart check-in
+    /// (`true`, `1`, `on`, `yes`; anything else or no field: off).
+    pub fn from_field(value: Option<&str>) -> CheckInOptions {
+        CheckInOptions {
+            bom_from_references: value.is_some_and(|v| {
+                matches!(
+                    v.trim().to_ascii_lowercase().as_str(),
+                    "true" | "1" | "on" | "yes"
+                )
+            }),
+        }
+    }
+}
+
+/// [`check_in`] with options: with `bom_from_references` the BOM of the
+/// revision is updated from the CAD references of the checked-in version
+/// (`bom_references::apply_on_checkin`) – `None` when that was not asked for
+/// or the revision has no structure file.
+///
+/// # Invariants
+///
+/// As [`check_in`], and with `bom_from_references`:
+///
+/// * **Permission:** the same as the check-in (the holder of the check-out,
+///   `revisions::ensure_editable`).
+/// * **Audit:** in addition `bom.add` / `bom.update` per changed line and one
+///   `bom.from_references` (`"source": "checkin"`) when a line changed.
+/// * **Atomic:** the BOM step runs in the check-in's transaction after the
+///   new versions and their references are stored: a refused upload (409)
+///   leaves the BOM as it was, a failing BOM step stores no file.
+pub async fn check_in_with(
+    pool: &PgPool,
+    actor: &Actor,
+    revision_id: Uuid,
+    uploads: &[Upload],
+    comment: &str,
+    options: CheckInOptions,
+) -> AppResult<(Revision, Vec<Stored>, Option<bom_references::CheckinBom>)> {
     let comment = validate_comment(comment)?;
     let mut tx = pool.begin().await?;
     let rev = revisions::lock(&mut tx, revision_id).await?;
@@ -1305,6 +1366,13 @@ pub async fn check_in(
     }
     revisions::ensure_editable(&rev, actor)?;
     let stored = store_uploads(&mut tx, actor, &rev, uploads, &comment).await?;
+    // the references of the new versions are stored: the BOM follows them
+    // in the same transaction (#407)
+    let bom = if options.bom_from_references {
+        bom_references::apply_on_checkin(&mut tx, actor, &rev).await?
+    } else {
+        None
+    };
     sqlx::query("UPDATE revisions SET checked_out_by = NULL, checked_out_at = NULL WHERE id = $1")
         .bind(rev.id)
         .execute(&mut *tx)
@@ -1353,7 +1421,7 @@ pub async fn check_in(
     }
     tx.commit().await?;
     let rev = revisions::get(pool, actor, revision_id).await?;
-    Ok((rev, stored))
+    Ok((rev, stored, bom))
 }
 
 /// Rollback: makes the content of an older version the newest version.

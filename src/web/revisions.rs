@@ -723,8 +723,21 @@ pub async fn checkin(
         // Large files sent before in chunks by app.js (field `uploads`).
         let sessions =
             take_session_uploads(&st, &ctx.me, uploads::Scope::Revision(id), &mut received).await?;
-        let result =
-            files::check_in(&st.db, &ctx.me, id, &received.uploads, &received.comment).await;
+        let options = files::CheckInOptions::from_field(
+            received
+                .fields
+                .get("bom_from_references")
+                .map(String::as_str),
+        );
+        let result = files::check_in_with(
+            &st.db,
+            &ctx.me,
+            id,
+            &received.uploads,
+            &received.comment,
+            options,
+        )
+        .await;
         if result.is_ok() {
             uploads::forget(&st.db, &st.vault, &sessions).await;
             warm_previews(&st, &received.uploads);
@@ -732,7 +745,7 @@ pub async fn checkin(
         result
     }
     .await;
-    finish(&st, result, &back, |(rev, stored)| {
+    finish(&st, result, &back, |(rev, stored, bom)| {
         let changed: Vec<String> = stored
             .iter()
             .filter(|s| s.changed)
@@ -746,6 +759,11 @@ pub async fn checkin(
                 revisions::label(&rev),
                 changed.join(", ")
             )
+        };
+        // what the BOM step changed (#407); nothing changed: no line
+        let message = match bom.as_ref().and_then(|b| b.summary()) {
+            Some(summary) => format!("{message} · {summary}"),
+            None => message,
         };
         (back.clone(), message)
     })
