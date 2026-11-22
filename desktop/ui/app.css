@@ -414,6 +414,11 @@ tr.row-conflict td:first-child, tr.row-clash td:first-child { box-shadow: inset 
 .status-update { display: inline-flex; align-items: center; gap: 2px; }
 .status-update button { height: 18px; font-size: 12px; padding: 0 6px; }
 #status-update-open { color: var(--link); }
+/* the Ko-fi tag (#403): once per start, a small chip that opens ko-fi.com in the
+   browser – static text, nothing loaded from there */
+.status-donate { display: inline-flex; align-items: center; gap: 2px; }
+.status-donate button { height: 18px; font-size: 12px; padding: 0 6px; }
+#status-donate-open { color: var(--link); border-radius: 9px; }
 
 /* ---------------------------------------------------------------- navigator */
 

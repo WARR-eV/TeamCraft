@@ -1,3 +1,4 @@
+| *Support us on Ko-fi* tag | nothing | a static note in the desktop status bar, once per start; nothing is loaded from ko-fi.com, and only a click opens `https://ko-fi.com/warr_ev` in the browser (#403) | shown once per start | *Settings → Support TeamCraft*; desktop policy `ShowDonateTag = 0` |
 # Privacy: what TeamCraft sends
 
 Everything TeamCraft sends over the network **by itself** – not as an action

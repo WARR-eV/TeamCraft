@@ -14,6 +14,18 @@ see the notices in the README.
 ## [Unreleased]
 ### Added
 
+- **Desktop: "Support us on Ko-fi" tag** (#403). Once per start of the app the
+  status bar shows a small tag; a click opens the Ko-fi page of the
+  association that develops TeamCraft (`https://ko-fi.com/warr_ev`, fixed in
+  the app) in the browser and hides it, *×* only hides it. Reconnecting,
+  switching server or reloading the window does not show it again (held in
+  memory only). Nothing is loaded from ko-fi.com and nothing is sent or
+  counted before the click. *Settings → Support TeamCraft* switches it off
+  (`donate_tag` in the settings file); the new desktop policy `ShowDonateTag`
+  turns it off (`0`) or keeps it on (`1`) – in the ADMX with English and
+  German ADML, the macOS profile and the Linux `policies.json`. Texts in
+  English and German.
+
 - **3D preview of E57 point clouds** (#373). Laser-scanner exports (`.e57`,
   ASTM E2807) open in the viewer like LAS: every scan is placed by its pose
   (rotation and translation), so multi-station scans line up; cartesian or

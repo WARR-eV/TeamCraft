@@ -174,8 +174,12 @@ feature milestone – the features in *What works* are enough; what is missing i
   test script per install type for each RC
 - [x] Desktop: managed deployment policies (#378) – Windows registry with ADMX/ADML templates, macOS configuration
   profile, `/etc/teamcraft/policies.json`; fixed server, updates, crash prompts, working folder, organisation name,
-  `UsageStatistics` (read for #383), `ReportUrl` (the problem-report tracker, #381), English and German ADML. Left: a manual test per OS (Group Policy, Intune, an MDM profile),
+  `UsageStatistics` (read for #383), `ReportUrl` (the problem-report tracker, #381), `ShowDonateTag` (the Ko-fi tag, #403), English and German ADML. Left: a manual test per OS (Group Policy, Intune, an MDM profile),
   a per-machine MSI checked for silent installs
+- [x] Desktop: optional *Support us on Ko-fi* tag (#403) – once per start in the status bar, fixed link
+  `https://ko-fi.com/warr_ev`, *Settings → Support TeamCraft*, policy `ShowDonateTag`, English and German texts. Left:
+  a manual check on each OS that the click opens the system browser; the web UI has no such link (open question of the
+  issue)
 - [ ] Desktop app run and tested on Windows x64/ARM64, macOS and Linux for each RC (a short manual test script in
   `docs/src/dev/release-checklist.md`)
 - [x] (**paused for the next releases since 2026-11-22**, to make releases faster: the installers below and the

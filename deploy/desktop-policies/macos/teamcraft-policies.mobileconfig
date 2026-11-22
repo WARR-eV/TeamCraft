@@ -35,6 +35,8 @@
       <string>Example Lab</string>
       <key>UsageStatistics</key>
       <integer>0</integer>
+      <key>ShowDonateTag</key>
+      <integer>0</integer>
     </dict>
   </array>
   <key>PayloadType</key>

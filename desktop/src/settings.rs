@@ -211,6 +211,10 @@ pub struct Settings {
     /// After a crash, ask at the next start whether to share the crash report
     /// (src/crash.rs); `None` = ask. Reports are never sent without asking.
     pub crash_prompt: Option<bool>,
+    /// *Settings → Show the "Support us on Ko-fi" tag at start* (#403);
+    /// `None` = shown once per start. Older settings files have no field.
+    #[serde(default)]
+    pub donate_tag: Option<bool>,
     /// The port of the local test server (*Try TeamCraft on this computer*,
     /// src/localserver.rs). While `server_url` is `http://127.0.0.1:<this
     /// port>`, the app starts that server when it starts.
@@ -789,6 +793,19 @@ mod tests {
             Some("https://plm.example.org")
         );
         assert_eq!(loaded.onboarding, None);
+        assert_eq!(loaded.donate_tag, None, "the Ko-fi tag stays on (#403)");
+    }
+
+    #[test]
+    fn the_donate_tag_choice_is_saved_and_loaded() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = Settings {
+            donate_tag: Some(false),
+            ..Settings::default()
+        };
+        s.save(dir.path()).unwrap();
+        let loaded = Settings::load_with(dir.path(), &FakeKeychain::new(true));
+        assert_eq!(loaded.donate_tag, Some(false));
     }
 
     #[test]

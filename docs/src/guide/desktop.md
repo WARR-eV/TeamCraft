@@ -900,6 +900,21 @@ available*. A click opens the **update window** with the release notes and:
 and says whether you are up to date. *Settings → Updates* switches the daily
 check off (for example on computers without internet access).
 
+## Support us on Ko-fi
+
+TeamCraft is free software, developed by a non-profit association. Once per
+start of the app, the status bar shows a small **Support us on Ko-fi** tag.
+A click opens the association's Ko-fi page (`https://ko-fi.com/warr_ev`) in
+your browser and hides the tag; *×* only hides it. It does not come back
+until the app starts again – reconnecting or switching server does not show
+it again. Nothing is loaded from ko-fi.com inside the app and nothing is
+sent or counted; only your click opens the page.
+
+*Settings → Support TeamCraft* switches the tag off for good on this
+computer. On a managed computer your organization may have switched it off
+(or on) with the `ShowDonateTag` policy; the switch then shows *Set by your
+organization*.
+
 ## Report a problem
 
 Every error message has a **Report…** link, and *Help → Report a Problem…*
@@ -972,8 +987,8 @@ app](../research/crash-reporting.md).
 
 On a computer your IT department manages, some settings can be fixed by
 *policies* (see [Deploying the desktop app](../admin/desktop-deployment.md)):
-the server, the update check, the question after a crash and the default
-working folder. *Settings* then shows *Managed by …* at the top, and a fixed
+the server, the update check, the question after a crash, the default
+working folder and the *Support us on Ko-fi* tag. *Settings* then shows *Managed by …* at the top, and a fixed
 setting is marked **Set by your organization** and cannot be changed. With a
 fixed server, the connect screen shows that server only, *Switch server…* is
 hidden and saved connections to other servers cannot be switched to.

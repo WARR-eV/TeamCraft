@@ -4,6 +4,7 @@
 
 import { $, ICONS, api, badge, call, clear, dialog, enc, errorText, h, invoke, run, setStatus, state, svgIcon, toast, tool } from "./core.js";
 import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
+import { t } from "/static/shared/js/i18n.js";
 import { checkServerVersion, showConnect } from "./connect.js";
 import { drawWorklist, navHead, selectView } from "./navigator.js";
 import { activeTab, closeTab, renderActive, renderTabs, tabShortcut } from "./tabs.js";
@@ -135,6 +136,8 @@ export function enterShell() {
     checkWorkspaceLayout();
     checkTokenStorage();
     checkUpdate();
+    // the Ko-fi tag (#403): once per start of the app, unless switched off
+    checkDonateTag();
     // the first start after the sign-in: *Getting started* (#422)
     maybeStartOnboarding();
   }).catch(function (err) {
@@ -186,6 +189,37 @@ export function initUpdateNotice() {
   setInterval(function () {
     if (state.me && document.hasFocus()) call("usage_tick").catch(function () {});
   }, 60 * 1000);
+}
+
+// ======================================================================
+// Ko-fi tag (#403): "Support us on Ko-fi" in the status bar, once per start
+// of the app (src/commands.rs donate_tag_due decides and remembers it in
+// memory). A click opens the fixed Ko-fi page in the browser and hides the
+// tag; × only hides it. Nothing is loaded from ko-fi.com inside the app.
+// ======================================================================
+
+export function checkDonateTag() {
+  invoke("donate_tag_due").then(function (due) { if (due) showDonateTag(true); }, function () {});
+}
+
+export function showDonateTag(show) {
+  if (show) {
+    // the texts here, not at start: the catalogs are loaded by then
+    var open = $("status-donate-open"), dismiss = $("status-donate-dismiss");
+    open.textContent = t("donate.tag");
+    open.title = t("donate.tag.title");
+    dismiss.title = t("donate.dismiss");
+    dismiss.setAttribute("aria-label", t("donate.dismiss"));
+  }
+  $("status-donate").classList.toggle("hidden", !show);
+}
+
+function initDonateTag() {
+  $("status-donate-open").addEventListener("click", function () {
+    showDonateTag(false);
+    call("open_donate_page").catch(function (e) { toast(errorText(e), "error"); });
+  });
+  $("status-donate-dismiss").addEventListener("click", function () { showDonateTag(false); });
 }
 
 /** What *Update now* does for each kind of installation (#377). */
@@ -284,6 +318,7 @@ export function checkUpdateNow() {
 
 export function initShell() {
   initUpdateNotice();
+  initDonateTag();
   if (/Mac/.test(navigator.platform)) $("search-kbd").textContent = "⌘F"; // the View → Search shortcut
   document.querySelectorAll(".rail button[data-view]").forEach(function (btn) {
     btn.addEventListener("click", function () {
