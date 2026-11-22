@@ -17,9 +17,11 @@
 //! (`nxpart`: only the reference streams) and SOLIDWORKS 2015+ files
 //! (`swpart`: the component tree of an assembly, otherwise the document
 //! manager's section – both inflated from their compressed sections). The
-//! rest of such a file (history, old names) is never scanned.
+//! rest of such a file (history, old names) is never scanned. SolidCraft
+//! designs (`scdesign`) list the designs their assembly links, read from
+//! the document; nothing else in them is scanned.
 //!
-//! For those two – and for STEP assemblies with external references – the
+//! For those three – and for STEP assemblies with external references – the
 //! scan also tells how often an assembly places each component
 //! ([`instance_counts`], stored as `file_references.instances`); every
 //! other format gives names only.
@@ -534,6 +536,8 @@ fn count_key(name: &str) -> String {
 /// * Inventor assemblies: the occurrences of each referenced file from the
 ///   file descriptor table without the suppressed ones
 ///   (`invasm::file_occurrence_counts`; only suppressed ones count 0).
+/// * SolidCraft assemblies: the placements of the components linked to each
+///   design (`scdesign::linked_designs`).
 ///
 /// `None` for every other format and for files without component data.
 /// Blocking (reads the file).
@@ -567,6 +571,14 @@ pub fn instance_counts(path: &Path, format: &str) -> Option<HashMap<String, u32>
                 .read_to_end(&mut content)
                 .ok()?;
             for (name, n) in crate::stepbom::external_instance_counts(&content)? {
+                let total = counts.entry(count_key(&name)).or_default();
+                *total = total.saturating_add(n);
+            }
+        }
+        "solidcraft-design" => {
+            let mut file = std::io::BufReader::new(std::fs::File::open(path).ok()?);
+            let document = crate::scdesign::document(&mut file)?;
+            for (name, n) in crate::scdesign::linked_designs(&document)? {
                 let total = counts.entry(count_key(&name)).or_default();
                 *total = total.saturating_add(n);
             }
@@ -630,6 +642,12 @@ fn names_in_file(path: &Path, own: &str) -> std::io::Result<Vec<String>> {
     }
     if let Some(data) = crate::swpart::reference_data(&mut file, MAX_SCAN)? {
         return Ok(from_sw_sections(data, own));
+    }
+    if let Some(document) = crate::scdesign::document(&mut file) {
+        let names = crate::scdesign::linked_designs(&document)
+            .map(|links| links.into_keys().collect())
+            .unwrap_or_default();
+        return Ok(finish(names, own));
     }
     let mut content = Vec::new();
     file.seek(std::io::SeekFrom::Start(0))?;
@@ -1015,6 +1033,34 @@ mod tests {
             from_nx_streams(&streams, "new_name.prt"),
             vec!["wheel.prt", "hub.prt", "axle.prt"]
         );
+    }
+
+    #[tokio::test]
+    async fn solidcraft_assemblies_list_their_linked_designs_with_counts() {
+        let document = br#"{"format":"solidcraft/40",
+            "occurrences":[{"id":5,"component":1,"name":"a"},{"id":6,"component":1,"name":"b"},
+                           {"id":7,"component":2,"name":"c"}],
+            "links":{"1":{"path":"parts/Plate.sc","feature":3},
+                     "2":{"path":"frame.sc","feature":4},
+                     "9":{"path":"","feature":5}},
+            "notes":"mentions old_bracket.step in a text"}"#;
+        // frame.sc is the scanned file itself, never its own reference; the
+        // text field is not scanned.
+        let expected = vec![FileRef {
+            name: "Plate.sc".into(),
+            instances: Some(2),
+        }];
+        for (encoding, bytes) in [
+            ("json", document.to_vec()),
+            ("zip", crate::scdesign::sample::design(document, None)),
+        ] {
+            let path =
+                std::env::temp_dir().join(format!("teamcraft-sc-{}.sc", uuid::Uuid::new_v4()));
+            std::fs::write(&path, &bytes).unwrap();
+            let found = scan_file(&path, "frame.sc", "solidcraft-design").await;
+            std::fs::remove_file(&path).ok();
+            assert_eq!(found, expected, "{encoding}");
+        }
     }
 
     #[tokio::test]

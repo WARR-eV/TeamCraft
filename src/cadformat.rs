@@ -597,7 +597,10 @@ pub fn detect(name: &str, head: &[u8]) -> Option<&'static CadFormat> {
         "pdf" => by_id("pdf"),
         // SolidCraft: a ZIP container or a JSON document; other .sc files
         // (scripts) are not CAD files.
-        "sc" if head.is_empty() || head.starts_with(b"PK\x03\x04") || is_solidcraft_json(head) => {
+        "sc" if head.is_empty()
+            || head.starts_with(b"PK\x03\x04")
+            || crate::scdesign::is_json_design(head) =>
+        {
             by_id("solidcraft-design")
         }
         "sc" => None,
@@ -790,13 +793,6 @@ fn is_netcdf_or_hdf5(head: &[u8]) -> bool {
         || head.starts_with(b"CDF\x02")
         || head.starts_with(b"CDF\x05")
         || head.starts_with(b"\x89HDF\r\n\x1a\n")
-}
-
-/// JSON design of SolidCraft (`"format": "solidcraft/N"`).
-fn is_solidcraft_json(head: &[u8]) -> bool {
-    let text = String::from_utf8_lossy(head);
-    text.trim_start().starts_with('{')
-        && (text.contains("\"solidcraft/") || text.contains("\"solvecraft/"))
 }
 
 /// Whether a PDF embeds a 3D model: the 3D stream dictionaries (`/Subtype

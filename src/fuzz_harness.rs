@@ -113,6 +113,18 @@ pub fn thumbnail(data: &[u8]) {
     let _ = crate::thumbnail::extract_from(Cursor::new(data));
 }
 
+/// SolidCraft designs: the document of a ZIP or JSON design, its linked
+/// designs, and the embedded thumbnail.
+pub fn scdesign(data: &[u8]) {
+    let _ = crate::scdesign::linked_designs(data);
+    if let Some(document) = crate::scdesign::document(&mut Cursor::new(data)) {
+        let _ = crate::scdesign::linked_designs(&document);
+    }
+    if let Some(mut design) = crate::scdesign::Container::open(Cursor::new(data)) {
+        let _ = design.thumbnail();
+    }
+}
+
 /// Text extraction for the full-text search.
 pub fn textindex(data: &[u8]) {
     for name in TEXT_NAMES {
@@ -254,6 +266,7 @@ pub const TARGETS: &[Target] = &[
     ("cadrefs", cadrefs),
     ("bomtable", bomtable),
     ("thumbnail", thumbnail),
+    ("scdesign", scdesign),
     ("textindex", textindex),
     ("htmltext", htmltext),
     ("mesh", mesh),

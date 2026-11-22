@@ -20,6 +20,13 @@ see the notices in the README.
   from the ZIP container with size and CRC checks and shown only when its key
   names the SHA-256 of this document and of the picture; unknown versions or
   damaged archives simply show none (`src/scdesign.rs`).
+- **SolidCraft assemblies reference their linked designs** (#365). The
+  designs an assembly links (*Insert Design*) are its file references, with
+  the number of placements as instance count, so where-used, *Create BOM
+  from CAD references* and the desktop's dependent files work for SolidCraft;
+  read from the ZIP or JSON document, unknown fields ignored. New fuzz target
+  `scdesign`. Run `teamcraft rescan-references --format solidcraft-design`
+  once for designs stored before.
 
 ## [0.2.11] - 2026-11-21
 
