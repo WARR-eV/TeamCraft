@@ -763,7 +763,9 @@ details* (status, message, page, time and version).
 Once a day of use, the app sends your TeamCraft server an anonymous report of
 the day before: a random id of this installation, the app version, system,
 package type, the minutes the window was in front, and how often fixed
-actions were used (check-out, check-in, 3D preview …) – never names,
+actions were used (check-out, check-in, cancel check-out, get files, open in
+CAD, 3D preview, BOM and folder imports, new items, releases, searches and
+assistant questions, STEP exports per CAD program) – never names,
 numbers, paths, search terms or anything you type, and not who you are.
 *Settings → Privacy → Show what is sent* shows the exact report. The report
 stays with your organisation; your administrator decides whether the server

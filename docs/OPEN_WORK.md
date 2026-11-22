@@ -154,9 +154,9 @@ feature milestone – the features in *What works* are enough; what is missing i
   SmartScreen and Gatekeeper
 - [x] Usage statistics (#383): desktop → own server always (anonymous daily report, fixed fields, *Show what is
   sent*), *Admin → Usage statistics*, sharing an aggregate with the developers off by default
-  (`TEAMCRAFT_USAGE_STATISTICS[_URL]`, `DO_NOT_TRACK`, `TEAMCRAFT_NO_TELEMETRY`). Left: a collection service run
-  by the project (where, who operates it, retention) and its published results; counting `new_item`, `release`,
-  `search`, `assistant`, `import_*`, `cancel_checkout` in the desktop UI (the names are accepted already); the
+  (`TEAMCRAFT_USAGE_STATISTICS[_URL]`, `DO_NOT_TRACK`, `TEAMCRAFT_NO_TELEMETRY`); the desktop counts every
+  listed action (guard test in `desktop/src/usage.rs`). Left: a collection service run
+  by the project (where, who operates it, retention) and its published results; the
   desktop policy `UsageStatistics` (#378) once the developers' share is decided per desktop
 - [ ] Desktop: report a problem from any error (#381). Done: *Report…* on every toast and dialog error, *Help → Report a
   Problem…*, redacted prefilled report (`desktop/src/report.rs`), *Open issue form* / *Copy* / *Save*, own tracker

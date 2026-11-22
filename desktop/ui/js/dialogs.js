@@ -104,6 +104,7 @@ export function createItemFromFiles(spec) {
     if (hex) body.idempotency_key = "new-item:" + hex;
     return api("POST", "/items", body);
   }).then(function (rev) {
+    call("usage_count", { action: "new_item" }).catch(function () {});
     if (!places.length) return rev;
     var folders = {};
     places.forEach(function (p, i) { folders[p.name] = spec.targets[i] != null ? spec.targets[i] : spec.folder; });

@@ -13,6 +13,17 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Changed
+
+- **Usage statistics: the desktop app counts every listed action** (#383).
+  Besides check-out, check-in, park, get files, open in CAD, 3D preview and
+  STEP exports, the daily report now also counts BOM imports (not the
+  preview), folder imports that created items, new items, releases (a change
+  created from *Release…*), cancelled check-outs, submitted searches and
+  answered assistant questions – still only counts, never names, numbers or
+  search terms. A test checks that every name of the fixed list has a place
+  in the app that counts it.
+
 ### Fixed
 
 - CI on `main` is green again: the comment of the shared text-selection rule
