@@ -14,7 +14,7 @@
 import { $, TAURI, call, errorText, h, invoke, setStatus, state, toast } from "./core.js";
 import { applySkin } from "./skins.js";
 import { checkServerVersion, initConnect, showConnect, startLocalServer, tryLocalServer } from "./connect.js";
-import { enterShell, initShell, onPackageProgress, refreshWorklistCount, uploadLine } from "./shell.js";
+import { checkUpdateNow, enterShell, initShell, onPackageProgress, refreshWorklistCount, uploadLine } from "./shell.js";
 import { selectView } from "./navigator.js";
 import { activeTab, reloadActive } from "./tabs.js";
 import { agent, onAgentEvent, openAgent } from "./agent.js";
@@ -84,6 +84,7 @@ export function handleMenu(id) {
   var shellVisible = !$("shell").classList.contains("hidden");
   switch (id) {
     case "about": case "about-app": openAbout(); return;
+    case "check-updates": checkUpdateNow(); return;
     case "zoom-in": setZoom(state.zoom * 1.1); return;
     case "zoom-out": setZoom(state.zoom / 1.1); return;
     case "zoom-reset": setZoom(1); return;

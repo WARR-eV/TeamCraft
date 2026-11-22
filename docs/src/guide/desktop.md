@@ -645,11 +645,26 @@ regular installers do not show the button.
 
 Once a day at most, the app asks GitHub for the latest TeamCraft release. If
 it is newer than your version, the status bar shows *TeamCraft x.y.z is
-available* – a link to the release page in your browser. The app never
-downloads or installs anything itself; install the new version as you
-installed this one. *×* hides the notice until the next version; *Settings → Updates* switches the check off (for
-example on computers without
-internet access).
+available*. A click opens the **update window** with the release notes and:
+
+* **Update now** (Windows installers, macOS) or **Download** (portable zip,
+  AppImage): downloads the file for your installation into your Downloads
+  folder and checks it against the release's published checksums
+  (`SHA256SUMS.txt`). A file that does not match is deleted and nothing
+  changes. A Windows installer then starts after you confirm – TeamCraft
+  closes, your working folder, sign-in and settings stay; on macOS the disk
+  image opens and you drag TeamCraft to *Applications*; a zip or AppImage is
+  shown in its folder to replace your copy. Installed with Flatpak or a
+  `.deb`/`.rpm` package, the window names the package-manager way instead.
+  Not while a check-in or Get runs.
+* **Skip this version** (or *×* in the status bar): no notice until a newer
+  version.
+* **Remind me later**: the notice comes back in three days.
+* **Release page**: the release on GitHub in your browser.
+
+*Help → Check for Updates…* asks at once – also when the daily check is off –
+and says whether you are up to date. *Settings → Updates* switches the daily
+check off (for example on computers without internet access).
 
 ## Crash reports
 
