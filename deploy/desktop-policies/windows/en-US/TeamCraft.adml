@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: MPL-2.0 – texts of TeamCraft.admx (#378) -->
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>TeamCraft Desktop</displayName>
+  <description>Policies of the TeamCraft Desktop app.</description>
+  <resources>
+    <stringTable>
+      <string id="TeamCraft">TeamCraft Desktop</string>
+      <string id="SUPPORTED_TeamCraft_0_2_12">TeamCraft Desktop 0.2.12 and later</string>
+      <string id="ServerUrl">TeamCraft server</string>
+      <string id="ServerUrl_Explain">The address of the TeamCraft server (https://…). The app starts with this server, the connect screen is prefilled and read-only, and other servers cannot be added or switched to – unless "Allow other servers" is enabled. An address that is not http(s) counts as not set.</string>
+      <string id="AllowOtherServers">Allow other servers</string>
+      <string id="AllowOtherServers_Explain">Enabled: users may add other servers although "TeamCraft server" is set (it is then only the default). Disabled or not configured: only the configured server can be used.</string>
+      <string id="CheckForUpdates">Check for updates</string>
+      <string id="CheckForUpdates_Explain">Enabled: the app looks for a newer release once a day and users cannot switch it off. Disabled: no update checks at all. Not configured: each user chooses (Settings → Updates).</string>
+      <string id="CrashReportPrompt">Offer crash reports for sharing</string>
+      <string id="CrashReportPrompt_Explain">Disabled: crash reports are kept on the computer only and never offered for sharing. Enabled: the app always asks after a crash. Not configured: each user chooses (Settings → Crash reports). Reports are never sent without the user opening the issue form.</string>
+      <string id="UsageStatistics">Anonymous usage statistics</string>
+      <string id="UsageStatistics_Explain">Disabled: no usage statistics are sent or kept, no notice is shown, and users cannot turn them on. Enabled: statistics are sent and users cannot turn them off. Not configured: each user chooses. (Read by app versions with usage statistics, #383.)</string>
+      <string id="WorkspaceRoot">Default working folder</string>
+      <string id="WorkspaceRoot_Explain">The folder new working folders are created in (an absolute path such as D:\CAD or \\fileserver\cad; environment variables are not expanded). Users can still choose another folder in Settings.</string>
+      <string id="OrganizationName">Organization name</string>
+      <string id="OrganizationName_Explain">Shown as "Managed by …" in Settings and About (one line, at most 64 characters).</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="ServerUrl"><textBox refId="ServerUrl"><label>Server address:</label></textBox></presentation>
+      <presentation id="WorkspaceRoot"><textBox refId="WorkspaceRoot"><label>Folder:</label></textBox></presentation>
+      <presentation id="OrganizationName"><textBox refId="OrganizationName"><label>Name:</label></textBox></presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

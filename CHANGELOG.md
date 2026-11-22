@@ -57,6 +57,17 @@ see the notices in the README.
   the lines – part properties, placement counts, purchased/standard parts not
   expanded, phantoms passed through, reference components left out
   (`src/scbom.rs`, fuzzed by the `scdesign` target).
+- **Desktop: managed deployment policies** (#378). IT departments preset
+  `ServerUrl` (+ `AllowOtherServers`), `CheckForUpdates`,
+  `CrashReportPrompt`, `WorkspaceRoot`, `OrganizationName` and
+  `UsageStatistics` per computer or user: Windows registry
+  (`Software\Policies\TeamCraft`, HKLM wins; ADMX/ADML templates for Group
+  Policy and Intune), a macOS configuration profile, or
+  `/etc/teamcraft/policies.json` on Linux. Read once at start, never sent;
+  wrong types count as not set; fixed settings show *Set by your
+  organization*, and *Managed by …* appears in Settings and About. The
+  templates ship with each release as
+  `teamcraft-desktop-policies-<version>.zip`.
 
 ## [0.2.11] - 2026-11-21
 

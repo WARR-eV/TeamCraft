@@ -20,12 +20,15 @@ use tokio::sync::Notify;
 use crate::{
     acp, addfiles,
     api::{self, Api, ApiError, Transfer},
-    bomimport, cadexport, cadlaunch, folderimport, layout, localserver, profiles, scprops,
+    bomimport, cadexport, cadlaunch, folderimport, layout, localserver, policy, profiles, scprops,
     settings::{self, Settings, TokenStorage},
     signin, update, workspace, AppState,
 };
 
 type CmdResult<T> = Result<T, ApiError>;
+
+/// A setting a policy fixes (#378) cannot be changed in the app.
+const MANAGED: &str = "This setting is set by your organization.";
 
 pub(crate) fn snapshot(state: &State<'_, AppState>) -> Settings {
     state.settings.lock().expect("settings lock").clone()
@@ -57,7 +60,12 @@ fn signed_in_api(state: &State<'_, AppState>) -> CmdResult<Api> {
 
 /// The default working folder (`Documents/TeamCraft`); connections after the
 /// first get theirs next to it (src/profiles.rs).
-fn default_workspace(app: &AppHandle) -> PathBuf {
+/// The root of new working folders: the policy `WorkspaceRoot` (#378), else
+/// `Documents/TeamCraft`.
+pub(crate) fn default_workspace(app: &AppHandle) -> PathBuf {
+    if let Some(root) = &policy::current().workspace_root {
+        return root.clone();
+    }
     app.path()
         .document_dir()
         .or_else(|_| app.path().home_dir())
@@ -106,6 +114,9 @@ pub struct Session {
     /// The configured server is the local test server: the UI starts it
     /// (`local_server_start`) before it signs in or opens the main window.
     pub local_server_in_use: bool,
+    /// Managed deployment policies (#378): the organisation and the settings
+    /// fixed by a policy.
+    pub policy: policy::PolicyView,
 }
 
 #[tauri::command]
@@ -113,9 +124,9 @@ pub fn session(app: AppHandle, state: State<'_, AppState>) -> Session {
     let s = snapshot(&state);
     Session {
         token_storage: s.token.as_ref().and(s.token_storage),
-        update_check: s.update_check != Some(false),
+        update_check: policy::current().update_check(s.update_check),
         checkout_parts: s.checkout_parts != Some(false),
-        crash_prompt: s.crash_prompt != Some(false),
+        crash_prompt: policy::current().crash_prompt(s.crash_prompt),
         server_url: s.server_url.clone(),
         signed_in: s.token.is_some(),
         skin: s.skin.clone().unwrap_or_else(|| "teamcraft".into()),
@@ -125,6 +136,7 @@ pub fn session(app: AppHandle, state: State<'_, AppState>) -> Session {
         zoom: s.zoom.unwrap_or(1.0),
         local_server_available: localserver::sidecar().is_some(),
         local_server_in_use: local_server_in_use(&s),
+        policy: policy::current().view(),
     }
 }
 
@@ -143,6 +155,11 @@ fn local_server_in_use(s: &Settings) -> bool {
 /// window or `teamcraft local` on the command line) is used as it is.
 #[tauri::command]
 pub async fn local_server_start(app: AppHandle, state: State<'_, AppState>) -> CmdResult<String> {
+    if policy::current().server_locked() {
+        return Err(ApiError::local(
+            "Your organization set the TeamCraft server – the local test server cannot be used.",
+        ));
+    }
     {
         let mut running = state.local_server.lock().expect("local server lock");
         if let Some(r) = running.as_mut() {
@@ -208,6 +225,9 @@ pub async fn set_server(
     url: String,
 ) -> CmdResult<String> {
     let base = settings::normalize_server_url(&url).map_err(ApiError::local)?;
+    policy::current()
+        .check_server(&base)
+        .map_err(ApiError::local)?;
     let api = Api {
         client: state.client.clone(),
         base: base.clone(),
@@ -262,6 +282,16 @@ pub fn connections(state: State<'_, AppState>) -> Vec<profiles::ProfileView> {
 /// Switches to a saved connection; the UI reloads afterwards.
 #[tauri::command]
 pub fn switch_connection(state: State<'_, AppState>, id: String) -> CmdResult<()> {
+    let target = snapshot(&state)
+        .profiles
+        .iter()
+        .find(|p| p.id == id)
+        .map(|p| p.server_url.clone());
+    if let Some(server) = target {
+        policy::current()
+            .check_server(&server)
+            .map_err(ApiError::local)?;
+    }
     stop_agent(&state);
     change_connection(&state, |s, dir, parking| {
         profiles::switch(s, dir, &settings::OsKeychain, parking, &id)
@@ -973,7 +1003,7 @@ pub struct UpdateNotice {
 #[tauri::command]
 pub async fn check_update(state: State<'_, AppState>) -> CmdResult<Option<UpdateNotice>> {
     let s = snapshot(&state);
-    if s.update_check == Some(false) {
+    if !policy::current().update_check(s.update_check) {
         return Ok(None);
     }
     let mut latest = s.update_latest.clone();
@@ -1011,6 +1041,9 @@ pub fn set_checkout_parts(state: State<'_, AppState>, enabled: bool) -> CmdResul
 /// Switches the daily release check on or off.
 #[tauri::command]
 pub fn set_update_check(state: State<'_, AppState>, enabled: bool) -> CmdResult<()> {
+    if policy::current().check_for_updates.is_some() {
+        return Err(ApiError::local(MANAGED));
+    }
     update_settings(&state, |s| s.update_check = Some(enabled))?;
     Ok(())
 }
@@ -1041,7 +1074,7 @@ pub fn crash_reports(state: State<'_, AppState>) -> Option<CrashReports> {
         count: reports.len(),
         kinds: reports.iter().map(|r| r.kind.clone()).collect(),
         text: crate::crash::combined(&reports),
-        ask: snapshot(&state).crash_prompt != Some(false),
+        ask: policy::current().crash_prompt(snapshot(&state).crash_prompt),
     })
 }
 
@@ -1075,6 +1108,9 @@ pub fn crash_reports_discard() {
 /// Settings → ask after a crash whether to share the report.
 #[tauri::command]
 pub fn set_crash_prompt(state: State<'_, AppState>, enabled: bool) -> CmdResult<()> {
+    if policy::current().crash_report_prompt.is_some() {
+        return Err(ApiError::local(MANAGED));
+    }
     update_settings(&state, |s| s.crash_prompt = Some(enabled))?;
     Ok(())
 }

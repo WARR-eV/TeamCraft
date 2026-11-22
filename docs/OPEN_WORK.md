@@ -149,6 +149,10 @@ feature milestone – the features in *What works* are enough; what is missing i
   (no code signing or notarisation): the checksums
   in `SHA256SUMS.txt` and the build provenance are the verification, and the docs explain the first start past
   SmartScreen and Gatekeeper
+- [x] Desktop: managed deployment policies (#378) – Windows registry with ADMX/ADML templates, macOS configuration
+  profile, `/etc/teamcraft/policies.json`; fixed server, updates, crash prompts, working folder, organisation name,
+  `UsageStatistics` (read for #383). Left: a manual test per OS (Group Policy, Intune, an MDM profile), a German ADML,
+  a per-machine MSI checked for silent installs
 - [ ] Desktop app run and tested on Windows x64/ARM64, macOS and Linux for each RC (a short manual test script in
   `docs/src/dev/release-checklist.md`)
 - [x] One download to try TeamCraft on a laptop: desktop installers *with local server* (Windows x64, macOS Apple
