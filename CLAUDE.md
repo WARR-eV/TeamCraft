@@ -72,10 +72,6 @@
 
 ## Git rules
 
-**Pull requests that still need work are opened as drafts** – work in progress, CI not yet
-green, or open questions. Mark a PR *ready for review* only when the work is done, the
-documentation is in it and its CI is green; a draft cannot be merged by accident.
-
 Always add, commit, and **push** after each successful and test-passing
 functionality implementation. If a push is rejected because the remote moved,
 tell the user immediately and ask them to run `! git pull --no-rebase && git push`
