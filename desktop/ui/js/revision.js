@@ -1,3 +1,6 @@
+      requests: r[0].open_requests || [],
+      // design properties that differ from the revision (#367; older servers: none)
+      propertyMismatches: r[0].property_mismatches || [],
 // SPDX-License-Identifier: MPL-2.0
 // TeamCraft Desktop – Revision tab: overview, files, structure, where used.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
@@ -14,8 +17,10 @@ import { addFilesDialog, checkinDialog, checkoutPartsDialog, doCancelCheckout, d
 import { openChange } from "./change.js";
 import { openRequest, requestChangeDialog } from "./requests.js";
 import { bomFromCadDialog, importBomDialog } from "./bom-import.js";
+import { addLineDialog, quantityInput, removeLineButton } from "./bom-lines.js";
 import { cadTargetChip, groupDefault, mainCadFile, openWithCad } from "./cad-open.js";
 import { incompleteGet, notOpenedText } from "./get-rules.js";
+import { revisionInputs } from "./report-inputs.js";
 
 /** Opens a revision tab; `viewerFile` (a file id) picks the file of its 3D viewer. */
 export function openRevision(number, code, sub, viewerFile) {
@@ -37,6 +42,8 @@ export function fetchRevision(number, code, onData) {
     var data = {
       rev: r[0].revision, files: r[0].files, bom: r[0].bom, changes: r[0].changes, item: r[1].item, revisions: r[1].revisions,
       requests: r[0].open_requests || [],
+      // design properties that differ from the revision (#367; older servers: none)
+      propertyMismatches: r[0].property_mismatches || [],
       watching: !!r[1].watching,
       refs: r[2] || { outgoing: [], incoming: [], files: [], file_referrers: [], impacts: [] },
       // my check-out: are there local changes? (decides the primary action)
@@ -476,13 +483,17 @@ export function checkOutAndOpen(tab, file) {
   doCheckout(tab, function (r) {
     var why = incompleteGet(r);
     if (why) { toast(notOpenedText(file.filename, why) + " The check-out stays.", "info"); return; }
-    openWithCad(rev, file).catch(function (e) { toast(errorText(e), "error"); });
+    openWithCad(rev, file).catch(function (e) {
+      toast(errorText(e), "error", "Opening " + file.filename + " in the CAD program", revisionInputs(rev, [["file", file.filename], ["format", file.format]]));
+    });
   });
 }
 
 /** Opens a CAD file of my own check-out from the working folder. */
 export function openCadFile(tab, file) {
-  openWithCad(tab.data.rev, file).catch(function (e) { toast(errorText(e), "error"); });
+  openWithCad(tab.data.rev, file).catch(function (e) {
+    toast(errorText(e), "error", "Opening " + file.filename + " in the CAD program", revisionInputs(tab.data.rev, [["file", file.filename], ["format", file.format]]));
+  });
 }
 
 export function revFiles(tab, el) {
@@ -494,11 +505,15 @@ export function revFiles(tab, el) {
   var groups = groupByFamily(d.files, state.me && state.me.preferred_cad);
   var rowOf = function (f) {
     var fmt = previewFormat(f);
+    // design properties read from a SolidCraft design (#367): data from the file
+    var props = f.properties_line
+      ? h("div.small.muted", { text: f.properties_line, title: "Design properties read from the file – not the item's attributes" })
+      : null;
     return {
       cells: [
         f.format_info && f.format_info.thumbnail
-          ? h("span.file-cell", null, [thumbImage(f), h("span", null, [f.filename, " ", formatChip(f)])])
-          : h("span", null, [f.filename, " ", formatChip(f)]),
+          ? h("span.file-cell", null, [thumbImage(f), h("span", null, [f.filename, " ", formatChip(f), props])])
+          : h("span", null, [f.filename, " ", formatChip(f), props]),
         h("span.badge", { text: "v" + f.version, title: "Version " + f.version + " – " + VERSION_HELP + " SHA-256 " + f.sha256 }),
         fmtSize(f.size_bytes),
         fmtDate(f.uploaded_at) + " · " + f.uploaded_by_name,
@@ -523,8 +538,30 @@ export function revFiles(tab, el) {
     n ? h("details.other-formats", null, [
       h("summary", { text: n + " file" + (n === 1 ? "" : "s") + " in other CAD formats (" + groups.families.join(", ") + ")" }),
       table(columns(), groups.other.map(rowOf), { numeric: [2] })
-    ]) : null
+    ]) : null,
+    propertyMismatchNotice(d.propertyMismatches)
   ]));
+}
+
+/** The notice that a SolidCraft design's properties differ from the
+ *  revision (`property_mismatches` of GET …/revisions/{code}, #367) – the
+ *  same hint as the web revision page; nothing is changed automatically.
+ *  Values come from the file: shown as text only. */
+export function propertyMismatchNotice(list) {
+  if (!Array.isArray(list) || !list.length) return null;
+  var items = [];
+  list.forEach(function (f) {
+    (f.mismatches || []).forEach(function (x) {
+      items.push(h("li", null, [h("span.mono", { text: f.filename }), ": " + x.label + " ",
+        h("span.mono", { text: x.file }), " ≠ " + x.item_label + " ", h("span.mono", { text: x.item })]));
+    });
+  });
+  if (!items.length) return null;
+  return h("div.notice", { role: "note" }, [
+    h("strong", { text: "Design properties differ from this revision" }),
+    " – read from the files, nothing is changed automatically. Edit the revision or the design if they should agree.",
+    h("ul.small", null, items)
+  ]);
 }
 
 /**
@@ -583,6 +620,8 @@ export function showVersions(tab, f, canRestore) {
 export function revStructure(tab, el) {
   var rule = tab.bomRule || "latest";
   var d = tab.data, rev = d.rev;
+  // my check-out: the lines of this revision can be added, edited and removed (#419)
+  var mine = rev.checked_out_by === state.me.id;
   var head = h("div.panel-head", null, [
     h("h2", { text: "Product structure" }),
     h("div.row", null, [
@@ -601,6 +640,12 @@ export function revStructure(tab, el) {
         type: "button", title: "Pick parts of this structure and check them out together – their files become writable",
         on: { click: function () { checkoutPartsDialog(tab); } }
       }, "Check out parts…") : null,
+      canEdit() ? h("button.small", {
+        type: "button", disabled: !mine,
+        title: mine ? "Add a component – search by number, name or file name"
+          : rev.checked_out_by ? "Checked out by " + rev.checked_out_by_name : "Check out first – BOM lines are added under your check-out",
+        on: { click: function () { addLineDialog(rev); } }
+      }, "Add line…") : null,
       canEdit() ? h("button.small", {
         type: "button", disabled: rev.checked_out_by !== state.me.id,
         title: rev.checked_out_by === state.me.id ? "Add the lines of a BOM exported by the CAD program (CSV, Excel, STEP assembly)"
@@ -629,7 +674,7 @@ export function revStructure(tab, el) {
         tree.root.name, badge(tree.root.state), "", "",
         fmtNum(tree.total_mass_kg, 3) + " kg" + (tree.mass_complete ? "" : " ⚠"),
         fmtNum(tree.total_cost, 2) + " €" + (tree.cost_complete ? "" : " ⚠")
-      ],
+      ].concat(mine ? [""] : []),
       cls: "selected"
     }];
     function walk(nodes, depth) {
@@ -643,24 +688,26 @@ export function revStructure(tab, el) {
         var indent = h("span.indent");
         indent.style.width = (depth * 1.2) + "rem";
         var r = n.revision;
+        // the lines of this revision itself (first level) under my check-out
+        var editable = mine && depth === 1 && !n.restricted;
         rows.push({
           cells: [
             h("span", null, [indent, twisty, h("span.mono", { text: String(n.find_number) + "  " }), h("span.mono", { text: n.item_number + (r ? "/" + r.code : "") })]),
             n.restricted ? h("span.muted", { text: "Restricted item – in a project group you are not a member of" })
               : r ? r.name : h("span.warn-text", { text: "no " + (rule === "released" ? "released " : "") + "revision" }),
             r ? badge(r.state) : "",
-            fmtNum(n.quantity, 6) + " " + n.unit,
+            editable ? h("span.nowrap", null, [quantityInput(n), " " + n.unit]) : fmtNum(n.quantity, 6) + " " + n.unit,
             n.notes || "",
             fmtNum(n.total_mass_kg, 3) + " kg" + (n.mass_complete ? "" : " ⚠"),
             fmtNum(n.total_cost, 2) + " €" + (n.cost_complete ? "" : " ⚠")
-          ],
+          ].concat(mine ? [editable ? removeLineButton(n) : ""] : []),
           open: r ? function () { openRevision(n.item_number, r.code); } : null
         });
         if (hasChildren && !collapsed) walk(n.children, depth + 1);
       });
     }
     walk(tree.children, 1);
-    panel.appendChild(table(["Find no. / item", "Name", "State", "Qty", "Notes", "Mass", "Cost"], rows, { numeric: [3, 5, 6] }));
+    panel.appendChild(table(["Find no. / item", "Name", "State", "Qty", "Notes", "Mass", "Cost"].concat(mine ? [""] : []), rows, { numeric: [3, 5, 6] }));
     panel.appendChild(h("p.hint", { text: tree.line_count + " lines" + (tree.unresolved_count ? " · " + tree.unresolved_count + " without a matching revision" : "") +
       (tree.restricted_lines ? " · mass and cost exclude " + tree.restricted_lines + " restricted line" + (tree.restricted_lines === 1 ? "" : "s") : "") +
       " · double-click a line to open it · ⚠ = incomplete mass or cost" }));

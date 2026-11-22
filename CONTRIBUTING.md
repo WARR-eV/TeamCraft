@@ -135,7 +135,7 @@ base) and starts only the jobs that need it.
 |-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
 | server: `src/`, `tests/`, `migrations/`, `templates/`, `static/`, `shared/`, `vendor/`, `media/logos/`, `media/icons/`, `fuzz/seeds/`, `Cargo.toml`/`Cargo.lock`, `build.rs`, lint and nextest configuration | CI: fmt and clippy, tests on PostgreSQL 16 and 18, Windows build (weekly: also macOS)            |
 | the desktop files server tests compare with: `desktop/ui/app.css`, `desktop/ui/index.html`, `desktop/ui/js/{core,settings,shell}.js`, `desktop/src/compat.rs`                                               | the server jobs as well                                                                          |
-| `docs/src/`, `deploy/teamcraft.env.example`, `deploy/docker-compose.yml`, `packaging/linux/teamcraft.env`                                                                                                   | CI: *docs and config guards* – `config::tests` and `tests/architecture_guards.rs`, no database   |
+| `docs/src/`, `deploy/teamcraft.env.example`, `deploy/docker-compose.yml`, `deploy/desktop-policies/windows/`, `packaging/linux/teamcraft.env`                                                               | CI: *docs and config guards* – `config::tests` and `tests/architecture_guards.rs`, no database   |
 | `Cargo.toml`/`Cargo.lock`, `desktop/Cargo.*`, `deny.toml`, `vendor/`                                                                                                                                        | CI: `cargo deny` for the lock file concerned                                                     |
 | the desktop app's Rust code and configuration, `shared/`, `media/logos/`, `media/icons/`, `tests/fixtures/cad/nist/`                                                                                        | Desktop app: fmt, clippy, tests, build and start-up test on every platform                      |
 | `desktop/ui/`, `static/`, `shared/`, `scripts/*.mjs`                                                                                                                                                        | Desktop app: *desktop UI* (syntax, imports, the Node tests)                                      |
@@ -301,7 +301,9 @@ code base. These are the most important rules:
   `ensure_editable` or a guarded getter such as `revisions::get` – the
   reviewed exceptions are on `NOT_GUARDED` with a reason); a template that
   is not in `TEMPLATES` or not rendered by `every_template_renders`; a
-  `TEAMCRAFT_*` variable missing from `docs/src/admin/configuration.md`.
+  `TEAMCRAFT_*` variable missing from `docs/src/admin/configuration.md`; a
+  language file of the desktop Group Policy template whose string or
+  presentation IDs differ from `en-US` or miss one the ADMX references.
 * **Multi-row mutations** run in one transaction. `tests/atomic_processes.rs`
   shows how to prove it: `inject` puts a trigger on a table that makes one
   step fail (an error or a lost connection), and the `snapshot` before and

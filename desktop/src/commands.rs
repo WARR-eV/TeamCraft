@@ -519,6 +519,10 @@ pub async fn assistant_send(state: State<'_, AppState>, body: Value) -> CmdResul
         .lock()
         .expect("assistant lock")
         .take();
+    if result.is_ok() {
+        // usage statistics (#383): one per answered question, never its text
+        usage(&state, |u| u.count("assistant"));
+    }
     result
 }
 
@@ -1763,7 +1767,12 @@ pub async fn import_bom(
     dry_run: bool,
 ) -> CmdResult<Value> {
     let api = signed_in_api(&state)?;
-    bomimport::send(&api, &path, &request, dry_run).await
+    let result = bomimport::send(&api, &path, &request, dry_run).await?;
+    if !dry_run {
+        // usage statistics (#383): the import itself, never the preview
+        usage(&state, |u| u.count("import_bom"));
+    }
+    Ok(result)
 }
 
 /// `(name on the server, local path)` for every path.

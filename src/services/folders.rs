@@ -61,6 +61,12 @@ pub struct Entry {
     /// What the file contains (`part`, `assembly`, `drawing`, …); null if unknown.
     #[sqlx(skip)]
     pub format_kind: Option<FormatKind>,
+    /// Content hash of the file's current version (null without a file).
+    pub sha256: Option<String>,
+    /// The file has a preview image (`GET /files/{id}/thumbnail`, #420),
+    /// stored in it or rendered from its 3D preview.
+    #[sqlx(skip)]
+    pub thumbnail: bool,
     pub item_number: String,
     pub item_type: String,
     /// Name, code and state of the item's latest revision.
@@ -153,6 +159,7 @@ pub async fn level(
     let rows = sqlx::query_as::<_, Counted>(&format!(
         "SELECT e.*, COUNT(*) OVER () AS total
          FROM (SELECT f.id AS file_id, f.filename, f.size_bytes, COALESCE(f.format, '') AS format,
+                      f.sha256,
                       i.number AS item_number, i.item_type, lr.name, lr.code, lr.state,
                       u.display_name AS checked_out_by_name
                FROM items i {LATEST}
@@ -160,7 +167,7 @@ pub async fn level(
                LEFT JOIN users u ON u.id = lr.checked_out_by
                WHERE i.project_id = $1 AND {visible} AND f.folder = $3
                UNION ALL
-               SELECT NULL::uuid, NULL::text, NULL::bigint, '',
+               SELECT NULL::uuid, NULL::text, NULL::bigint, '', NULL::text,
                       i.number, i.item_type, lr.name, lr.code, lr.state, u.display_name
                FROM items i {LATEST}
                LEFT JOIN users u ON u.id = lr.checked_out_by
@@ -185,6 +192,7 @@ pub async fn level(
             if let Some(info) = cadformat::info(&entry.format) {
                 entry.format_label = Some(info.label);
                 entry.format_kind = Some(info.kind);
+                entry.thumbnail = info.thumbnail && entry.file_id.is_some();
             }
             entry
         })

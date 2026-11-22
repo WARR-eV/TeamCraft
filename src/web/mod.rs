@@ -44,8 +44,9 @@ pub(crate) use branding::image as branding_image;
 pub(crate) use imports::{options_from as import_options, receive as receive_import};
 pub(crate) use requests::{attachment_response, receive_attachment};
 pub(crate) use revisions::{
-    file_response, mesh_response, receive_uploads, take_session_uploads, thumbnail_response,
-    upload_files, version_response, warm_previews, Received,
+    file_response, mesh_response, receive_uploads, revision_thumbnail_response,
+    take_session_uploads, thumbnail_response, upload_files, version_response, warm_previews,
+    Received,
 };
 
 use axum::{
@@ -116,6 +117,8 @@ pub fn router(state: &AppState) -> Router<AppState> {
                 .delete(uploads::abort),
         )
         .route("/items/new", get(items::new_form))
+        // component picker of the BOM (static/app.js, #419)
+        .route("/items/suggest", get(items::suggest))
         .route("/items/{id}", get(items::show))
         .route("/items/{id}/label", get(items::label))
         .route("/items/{id}/qr.svg", get(items::qr_svg))
@@ -153,6 +156,10 @@ pub fn router(state: &AppState) -> Router<AppState> {
             post(revisions::cancel_checkout),
         )
         .route("/revisions/{id}/revise", post(revisions::revise))
+        .route(
+            "/revisions/{id}/thumbnail",
+            get(revisions::revision_thumbnail),
+        )
         .route("/revisions/{id}/obsolete", post(revisions::obsolete))
         .route(
             "/revisions/{id}/files",
@@ -887,6 +894,10 @@ async fn html_errors(State(st): State<AppState>, req: Request, next: Next) -> Re
         .unwrap_or_else(|| "/".into());
     let is_get = req.method() == Method::GET;
     let skin = skin_from_cookie(req.headers());
+    let request_id = req
+        .extensions()
+        .get::<crate::RequestId>()
+        .map(|r| r.0.clone());
     let response = next.run(req).await;
     // The viewer fetches preview meshes itself and shows the JSON error message.
     let path = target.split('?').next().unwrap_or("");
@@ -925,6 +936,8 @@ async fn html_errors(State(st): State<AppState>, req: Request, next: Next) -> Re
         "path": path,
         "time": chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string(),
         "version": env!("CARGO_PKG_VERSION"),
+        // the `x-request-id` of this answer: matches the server log line
+        "request_id": request_id,
         "skin": skin,
         "branding": branding,
     });

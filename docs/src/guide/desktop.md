@@ -90,6 +90,19 @@ check-outs and reviews, and a **local working folder**:
   the counts existed – are ticked; *Apply* adds and corrects them in one step (the same plan as *Create BOM from CAD
   references…* in the web UI). A
   quantity the CAD file does not tell never replaces an existing one;
+* *Add line…* (also in the *Structure* tab of a revision you have checked
+  out) adds a single component: type part of its number, name or file name
+  and choose one of the matching items – shown with the preview image from
+  the CAD file, revision, state and project group (↑/↓ and Enter work too, Esc closes the list);
+  enter quantity, find number (empty = next free one) and notes, *Add*. An
+  exact item number works without choosing. Only items you may read are
+  offered (restricted groups you are not in stay hidden). Under your
+  check-out the quantity of every first-level line is an input – a change is
+  saved when you leave it or press Enter (Esc restores it) – and *Remove*
+  deletes a line after a confirmation; the tab reloads after each change.
+  These use the same REST routes as the web UI (`GET /items/suggest`,
+  `POST …/bom`, `PATCH`/`DELETE /bom-lines/{id}`); an older server without
+  the suggest route is searched through `GET /items?q=`;
 * the *Graph* tab draws a navigable reference and BOM graph around the
   revision: the focused item in the middle, its BOM children and references
   below (*ref*), the assemblies that use it above (*uses*). Every node is a
@@ -210,6 +223,12 @@ check-outs and reviews, and a **local working folder**:
   TeamCraft's ids and server under the key `teamcraft.pdm`, through
   `solidcraft-cli`. Refused while the design is read-only or open in
   SolidCraft. The design changes and is checked in like any other change.
+  The Files tab of a revision lists the design properties TeamCraft read
+  from a design under its name (*Part number … · Revision … · Description …*),
+  with the notice *Design properties differ from this revision* when they
+  do not match the item; *New item* from local files and *Import a CAD
+  folder* fill an empty description from them, the name stays the file name
+  (see [Files](files.md#design-properties-of-solidcraft-designs)).
 * with a *Preferred CAD program* set on your account page in the web UI, the
   Files tab of a revision collapses the native files of other CAD programs
   (see [Files](files.md#preferred-cad-program)); the app reads the setting at
@@ -421,6 +440,15 @@ this computer.
 * *All items*: every item in one list, the name first (the first 500 by
   number);
 * *Structure*: the assemblies with their parts.
+
+**Pictures in the rows** (#420). In all three views and in the search, a
+row shows a small picture of its model in place of the type icon: in
+*Files* the preview image of the file itself, in *All items*, *Structure*
+and the search the picture of the item's main model (the assembly before the
+part before the drawing, as at the top of the revision page). The server
+names the picture in the list, and the app fetches it only when the row
+scrolls into view, once per file content; rows without a picture keep the
+type icon.
 
 **Favourite folder.** When your work is several folders down, make that
 folder the group's favourite: point at the folder in *Files* and click its
@@ -665,6 +693,36 @@ whose newer revision takes the place, stay where they are; files you
 changed are moved first. Identical copies are removed, emptied old folders
 too, and every step is written to `.teamcraft/migration.log`.
 
+## Empty views
+
+An empty list says what to do next, and the answer depends on your role
+(#423):
+
+* **No project group yet** – CAD editors get *Create a project group* (you
+  become its manager and add the others); viewers are asked to have a
+  manager of a group add them.
+* **An empty project group** on *Home* (*Files*, *All items* and
+  *Structure*) – *Import CAD folder…* and *New item*, for CAD editors who may
+  create items in the group; CAD editors who are not members of it are asked
+  to have a manager of the group add them; viewers learn that the group's CAD
+  editors add the items.
+* **New on this computer** in the worklist without suggestions – *Get…*
+  copies the files of a project group into your working folder; the dialog
+  starts with the active group ticked.
+* **Checked out by me**, **Waiting for my review** and **My open changes**
+  say in one line how work gets there – in the worklist and on the *Home*
+  tab.
+* A **viewer account** sees a note at the top of the worklist and of the
+  *Home* tab: editing –
+  items, check-outs, changes – needs the CAD editor role; ask an
+  administrator of the server.
+
+An empty working folder on a revision tells the holder of the check-out to
+save the CAD files there and check them in, tells who may check the revision
+out to do so, and everyone else only that it has no files yet.
+
+The texts follow *Settings → Language*.
+
 ## Install or run it
 
 The installers of every version are on the
@@ -739,7 +797,7 @@ check off (for example on computers without internet access).
 Every error message has a **Report…** link, and *Help → Report a Problem…*
 opens the same dialog without one. It shows the report before anything
 leaves the app: a title (what you did and the error), the action, its key
-inputs (no file contents or item data), the error and the versions; add what
+inputs, the error and the versions; add what
 you were trying to do (left out if empty) and, if you like, the error
 messages of this session. Your home folder, server addresses and tokens are
 removed. Edit the text as you like, then:
@@ -751,15 +809,26 @@ removed. Edit the text as you like, then:
 * *Copy report* puts it on the clipboard;
 * *Save report…* writes it to a file (both work without a network).
 
+The key inputs are what the action worked on, for example the project group,
+item number and revision of a check-out or check-in, the names of the ticked
+files, the file and format of a 3D preview, or the file name and options of a
+BOM or folder import. They are names and short values only: a path is
+reduced to the file name, and file contents, item names, descriptions and
+BOM lines are never included.
+
 The error pages of the web UI have *Details for a bug report* with *Copy
-details* (status, message, page, time and version).
+details* (status, message, page, time, version and the request id). The
+request id is also in the server log, so your administrator can find the
+error there.
 
 ## Usage report
 
 Once a day of use, the app sends your TeamCraft server an anonymous report of
 the day before: a random id of this installation, the app version, system,
 package type, the minutes the window was in front, and how often fixed
-actions were used (check-out, check-in, 3D preview …) – never names,
+actions were used (check-out, check-in, cancel check-out, get files, open in
+CAD, 3D preview, BOM and folder imports, new items, releases, searches and
+assistant questions, STEP exports per CAD program) – never names,
 numbers, paths, search terms or anything you type, and not who you are.
 *Settings → Privacy → Show what is sent* shows the exact report. The report
 stays with your organisation; your administrator decides whether the server

@@ -130,6 +130,7 @@ pub fn router(state: &AppState) -> Router<AppState> {
         .route("/projects/{code}/default-cad", put(set_project_default_cad))
         .route("/items", get(list_items).post(create_item))
         .route("/items/duplicates", get(item_duplicates))
+        .route("/items/suggest", get(item_suggest))
         .route("/items/bulk", post(items_bulk))
         .route("/items/{number}", get(get_item).patch(update_item))
         .route("/attributes", get(list_attributes).post(create_attribute))
@@ -363,6 +364,7 @@ pub fn router(state: &AppState) -> Router<AppState> {
         )
         .route("/files/{id}/content", get(download))
         .route("/files/{id}/thumbnail", get(file_thumbnail))
+        .route("/revisions/{id}/thumbnail", get(revision_thumbnail))
         .route("/files/{id}/versions", get(file_versions))
         .route("/files/{id}/restore", post(restore_file))
         .route("/file-versions/{id}/content", get(download_version))
@@ -553,6 +555,7 @@ async fn index() -> Json<Value> {
             "GET    /api/v1/items?q=&type=&project=&state=&system=&class=&attr=&value=&limit=&offset=   system = CAD program, e.g. solidworks, nx, creo; class = make|purchased|standard; attr + value = custom attribute (value: text contains, yes/no, 12, >=10, <=20, 10..20, empty = has a value)",
             "POST   /api/v1/items                                     {item_type, name, number?, unit?, project?, description?, material?, mass_kg?, unit_cost?, classification?, attributes?, folder?}",
             "GET    /api/v1/items/duplicates?name=&type=&limit=        readable items with a similar name (check before creating one)",
+            "GET    /api/v1/items/suggest?q=&limit=                 component picker: readable items matching number, name or file name (at most 10, q of 2+ characters), latest revision, group, thumbnail_file_id",
             "POST   /api/v1/items/bulk                                {action: revise|obsolete, items: [number]} – the latest revision of each item, one by one (at most 200)",
             "GET    /api/v1/items/{number}",
             "PATCH  /api/v1/items/{number}                            {project?, unit?, classification?: make|purchased|standard, folder?} – master data",
@@ -658,6 +661,7 @@ async fn index() -> Json<Value> {
             "PATCH  /api/v1/files/{id}                                {folder?, retention?} – its place in the working folder; retention all | latest (old versions of a latest file are removed after a grace period) – revision checked out by you",
             "GET    /api/v1/files/{id}/content                   resumable: Range: bytes=N- with If-Range: \"<sha256>\" (ETag) → 206",
             "GET    /api/v1/files/{id}/thumbnail                      preview image stored in Inventor, Solid Edge and SolidWorks files (PNG or BMP, 404 if none)",
+            "GET    /api/v1/revisions/{id}/thumbnail                  main thumbnail of a revision: the preview image of its main CAD file (assembly > part > model > drawing > JT; ETag, If-None-Match → 304; 404 if none or not readable)",
             "GET    /api/v1/files/{id}/versions",
             "POST   /api/v1/files/{id}/restore                        {version}",
             "GET    /api/v1/file-versions/{id}/content           resumable like /files/{id}/content",
