@@ -458,8 +458,9 @@ CAD users change parts **in the context of the assembly**. *Check out
 parts…* (revision toolbar, group **Lock**, on an assembly, and the
 *Structure* tab) shows the assembly's structure as a tree with check boxes:
 every part with its state and who holds it. Parts that cannot be checked
-out are greyed out with the reason – *Released – revise it first*, *In
-review*, *Checked out by …*, or *Already checked out by you* (ticked). A
+out are greyed out with the reason – *Not a member of project group …*,
+*Released – revise it first*, *In review*, *Checked out by …*, or
+*Already checked out by you* (ticked). A
 part used several times is offered once; parts the CAD files reference
 without a BOM line follow at the end. *Tick all* / *Tick none* help with
 large assemblies.

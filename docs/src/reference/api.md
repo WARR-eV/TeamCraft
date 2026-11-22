@@ -169,7 +169,7 @@ no change, no audit record), `reason`, `message` and `checked_out_by_name`
 
 | `reason`    | Meaning                                                                       |
 |-------------|-------------------------------------------------------------------------------|
-| `not_found` | Missing, or in a group you may not read – the same answer, without its name  |
+| `not_found` | Missing, or in a group you may not read – the same answer, without its name; only what you sent (`item` and `code`, or `revision_id` when you sent an id) comes back |
 | `released`  | Released or obsolete: revise it first                                         |
 | `in_review` | In review: it can be checked out again once the change returns it to in work |
 | `locked`    | Checked out by someone else (`checked_out_by_name`)                          |

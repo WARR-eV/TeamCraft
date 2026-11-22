@@ -485,18 +485,41 @@ fn refusal(rev: &Revision, actor: &Actor) -> Option<(CheckoutRefusal, String)> {
     })
 }
 
-/// Looks up the id of a revision by item number and code (`latest` = the
-/// newest revision). Read-only and without a visibility check: the caller
-/// checks visibility on the locked row and answers hidden ones like missing.
-async fn revision_id_by_code(pool: &PgPool, item: &str, code: &str) -> AppResult<Option<Uuid>> {
-    Ok(sqlx::query_scalar(
+/// Looks up the id of a revision the actor may read, by item number and
+/// code (`latest` = the newest revision). Read-only; a hidden revision is
+/// `None`, exactly like a missing one, so the caller deduplicates and locks
+/// only visible rows (nothing about a hidden revision reaches the answer or
+/// its timing).
+async fn visible_revision_id_by_code(
+    pool: &PgPool,
+    actor: &Actor,
+    item: &str,
+    code: &str,
+) -> AppResult<Option<Uuid>> {
+    Ok(sqlx::query_scalar(&format!(
         "SELECT r.id FROM revisions r JOIN items i ON i.id = r.item_id
-          WHERE i.number = $1 AND ($2 = 'LATEST' OR r.code = $2)
+          WHERE i.number = $1 AND ($2 = 'LATEST' OR r.code = $2) AND {}
           ORDER BY r.seq DESC
           LIMIT 1",
-    )
+        access::item_visible("i", 3)
+    ))
     .bind(item)
     .bind(code)
+    .bind(&actor.hidden_projects)
+    .fetch_optional(pool)
+    .await?)
+}
+
+/// `id` if it names a revision the actor may read, else `None` (missing and
+/// hidden alike).
+async fn visible_revision_id(pool: &PgPool, actor: &Actor, id: Uuid) -> AppResult<Option<Uuid>> {
+    Ok(sqlx::query_scalar(&format!(
+        "SELECT r.id FROM revisions r JOIN items i ON i.id = r.item_id
+          WHERE r.id = $1 AND {}",
+        access::item_visible("i", 2)
+    ))
+    .bind(id)
+    .bind(&actor.hidden_projects)
     .fetch_optional(pool)
     .await?)
 }
@@ -518,7 +541,9 @@ async fn revision_id_by_code(pool: &PgPool, item: &str, code: &str) -> AppResult
 ///   (`locked`, with the holder's name).
 /// * **Bounds:** at most [`MAX_CHECKOUT_BATCH`] entries (400); every entry
 ///   names an id or an item and a code (400).
-/// * **Locks:** all requested revision rows in one `SELECT … FOR UPDATE`
+/// * **Locks:** the requested revisions the actor may read (resolved and
+///   deduplicated under the visibility guard, so a hidden row is neither
+///   locked nor collapsed with another entry) in one `SELECT … FOR UPDATE`
 ///   ordered by id, so two batches over overlapping sets cannot deadlock:
 ///   the second waits, then reports the revisions the first took as
 ///   `locked` – each revision has one winner.
@@ -545,7 +570,7 @@ pub async fn checkout_many(
                 requested_id: Some(id),
                 item: String::new(),
                 code: String::new(),
-                id: Some(id),
+                id: visible_revision_id(pool, actor, id).await?,
             }
         } else {
             let item = t.item.as_deref().unwrap_or("").trim().to_ascii_uppercase();
@@ -555,7 +580,7 @@ pub async fn checkout_many(
                     "Every revision needs an id or an item and a code.".into(),
                 ));
             }
-            let id = revision_id_by_code(pool, &item, &code).await?;
+            let id = visible_revision_id_by_code(pool, actor, &item, &code).await?;
             BatchSlot {
                 requested_id: None,
                 item,
@@ -563,9 +588,11 @@ pub async fn checkout_many(
                 id,
             }
         };
-        let key = match slot.id {
-            Some(id) => id.to_string(),
-            None => format!("{}/{}", slot.item, slot.code),
+        // Only visible revisions are deduplicated by their id; a missing or
+        // hidden one by what was sent, so both collapse (or not) alike.
+        let key = match (slot.id, slot.requested_id) {
+            (Some(id), _) | (None, Some(id)) => id.to_string(),
+            (None, None) => format!("{}/{}", slot.item, slot.code),
         };
         if seen.insert(key) {
             slots.push(slot);

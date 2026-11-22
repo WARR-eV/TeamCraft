@@ -4,7 +4,7 @@
 
 import { $, api, badge, call, clear, confirmDialog, dialog, enc, errorText, field, h, invoke, lockBadge, materialField, run, setStatus, state, toast, tool } from "./core.js";
 import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
-import { isCancelled, refreshWorklistCount, uploadLine } from "./shell.js";
+import { canEdit, canEditProject, isCancelled, refreshWorklistCount, uploadLine } from "./shell.js";
 import { reloadActive, renderActive, table } from "./tabs.js";
 import { PROGRAM_LABEL, cadPrograms, dd, exportProgram, exportStep, openRevision, previewFormat, revisionAbilities } from "./revision.js";
 import { openChange } from "./change.js";
@@ -424,10 +424,14 @@ export function doCheckout(tab, then) {
 }
 
 /** Why a part of the structure cannot be ticked in *Check out parts…*, or
- * null; `info` is its revision in the working set (state, lock). */
+ * null; `info` is its revision in the working set (state, lock, group). */
 export function checkoutBlocker(info) {
   if (!info) return "Not in the working set";
   if (info.locked_by_me) return "Already checked out by you";
+  if (!canEdit()) return "Viewers cannot check out";
+  // the group by its code; one the app does not know is left to the server
+  var group = info.project_code ? state.projects.filter(function (p) { return p.code === info.project_code; })[0] : null;
+  if (group && !canEditProject(group.id)) return "Not a member of project group " + info.project_code;
   if (info.state === "released") return "Released – revise it first";
   if (info.state === "in_review") return "In review";
   if (info.state !== "in_work") return label(info.state) + " – cannot be checked out";

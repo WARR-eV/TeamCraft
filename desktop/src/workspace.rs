@@ -706,8 +706,14 @@ pub async fn checkout_many(
             .collect::<Vec<_>>(),
     });
     let answer = api.json(Method::POST, "/checkouts", Some(&body)).await?;
-    let results: Vec<CheckoutResult> =
-        serde_json::from_value(answer["revisions"].clone()).unwrap_or_default();
+    // The server has committed the check-outs by now: an answer we cannot
+    // read is an error (refresh), never "nothing was checked out".
+    let results: Vec<CheckoutResult> = serde_json::from_value(answer["revisions"].clone())
+        .map_err(|e| {
+            ApiError::local(format!(
+                "Unexpected answer of POST /checkouts: {e}. Some parts may be checked out – refresh to see them."
+            ))
+        })?;
     let mut files = Vec::new();
     let mut dirs = Vec::new();
     let mut failed = Vec::new();
