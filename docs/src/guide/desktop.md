@@ -34,6 +34,10 @@ check-outs and reviews, and a **local working folder**:
   locked; parts you changed locally, or whose place is taken by another file,
   are never overwritten and are listed in the report (*Settings → Workspace*
   switches this off);
+* *Check out parts…* on an assembly (revision toolbar, group **Lock**, and
+  the *Structure* tab) checks out several of its parts at once, to change
+  them in the context of the assembly – see
+  [Check out parts of an assembly](#check-out-parts-of-an-assembly);
 * *Files / All items / Structure* in the navigator head: *Files* shows the
   folders and files of the project group as in its working folder (see
   below); *Structure* shows, per project
@@ -342,7 +346,7 @@ shown or the app window gets the focus back – save in the CAD program, switch
 back, and *Check in…* is highlighted.
 
 * revision tab: **Lock** (*Check out*, or *Check in…* and *Cancel check-out*
-  / *Force unlock* while checked out) · **Open** (*Check out and open*, or *Open in CAD* for your own
+  / *Force unlock* while checked out; *Check out parts…* on an assembly) · **Open** (*Check out and open*, or *Open in CAD* for your own
   check-out, with the CAD program that will open the file next to it – see
   [Check out and open](#check-out-and-open)) · **Work** (*Edit attributes*, *Get…*, *Open
   folder*) · **Lifecycle** (*Release…*, *Revise*) · **Collaborate**
@@ -475,6 +479,28 @@ shows without restarting the app.
 Keyboard: `Ctrl/Cmd+N` new item, `Ctrl/Cmd+F` search, `F5` refresh,
 `Ctrl/Cmd+1/2/3/4/5` Home, Worklist, Changes, Agent, Projects, `Ctrl/Cmd+W` close the tab,
 `Ctrl/Cmd` + `+` / `-` / `0` (or `Ctrl` + mouse wheel) zoom.
+
+## Check out parts of an assembly
+
+CAD users change parts **in the context of the assembly**. *Check out
+parts…* (revision toolbar, group **Lock**, on an assembly, and the
+*Structure* tab) shows the assembly's structure as a tree with check boxes:
+every part with its state and who holds it. Parts that cannot be checked
+out are greyed out with the reason – *Not a member of project group …*,
+*Released – revise it first*, *In review*, *Checked out by …*, or
+*Already checked out by you* (ticked). A
+part used several times is offered once; parts the CAD files reference
+without a BOM line follow at the end. *Tick all* / *Tick none* help with
+large assemblies.
+
+*Check out* takes the locks of all ticked parts in **one step** on the
+server (`POST /api/v1/checkouts`) and makes their files in the working
+folder writable – missing or outdated files are downloaded, an unchanged
+copy only loses its read-only flag, a copy you changed is kept – so the CAD
+program can save them. What the server refused (someone took a part a
+moment earlier, a part was released meanwhile, you are not a member of its
+project group) is listed with the reason; the rest is checked out anyway.
+The other parts stay read-only.
 
 ## Check out and open
 

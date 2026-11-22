@@ -15,6 +15,20 @@ see the notices in the README.
 
 ### Added
 
+- **Check out several parts of an assembly at once** (#415): `POST /api/v1/checkouts`
+  takes a list of revisions (by id, or item and code) and checks them out in one
+  transaction with a result per revision – the ones that can be taken are checked
+  out, the rest are reported with a reason (`not_found`, `released`, `in_review`,
+  `locked`, `forbidden`), so one released or locked part does not stop the others.
+  The rows are locked in a fixed order, so overlapping batches cannot deadlock and
+  every revision has one winner; each changed revision gets its own
+  `revision.checkout` audit record. A server batch rather than one call per part:
+  one round trip and one consistent moment for the whole set, with the rules of
+  the single check-out in one place. TeamCraft Desktop: *Check out parts…* on an
+  assembly (revision toolbar and *Structure* tab) shows the structure as a tree
+  with check boxes, state and lock holder (parts that cannot be checked out are
+  disabled with the reason), checks out the ticked ones in one step, makes their
+  files in the working folder writable and lists what was refused.
 - **BOM components picked by search** (#419, UX B5 of #408): *Add component*
   on the web BOM card lists matching items as you type part of their number,
   name or file name – with the preview image from the CAD file, latest

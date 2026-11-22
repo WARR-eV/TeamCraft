@@ -153,6 +153,45 @@ curl -s -X POST -H "$H" -H "Content-Type: application/json" \
      $API/items/PRT-000001/revisions/A/cancel-checkout
 ```
 
+### Checking out several revisions at once
+
+`POST /checkouts` checks out several revisions in one step – the parts of
+an assembly a CAD user wants to change in the assembly's context (#415).
+Each entry names a revision by `id`, or by `item` and `code` (`latest` = the
+newest revision); at most 500 entries, duplicates are answered once.
+
+```sh
+curl -s -X POST -H "$H" -H "Content-Type: application/json" \
+     -d '{"revisions": [{"item": "PRT-000011", "code": "A"}, {"item": "PRT-000012", "code": "B"}]}' \
+     $API/checkouts
+```
+
+The answer has **a result per revision**, not all-or-nothing: the revisions
+that can be taken are checked out, the others are reported, so one released
+part or a part somebody else holds does not stop the rest. It is `200` with
+`checked_out`, `refused`, a `summary` sentence and `revisions`, each with
+`revision_id`, `item`, `code`, `name`, `ok`, `already` (you held it before:
+no change, no audit record), `reason`, `message` and `checked_out_by_name`
+(you when `ok`, the holder when `locked`). The reasons:
+
+| `reason`    | Meaning                                                                       |
+|-------------|-------------------------------------------------------------------------------|
+| `not_found` | Missing, or in a group you may not read – the same answer, without its name; only what you sent (`item` and `code`, or `revision_id` when you sent an id) comes back |
+| `released`  | Released or obsolete: revise it first                                         |
+| `in_review` | In review: it can be checked out again once the change returns it to in work |
+| `locked`    | Checked out by someone else (`checked_out_by_name`)                          |
+| `forbidden` | You are not a member of the item's project group                              |
+
+The whole batch is one transaction: the rows are locked in a fixed order
+(by id), so two batches over overlapping parts cannot deadlock – the second
+waits, then reports what the first took as `locked`; every revision has one
+winner. Each revision whose lock changed gets its own `revision.checkout`
+audit record. Viewers get `403` for the whole request, more than 500 entries
+or an entry without an id or an item and a code `400`. The choice of a server
+batch over one `checkout` call per revision: one round trip, one consistent
+moment for the whole set, and the per-revision rules stay those of
+`revisions::checkout` in one place.
+
 ### Concurrency: base versions and file status
 
 A check-in or upload can name the version each file is **based on** in the
@@ -492,6 +531,7 @@ the caller cannot read are left out; a successor there is a placeholder with
 |-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Items                   | `GET/POST /items` (`class=`, `attr=` + `value=`, `result=` + `result_name=` filters), `GET /items/duplicates?name=&type=` (likely duplicates by name, before creating), `GET /items/suggest?q=&limit=` (component picker of the BOM, #419: readable items whose number, name, description, attributes or file name match – at most 10, nothing for fewer than 2 characters – as `{"items": [{id, number, item_type, unit, name, latest_code, latest_state, project_code, matched_file, thumbnail_file_id}]}`; `thumbnail_file_id` is a file for `GET /files/{id}/thumbnail`; the web UI has the same list at `/items/suggest` for its session), `POST /items/bulk` (`{"action": "revise"\|"obsolete", "items": [number]}`: the latest revision of up to 200 items, each in its own transaction, outcome per item), `GET/PATCH /items/{number}` (classification, unit, project, folder), `where-used` (`levels=1…25` for parents of parents), `interchange`, `alternates`, `supersession`, `replace`, history, impacts, watch |
 | Attributes              | `GET /attributes` (`all=true`: also inactive), `POST /attributes`, `PATCH /attributes/{key}` (admins); values in `attributes` of a revision                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Revisions               | `GET/PATCH /items/{number}/revisions/{code\|latest}`, `checkout`, `checkin`, `cancel-checkout`, `file-status`, `revise`, `obsolete`; `POST /checkouts` (several at once, a result per revision)                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Revisions               | `GET/PATCH /items/{number}/revisions/{code\|latest}`, `checkout`, `checkin`, `cancel-checkout`, `file-status`, `revise`, `obsolete`; `GET /revisions/{id}/thumbnail` – the picture of the main model (see below)                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Worklist                | `GET /worklist` (check-outs, reviews, impacts and `impact_groups`, statistics), `POST /worklist/checkin-all`                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Users                   | `GET /users/{id}/holdings` – what a user still holds (check-outs, open change orders, pending reviews, change requests, owned items, memberships, tokens), as the caller may see it: administrators, and group managers for the groups they manage; `POST /users/{id}/offboard` `{hand_over_to?: username, release_checkouts?, revoke_tokens?, confirm_no_manager?}` – administrators deactivate a leaver in one step (see [When someone leaves](../admin/users.md#when-someone-leaves))                                                     |

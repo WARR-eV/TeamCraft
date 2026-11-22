@@ -83,6 +83,7 @@ pub fn router(state: &AppState) -> Router<AppState> {
         .route("/users/{id}/offboard", post(user_offboard))
         .route("/worklist", get(worklist))
         .route("/worklist/checkin-all", post(checkin_all))
+        .route("/checkouts", post(checkout_many))
         .route("/mcp", post(crate::mcp::http).get(crate::mcp::http_get))
         .route("/assistant", get(assistant_info).post(assistant_ask))
         .route(
@@ -574,6 +575,7 @@ async fn index() -> Json<Value> {
             "GET    /api/v1/items/{number}/revisions/{code|latest}",
             "PATCH  /api/v1/items/{number}/revisions/{code}           {name?, description?, material?, mass_kg?, unit_cost?, attributes?: {key: value|null}}",
             "POST   /api/v1/items/{number}/revisions/{code}/checkout",
+            "POST   /api/v1/checkouts                                 {revisions: [{id} | {item, code}]} – check out several revisions in one transaction; a result per revision (ok, reason: not_found | released | in_review | locked | forbidden, message, checked_out_by_name)",
             "POST   /api/v1/items/{number}/revisions/{code}/checkin   optional multipart: 'file' (new versions), 'comment', 'bases' = {\"name\": version | sha256} → 409 if a file moved on, 'folder' or 'folders' = {\"name\": \"folder\"}, 'uploads' = [upload id] (chunked uploads)",
             "POST   /api/v1/uploads                                   {item, revision, filename, size, sha256?, content_type?, base?, folder?, refuse_clash?, refuse_same_name?} – start a chunked, resumable upload (checked-out revision); the refuse flags are the duplicate guard of the multipart upload, applied when the file is stored",
             "GET    /api/v1/uploads/{id}                              state and offset to resume from (also HEAD: Upload-Offset, Upload-Length)",
