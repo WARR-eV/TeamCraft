@@ -1,6 +1,3 @@
-      requests: r[0].open_requests || [],
-      // design properties that differ from the revision (#367; older servers: none)
-      propertyMismatches: r[0].property_mismatches || [],
 // SPDX-License-Identifier: MPL-2.0
 // TeamCraft Desktop – Revision tab: overview, files, structure, where used.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
