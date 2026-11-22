@@ -55,6 +55,12 @@ function hideOverlay() {
   document.body.classList.remove("drop-target", "drop-refused");
 }
 
+/** Shows the overlay for the dragged paths, or hides it when nothing droppable is dragged (text, a URL). */
+function updateOverlay() {
+  var r = dragged.length ? route(dragged) : null;
+  if (r) showOverlay(r); else hideOverlay();
+}
+
 /** Applies a drop: regular files only, then *New*, *Add files…* or the refusal. */
 function onDrop(paths) {
   var first = route(paths);
@@ -82,9 +88,9 @@ export function initDrop() {
     if (!shellShown()) { hideOverlay(); dragged = []; return; }
     if (p.type === "enter") {
       dragged = p.paths || [];
-      showOverlay(route(dragged));
+      updateOverlay();
     } else if (p.type === "over") {
-      if (dragged.length) showOverlay(route(dragged));
+      updateOverlay();
     } else if (p.type === "drop") {
       hideOverlay();
       dragged = [];

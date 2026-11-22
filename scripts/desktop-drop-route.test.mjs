@@ -41,8 +41,8 @@ test("an empty drop does nothing", () => {
 test("no tab: New with the files", () => {
   const r = routeDrop({ paths, tab: null, canCreate: true });
   assert.deepEqual(r, { kind: "new", paths });
-  assert.equal(dropLabel(r), "Drop to create a new item with 2 files");
-  assert.equal(dropLabel(routeDrop({ paths: [paths[0]], tab: null, canCreate: true })), "Drop to create a new item with the file");
+  assert.equal(dropLabel(r), "Drop to create a new item with the dropped files");
+  assert.equal(dropLabel(routeDrop({ paths: [paths[0]], tab: null, canCreate: true })), "Drop to create a new item with the dropped files");
 });
 
 test("a change or other tab: New with the files", () => {
@@ -56,7 +56,7 @@ test("a revision checked out by me: Add files…", () => {
   assert.equal(r.kind, "add");
   assert.equal(r.tab, tab);
   assert.deepEqual(r.paths, paths);
-  assert.equal(dropLabel(r), "Drop to add 2 files to PRT-000042/A");
+  assert.equal(dropLabel(r), "Drop to add the dropped files to PRT-000042/A");
 });
 
 test("a free revision Add files… would check out: Add files…", () => {

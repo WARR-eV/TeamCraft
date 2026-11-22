@@ -45,11 +45,15 @@ export function routeDrop(o) {
   return { kind: "new", paths: paths };
 }
 
-/** The line on the drop overlay while files are dragged over the window. */
+/**
+ * The line on the drop overlay while files are dragged over the window.
+ * It names no count: the dragged paths may hold folders, which the drop
+ * leaves out (src/commands.rs dropped_files) – skippedText() reports them.
+ */
 export function dropLabel(route) {
   if (!route) return "";
   if (route.kind === "refuse") return route.text;
-  var t = route.paths.length === 1 ? "the file" : route.paths.length + " files";
+  var t = "the dropped files";
   if (route.kind === "add") {
     var rev = route.tab.data.rev;
     return "Drop to add " + t + " to " + rev.item_number + "/" + rev.code;
