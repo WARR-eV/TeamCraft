@@ -326,7 +326,9 @@ end-to-end tests against a real PostgreSQL.
   or *Add files…*, new items straight from the files
   saved in the working folder (group and folder taken from where they are,
   duplicates refused, the worklist suggesting the parts and assemblies that
-  belong to no item yet), an Agent view, crash reports the user
+  belong to no item yet), a *Local changes* list of the whole working folder
+  (modified, outdated, conflicting and missing files with *Check out (keep my
+  file)*, *Get latest* and *Check in selected*), an Agent view, crash reports the user
   decides about, *Report…* on every error (a reviewed, redacted report with
   the action and its key inputs; nothing is sent without a click) and an update notice (never installs anything itself). The
   download *with local server* also runs a private test server with its own

@@ -1118,7 +1118,7 @@ ul.file-picks li .mono { overflow: hidden; text-overflow: ellipsis; white-space:
 .new-item-info:empty { display: none; }
 .new-item-info .notice { margin: 0; }
 /* worklist: New on this computer – the tick box before the row's icon */
-.node.new-file input[type="checkbox"] { flex: none; margin: 0 4px 0 2px; }
+.node.new-file input[type="checkbox"], .node.local-change input[type="checkbox"] { flex: none; margin: 0 4px 0 2px; }
 
 /* Preview images stored in CAD files (Inventor, Solid Edge, SolidWorks):
    drawings on paper, white in both schemes */

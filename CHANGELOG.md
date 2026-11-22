@@ -15,6 +15,29 @@ see the notices in the README.
 
 ### Added
 
+- **Desktop: one *Local changes* list for the whole working folder** (#416):
+  a worklist section next to *New on this computer* lists every file of the
+  working folder that is modified, outdated, in conflict, new (a companion
+  such as a STEP export) or missing, grouped by item – also a file changed
+  after clearing its read-only flag without a check-out, and files outdated
+  because somebody checked in a newer version, without opening their item.
+  Each row and each selection offers *Check out (keep my file)*, *Get latest*,
+  *Check in selected* (the *Check in all* flow), *Merge…* for a conflict and
+  *Folder*. The count joins the worklist badge on the rail. The scan
+  (`local_changes_scan`, `desktop/src/localchanges.rs`) compares
+  `state.json` with the disk first (no network; unchanged files are never
+  read, at most 512 MiB hashed per scan) and then the Workspace status of at
+  most 100 revisions (local changes first, then own check-outs, then a window
+  over the rest that moves on with every scan, so outdated files anywhere in
+  the folder are found over successive scans). The scan only compares: it
+  sets no read-only flags and writes no state. A check-in from the list takes
+  every changed file of the revision along (the check-in releases the
+  check-out; the dialog names the unticked ones and offers *Park* instead).
+  It runs when the worklist opens or is refreshed and when the window gets
+  the focus back (at most every 15 s), and at once after a check-out,
+  check-in, park, cancelled check-out or Get. The list rules are in
+  `desktop/ui/js/local-changes.js`, tested by
+  `scripts/desktop-local-changes.test.mjs`.
 - **Check-in: *Update the BOM from the CAD file*** (#407): a box in the web
   check-in form and the desktop app's *Check in…*, ticked by default every
   time, shown when the revision has an assembly whose references are read (an

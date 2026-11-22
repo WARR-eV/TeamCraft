@@ -20,8 +20,8 @@ use tokio::sync::Notify;
 use crate::{
     acp, addfiles,
     api::{self, Api, ApiError, Transfer},
-    bomimport, cadexport, cadlaunch, folderimport, layout, localserver, policy, profiles, scbridge,
-    scprops,
+    bomimport, cadexport, cadlaunch, folderimport, layout, localchanges, localserver, policy,
+    profiles, scbridge, scprops,
     settings::{self, Settings, TokenStorage},
     signin, update, workspace, AppState,
 };
@@ -940,6 +940,22 @@ pub async fn workspace_local_changes(
         results.push((r, files));
     }
     Ok(layout::local_changes(results))
+}
+
+/// *Local changes* (#416): the modified, outdated, conflicting, new and
+/// missing files of every revision in the working folder – a local pass over
+/// the state, then the Workspace status of at most
+/// [`localchanges::MAX_REVISIONS`] revisions (`src/localchanges.rs`). Unlike
+/// [`workspace_status`] it writes nothing: no SolidCraft bridge state, no
+/// read-only flags, no `state.json` (`workspace::status_with(.., false)`).
+#[tauri::command]
+pub async fn local_changes_scan(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> CmdResult<localchanges::LocalChangesScan> {
+    let api = signed_in_api(&state)?;
+    let root = workspace_root(&app, &state);
+    localchanges::scan(&api, &root).await
 }
 
 /// A fresh cancel switch for the upload that starts now (`cancel_upload`

@@ -221,6 +221,7 @@ desktop/           TeamCraft Desktop (Tauri 2, own Cargo project – never part 
                    list-thumbs.js = row pictures of Home and the search (lazy, IntersectionObserver, #420),
                    crash.js = crash reports; desktop/src/workspace.rs + layout.rs = working folder, park, local changes;
                    new-files.js + desktop/src/newfiles.rs = new items from local files, worklist *New on this computer* (#359);
+                   local-changes.js + desktop/src/localchanges.rs = worklist *Local changes* over the whole working folder (#416);
                    drop.js + drop-rules.js = files dropped from the file manager → *New* / *Add files…* (#418, dragDropEnabled);
                    desktop/src/localserver.rs = *Try TeamCraft on this computer* (starts the bundled teamcraft-server local);
                    desktop/src/policy.rs = managed deployment policies (registry / macOS profile / /etc/teamcraft, #378);
