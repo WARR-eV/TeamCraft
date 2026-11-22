@@ -1,0 +1,9 @@
+{
+  "ServerUrl": "https://plm.example.org",
+  "AllowOtherServers": 0,
+  "CheckForUpdates": 1,
+  "CrashReportPrompt": 0,
+  "WorkspaceRoot": "/srv/cad",
+  "OrganizationName": "Example Lab",
+  "UsageStatistics": 0
+}

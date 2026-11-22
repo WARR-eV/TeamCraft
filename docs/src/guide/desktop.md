@@ -120,8 +120,7 @@ check-outs and reviews, and a **local working folder**:
   resumable chunks – a dropped connection resumes where it stopped (see
   [Large files](vault.md#large-files-chunked-resumable-uploads)). The dialog
   stays open with the progress while the check-in runs, and **Cancel** stops
-  it at any point until the last byte is sent: before the next STEP export,
-  between two chunks of a large file (the chunks on the server are
+  it at any point until the last byte is sent: between two chunks of a large file (the chunks on the server are
   discarded – a cancelled upload starts over next time) or half-way through
   the request with the small files. Nothing is stored then, the revision
   stays checked out to you and your local files are untouched. Once every
@@ -191,6 +190,16 @@ check-outs and reviews, and a **local working folder**:
   is not found); a design with a failing feature is not exported. An export
   that fails or is not possible never stops the check-in – the file is
   checked in without its STEP and the result names the reason.
+* with the check-in option ticked, the ticked files are **uploaded first**
+  (parked – the revision stays checked out), then the exports run one after
+  the other with the time each has taken so far, then the check-in follows
+  with the STEP files (#342). An export of a large assembly can take many
+  minutes: **Cancel** during an export skips it (and the remaining ones) and
+  ends an Inventor or Solid Edge the export started – your files are already
+  on the server. Calls Inventor rejects while it is busy are tried again for
+  up to a minute. The whole error output of a failed export is kept in
+  `export-logs/` in the app's configuration folder (the newest 20, on this
+  computer only); the error message names the log.
 * for a SolidCraft design of your own check-out, *Item data* (Workspace tab)
   writes the item number, the revision and the item name into the design's
   properties (*Part number*, *Revision*, *Description* in SolidCraft), plus
@@ -363,7 +372,10 @@ this computer.
 * *Files* (the view Home starts with): the **folders** of the group and the **files** in them, as in its working
   folder – folders first, then the files
   by name the way a file manager orders them (without regard to case, `Part2`
-  before `Part10`), each with the state and the lock of its item. The file
+  before `Part10`), each with the state and the lock of its item. A checked-out file is marked
+  with a bar in the lock colour at the left edge of its row and a light tint
+  of the row (the same for your check-outs and other people's; also in
+  *Structure*). The file
   name comes first and the number and revision after it, so a narrow navigator
   cuts the number, not the name. A folder opens its own level – a large group
   is never loaded as a whole, and a folder with more than 500 files offers *show … more*. The files are those of the
@@ -678,3 +690,13 @@ for the next start. *Don't ask again* (or *Settings → Crash reports*) stops
 the question; the reports then stay on the computer only. Background and the
 alternatives that were considered: [Crash reports from the desktop
 app](../research/crash-reporting.md).
+
+## Managed computers
+
+On a computer your IT department manages, some settings can be fixed by
+*policies* (see [Deploying the desktop app](../admin/desktop-deployment.md)):
+the server, the update check, the question after a crash and the default
+working folder. *Settings* then shows *Managed by …* at the top, and a fixed
+setting is marked **Set by your organization** and cannot be changed. With a
+fixed server, the connect screen shows that server only, *Switch server…* is
+hidden and saved connections to other servers cannot be switched to.

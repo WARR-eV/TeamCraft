@@ -155,6 +155,10 @@ feature milestone – the features in *What works* are enough; what is missing i
   installers started, `.dmg` opened. Left: swapping a portable zip or AppImage in place with *Restart now*, a
   signature on the checksum list (release key built into the app), the *server needs desktop x.y* hint, a manual
   test script per install type for each RC
+- [x] Desktop: managed deployment policies (#378) – Windows registry with ADMX/ADML templates, macOS configuration
+  profile, `/etc/teamcraft/policies.json`; fixed server, updates, crash prompts, working folder, organisation name,
+  `UsageStatistics` (read for #383). Left: a manual test per OS (Group Policy, Intune, an MDM profile), a German ADML,
+  a per-machine MSI checked for silent installs
 - [ ] Desktop app run and tested on Windows x64/ARM64, macOS and Linux for each RC (a short manual test script in
   `docs/src/dev/release-checklist.md`)
 - [x] One download to try TeamCraft on a laptop: desktop installers *with local server* (Windows x64, macOS Apple
@@ -670,6 +674,10 @@ real files and belong to section 3 once such files are at hand.
 - [ ] Test the STEP export (built) with real files on Windows – the preview images are verified with the NIST Inventor
   2021 files. Inventor 2027 is registered for COM in the Windows 11 ARM64 test VM (`Inventor.Application`,
   `Inventor.exe /Automation`, found by the app's registry check); the export itself was not tried there yet
+- [x] Desktop: a slow or failed STEP export never costs the check-in (#342): files uploaded first, exports skippable
+  (the started Inventor is ended), busy COM calls retried, the whole error output in `export-logs/`. Left: STEP
+  export of large assemblies in the background after the check-in (a new version of the STEP later), parts-only
+  or size limits, `TranslatorAddIn.SaveCopyAs` with translator options; a manual test on Windows
 - [ ] Test the BOM import with real exports of the BOM editor (structured and parts only); *Phantom* components are
   imported as normal sub-assemblies today (*Reference* components are skipped)
 - [ ] Extend the Inventor part of the tutorial: Pack and Go, `.ipj`, Design Assistant for broken references

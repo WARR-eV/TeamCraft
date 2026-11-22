@@ -622,6 +622,9 @@ jobs:
           path: dist
           pattern: desktop-*
           merge-multiple: true
+      # the policy templates of managed desktop deployments (#378)
+      - name: Desktop policy templates
+        run: cd deploy/desktop-policies && zip -qr "$GITHUB_WORKSPACE/dist/teamcraft-desktop-policies-${{ needs.version.outputs.version }}.zip" .
       - name: Checksums
         working-directory: dist
         run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
