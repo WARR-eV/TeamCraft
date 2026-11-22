@@ -42,6 +42,11 @@ see the notices in the README.
   SolidCraft design's properties (and TeamCraft's ids and server under
   `teamcraft.pdm`) through `solidcraft-cli`; refused while the design is
   read-only or open in SolidCraft.
+- **TeamCraft plugin for SolidCraft** (`plugins/solidcraft`). A WebAssembly
+  component for SolidCraft's plugin runtime: *TeamCraft status*, *Check for
+  TeamCraft* (part numbers, BOM rows, linked designs), *Link to TeamCraft
+  item* and *Unlink*; works offline on the open design. Built and tested by
+  the new workflow *SolidCraft plugin*.
 
 ## [0.2.11] - 2026-11-21
 

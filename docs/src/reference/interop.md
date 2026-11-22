@@ -23,7 +23,32 @@ references it.
 
 The three projects share their approach – one Rust build, a desktop app and
 a command line, open formats – but not code: TeamCraft is licensed under the
-MPL-2.0 and does not include SolidCraft or FieldCraft code.
+MPL-2.0 and does not include SolidCraft or FieldCraft code (the plugin for SolidCraft below contains SolidCraft's interface definition, MIT).
 
 What TeamCraft reads from a `.sc` design, and the sources of those findings, are
 recorded in the research page [SolidCraft designs](../research/solidcraft-design.md).
+
+## TeamCraft plugin for SolidCraft
+
+`plugins/solidcraft` is a plugin for SolidCraft's plugin runtime (a
+WebAssembly component, `craft:plugin@0.2.0`, built by the workflow
+*SolidCraft plugin*, see its [README](https://github.com/WARR-eV/TeamCraft/tree/main/plugins/solidcraft)).
+SolidCraft's plugins have no network access, so it works on the open design
+only – with the TeamCraft object the desktop app's *Item data* writes
+(`teamcraft.pdm`):
+
+* **TeamCraft status** – the item and revision of the design, the link to the
+  revision page, whether part number and revision still match;
+* **Check for TeamCraft** – missing part numbers, a part number or revision
+  that differs from the linked item, BOM rows without a part number, one part
+  number with two descriptions, quantities SolidCraft cannot add up, linked
+  designs with an absolute path or the same file name twice;
+* **Link to TeamCraft item** / **Unlink from TeamCraft** – write or remove the
+  item data from inside SolidCraft, for designs edited without the desktop
+  app.
+
+Install: copy the package folder `teamcraft` into SolidCraft's plugins folder
+(*Preferences › Plugins › Show in folder*) and enable it. The plugin is
+TeamCraft's own code (MPL-2.0); it contains SolidCraft's interface definition
+`plugin.wit` unchanged under SolidCraft's MIT licence, which a component for
+SolidCraft's runtime needs.
