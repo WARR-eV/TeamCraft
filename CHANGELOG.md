@@ -17,7 +17,10 @@ see the notices in the README.
 
 - **Check-in: *Update the BOM from the CAD file*** (#407): a box in the web
   check-in form and the desktop app's *Check in…*, ticked by default every
-  time, shown when the revision has an assembly. The plan of *Create BOM from
+  time, shown when the revision has an assembly whose references are read (an
+  assembly item, an assembly file, or an NX part, STEP file or SolidCraft
+  design with counted instances – `bom_structure` in `file-status` for the
+  desktop app; not for a plain part check-in). The plan of *Create BOM from
   CAD references…* is applied to the version being checked in, in the
   check-in's transaction: new children added, quantities the CAD file counts
   corrected (never from an *assumed 1*), circular children refused, no line
@@ -27,7 +30,9 @@ see the notices in the README.
   field `bom_from_references` on `POST …/checkin` and in the body of
   `POST /uploads/{id}/finish` (off by default), the answer adds `bom`;
   audit `bom.from_references` with `"source": "checkin"`. *Park* never
-  changes the BOM.
+  changes the BOM. Parts still in the assembly but only excluded from its BOM
+  there are not reported as *no longer in the CAD file*; the manual plan no
+  longer holds a database connection while it reads the CAD files.
 
 ### Changed
 

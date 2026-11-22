@@ -13,7 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const source = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../desktop/ui/js/checkin-bom.js");
-const { bomStructureFile, checkinBomText } =
+const { bomStructureFile, offerBomUpdate, checkinBomText } =
   await import("data:text/javascript;base64," + fs.readFileSync(source).toString("base64"));
 
 let passed = 0;
@@ -25,12 +25,11 @@ function test(name, fn) {
 
 const kinds = { iam: "assembly", sldasm: "assembly", asm: "assembly", ipt: "part", prt: "model", stp: "exchange", pdf: "document" };
 
-test("assemblies, NX parts, STEP files and SolidCraft designs offer the box", () => {
+test("assembly formats and SolidCraft designs offer the box", () => {
   assert.equal(bomStructureFile(["Wagon.iam"], kinds), true);
   assert.equal(bomStructureFile(["Pump.SLDASM"], kinds), true);
-  assert.equal(bomStructureFile(["frame.prt"], {}), true, "NX: an assembly by content");
-  assert.equal(bomStructureFile(["pump.STEP"], {}), true);
   assert.equal(bomStructureFile(["cart.sc"], {}), true);
+  assert.equal(bomStructureFile(["cart.solidcraft"], {}), true, "the second SolidCraft extension");
   assert.equal(bomStructureFile(["bracket.asm.7"], kinds), true, "a Creo iteration");
 });
 
@@ -40,6 +39,19 @@ test("parts, drawings and documents do not", () => {
   assert.equal(bomStructureFile(["README"], kinds), false);
   assert.equal(bomStructureFile(["bolt.ipt.3"], kinds), false);
   assert.equal(bomStructureFile(null, kinds), false);
+  // NX and Creo parts are .prt, every part gets a STEP export: the server decides
+  assert.equal(bomStructureFile(["frame.prt"], kinds), false);
+  assert.equal(bomStructureFile(["pump.STEP", "pump.stp"], kinds), false);
+});
+
+test("the server's structure flag and assembly items offer the box", () => {
+  const files = (...names) => names.map((name) => ({ name }));
+  assert.equal(offerBomUpdate({ bom_structure: true, files: files("frame.prt") }, { item_type: "part" }, kinds), true);
+  assert.equal(offerBomUpdate({ bom_structure: false, files: files("frame.prt", "frame.stp") }, { item_type: "part" }, kinds), false);
+  assert.equal(offerBomUpdate({ files: files("frame.prt") }, { item_type: "assembly" }, kinds), true, "an assembly item");
+  assert.equal(offerBomUpdate({ files: files("Wagon.iam") }, { item_type: "part" }, kinds), true);
+  assert.equal(offerBomUpdate({ files: files("cart.solidcraft") }, null, {}), true);
+  assert.equal(offerBomUpdate(null, null, kinds), false);
 });
 
 test("the result line says what changed", () => {

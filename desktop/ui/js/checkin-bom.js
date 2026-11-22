@@ -5,13 +5,28 @@
 //
 // The server updates the BOM from the references of the checked-in version
 // (new lines added, counted quantities corrected, nothing removed). The box
-// is offered only when a file of the revision can tell the structure:
-// assemblies (Inventor, SOLIDWORKS, …), NX parts and SolidCraft designs (an
-// assembly by their content) and STEP files (assemblies with external
-// parts) – the server checks the content and leaves the BOM alone otherwise.
+// is offered only for a revision with an assembly whose references are read:
+// the server knows a structure file of it (`bom_structure` of file-status:
+// an assembly, or an NX part, STEP file or SolidCraft design whose
+// references carry instance counts), the item is an assembly, or a file is
+// of an assembly format (Inventor, SOLIDWORKS, Creo, …) or a SolidCraft
+// design (the desktop's own CAD program; a part or an assembly by content).
+// NX `.prt` and STEP files are left to the server: every Creo part is a
+// `.prt` too, and *Check in…* exports a STEP of every part.
 
-/** Extensions whose files may be assemblies by content, whatever their kind. */
-export var BOM_STRUCTURE_EXTENSIONS = ["prt", "stp", "step", "sc"];
+/** Extensions whose files may be assemblies by content, whatever their kind
+ *  (SolidCraft designs, both extensions of `solidcraft-design`). */
+export var BOM_STRUCTURE_EXTENSIONS = ["sc", "solidcraft"];
+
+/** Is *Update the BOM from the CAD file* offered? `status` is the answer of
+ *  workspace_status (`bom_structure`, `files`), `rev` the revision (its
+ *  `item_type`), `kinds` the extension → format kind map of GET /formats. */
+export function offerBomUpdate(status, rev, kinds) {
+  if (status && status.bom_structure) return true;
+  if (rev && rev.item_type === "assembly") return true;
+  var names = ((status && status.files) || []).map(function (f) { return f.name; });
+  return bomStructureFile(names, kinds);
+}
 
 /** Does one of the file names lead to a BOM from the CAD file? `kinds` is
  *  the extension → format kind map of GET /formats. */

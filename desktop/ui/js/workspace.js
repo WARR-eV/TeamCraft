@@ -16,7 +16,7 @@ import { incompleteGet, notOpenedText } from "./get-rules.js";
 import { formatKinds } from "./folder-import.js";
 import { isNewModelOfItsOwn, workspacePath } from "./new-files.js";
 import { newItemDialog } from "./dialogs.js";
-import { bomStructureFile, checkinBomText } from "./checkin-bom.js";
+import { offerBomUpdate, checkinBomText } from "./checkin-bom.js";
 
 // ---------------------------------------------------------------- 3D viewer
 
@@ -484,7 +484,7 @@ export function checkinDialog(tab, park) {
     // #407: on by default every time (the choice is not remembered); only on
     // a check-in – Park keeps the revision checked out, nothing is final yet
     var withBom = h("input", { type: "checkbox", checked: true });
-    var bomNote = bomStructureFile(ws.files.map(function (f) { return f.name; }), kinds) ? h("label.check", null, [withBom,
+    var bomNote = offerBomUpdate(ws, rev, kinds) ? h("label.check", null, [withBom,
       "Update the BOM from the CAD file – adds the parts the assembly uses and corrects counted quantities, never removes a line (not when parking)"]) : null;
     var body = h("div.stack", null, [
       h("p.small.muted", null, ["From ", h("span.mono", { text: ws.dir })]),

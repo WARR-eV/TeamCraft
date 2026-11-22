@@ -90,10 +90,13 @@ plan, `POST …/bom/from-references` with
 
 The check-in form of the web UI and the desktop app's *Check in…* have a
 box **Update the BOM from the CAD file**, ticked by default every time
-(#407). It is shown when the revision has an assembly (in the web UI: an
-assembly item or a revision whose CAD files lead to other items; in the
-desktop app: an Inventor `.iam`, a SOLIDWORKS assembly, an NX `.prt`, a STEP
-file or a SolidCraft `.sc`). With the box ticked, the plan above is applied
+(#407). It is shown when the revision has an assembly whose references are
+read: an assembly item, a file of an assembly format, or an NX part, STEP
+file or SolidCraft design whose stored references carry instance counts (in
+the web UI also a revision whose CAD files lead to other items; in the
+desktop app also a file of an assembly format or a SolidCraft `.sc` /
+`.solidcraft` design in the working folder, a part or an assembly by
+content). Any other plain part check-in shows no box. With the box ticked, the plan above is applied
 to the version being checked in, **in the check-in's transaction** – the
 files and the BOM change together, or neither (a refused upload, 409, leaves
 the BOM as it was):
@@ -104,7 +107,9 @@ the BOM as it was):
 * *circular* children are refused, as above;
 * lines whose part the CAD files no longer reference are **kept** (a BOM
   carries lines without CAD geometry: glue, cable ties, bought parts) and
-  reported as *no longer in the CAD file*;
+  reported as *no longer in the CAD file*; a part still in the assembly but
+  only excluded from its BOM there (SOLIDWORKS *exclude from BOM*, suppressed
+  Inventor occurrences) is kept without that report;
 * referenced files TeamCraft does not have are reported as *not in
   TeamCraft*, never created.
 

@@ -728,6 +728,10 @@ pub struct Status {
     /// last checked out (the server's `released`: `by_name`, `at`, `reason`,
     /// `message`): local changes stay, but need a new check-out.
     pub released: Option<Value>,
+    /// The server knows a structure file of the revision (`bom_structure` of
+    /// `file-status`, false from older servers): *Check in…* offers *Update
+    /// the BOM from the CAD file* (#407).
+    pub bom_structure: bool,
 }
 
 /// A local file of a revision: where it is and what the state says.
@@ -840,6 +844,7 @@ pub fn inaccessible_status(root: &Path, project: Option<&str>, item: &str, code:
         locked_by_name: None,
         inaccessible: true,
         released: None,
+        bom_structure: false,
         files,
     }
 }
@@ -999,6 +1004,7 @@ pub async fn status(
         locked_by_name: rev.locked_by_name,
         inaccessible: false,
         released: Some(server["released"].clone()).filter(Value::is_object),
+        bom_structure: server["bom_structure"].as_bool().unwrap_or(false),
         files: out,
     })
 }

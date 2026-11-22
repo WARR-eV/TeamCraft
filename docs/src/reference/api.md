@@ -196,7 +196,11 @@ curl -s -X POST -H "$H" -F file=@hub.step -F 'bases={"hub.step": 3}' \
 
 `GET …/revisions/{code}/file-status` returns every file with its current
 `version`, `sha256`, uploader and the lock (`locked_by`, `locked_by_name`,
-`locked_at`, `locked_by_me`, `locked_by_other`). When somebody else released *your* check-out of the revision and nobody
+`locked_at`, `locked_by_me`, `locked_by_other`). `bom_structure` is `true` when a
+current file of the revision describes its structure by what the reference
+scan stored (an assembly, or an NX part, STEP file or SolidCraft design whose
+references carry instance counts) – the desktop app then offers *Update the
+BOM from the CAD file* at check-in. When somebody else released *your* check-out of the revision and nobody
 has checked it out since,
 `released` says so (`by_name`, `at`, `reason` and the `message` *Released by
 X; your local changes are kept and need a new check-out.*); otherwise it is

@@ -51,7 +51,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sqlx::PgConnection;
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 use crate::{
@@ -154,6 +154,10 @@ pub struct Plan {
     /// The revision has a file whose references describe its structure.
     #[serde(skip)]
     pub structure: bool,
+    /// Items the structure files reference only through components excluded
+    /// from the BOM there (`excluded`): still in the CAD file.
+    #[serde(skip)]
+    pub excluded_items: Vec<Uuid>,
 }
 
 /// A child before it is compared with the BOM.
@@ -181,22 +185,58 @@ pub(crate) struct Collected {
     pub children: Vec<Candidate>,
     pub unmatched: Vec<Unmatched>,
     pub excluded: Vec<String>,
+    /// The items behind `excluded` (other revisions' files only).
+    pub excluded_items: Vec<Uuid>,
+}
+
+/// The structure rule: a file with references describes the structure of
+/// its revision when it is of an assembly format, or an NX part, SolidCraft
+/// design or STEP file whose references carry instance counts (`counted`:
+/// an assembly by content, not by extension).
+fn structure_rule(kind: Option<FormatKind>, format: &str, counted: bool) -> bool {
+    match kind {
+        Some(FormatKind::Assembly) => true,
+        // NX, SolidCraft: an assembly by content (it has component instances)
+        Some(FormatKind::Model) if matches!(format, "nx-part" | "solidcraft-design") => counted,
+        // STEP: an assembly with external references (occurrences counted)
+        Some(FormatKind::Exchange) if format == "step" => counted,
+        _ => false,
+    }
 }
 
 /// Does this file's references describe the structure of the revision?
 fn is_structure(src: &SourceFile<'_>) -> bool {
-    match src.file.format_kind {
-        Some(FormatKind::Assembly) => true,
-        // NX, SolidCraft: an assembly by content (it has component instances)
-        Some(FormatKind::Model) if matches!(src.format, "nx-part" | "solidcraft-design") => {
-            src.counts.is_some_and(|c| !c.is_empty())
-        }
-        // STEP: an assembly with external references (occurrences counted)
-        Some(FormatKind::Exchange) if src.format == "step" => {
-            src.counts.is_some_and(|c| !c.is_empty())
-        }
-        _ => false,
-    }
+    structure_rule(
+        src.file.format_kind,
+        src.format,
+        src.counts.is_some_and(|c| !c.is_empty()),
+    )
+}
+
+/// Has the revision a structure file, by what the reference scan stored
+/// (`file_references.instances`)? Cheap – no file is parsed and no name is
+/// matched; the caller has checked that the actor may read the revision.
+/// Offers *Update the BOM from the CAD file* at check-in (web form, desktop
+/// `file-status`).
+pub async fn has_structure(pool: &PgPool, revision_id: Uuid) -> AppResult<bool> {
+    let rows = sqlx::query_as::<_, (String, bool)>(
+        "SELECT COALESCE(f.format, ''), COALESCE(bool_or(fr.instances >= 0), FALSE)
+         FROM files f
+         JOIN file_versions fv ON fv.file_id = f.id AND fv.version = f.current_version
+         JOIN file_references fr ON fr.file_version_id = fv.id
+         WHERE f.revision_id = $1
+         GROUP BY f.id, f.format",
+    )
+    .bind(revision_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.iter().any(|(format, counted)| {
+        structure_rule(
+            crate::cadformat::by_id(format).map(|f| f.kind),
+            format,
+            *counted,
+        )
+    }))
 }
 
 /// The children of the structure files: the first match of every referenced
@@ -212,6 +252,12 @@ pub(crate) fn collect(files: &[SourceFile<'_>]) -> Collected {
             if counted == Some(0) {
                 if !out.excluded.contains(&name.name) {
                     out.excluded.push(name.name.clone());
+                }
+                // still in the CAD file, only not in its BOM
+                for m in name.matches.iter().filter(|m| !m.same_revision) {
+                    if !out.excluded_items.contains(&m.item_id) {
+                        out.excluded_items.push(m.item_id);
+                    }
                 }
                 continue;
             }
@@ -282,17 +328,6 @@ struct FileRow {
     format: String,
 }
 
-/// Where the instance counts of a plan come from.
-enum Counts<'a> {
-    /// Read again from the stored files (the manual flow; it also covers
-    /// files whose references were scanned before the counts were stored).
-    Read(&'a AppState),
-    /// The counts the reference scan stored with the references
-    /// (`file_references.instances`): the check-in, which never parses a
-    /// file while it holds the revision lock.
-    Stored,
-}
-
 /// The stored instance counts of one file, by lower case name (`None`: the
 /// file told none).
 fn stored_counts(file: &FileWithReferences) -> Option<HashMap<String, u32>> {
@@ -352,23 +387,51 @@ async fn hidden_names(
 
 /// What the BOM of the revision would be, from the CAD references.
 ///
-/// Read-only; the actor must be able to read the revision.
+/// Read-only; the actor must be able to read the revision. The files are
+/// parsed for their instance counts with no pooled connection held: a plan
+/// of a large assembly never keeps a connection busy while it reads.
 pub async fn plan(st: &AppState, actor: &Actor, revision_id: Uuid) -> AppResult<Plan> {
     let rev = revisions::get(&st.db, actor, revision_id).await?;
+    access::ensure_visible(actor, rev.project_id, access::not_found_revision())?;
+    let (files, rows) = {
+        let mut conn = st.db.acquire().await?;
+        load_files(&mut conn, actor, revision_id).await?
+    };
+    let meta: HashMap<Uuid, &FileRow> = rows.iter().map(|r| (r.id, r)).collect();
+    let mut counts: HashMap<Uuid, HashMap<String, u32>> = HashMap::new();
+    for f in &files {
+        if let Some(row) = meta.get(&f.file_id) {
+            if let Some(c) = read_counts(st, &row.sha256, &row.format).await? {
+                counts.insert(f.file_id, c);
+            }
+        }
+    }
     let mut conn = st.db.acquire().await?;
-    plan_on(&mut conn, Counts::Read(st), actor, &rev).await
+    compare_on(&mut conn, actor, &rev, &files, &meta, &counts).await
 }
 
-/// The plan of `rev`, read on one connection: inside a transaction it sees
-/// the references and BOM lines that transaction wrote.
-async fn plan_on(
-    conn: &mut PgConnection,
-    counts_from: Counts<'_>,
-    actor: &Actor,
-    rev: &Revision,
-) -> AppResult<Plan> {
+/// The plan of `rev` with the stored instance counts, read on one
+/// connection: inside a transaction it sees the references and BOM lines
+/// that transaction wrote (the check-in, which never parses a file while it
+/// holds the revision lock).
+async fn plan_on(conn: &mut PgConnection, actor: &Actor, rev: &Revision) -> AppResult<Plan> {
     access::ensure_visible(actor, rev.project_id, access::not_found_revision())?;
-    let revision_id = rev.id;
+    let (files, rows) = load_files(conn, actor, rev.id).await?;
+    let meta: HashMap<Uuid, &FileRow> = rows.iter().map(|r| (r.id, r)).collect();
+    let counts: HashMap<Uuid, HashMap<String, u32>> = files
+        .iter()
+        .filter_map(|f| stored_counts(f).map(|c| (f.file_id, c)))
+        .collect();
+    compare_on(conn, actor, rev, &files, &meta, &counts).await
+}
+
+/// The files of the revision with their matched references, and their
+/// content hash and format.
+async fn load_files(
+    conn: &mut PgConnection,
+    actor: &Actor,
+    revision_id: Uuid,
+) -> AppResult<(Vec<FileWithReferences>, Vec<FileRow>)> {
     let files = references::files_of_revision_on(conn, actor, revision_id).await?;
     let ids: Vec<Uuid> = files.iter().map(|f| f.file_id).collect();
     let rows = sqlx::query_as::<_, FileRow>(
@@ -377,20 +440,20 @@ async fn plan_on(
     .bind(&ids)
     .fetch_all(&mut *conn)
     .await?;
-    let meta: HashMap<Uuid, &FileRow> = rows.iter().map(|r| (r.id, r)).collect();
-    let mut counts: HashMap<Uuid, HashMap<String, u32>> = HashMap::new();
-    for f in &files {
-        let found = match &counts_from {
-            Counts::Read(st) => match meta.get(&f.file_id) {
-                Some(row) => read_counts(st, &row.sha256, &row.format).await?,
-                None => None,
-            },
-            Counts::Stored => stored_counts(f),
-        };
-        if let Some(c) = found {
-            counts.insert(f.file_id, c);
-        }
-    }
+    Ok((files, rows))
+}
+
+/// The plan from the loaded files and their counts, compared with the BOM
+/// of `rev` on `conn`.
+async fn compare_on(
+    conn: &mut PgConnection,
+    actor: &Actor,
+    rev: &Revision,
+    files: &[FileWithReferences],
+    meta: &HashMap<Uuid, &FileRow>,
+    counts: &HashMap<Uuid, HashMap<String, u32>>,
+) -> AppResult<Plan> {
+    let revision_id = rev.id;
     let sources: Vec<SourceFile<'_>> = files
         .iter()
         .map(|f| SourceFile {
@@ -448,6 +511,7 @@ async fn plan_on(
         hidden: hidden_items.len() as i64,
         excluded: collected.excluded,
         structure,
+        excluded_items: collected.excluded_items,
     })
 }
 
@@ -744,8 +808,9 @@ async fn lines_not_in(
 ///   differing line is changed only when the CAD file counts it (*CAD
 ///   instances*, never an *assumed 1*); a circular child is refused; no line
 ///   is ever removed – lines whose child is no longer referenced are reported
-///   as `kept_not_in_cad`, referenced files TeamCraft does not have as
-///   `not_in_teamcraft`.
+///   as `kept_not_in_cad` (a child whose components are only excluded from
+///   the BOM in the CAD file is still referenced: kept, not reported),
+///   referenced files TeamCraft does not have as `not_in_teamcraft`.
 /// * **No structure:** a revision without a structure file (assembly, NX or
 ///   STEP assembly with counts) is left alone: `None`.
 /// * **Audit:** `bom.add` / `bom.update` per line and one
@@ -758,7 +823,7 @@ pub(crate) async fn apply_on_checkin(
     parent: &Revision,
 ) -> AppResult<Option<CheckinBom>> {
     revisions::ensure_editable(parent, actor)?;
-    let plan = plan_on(&mut *tx, Counts::Stored, actor, parent).await?;
+    let plan = plan_on(&mut *tx, actor, parent).await?;
     if !plan.structure {
         return Ok(None);
     }
@@ -771,7 +836,10 @@ pub(crate) async fn apply_on_checkin(
         c.quantity_source == QuantitySource::CadInstances
     })
     .await?;
-    let referenced: Vec<Uuid> = plan.children.iter().map(|c| c.item_id).collect();
+    // children still in the CAD file: counted ones and those only excluded
+    // from its BOM there (not "no longer in the CAD file")
+    let mut referenced: Vec<Uuid> = plan.children.iter().map(|c| c.item_id).collect();
+    referenced.extend(plan.excluded_items.iter().copied());
     let kept_not_in_cad = lines_not_in(&mut *tx, actor, parent.id, &referenced).await?;
     let result = CheckinBom {
         added: applied.added,
@@ -915,6 +983,56 @@ mod tests {
         );
         assert_eq!(c.children[1].source, QuantitySource::Assumed);
         assert_eq!(c.excluded, ["glue.sldprt"]);
+        // still in the assembly, only excluded from its BOM: never "no
+        // longer in the CAD file" at check-in
+        assert_eq!(c.excluded_items, [Uuid::from_u128(3)]);
+    }
+
+    #[test]
+    fn excluded_components_of_the_own_revision_are_no_items() {
+        let asm = file(
+            "A.iam",
+            FormatKind::Assembly,
+            vec![
+                ("own.ipt", vec![m(2, "ASM-1", "own.ipt", true)]),
+                ("ghost.ipt", vec![]),
+            ],
+        );
+        let counts: HashMap<String, u32> =
+            [("own.ipt".to_string(), 0), ("ghost.ipt".to_string(), 0)].into();
+        let c = collect(&[SourceFile {
+            file: &asm,
+            format: "inventor-assembly",
+            counts: Some(&counts),
+        }]);
+        assert_eq!(c.excluded, ["own.ipt", "ghost.ipt"]);
+        assert!(c.excluded_items.is_empty());
+        assert!(c.children.is_empty() && c.unmatched.is_empty());
+    }
+
+    #[test]
+    fn the_structure_rule_needs_counts_for_models_and_step() {
+        assert!(structure_rule(
+            Some(FormatKind::Assembly),
+            "inventor-assembly",
+            false
+        ));
+        assert!(!structure_rule(Some(FormatKind::Model), "nx-part", false));
+        assert!(structure_rule(Some(FormatKind::Model), "nx-part", true));
+        assert!(structure_rule(
+            Some(FormatKind::Model),
+            "solidcraft-design",
+            true
+        ));
+        assert!(!structure_rule(Some(FormatKind::Model), "creo-part", true));
+        assert!(!structure_rule(Some(FormatKind::Exchange), "step", false));
+        assert!(structure_rule(Some(FormatKind::Exchange), "step", true));
+        assert!(!structure_rule(
+            Some(FormatKind::Drawing),
+            "inventor-drawing",
+            true
+        ));
+        assert!(!structure_rule(None, "", true));
     }
 
     #[test]

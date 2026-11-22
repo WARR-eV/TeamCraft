@@ -132,8 +132,13 @@ check-outs and reviews, and a **local working folder**:
   own (#359);
 * **Update the BOM from the CAD file** (#407) – a box in *Check in…*,
   **ticked by default** every time (the choice is not remembered) and shown
-  when the revision has an assembly whose references are read (Inventor
-  `.iam`, SOLIDWORKS, an NX `.prt`, a STEP file, a SolidCraft `.sc`). The
+  when the revision has an assembly whose references are read: the server
+  knows a structure file of it (`bom_structure` of `file-status` – an
+  assembly, or an NX part, STEP file or SolidCraft design with counted
+  instances), the item is an assembly, or a file is an assembly (Inventor
+  `.iam`, SOLIDWORKS, Creo `.asm`) or a SolidCraft `.sc` / `.solidcraft`
+  design. A plain part check-in (an NX or Creo part, its STEP export) shows
+  no box. The
   server applies the plan of *Quantities from CAD…* to the version being
   checked in, in the same transaction: missing children are added, a
   quantity the CAD file counts (*CAD instances*) is corrected – an *assumed
