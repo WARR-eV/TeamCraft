@@ -68,6 +68,7 @@ kbd {
 .empty-hint .row { flex-wrap: wrap; gap: 6px; }
 .empty-hint .small { margin: 4px 0 0; }
 .navigator .viewer-note { margin: 0 8px 8px; padding: 6px 8px; border-left: 3px solid var(--accent); }
+.welcome .viewer-note { padding: 6px 8px; border-left: 3px solid var(--accent); }
 
 /* Item, change and revision numbers: the text face with tabular figures. */
 h1 .mono, .node .label .mono, table.grid td:first-child > .mono, .impact-group .mono, button.link.mono, .thread-meta .mono {

@@ -41,6 +41,9 @@ test("an empty group: Import CAD folder… and New item for those who may", () =
   assert.equal(viewer.lead, "empty.group_empty");
   assert.equal(viewer.text, "empty.group_empty.viewer");
   assert.deepEqual(viewer.actions, []);
+  const outsider = emptyGroupHint(false, true);
+  assert.equal(outsider.text, "empty.group_empty.not_member", "a CAD editor outside the group asks to be added");
+  assert.deepEqual(outsider.actions, [], "and gets no button the group refuses");
 });
 
 test("no new files in the working folder: Get… a group", () => {
@@ -68,7 +71,7 @@ test("every action has a label, unknown ones none", () => {
 test("every message the rules answer is in both catalogs", () => {
   const en = catalog("en"), de = catalog("de");
   const answered = new Set(EMPTY_MESSAGE_IDS);
-  const hints = [noGroupsHint(true), noGroupsHint(false), emptyGroupHint(true), emptyGroupHint(false), noNewFilesHint()]
+  const hints = [noGroupsHint(true), noGroupsHint(false), emptyGroupHint(true), emptyGroupHint(false), emptyGroupHint(false, true), noNewFilesHint()]
     .concat(["checkouts", "reviews", "changes"].flatMap((s) => [worklistHint(s, true), worklistHint(s, false)]));
   for (const h of hints) {
     for (const id of [h.lead, h.text, h.note].filter(Boolean)) assert.ok(answered.has(id), id + " is in EMPTY_MESSAGE_IDS");

@@ -57,7 +57,7 @@ export function emptyHint(hint, ctx) {
     create_group: function () { newProjectDialog(); },
     import_folder: function () { importFolderDialog(); },
     new_item: function () { newItemDialog(ctx.project ? { project: ctx.project } : undefined); },
-    get: function () { getProjectsDialog(); }
+    get: function () { getProjectsDialog(ctx.project ? { project: ctx.project } : undefined); }
   };
   var buttons = hint.actions.filter(function (a) { return run[a] && emptyActionLabel(a); }).map(function (a) {
     return h("button.small", { type: "button", on: { click: function (ev) { ev.stopPropagation(); run[a](); } } }, t(emptyActionLabel(a)));
@@ -360,7 +360,7 @@ export function loadProjectItems(p, ul, count, opts) {
     clear(ul);
     count.textContent = r.total > r.items.length ? r.items.length + " of " + r.total : String(r.total);
     if (!r.items.length) {
-      ul.appendChild(emptyHint(emptyGroupHint(canEditProject(p.id)), { project: p.code, tag: "li" }));
+      ul.appendChild(emptyHint(emptyGroupHint(canEditProject(p.id), canEdit()), { project: p.code, tag: "li" }));
       return;
     }
     var items = opts.sort ? sortItems(r.items, opts.sort) : r.items;
@@ -446,7 +446,9 @@ function newFilesSection(nav) {
   var head = h("div.row", null, [sectionTitle("New on this computer", list.length), list.length ? createBtn : null]);
   nav.appendChild(head);
   if (!list.length) {
-    nav.appendChild(emptyHint(noNewFilesHint()));
+    // Get… starts with the active group (#423)
+    var active = activeProject();
+    nav.appendChild(emptyHint(noNewFilesHint(), { project: active ? active.code : null }));
   } else {
     nav.appendChild(h("ul.tree", null, list.map(function (s) {
       var box = h("input", { type: "checkbox", "aria-label": "Tick " + s.name, checked: !!ticked[s.key],
@@ -758,7 +760,7 @@ function loadStructureRoots(p, ul, count) {
     var top = rootNodes(r);
     count.textContent = String(top.total);
     if (!top.nodes.length) {
-      ul.appendChild(emptyHint(emptyGroupHint(canEditProject(p.id)), { project: p.code, tag: "li" }));
+      ul.appendChild(emptyHint(emptyGroupHint(canEditProject(p.id), canEdit()), { project: p.code, tag: "li" }));
       return;
     }
     top.nodes.forEach(function (n) { ul.appendChild(structureNode(n, "grp:" + p.code)); });

@@ -453,7 +453,7 @@ mod tests {
         let empty_group = || {
             with_common(json!({
                 "folders": [{ "id": ROCKET, "code": "ROCKET", "name": "Sounding rocket", "items": 0, "locked": 0 }],
-                "folder": ROCKET, "entries": [], "limit": 500, "q": "", "selected": null,
+                "folder": ROCKET, "can_create": true, "entries": [], "limit": 500, "q": "", "selected": null,
                 "back": "%2Fvault", "max_upload_mb": 512 }))
         };
         let html = render(env, "explorer.html", empty_group());
@@ -461,7 +461,20 @@ mod tests {
         assert!(html.contains(&en("empty.group_empty.editor_web")));
         assert!(html.contains(&format!("href=\"/items/new?project={ROCKET}\"")));
         assert!(html.contains("href=\"/import\"") && html.contains(&en("empty.action.import_bom")));
-        let html = render(env, "explorer.html", as_viewer(empty_group()));
+        // a CAD editor who is not a member of the group (unrestricted groups
+        // are listed for everyone) cannot create items there: no buttons,
+        // ask a manager to be added
+        let mut outsider = empty_group();
+        outsider["can_create"] = json!(false);
+        outsider["me"]["role"] = json!("editor");
+        outsider["me"]["is_admin"] = json!(false);
+        let html = render(env, "explorer.html", outsider);
+        assert!(html.contains(&en("empty.group_empty.not_member")));
+        assert!(!html.contains(&en("empty.group_empty.editor_web")));
+        assert!(!html.contains("/items/new?project=") && !html.contains("href=\"/import\""));
+        let mut viewer_group = as_viewer(empty_group());
+        viewer_group["can_create"] = json!(false);
+        let html = render(env, "explorer.html", viewer_group);
         assert!(
             html.contains(&en("empty.group_empty"))
                 && html.contains(&en("empty.group_empty.viewer"))

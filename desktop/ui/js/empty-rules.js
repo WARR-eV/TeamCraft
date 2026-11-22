@@ -25,11 +25,11 @@ export function noGroupsHint(editor) {
 }
 
 /** A project group without items. `editor` = the user may create items in
- *  it (CAD editor and member, or administrator). */
-export function emptyGroupHint(editor) {
-  return editor
-    ? emptyHintOf("empty.group_empty.editor", ["import_folder", "new_item"], null, "empty.group_empty")
-    : emptyHintOf("empty.group_empty.viewer", [], null, "empty.group_empty");
+ *  it (CAD editor and member, or administrator); `editorRole` = the user is
+ *  a CAD editor, but not a member of this group: ask a manager to be added. */
+export function emptyGroupHint(editor, editorRole) {
+  if (editor) return emptyHintOf("empty.group_empty.editor", ["import_folder", "new_item"], null, "empty.group_empty");
+  return emptyHintOf(editorRole ? "empty.group_empty.not_member" : "empty.group_empty.viewer", [], null, "empty.group_empty");
 }
 
 /** The worklist section *New on this computer* without suggestions: the
@@ -63,7 +63,7 @@ export function emptyActionLabel(action) {
 /** Every message ID these rules can answer (the test checks the catalogs). */
 export var EMPTY_MESSAGE_IDS = [
   "empty.no_groups.editor", "empty.no_groups.viewer", "empty.viewer_note",
-  "empty.group_empty", "empty.group_empty.editor", "empty.group_empty.viewer",
+  "empty.group_empty", "empty.group_empty.editor", "empty.group_empty.viewer", "empty.group_empty.not_member",
   "empty.no_new_files", "empty.no_new_files.get",
   "empty.no_checkouts", "empty.no_checkouts.viewer", "empty.nothing_to_review",
   "empty.no_open_changes", "empty.no_open_changes.viewer",

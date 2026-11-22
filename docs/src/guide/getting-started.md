@@ -64,7 +64,9 @@ installations and the desktop app:
 **Empty pages name the next step** (#423): with no project group yet, the
 vault and *Projects* offer *Create a project group* to CAD editors and tell
 viewers to ask a manager of a group to add them; an empty project group in
-the vault offers *New item* and *Import BOM*; the dashboard's empty cards
+the vault offers *New item* and *Import BOM* to those who may create items
+in it (its CAD editor members and administrators) and asks other CAD editors
+to have a manager of the group add them; the dashboard's empty cards
 (*Waiting for my review*, *Checked out by me*, *My open changes*) say how work
 arrives there. A **viewer account** sees a note on the dashboard that editing
 needs the CAD editor role and that an administrator of the server grants it –

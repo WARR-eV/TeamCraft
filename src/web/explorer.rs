@@ -51,6 +51,10 @@ pub async fn show(
             Uuid::parse_str(id).map_err(|_| AppError::BadRequest("Unknown folder.".into()))?,
         ),
     };
+    // an empty project group offers New item / Import BOM only to who may
+    // create items in it: a CAD editor who is a member, or an administrator
+    // (#423) – not to every CAD editor who can see the group
+    let can_create = matches!(listing, Listing::Project(id) if ctx.me.can_edit_project(Some(id)));
     let (folders, entries) = tokio::try_join!(
         explorer::folders(&st.db, &ctx.me),
         explorer::list(&st.db, &ctx.me, listing, &q)
@@ -109,6 +113,7 @@ pub async fn show(
         json!({
             "folders": folders,
             "folder": folder,
+            "can_create": can_create,
             "entries": entries,
             "limit": explorer::LIMIT,
             "q": q,

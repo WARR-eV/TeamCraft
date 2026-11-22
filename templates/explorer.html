@@ -60,8 +60,8 @@
     {#- empty states name the next step (#423) -#}
     {% set in_group = folder not in ["mine", "favorites", "locked", "none", "search"] %}
     {% if in_group and not q %}
-    <p class="empty">{{ t("empty.group_empty") }} {% if me.can_edit %}{{ t("empty.group_empty.editor_web") }}{% else %}{{ t("empty.group_empty.viewer") }}{% endif %}</p>
-    {% if me.can_edit %}
+    <p class="empty">{{ t("empty.group_empty") }} {% if can_create %}{{ t("empty.group_empty.editor_web") }}{% elif me.can_edit %}{{ t("empty.group_empty.not_member") }}{% else %}{{ t("empty.group_empty.viewer") }}{% endif %}</p>
+    {% if can_create %}
     <div class="actions empty-actions">
       <a class="button" href="/items/new?project={{ folder }}">{{ t("empty.action.new_item") }}</a>
       <a class="button ghost" href="/import">{{ t("empty.action.import_bom") }}</a>

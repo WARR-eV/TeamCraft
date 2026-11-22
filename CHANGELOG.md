@@ -28,10 +28,14 @@ see the notices in the README.
   group → *Create a project group* for CAD editors, "ask a manager of a group
   to add you" for viewers (vault, *Projects*, desktop *Home* and *Projects*);
   an empty project group → *New item* / *Import BOM* in the vault and
-  *Import CAD folder…* / *New item* on desktop *Home*; *New on this computer*
-  without suggestions → *Get…*; the empty review, check-out and change lists
-  of the dashboard and the desktop worklist say how work arrives there.
-  Viewer accounts see a note on the dashboard and atop the desktop worklist
+  *Import CAD folder…* / *New item* on desktop *Home* for those who may create
+  items in it (CAD editors outside the group are asked to have a manager add
+  them); *New on this computer* without suggestions → *Get…* with the active
+  group ticked; the empty review, check-out and change lists of the dashboard,
+  the desktop *Home* tab and the desktop worklist say how work arrives there;
+  an empty working folder of a revision names the next step by check-out.
+  Viewer accounts see a note on the dashboard, the desktop *Home* tab and atop
+  the desktop worklist
   that editing needs the CAD editor role and that a server administrator
   grants it. The texts are in the i18n catalogs (`empty.*`, English and
   German); the desktop app loads its catalog before the first view draws.

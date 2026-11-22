@@ -67,7 +67,7 @@ export function renderFiles(p, ul, opts) {
     drawBar(p, opts, level);
     // an empty group names the next step by role (#423)
     drawLevel(p, root, ul, level, opts, root ? "The favourite folder has no files." : function () {
-      return emptyHint(emptyGroupHint(canEditProject(p.id)), { project: p.code, tag: "li" });
+      return emptyHint(emptyGroupHint(canEditProject(p.id), canEdit()), { project: p.code, tag: "li" });
     });
   }, function (err) {
     if (err && err.status === 404 && opts.olderServer) {
