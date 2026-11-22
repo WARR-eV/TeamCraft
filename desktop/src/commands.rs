@@ -20,7 +20,7 @@ use tokio::sync::Notify;
 use crate::{
     acp, addfiles,
     api::{self, Api, ApiError, Transfer},
-    bomimport, cadexport, cadlaunch, folderimport, layout, localserver, profiles,
+    bomimport, cadexport, cadlaunch, folderimport, layout, localserver, profiles, scprops,
     settings::{self, Settings, TokenStorage},
     signin, update, workspace, AppState,
 };
@@ -1502,7 +1502,10 @@ pub async fn pick_bom_file(app: AppHandle) -> CmdResult<Option<PathBuf>> {
         app.dialog()
             .file()
             .set_title("BOM to import")
-            .add_filter("BOM tables and STEP assemblies", bomimport::EXTENSIONS)
+            .add_filter(
+                "BOM tables, STEP assemblies and SolidCraft designs",
+                bomimport::EXTENSIONS,
+            )
             .blocking_pick_file()
             .and_then(|p| p.into_path().ok())
     })
@@ -1601,6 +1604,45 @@ pub async fn cad_export_step(
         .and_then(|n| n.to_str())
         .unwrap_or_default()
         .to_string())
+}
+
+/// Writes the item number, revision and name (and TeamCraft's ids) into the
+/// properties of a SolidCraft design of my check-out, with SolidCraft's
+/// command-line tool (#369). Refused for a design that is read-only or open
+/// in SolidCraft.
+#[tauri::command]
+pub async fn solidcraft_write_item_data(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    project: Option<String>,
+    item: String,
+    code: String,
+    file: String,
+    data: scprops::ItemData,
+) -> CmdResult<()> {
+    if file.contains(['/', '\\']) || file == ".." || file.is_empty() {
+        return Err(ApiError::local(format!("'{file}' is not a file name.")));
+    }
+    let api = signed_in_api(&state)?;
+    let (_, found) = workspace::locate(
+        &api,
+        &workspace_root(&app, &state),
+        project.as_deref(),
+        &item,
+        &code,
+        &file,
+    )
+    .await?;
+    let Some(design) = found.filter(|p| p.is_file()) else {
+        return Err(ApiError::local(format!(
+            "{file} is not in the working folder – check out or use “Get files” first."
+        )));
+    };
+    let server = api.base.clone();
+    tokio::task::spawn_blocking(move || scprops::write(&design, &data, &server))
+        .await
+        .map_err(|e| ApiError::local(format!("SolidCraft stopped: {e}")))?
+        .map_err(ApiError::local)
 }
 
 /// The CAD programs found on this computer (for *Check out and open*).

@@ -13,6 +13,51 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Added
+
+- **SolidCraft designs show their picture** (#364). The preview image of a
+  `.sc` design is the PNG SolidCraft embeds when saving with its model, read
+  from the ZIP container with size and CRC checks and shown only when its key
+  names the SHA-256 of this document and of the picture; unknown versions or
+  damaged archives simply show none (`src/scdesign.rs`).
+- **SolidCraft assemblies reference their linked designs** (#365). The
+  designs an assembly links (*Insert Design*) are its file references, with
+  the number of placements as instance count, so where-used, *Create BOM
+  from CAD references* and the desktop's dependent files work for SolidCraft;
+  read from the ZIP or JSON document, unknown fields ignored. New fuzz target
+  `scdesign`. Run `teamcraft rescan-references --format solidcraft-design`
+  once for designs stored before.
+- **Desktop: designs open in SolidCraft** (#370). The Workspace tab marks a
+  SolidCraft design that SolidCraft has open (its `.~<file>.lock`, stale
+  locks ignored) with the computer and user, and the check-in dialog warns
+  that unsaved changes there are not checked in.
+- **Desktop: STEP export of SolidCraft designs** (#368). *STEP* in the
+  Workspace tab and *Create STEP exports … first* at check-in export `.sc`
+  designs through SolidCraft's `solidcraft-cli` on Windows, macOS and Linux
+  (`SOLIDCRAFT_CLI`, `PATH` or the default install folders). A failed export
+  – any program – no longer stops the check-in: the file is checked in
+  without its STEP and the result says why.
+- **Desktop: item data into SolidCraft designs** (#369). *Item data* in the
+  Workspace tab writes the item number, revision and name into a checked-out
+  SolidCraft design's properties (and TeamCraft's ids and server under
+  `teamcraft.pdm`) through `solidcraft-cli`; refused while the design is
+  read-only or open in SolidCraft.
+- **TeamCraft plugin for SolidCraft** (`plugins/solidcraft`). A WebAssembly
+  component for SolidCraft's plugin runtime: *TeamCraft status*, *Check for
+  TeamCraft* (part numbers, BOM rows, linked designs), *Link to TeamCraft
+  item* and *Unlink*; works offline on the open design. Built and tested by
+  the new workflow *SolidCraft plugin*.
+- **SolidCraft BOM CSV import** (part of #366). *Import BOM* recognises the
+  CSV SolidCraft's bill of materials writes: `definition` is the name, and
+  its counts – counted in all – become quantities per parent row (a count
+  that does not divide evenly is kept and reported); `revision` and the
+  amount column `quantity` are extra columns.
+- **BOM import from a SolidCraft design** (#366). *Import BOM* (web and
+  desktop) also takes a `.sc` assembly: its components and placements become
+  the lines – part properties, placement counts, purchased/standard parts not
+  expanded, phantoms passed through, reference components left out
+  (`src/scbom.rs`, fuzzed by the `scdesign` target).
+
 ## [0.2.11] - 2026-11-21
 
 ### Added

@@ -77,6 +77,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "scdesign"
+path = "fuzz_targets/scdesign.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "textindex"
 path = "fuzz_targets/textindex.rs"
 test = false

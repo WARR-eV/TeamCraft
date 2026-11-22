@@ -1,0 +1,28 @@
+# The TeamCraft plugin for SolidCraft – a WebAssembly component, built on its
+# own (never part of the server or desktop build). See README.md.
+[package]
+name = "teamcraft-solidcraft-plugin"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+description = "TeamCraft plugin for SolidCraft: TeamCraft item status, check before check-in, link a design to an item"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde_json = "1"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wit-bindgen = "0.41"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+# Not a member of another workspace.
+[workspace]

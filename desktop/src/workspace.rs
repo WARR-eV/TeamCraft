@@ -709,6 +709,8 @@ pub struct LocalFile {
     pub read_only: bool,
     /// The file at this place belongs to another item.
     pub clash_with: Option<String>,
+    /// A CAD program has the file open now (its lock file, `cadlock`).
+    pub open_in: Option<crate::cadlock::OpenIn>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -826,6 +828,7 @@ pub fn inaccessible_status(root: &Path, project: Option<&str>, item: &str, code:
                 base_version: Some(e.version),
                 read_only: is_read_only(&path),
                 clash_with: None,
+                open_in: None,
             }
         })
         .collect();
@@ -979,6 +982,7 @@ pub async fn status(
             name: f.name,
             local_name,
             path: f.rel,
+            open_in: f.path.as_deref().and_then(crate::cadlock::open_in),
             state: state_name.to_string(),
             clash_with: f.clash_with,
         });

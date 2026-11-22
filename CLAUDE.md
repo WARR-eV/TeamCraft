@@ -162,6 +162,9 @@ src/nxpart.rs      NX part stream container (SPLMSSTR): directory, reference str
 src/nxasm.rs       NX assemblies: components + placements from /Root/FastLoad/Structure (OM objects, hash map instance→record);
                    services/assemblies.rs composes the assembly preview from the parts' previews (found by file name)
 src/fusion.rs      Fusion design archives (.f3d): ZIP with Zstandard entries (ruzstd), size/CRC-checked; sample archives for tests
+src/scdesign.rs    SolidCraft designs (.sc): ZIP design container (bounded, size/CRC-checked, unknown versions = nothing found), embedded thumbnail,
+                   document of ZIP or JSON designs, linked designs with placement counts (cadrefs)
+src/scbom.rs       BOM of a SolidCraft assembly from its design (components, placements, BOM types) → BomTable for the BOM import
 src/swpart.rs      SOLIDWORKS 2015+ section container: Deflate sections (bounded, CRC-checked), PreviewPNG, component tree (COMPINSTANCETREE):
                    referenced files and placements (assembly previews, also via services/assemblies.rs)
 src/invpart.rs     Inventor files: OLE storage RSeStorage, zlib or Zstandard segments (meta stream: section lengths + class UUID table),
@@ -208,6 +211,9 @@ desktop/           TeamCraft Desktop (Tauri 2, own Cargo project – never part 
                    new-files.js + desktop/src/newfiles.rs = new items from local files, worklist *New on this computer* (#359);
                    desktop/src/localserver.rs = *Try TeamCraft on this computer* (starts the bundled teamcraft-server local);
                    tauri.local-server.conf.json = the *with local server* installers (externalBin teamcraft-server + postgresql/)
+plugins/solidcraft TeamCraft plugin for SolidCraft: WebAssembly component (craft:plugin@0.2.0, wit/plugin.wit = SolidCraft's
+                   interface, MIT), own Cargo project; src/logic.rs = status, check, link, unlink over SolidCraft's commands
+                   (fake host in tests); build.sh → target/package/teamcraft; workflow solidcraft-plugin.yml
 ```
 
 ## Conventions
