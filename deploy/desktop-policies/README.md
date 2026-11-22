@@ -7,7 +7,7 @@ full description is in the admin guide, *Deploying the desktop app*
 
 | Folder     | Use                                                                                     |
 |------------|-----------------------------------------------------------------------------------------|
-| `windows/` | `TeamCraft.admx` + `en-US/TeamCraft.adml` (English) and `de-DE/TeamCraft.adml` (German) for Group Policy and Intune (custom ADMX import); values under `Software\Policies\TeamCraft` in `HKLM` (wins) or `HKCU` |
+| `windows/` | `TeamCraft.admx` + `en-US/TeamCraft.adml` (English) and `de-DE/TeamCraft.adml` (German) for Group Policy and Intune (custom ADMX import with the ADMX and the en-US ADML); values under `Software\Policies\TeamCraft` in `HKLM` (wins) or `HKCU` |
 | `macos/`   | an example configuration profile for the preference domain `io.github.rudalabs.teamcraft` |
 | `linux/`   | an example of `/etc/teamcraft/policies.json`                                            |
 

@@ -22,7 +22,7 @@
       <string id="ReportUrl">Probleme melden an</string>
       <string id="ReportUrl_Explain">Die Adresse des Meldeformulars Ihres Helpdesks (https://…). *Problem melden* in der Desktop-App öffnet es mit dem geprüften Bericht in den Parametern title und body, statt des TeamCraft-Meldeformulars auf GitHub. Benutzer können sie nicht ändern.</string>
       <string id="OrganizationName">Name der Organisation</string>
-      <string id="OrganizationName_Explain">Wird als „Verwaltet von …“ in den Einstellungen und unter Über angezeigt (eine Zeile, höchstens 64 Zeichen).</string>
+      <string id="OrganizationName_Explain">Wird in den Einstellungen und im Dialog „About TeamCraft“ als „Managed by …“ angezeigt (die Desktop-App zeigt diesen Text bisher nur auf Englisch; eine Zeile, höchstens 64 Zeichen).</string>
     </stringTable>
     <presentationTable>
       <presentation id="ServerUrl"><textBox refId="ServerUrl"><label>Serveradresse:</label></textBox></presentation>

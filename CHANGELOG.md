@@ -181,7 +181,8 @@ see the notices in the README.
   `teamcraft-desktop-policies-<version>.zip`.
 - **German Group Policy texts** (#378): `deploy/desktop-policies/windows/de-DE/TeamCraft.adml`
   shows the TeamCraft Desktop policies in German in the Group Policy editor
-  (same string and presentation IDs as `en-US`); it ships in the policy zip.
+  (same string and presentation IDs as `en-US`, checked by
+  `tests/architecture_guards.rs`); it ships in the policy zip.
 
 ### Fixed
 
