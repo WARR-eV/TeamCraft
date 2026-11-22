@@ -1922,6 +1922,7 @@ mod tests {
         assert_eq!(info("step").unwrap().preview, Some("step"));
         assert_eq!(info("3mf").unwrap().preview, Some("3mf"));
         assert_eq!(info("las").unwrap().preview, Some("las"));
+        assert_eq!(info("e57").unwrap().preview, Some("e57"));
         assert_eq!(
             info("brep").unwrap().preview,
             None,

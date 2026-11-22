@@ -131,3 +131,10 @@ path = "fuzz_targets/solversummary.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "e57"
+path = "fuzz_targets/e57.rs"
+test = false
+doc = false
+bench = false

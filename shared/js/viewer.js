@@ -137,11 +137,17 @@
           at += vertices * 4;
         }
       }
+      // flag 8: a thinned point cloud, the points in the file (u64) after the fields
+      var thinned = null;
+      if (flags & 8) {
+        at = Math.ceil(at / 4) * 4;
+        if (at + 8 <= buffer.byteLength) thinned = dv.getUint32(at, true) + dv.getUint32(at + 4, true) * 4294967296;
+      }
       // flag 4: partial preview, face counts in the last 8 bytes (after the fields)
       var faces = flags & 4 && buffer.byteLength >= 56
         ? { shown: dv.getUint32(buffer.byteLength - 8, true), total: dv.getUint32(buffer.byteLength - 4, true) }
         : null;
-      return { positions: positions, indices: index, colors: colors, parts: parts, bounds: bounds, fields: fields, faces: faces };
+      return { positions: positions, indices: index, colors: colors, parts: parts, bounds: bounds, fields: fields, faces: faces, thinned: thinned };
     }
 
     // ---------------------------------------------------------------- colour map
@@ -666,7 +672,10 @@
       var partial = mesh.faces
         ? " · partial preview: " + mesh.faces.shown.toLocaleString() + " of " + mesh.faces.total.toLocaleString() + " faces"
         : "";
-      setStatus(what + " · " + fmt(size[0]) + " × " + fmt(size[1]) + " × " + fmt(size[2]) + " (X × Y × Z, model units)" + partial);
+      var thin = mesh.thinned
+        ? " · thinned for the preview from " + mesh.thinned.toLocaleString() + " points"
+        : "";
+      setStatus(what + " · " + fmt(size[0]) + " × " + fmt(size[1]) + " × " + fmt(size[2]) + " (X × Y × Z, model units)" + partial + thin);
     }
 
     function render() {

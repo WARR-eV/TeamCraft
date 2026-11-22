@@ -27,6 +27,7 @@ fn fixture_types(target: &str) -> Option<&'static [&'static str]> {
         // The STEP tessellation is slow in a debug build: only small files.
         "mesh_step" => &["stp"],
         "mesh" => &["3dm"],
+        "e57" => &["e57"],
         _ => return None,
     })
 }

@@ -29,6 +29,9 @@ pub struct Mesh {
     /// A partial preview: (faces shown, faces in the file) – STEP files
     /// whose B-rep the kernel could tessellate only in part.
     pub faces: Option<(u32, u32)>,
+    /// A point cloud thinned out for the preview: the number of points in
+    /// the file (the preview shows `vertex_count()` of them, evenly spread).
+    pub thinned: Option<u64>,
 }
 
 /// Fields a mesh carries at most (the viewer offers them in a selector).
@@ -244,20 +247,22 @@ impl Mesh {
     /// ```text
     /// 0   "TCMESH01"
     /// 8   u32 vertices   12  u32 indices   16  u32 parts
-    /// 20  u32 flags (1 = colours, 2 = fields, 4 = partial preview)
+    /// 20  u32 flags (1 = colours, 2 = fields, 4 = partial preview, 8 = thinned point cloud)
     /// 24  f32 × 6 bounding box
     /// 48  f32 × 3·vertices, u32 × indices, u8 × 3·vertices (colours, padded to 4 bytes)
     ///     only with flag 2, after that:
     ///     u32 field count, then per field
     ///     u32 n, n bytes name (UTF-8), u32 m, m bytes unit, padding to 4 bytes,
     ///     f32 min, f32 max, f32 × vertices (NaN = no value)
+    /// with flag 8, after that: u64 points in the file (the cloud was thinned)
     /// with flag 4, the last 8 bytes of the file: u32 faces shown, u32 faces in the file
     /// ```
     ///
     /// Viewers that do not know flag 2 ignore the field section; meshes
     /// with fields also carry the first field as colours for them. The face
     /// count sits at the very end, so viewers that do not know flag 4 – and
-    /// the field section in between – are not affected.
+    /// the field section in between – are not affected. The point count of
+    /// flag 8 sits between the two, so neither older reader sees it.
     pub fn encode(&self) -> Vec<u8> {
         let field_bytes: usize = self
             .fields
@@ -269,12 +274,13 @@ impl Mesh {
                 + self.indices.len() * 4
                 + self.colors.len()
                 + field_bytes
-                + 4,
+                + 20,
         );
         out.extend_from_slice(MAGIC);
         let flags = u32::from(!self.colors.is_empty())
             | (u32::from(!self.fields.is_empty()) << 1)
-            | (u32::from(self.faces.is_some()) << 2);
+            | (u32::from(self.faces.is_some()) << 2)
+            | (u32::from(self.thinned.is_some()) << 3);
         for v in [
             self.vertex_count() as u32,
             self.indices.len() as u32,
@@ -313,6 +319,9 @@ impl Mesh {
                     out.extend_from_slice(&v.to_le_bytes());
                 }
             }
+        }
+        if let Some(total) = self.thinned {
+            out.extend_from_slice(&total.to_le_bytes());
         }
         // last, so that viewers that do not know flag 4 are not affected
         if let Some((shown, total)) = self.faces {
@@ -397,6 +406,14 @@ impl Mesh {
             }
             end = at;
         }
+        // flag 8: the point count of a thinned cloud, after the fields
+        let thinned = if flags & 8 == 8 {
+            let total = u64_le(data, end).context("truncated mesh")?;
+            end += 8;
+            Some(total)
+        } else {
+            None
+        };
         // flag 4: the face count in the last 8 bytes, after everything else
         let faces = if flags & 4 == 4 {
             if data.len() < end + 8 {
@@ -414,6 +431,7 @@ impl Mesh {
             parts: parts as u32,
             fields,
             faces,
+            thinned,
         })
     }
 }
@@ -548,6 +566,41 @@ mod tests {
         short[20] |= 4;
         short.extend_from_slice(&[0; 4]);
         assert!(Mesh::decode(&short).is_err());
+    }
+
+    #[test]
+    fn thinned_clouds_carry_their_point_count() {
+        let mut cloud = Mesh {
+            positions: vec![0.0, 0.0, 0.0, 1.0, 2.0, 3.0],
+            colors: vec![1, 2, 3, 4, 5, 6],
+            parts: 1,
+            ..Mesh::default()
+        };
+        let plain = cloud.encode();
+        cloud.thinned = Some(5_000_000_000);
+        let thinned = cloud.encode();
+        assert_eq!(flags(&thinned), 1 | 8);
+        assert_eq!(thinned.len(), plain.len() + 8);
+        assert_eq!(thinned.len() % 4, 0);
+        assert_eq!(Mesh::decode(&thinned).unwrap(), cloud);
+        assert!(Mesh::decode(&thinned[..thinned.len() - 4]).is_err());
+
+        // with fields and a face count: fields, then the point count, then
+        // the face count in the last 8 bytes
+        cloud.fields = vec![Field {
+            name: "Intensity".into(),
+            unit: String::new(),
+            values: vec![0.0, 1.0],
+        }];
+        cloud.faces = Some((1, 2));
+        let all = cloud.encode();
+        assert_eq!(flags(&all), 1 | 2 | 4 | 8);
+        assert_eq!(all[all.len() - 8..all.len() - 4], 1u32.to_le_bytes());
+        assert_eq!(
+            all[all.len() - 16..all.len() - 8],
+            5_000_000_000u64.to_le_bytes()
+        );
+        assert_eq!(Mesh::decode(&all).unwrap(), cloud);
     }
 
     #[test]

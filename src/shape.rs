@@ -695,6 +695,7 @@ mod tests {
             parts: 1,
             fields: Vec::new(),
             faces: None,
+            thinned: None,
         }
     }
 
@@ -719,6 +720,7 @@ mod tests {
             parts: 1,
             fields: Vec::new(),
             faces: None,
+            thinned: None,
         }
     }
 

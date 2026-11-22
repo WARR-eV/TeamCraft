@@ -15,6 +15,31 @@ see the notices in the README.
 
 ### Added
 
+- **3D preview of E57 point clouds** (#373). Laser-scanner exports (`.e57`,
+  ASTM E2807) open in the viewer like LAS: every scan is placed by its pose
+  (rotation and translation), so multi-station scans line up; cartesian or
+  spherical coordinates, float or scaled-integer values, colours scaled by
+  `colorLimits`, otherwise the intensity as a colour-mapped field; points
+  marked invalid, embedded images and unknown fields are left out; metres
+  become millimetres. The CRC-32C of every 1 KiB page is checked first, so a
+  damaged file is refused with a message instead of shown wrong. Own bounded
+  reader in the isolated preview process (`src/mesh/e57.rs`, no new crate),
+  fuzz target `e57`; research page *3D preview of E57 point clouds*.
+- **Thinned point clouds say so.** A cloud with more points than the preview
+  shows (3 million) is thinned evenly, and the line below the viewer now says
+  *thinned for the preview from N points* – E57, LAS, PTS/XYZ and point-only
+  OFF files (flag 8 of the `TCMESH01` mesh). Previews cached before keep
+  their old line until the cache is rebuilt.
+- **E57 and large scans:** E57 shares `TEAMCRAFT_PREVIEW_MAX_MESH_MB`
+  (256 MB); the admin guide now says to raise it, and the preview memory limit
+  to about the file size plus 100 MB, to preview larger scans.
+
+### Fixed
+
+- PTS/XYZ files whose point count was underestimated from their first lines
+  failed with *point cloud not thinned out*; the reader now drops every second
+  kept point and doubles its stride when it reaches the budget, so the kept
+  points stay evenly spread over the whole file.
 - **Desktop: one *Local changes* list for the whole working folder** (#416):
   a worklist section next to *New on this computer* lists every file of the
   working folder that is modified, outdated, in conflict, new (a companion

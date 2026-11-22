@@ -32,6 +32,7 @@ pub const MESH_FORMATS: &[&str] = &[
     "rhino",
     "pts",
     "las",
+    "e57",
     "jt",
     "vtk-legacy",
     "vtk-unstructured",
@@ -156,6 +157,24 @@ pub fn mesh(data: &[u8]) {
     let _ = crate::catprod::document(data);
 }
 
+/// E57 point clouds: the bytes as they are (almost always refused by the
+/// page checksums), then cut to whole pages with the file length in the
+/// header set and every page checksum recomputed, so the fuzzer reaches the
+/// XML, the packets and the bit-packed streams behind the checksums.
+pub fn e57(data: &[u8]) {
+    let _ = crate::mesh::read("e57", data);
+    let pages = data.len() / 1024 * 1024;
+    if pages == 0 {
+        return;
+    }
+    let mut sealed = data.get(..pages).unwrap_or_default().to_vec();
+    if let Some(length) = sealed.get_mut(16..24) {
+        length.copy_from_slice(&(pages as u64).to_le_bytes());
+    }
+    crate::mesh::seal_e57_pages(&mut sealed);
+    let _ = crate::mesh::read("e57", &sealed);
+}
+
 /// File names whose format `cadformat::detect` decides by content (the
 /// solver files of Fluent, STAR-CCM+ and Simcenter 3D among them).
 const DETECT_NAMES: &[&str] = &[
@@ -278,6 +297,7 @@ pub const TARGETS: &[Target] = &[
     ("htmltext", htmltext),
     ("mesh", mesh),
     ("mesh_step", mesh_step),
+    ("e57", e57),
     ("cadformat", cadformat),
     ("resultscan", resultscan),
     ("solversummary", solversummary),

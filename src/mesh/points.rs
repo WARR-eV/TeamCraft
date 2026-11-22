@@ -7,16 +7,28 @@ use super::*;
 /// `x y z [intensity] [r g b]` per line (spaces, commas or semicolons); lines
 /// that are not numbers (headers, the point count of .pts files) are skipped.
 pub(super) fn read_text(data: &[u8]) -> Result<Mesh> {
+    read_text_within(data, MAX_POINTS)
+}
+
+/// [`read_text`] with a point budget (tests use a small one).
+///
+/// The stride starts from an estimate of the row count (the first lines);
+/// when the kept points reach the budget, every second one is dropped and the
+/// stride doubles, so the kept rows stay evenly spread over the whole file
+/// even when the estimate was too low.
+fn read_text_within(data: &[u8], budget: usize) -> Result<Mesh> {
+    let budget = budget.max(1);
     let text = text(data);
-    // estimate the number of points from the first lines to thin out evenly
     let sample: Vec<usize> = text.lines().take(1000).map(|l| l.len() + 1).collect();
     let average = (sample.iter().sum::<usize>() / sample.len().max(1)).max(8);
-    let stride = stride_for(data.len() / average);
+    let mut stride = stride_within(data.len() / average, budget);
     let mut mesh = Mesh {
         parts: 1,
         ..Mesh::default()
     };
-    let mut colors = Vec::new();
+    let mut colors: Vec<u8> = Vec::new();
+    // colours are kept only while every kept row has one
+    let mut colored = true;
     let mut row = 0usize;
     for line in text.lines() {
         let values: Vec<f64> = line
@@ -31,22 +43,50 @@ pub(super) fn read_text(data: &[u8]) -> Result<Mesh> {
         if (row - 1) % stride != 0 {
             continue;
         }
-        mesh.vertex([*x, *y, *z]);
-        // the last three values are the colour (an intensity may come first)
-        if let [.., r, g, b] = rest {
-            let rgb = [*r, *g, *b];
-            if rgb.iter().all(|c| (0.0..=255.0).contains(c)) {
-                colors.extend(rgb.iter().map(|c| *c as u8));
+        if mesh.vertex_count() >= budget {
+            // kept rows are 0, s, 2s, …: keep 0, 2s, 4s, … and double s
+            halve(&mut mesh.positions);
+            if colored {
+                halve(&mut colors);
+            }
+            stride = stride.saturating_mul(2);
+            if (row - 1) % stride != 0 {
+                continue;
             }
         }
-        if mesh.vertex_count() > MAX_POINTS {
-            break;
+        mesh.vertex([*x, *y, *z]);
+        // the last three values are the colour (an intensity may come first)
+        if colored {
+            match rest {
+                [.., r, g, b] if [r, g, b].iter().all(|c| (0.0..=255.0).contains(*c)) => {
+                    colors.extend([*r as u8, *g as u8, *b as u8]);
+                }
+                _ => {
+                    colored = false;
+                    colors = Vec::new();
+                }
+            }
         }
     }
-    if colors.len() == mesh.positions.len() {
+    if colored && colors.len() == mesh.positions.len() {
         mesh.colors = colors;
     }
+    // every row was counted, also those dropped for the budget
+    if mesh.vertex_count() < row {
+        mesh.thinned = Some(row as u64);
+    }
     Ok(mesh)
+}
+
+/// Keeps every second triple (x y z or r g b) of `values`.
+fn halve<T: Copy>(values: &mut Vec<T>) {
+    let kept: Vec<T> = values
+        .chunks_exact(3)
+        .step_by(2)
+        .flatten()
+        .copied()
+        .collect();
+    *values = kept;
 }
 
 pub(super) fn read_las(data: &[u8]) -> Result<Mesh> {
@@ -84,6 +124,7 @@ pub(super) fn read_las(data: &[u8]) -> Result<Mesh> {
     let stride = stride_for(count);
     let mut mesh = Mesh {
         parts: 1,
+        thinned: (count > MAX_POINTS).then_some(count as u64),
         ..Mesh::default()
     };
     let mut raw_colors: Vec<u16> = Vec::new();
@@ -169,5 +210,37 @@ mod tests {
         assert!(err.contains("no geometry"), "{err}");
         assert!(read_las(b"LASF").is_err(), "header cut short");
         assert!(read_las(b"not a las file at all").is_err());
+    }
+
+    #[test]
+    fn text_points_are_thinned_over_the_whole_file() {
+        // long first lines make the row estimate far too low: 1000 padded
+        // lines, then 3000 short ones, x = row number, all with a colour
+        let mut file = String::new();
+        for row in 0..4000 {
+            let pad = if row < 1000 {
+                " ".repeat(100)
+            } else {
+                String::new()
+            };
+            file.push_str(&format!("{row} 0 0{pad} 1 2 3\n"));
+        }
+        let cloud = read_text_within(file.as_bytes(), 100).unwrap();
+        assert!(cloud.vertex_count() <= 100, "{}", cloud.vertex_count());
+        assert!(cloud.vertex_count() >= 50, "{}", cloud.vertex_count());
+        assert_eq!(cloud.thinned, Some(4000));
+        let xs: Vec<f32> = cloud.positions.chunks_exact(3).map(|p| p[0]).collect();
+        assert_eq!(xs[0], 0.0);
+        assert!(*xs.last().unwrap() > 3500.0, "the end of the file is kept");
+        // evenly spaced rows
+        let step = xs[1] - xs[0];
+        assert!(xs.windows(2).all(|w| w[1] - w[0] == step));
+        assert_eq!(cloud.colors.len(), cloud.positions.len());
+        assert_eq!(&cloud.colors[..3], &[1, 2, 3]);
+
+        // within the budget nothing is dropped and nothing is marked thinned
+        let small = read_text_within(file.as_bytes(), 4000).unwrap();
+        assert_eq!(small.vertex_count(), 4000);
+        assert_eq!(small.thinned, None);
     }
 }

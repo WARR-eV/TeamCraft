@@ -92,7 +92,7 @@ has the same notes under `/api/v1/file-versions/{id}/annotations`.
 |                     | Fusion designs (`.f3d`) – the display mesh Fusion stores                                                                                               |
 | Visualisation       | JT (`.jt`): JT 10 parts and whole assemblies, placed; JT 9 as NX writes it                                                                             |
 | Meshes              | STL, OBJ, PLY, OFF, 3MF (incl. components), AMF, glTF / GLB, 3DS                                                                                       |
-| Point clouds        | PTS, XYZ, LAS (uncompressed), PLY and OBJ without faces                                                                                                |
+| Point clouds        | PTS, XYZ, LAS (uncompressed), E57 (every scan placed by its pose, colour or intensity), PLY and OBJ without faces                                      |
 | Simulation results  | VTK (`.vtk`), VTU, VTP, CalculiX FRD – coloured by result fields                                                                                       |
 
 The server converts a file **once**, in a separate process with a time limit,
@@ -115,6 +115,12 @@ silently empty canvas.
 When a STEP preview shows only part of the model, the line below the viewer
 says **partial preview: N of M faces** – the missing faces use geometry the
 kernel cannot tessellate. Details: [STEP in the 3D preview](../reference/formats.md#step-in-the-3d-preview).
+
+Point clouds with more than 3 million points are thinned out evenly (over all
+scans of an E57 file); the line below the viewer then says **thinned for the
+preview from N points**. An E57 file whose page checksums do not match is
+refused with a message instead of being shown wrong. Details:
+[E57 in the 3D preview](../reference/formats.md#e57-in-the-3d-preview).
 
 Simulation results show the outer surface of the mesh with a colour scale (viridis), the range of the field above the
 canvas and, when the file has

@@ -143,6 +143,11 @@ results are stored as they are, never parsed fully – see
 | `TEAMCRAFT_PREVIEW_MAX_STEP_MB`   | `256`   | largest STEP file (tessellation needs a multiple of the file size)    |
 | `TEAMCRAFT_PREVIEW_MAX_MEMORY_MB` | `1024`  | address space of the preview process, `0` = unlimited                 |
 
+E57 laser scans (`.e57`) count as point clouds under `TEAMCRAFT_PREVIEW_MAX_MESH_MB`; real scans are often larger than
+256 MB and are then not previewed. When you raise the cap for them, keep `TEAMCRAFT_PREVIEW_MAX_MEMORY_MB` at least about
+the largest file size plus 100 MB: the E57 reader holds the whole file in memory to check the checksum of every page
+before the cloud is thinned to 3 million points.
+
 The same process limits protect the text extraction of PDF and HTML reports (`teamcraft text-extract`: at most 32 MB per
 PDF and 100 pages, the first 16 MB
 of an HTML file, 60 s, the memory limit below) and the spreadsheets of BOM and result imports (XLSX, XLSM, XLSB, XLS,
