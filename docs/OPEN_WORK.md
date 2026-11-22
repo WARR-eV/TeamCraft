@@ -773,22 +773,20 @@ needs an issue with a reason first (see *Direction*).
 #### Core data, CAD and vault
 
 - [ ] Modern, quieter UI: fewer clicks, modal dialogs and legacy patterns on the common paths – the CAD-user
-  review is #408: quick wins done (#409 check-in icon, #410 one vocabulary + glossary, #411 web check-out wording
-  and *Get TeamCraft Desktop*, #412 preview at the top of the revision page, #413 no hash column, #414 revision vs
-  version explained), #421 section nav of the revision page, #417 right-click menus in the desktop app; left: the
-  daily CAD loop (#416, #418–#420) and onboarding (#422–#424); done: #415 check out several parts of an assembly at
-  once (`POST /api/v1/checkouts`, desktop *Check out parts…*) – open follow-up: *Revise and check out* for released
-  parts
-  version explained), #421 section nav of the revision page, #417 right-click menus in the desktop app, #423 empty
-  states that name the next step (web and desktop, by role, i18n catalogs), #420 thumbnails in the item list,
-  search, vault explorer and the desktop Home views (left from #420: a revision with only STEP or mesh files gets
-  no list picture yet – a fallback rendered from its 3D preview needs `thumbnail::supports` and `cadformat`
-  widened), #419 BOM components picked by search (number, name, file name) in web and desktop, with Add line /
-  quantity / remove in the desktop *Structure* tab; left: the daily CAD loop (#415, #416, #418) and onboarding (#422,
-  #424); the other empty states
-  (detail tabs, admin pages) still in English only;
-  #423 left: a *Get…* hint for viewers (they may get read-only copies, but *New on this computer* is shown to CAD
-  editors only) and a check whether the working folder really lacks the active group's files
+  review is #408. Done: the quick wins (#409 check-in icon, #410 one vocabulary + glossary, #411 web check-out
+  wording and *Get TeamCraft Desktop*, #412 preview at the top of the revision page, #413 no hash column, #414
+  revision vs version explained), #421 section nav of the revision page, #417 right-click menus in the desktop app,
+  the daily CAD loop – #415 check out several parts of an assembly at once (`POST /api/v1/checkouts`, desktop
+  *Check out parts…*), #416 *Local changes* over the whole working folder, #418 files dropped from the file
+  manager, #419 BOM components picked by search (number, name, file name) in web and desktop with Add line /
+  quantity / remove in the desktop *Structure* tab, #420 thumbnails in the item list, search, vault explorer and
+  the desktop Home views, #407 *Update the BOM from the CAD file* at check-in – and onboarding: #422 the first-start
+  wizard *Getting started*, #423 empty states that name the next step (web and desktop, by role, i18n catalogs).
+  Left: #424 new desktop screenshots; follow-ups – *Revise and check out* for released parts (#415), a list picture
+  for revisions with only STEP or mesh files (#420: a fallback rendered from the 3D preview needs
+  `thumbnail::supports` and `cadformat` widened), the CAD file creation of the wizard's *CAD setup* step (#422), the
+  other empty states (detail tabs, admin pages; still in English only), a *Get…* hint for viewers and a check
+  whether the working folder really lacks the active group's files (#423)
 - [ ] Responsive pages on large data (1M files, 100k items, 10k-line BOMs – see the scale targets)
 - [ ] Faster opening of large CAD files and assemblies
 - [ ] Configurable lifecycle states and site-specific allowed transitions instead of one built-in state machine
@@ -889,7 +887,7 @@ needs an issue with a reason first (see *Direction*).
 - [ ] CAD clone workflows: clone an assembly with selective reuse, Save As / revise per component over a whole
   structure, shown as an indented tree
 - [ ] Interactive onboarding and contextual help – the desktop first-start wizard *Getting started* is done (#422);
-  left: empty states that name the next step (#423) and contextual help
+  empty states that name the next step are done too (#423); left: contextual help
 - [ ] Migration tooling from commercial PLM/PDM systems
 - [ ] GA proofs: production readiness, migration and concurrency safety, scale validation, external security review,
   support and versioning policy

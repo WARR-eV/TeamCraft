@@ -12,7 +12,6 @@ TeamCraft has no stable release yet. The project status is work in progress:
 see the notices in the README.
 
 ## [Unreleased]
-
 ### Added
 
 - **3D preview of E57 point clouds** (#373). Laser-scanner exports (`.e57`,
@@ -81,6 +80,10 @@ see the notices in the README.
   changes the BOM. Parts still in the assembly but only excluded from its BOM
   there are not reported as *no longer in the CAD file*; the manual plan no
   longer holds a database connection while it reads the CAD files.
+
+- CI on `main` is green again: the comment of the shared text-selection rule
+  (#436) quoted two hex colours, which the no-literal-colours guard of
+  `shared/css/` counts as colours in the stylesheet.
 
 ### Changed
 
@@ -157,8 +160,6 @@ see the notices in the README.
   their parts' previews, whose picture changes with a component). Similar-part hits use the same
   picture rule.
 
-### Changed
-
 - **Usage statistics: the desktop app counts every listed action** (#383).
   Besides check-out, check-in, park, get files, open in CAD, 3D preview and
   STEP exports, the daily report now also counts BOM imports (not the
@@ -167,12 +168,6 @@ see the notices in the README.
   answered assistant questions – still only counts, never names, numbers or
   search terms. A test checks that every name of the fixed list has a place
   in the app that counts it.
-
-### Fixed
-
-- CI on `main` is green again: the comment of the shared text-selection rule
-  (#436) quoted two hex colours, which the no-literal-colours guard of
-  `shared/css/` counts as colours in the stylesheet.
 
 ## [0.2.12] - 2026-11-22
 
