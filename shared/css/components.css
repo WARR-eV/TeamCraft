@@ -5,7 +5,7 @@
 /* Selected text, in both apps and every skin: the primary colour with its
  * text colour, as the OS shows a selection. --selected (the background of a
  * selected row) was used before, but in the dark skins it is barely lighter
- * than --input-bg (CachyOS: #003b33 on #000e0e), so text selected in a field
+ * than --input-bg (CachyOS: about 1.6 : 1), so text selected in a field
  * – Ctrl+A in the server address – looked unselected. The contrast test
  * (src/domain/mod.rs, skins_meet_contrast) checks --on-primary on --primary
  * in every skin. */

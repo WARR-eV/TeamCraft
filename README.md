@@ -30,8 +30,8 @@
 <p align="center">
   <strong><a href="https://github.com/WARR-eV/TeamCraft/releases">Download TeamCraft</a></strong>
   for Windows, macOS and Linux.<br />
-  To try it, pick the desktop app <em>with local server</em>: app, server and
-  database in one installer, nothing to set up (<a href="#download">which file?</a>).
+  The desktop app <em>with local server</em> (app, server and database in one
+  installer) is paused for the next releases (<a href="#download">which file?</a>).
 </p>
 
 <p align="center">
@@ -82,7 +82,10 @@
 [Releases page](https://github.com/WARR-eV/TeamCraft/releases)** – 0.x
 versions are pre-releases (see the warning above). Which one you need:
 
-- **Just try TeamCraft on your laptop** – the desktop app **with local
+- **Just try TeamCraft on your laptop** – *paused for the next releases (since 2026-11-22, to make releases faster); until it is back, use the
+  [live demo][demo] or `teamcraft local` with the Linux server archive (see
+  [Try it on your computer](https://warr-ev.github.io/TeamCraft/guide/local-server.html)).*
+  The desktop app **with local
   server** (`TeamCraft-with-local-server_…`): one installer with the app, the
   server and its PostgreSQL database. It installs **TeamCraft Local**, an app
   of its own; start it and it starts its local server, your browser opens to
@@ -95,9 +98,9 @@ versions are pre-releases (see the warning above). Which one you need:
 
 |                                            | Linux x86_64                            | Linux ARM64                | macOS (Apple silicon) | Windows x64                                   | Windows ARM64                                     |
 |--------------------------------------------|-----------------------------------------|----------------------------|-----------------------|-----------------------------------------------|---------------------------------------------------|
-| **Desktop app with local server** (try it) | `.AppImage`                             | –                          | `.dmg`                | `_x64-setup.exe`                              | –                                                 |
+| **Desktop app with local server** (paused) | –                                       | –                          | –                     | –                                             | –                                                 |
 | **Desktop app**                            | `.AppImage`, `.deb`, `.rpm`, `.flatpak` | `.deb`, `.rpm`, `.flatpak` | `.dmg`, `.app.zip`    | `.msi`, `_x64-setup.exe`, `_x64_portable.zip` | `.msi`, `_arm64-setup.exe`, `_arm64_portable.zip` |
-| **Server** (`teamcraft`)                   | `.tar.gz`                               | `.tar.gz`                  | –                     | `.zip`                                        | –                                                 |
+| **Server** (`teamcraft`)                   | `.tar.gz`                               | `.tar.gz`                  | –                     | – (paused; build from source)                 | –                                                 |
 
 - **With local server:** the same app plus the server (`teamcraft-server`)
   and PostgreSQL's programs, installed as *TeamCraft Local* next to the
@@ -303,8 +306,9 @@ end-to-end tests against a real PostgreSQL.
 
 - **Web UI** – light and dark design that follows the operating system, plus
   distribution skins; responsive down to phone width. English and German (first
-  part, #379): the header follows the browser's language, the desktop app has
-  *Settings → Language*.
+  part, #379): the header and the empty states follow the browser's language, the desktop app has
+  *Settings → Language*. Empty lists name the next step, by role – viewers
+  learn why they see no editing buttons (#423).
 - **Desktop app** – Linux, macOS and Windows client with a local working
   folder, *Get* of whole assemblies, an import wizard, a *Files* view of each
   project group (with *New item here* on every folder, starting in a favourite folder, e.g. the one with the

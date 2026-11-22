@@ -23,7 +23,7 @@
       {%- if f.locked %}<span class="lock-count"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>{{ f.locked }}<span class="visually-hidden"> checked out</span></span>{% endif %}
     </a>
     {% else %}
-    <p class="empty small">No project groups yet – <a href="/projects#new-project">create one</a>.</p>
+    <p class="empty small">{% if me.can_edit %}{{ t("empty.no_groups.editor") }} <a href="/projects#new-project">{{ t("empty.action.create_group") }}</a>{% else %}{{ t("empty.no_groups.viewer") }}{% endif %}</p>
     {% endfor %}
     <a class="{% if folder == 'none' %}active{% endif %}" href="/vault?folder=none">Without group</a>
   </nav>
@@ -58,8 +58,20 @@
     </div>
     {% if entries|length >= limit %}<p class="hint">Showing the first {{ limit }} items – use the filter to narrow down.</p>{% endif %}
     {% else %}
-    <p class="empty">{% if folder == "mine" %}You have nothing checked out.{% elif folder == "favorites" %}No favorites yet – use the star on an item.{% elif q %}No items match “{{ q }}”.{% else %}This folder is empty.{% endif %}
-      Pick a folder, select an item, check it out, work on the files and check them back in.</p>
+    {#- empty states name the next step (#423) -#}
+    {% set in_group = folder not in ["mine", "favorites", "locked", "none", "search"] %}
+    {% if in_group and not q %}
+    <p class="empty">{{ t("empty.group_empty") }} {% if can_create %}{{ t("empty.group_empty.editor_web") }}{% elif me.can_edit %}{{ t("empty.group_empty.not_member") }}{% else %}{{ t("empty.group_empty.viewer") }}{% endif %}</p>
+    {% if can_create %}
+    <div class="actions empty-actions">
+      <a class="button" href="/items/new?project={{ folder }}">{{ t("empty.action.new_item") }}</a>
+      <a class="button ghost" href="/import">{{ t("empty.action.import_bom") }}</a>
+    </div>
+    {% endif %}
+    {% else %}
+    <p class="empty">{% if folder == "mine" and not me.can_edit %}{{ t("empty.no_checkouts.viewer") }}{% elif folder == "mine" %}You have nothing checked out.{% elif folder == "favorites" %}No favorites yet – use the star on an item.{% elif q %}No items match “{{ q }}”.{% else %}{{ t("empty.folder_empty") }}{% endif %}
+      {%- if me.can_edit %} Pick a folder, select an item, check it out, work on the files and check them back in.{% endif %}</p>
+    {% endif %}
     {% endif %}
   </section>
 

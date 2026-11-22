@@ -154,9 +154,9 @@ feature milestone – the features in *What works* are enough; what is missing i
   SmartScreen and Gatekeeper
 - [x] Usage statistics (#383): desktop → own server always (anonymous daily report, fixed fields, *Show what is
   sent*), *Admin → Usage statistics*, sharing an aggregate with the developers off by default
-  (`TEAMCRAFT_USAGE_STATISTICS[_URL]`, `DO_NOT_TRACK`, `TEAMCRAFT_NO_TELEMETRY`). Left: a collection service run
-  by the project (where, who operates it, retention) and its published results; counting `new_item`, `release`,
-  `search`, `assistant`, `import_*`, `cancel_checkout` in the desktop UI (the names are accepted already); the
+  (`TEAMCRAFT_USAGE_STATISTICS[_URL]`, `DO_NOT_TRACK`, `TEAMCRAFT_NO_TELEMETRY`); the desktop counts every
+  listed action (guard test in `desktop/src/usage.rs`). Left: a collection service run
+  by the project (where, who operates it, retention) and its published results; the
   desktop policy `UsageStatistics` (#378) once the developers' share is decided per desktop
 - [ ] Desktop: report a problem from any error (#381). Done: *Report…* on every toast and dialog error, *Help → Report a
   Problem…*, redacted prefilled report (`desktop/src/report.rs`), *Open issue form* / *Copy* / *Save*, own tracker
@@ -170,11 +170,13 @@ feature milestone – the features in *What works* are enough; what is missing i
   test script per install type for each RC
 - [x] Desktop: managed deployment policies (#378) – Windows registry with ADMX/ADML templates, macOS configuration
   profile, `/etc/teamcraft/policies.json`; fixed server, updates, crash prompts, working folder, organisation name,
-  `UsageStatistics` (read for #383), `ReportUrl` (the problem-report tracker, #381). Left: a manual test per OS (Group Policy, Intune, an MDM profile), a German ADML,
+  `UsageStatistics` (read for #383), `ReportUrl` (the problem-report tracker, #381), English and German ADML. Left: a manual test per OS (Group Policy, Intune, an MDM profile),
   a per-machine MSI checked for silent installs
 - [ ] Desktop app run and tested on Windows x64/ARM64, macOS and Linux for each RC (a short manual test script in
   `docs/src/dev/release-checklist.md`)
-- [x] One download to try TeamCraft on a laptop: desktop installers *with local server* (Windows x64, macOS Apple
+- [x] (**paused for the next releases since 2026-11-22**, to make releases faster: the installers below and the
+  Windows/macOS server builds are switched off in `release.yml`; bring back before 1.0 or when testers ask)
+  One download to try TeamCraft on a laptop: desktop installers *with local server* (Windows x64, macOS Apple
   silicon, Linux x86_64 AppImage) with the server and PostgreSQL, *Try TeamCraft on this computer*, and
   `teamcraft local` for an installed PostgreSQL ([research](src/research/local-test-server.md),
   [guide](src/guide/local-server.md)). Left: the manual check in section 3; Windows ARM64 and Linux ARM64 variants if
@@ -665,9 +667,13 @@ real files and belong to section 3 once such files are at hand.
 
 **All CAD programs**
 
-- [ ] (research first) CAD add-ins through the official APIs (Inventor API, Solid Edge API, SolidWorks API, NX Open):
+- [x] (research first) CAD add-ins through the official APIs (Inventor API, Solid Edge API, SolidWorks API, NX Open):
   check out, "save and check in", "get latest" inside the CAD program – also to report conflicts when a file is opened
-  inside the CAD program (the desktop app already asks before opening)
+  inside the CAD program (the desktop app already asks before opening). Research page *CAD add-ins: Inventor and
+  Siemens NX first* (#425): Inventor MVP (.NET 8, registry-free `.addin`), NX MVP after the author-licence check, both
+  over per-user local IPC to the desktop app (protocol `teamcraft.cad` v1); SOLIDWORKS/Solid Edge after Inventor,
+  FreeCAD as the reference add-in for CI. Left: the follow-up issues *Inventor add-in MVP* and *NX add-in MVP* (desktop
+  listener, shared core with a fake host, *Settings → CAD add-ins*, `CadAddins` policy, threat-model entry)
 - [ ] Check-in takes dependent files along automatically (from the reference scan)
 - [ ] Create viewables (STEP) in the background without blocking the check-in
 - [ ] Sync file properties with item attributes: part number, name, material, mass
@@ -716,7 +722,10 @@ real files and belong to section 3 once such files are at hand.
 **Siemens NX**
 
 - [ ] (research first) How other PLMs connect NX (native vs. through a PLM integration), licences (student/academic) and
-  what is feasible for an open-source project
+  what is feasible for an open-source project – the add-in part is answered in the research page *CAD add-ins: Inventor
+  and Siemens NX first* (#425: NX Open journals vs signed startup applications, author licence, vendor assemblies never
+  redistributed). Left: whether the team's academic NX licence includes an NX Open author licence (checked on a licensed
+  machine, recorded on that page)
 - [ ] Folder import for the master model concept: the drawing `*_dwg*.prt` belongs into the item of the model
 - [ ] Test the BOM import with real NX BOM exports
 - [ ] STEP export through the local NX (NX Open / journal), on Windows and Linux
@@ -753,11 +762,14 @@ needs an issue with a reason first (see *Direction*).
 - [ ] Modern, quieter UI: fewer clicks, modal dialogs and legacy patterns on the common paths – the CAD-user
   review is #408: quick wins done (#409 check-in icon, #410 one vocabulary + glossary, #411 web check-out wording
   and *Get TeamCraft Desktop*, #412 preview at the top of the revision page, #413 no hash column, #414 revision vs
-  version explained), #421 section nav of the revision page, #417 right-click menus in the desktop app, #420
-  thumbnails in the item list, search, vault explorer and the desktop Home views (left from #420: a
-  revision with only STEP or mesh files gets no list picture yet – a fallback rendered from its 3D preview needs
-  `thumbnail::supports` and `cadformat` widened); left: the daily CAD loop (#415, #416,
-  #418, #419) and onboarding (#422–#424)
+  version explained), #421 section nav of the revision page, #417 right-click menus in the desktop app, #423 empty
+  states that name the next step (web and desktop, by role, i18n catalogs), #420 thumbnails in the item list,
+  search, vault explorer and the desktop Home views (left from #420: a revision with only STEP or mesh files gets
+  no list picture yet – a fallback rendered from its 3D preview needs `thumbnail::supports` and `cadformat`
+  widened); left: the daily CAD loop (#415, #416, #418, #419) and onboarding (#422, #424); the other empty states
+  (detail tabs, admin pages) still in English only;
+  #423 left: a *Get…* hint for viewers (they may get read-only copies, but *New on this computer* is shown to CAD
+  editors only) and a check whether the working folder really lacks the active group's files
 - [ ] Responsive pages on large data (1M files, 100k items, 10k-line BOMs – see the scale targets)
 - [ ] Faster opening of large CAD files and assemblies
 - [ ] Configurable lifecycle states and site-specific allowed transitions instead of one built-in state machine
@@ -766,7 +778,8 @@ needs an issue with a reason first (see *Direction*).
 - [ ] Central conversion queue for previews and derivatives with retries and a failure view
 - [ ] 3D preview of more native formats; IFC geometry in the viewer
 - [ ] PMI in the 3D preview, also PMI authored on assemblies
-- [ ] Native CAD add-ins (see the research entry in section 4): check in/out, search, revise, BOM and references inside
+- [ ] Native CAD add-ins (research page *CAD add-ins: Inventor and Siemens NX first*, #425; Inventor and NX MVPs are
+  follow-up issues): check in/out, search, revise, BOM and references inside
   SolidWorks, Inventor, Solid Edge (occurrence semantics), Creo, CATIA, AutoCAD (xrefs) and Revit/BIM; NX comparable
   to a managed mode (Save As, revise, structure, numbering)
 - [ ] ECAD/EPLAN integration: electrical design files and their BOM connectivity as first-class data, not

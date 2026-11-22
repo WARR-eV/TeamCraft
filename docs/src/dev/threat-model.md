@@ -267,3 +267,13 @@ module, without WASI, network or file access, under fuel, memory and
 wall-time limits, reading data only with the acting user's rights and
 writing only through `services::*`. Nothing of it is built yet; this page
 gets the real entry when it is.
+
+## Planned: CAD add-ins (not built yet)
+
+Add-ins for Inventor and Siemens NX are designed in the research page
+[CAD add-ins: Inventor and Siemens NX first](../research/cad-addins.md)
+(#425): they talk only to the desktop app, over a per-user named pipe
+(Windows, ACL for the current user) or a `0600` Unix socket, hold no token
+and no server data beyond display state, and their requests are untrusted
+intents the desktop app checks and the user confirms – the rules of the
+SolidCraft plugin bridge above. The real entry comes with the first MVP.

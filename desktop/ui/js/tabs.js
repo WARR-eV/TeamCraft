@@ -6,7 +6,9 @@ import { $, ICONS, append, clear, errorText, h, state, svgIcon, tool } from "./c
 import { loadLocks, renderLocks } from "./lock-overview.js";
 import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
 import { canEdit, checkInAll, refreshWorklistCount } from "./shell.js";
-import { selectView } from "./navigator.js";
+import { emptyHint, selectView } from "./navigator.js";
+import { worklistHint } from "./empty-rules.js";
+import { t } from "/static/shared/js/i18n.js";
 import { assistantContextChanged } from "./assistant.js";
 import { agent, renderAgentTab, schedulePaint } from "./agent.js";
 import { loadRevision, openRevision, renderRevision, revisionTitle } from "./revision.js";
@@ -412,7 +414,9 @@ export function renderWelcome(body, toolbar) {
   var w = state.worklist;
   var welcome = h("div.welcome", null, [
     h("h1", { text: "Home" }),
-    h("p.muted", { text: "Open an item from the navigator, or press " + (/Mac/.test(navigator.platform) ? "⌘F" : "Ctrl+F") + " to search." })
+    h("p.muted", { text: "Open an item from the navigator, or press " + (/Mac/.test(navigator.platform) ? "⌘F" : "Ctrl+F") + " to search." }),
+    // why a viewer account has no editing buttons, like the web dashboard (#423)
+    canEdit() ? null : h("p.small.dim.viewer-note", { text: t("empty.viewer_note") })
   ]);
   body.appendChild(welcome);
   var fill = function (wl) {
@@ -428,7 +432,7 @@ export function renderWelcome(body, toolbar) {
       wl.reviews.length ? table(["Change", "Title", "Submitted"], wl.reviews.map(function (c) {
         var open = function () { openChange(c.number); };
         return { cells: [recordLink(c.number, open), c.title, fmtDate(c.submitted_at)], open: open };
-      })) : h("p.empty", { text: "Nothing to review." })]));
+      })) : emptyHint(worklistHint("reviews", canEdit()))]));
     var groups = impactGroups(wl);
     if (groups.length) {
       append(welcome, h("section.panel", null, [h("div.panel-head", null, [panelTitle("Dependents to check", groups.length)]),
@@ -442,7 +446,7 @@ export function renderWelcome(body, toolbar) {
         var open = function () { openRevision(r.item_number, r.code); };
         return { cells: [recordLink(r.item_number + "/" + r.code, open), r.name,
           h("span", { title: fmtDate(r.checked_out_at), text: lockAge(r.checked_out_at) })], open: open };
-      })) : h("p.empty", { text: "Nothing checked out." })]));
+      })) : emptyHint(worklistHint("checkouts", canEdit()))]));
   };
   if (w) fill(w);
   else refreshWorklistCount().then(fill, function () {});

@@ -76,11 +76,12 @@ mismatch.
 
 ## 5. Verify the assets
 
-- [ ] The GitHub Release lists the server archives (Linux x86_64 and ARM64,
-  Windows x64), the desktop installers (AppImage, `.deb`, `.rpm`,
-  Flatpak, `.dmg`, `.msi`, NSIS setup and portable `.zip`), the three
-  installers *with local server* (`TeamCraft-with-local-server_…`: Windows x64
-  setup, macOS `.dmg`, Linux x86_64 AppImage) and `SHA256SUMS.txt`.
+- [ ] The GitHub Release lists the server archives (Linux x86_64 and ARM64),
+  the desktop installers (AppImage, `.deb`, `.rpm`,
+  Flatpak, `.dmg`, `.msi`, NSIS setup and portable `.zip`) and `SHA256SUMS.txt`.
+  *Paused since 2026-11-22:* the Windows x64 server archive and the three
+  installers *with local server* (`TeamCraft-with-local-server_…`) – when they
+  are switched on again (CONTRIBUTING.md, "Releases"), check them here too.
 - [ ] Download `SHA256SUMS.txt` and at least one archive and check the hash
   with `sha256sum -c SHA256SUMS.txt --ignore-missing`. A mismatch means
   the release is withdrawn, not patched.

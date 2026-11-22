@@ -372,6 +372,123 @@ mod tests {
         assert!(html.contains("<html lang=\"en\"") && html.contains(">Items<"));
     }
 
+    /// The empty states of the dashboard, the vault explorer and the lists
+    /// name the next step – by role (#423); rendered as a CAD editor and as
+    /// a viewer, in English and in German. Part of `every_template_renders`,
+    /// so the pages go through the accessibility checks as well.
+    fn empty_states_name_the_next_step(env: &Environment<'static>) {
+        let viewer = json!({ "id": ME, "username": "vera", "display_name": "Vera Viewer", "initials": "VV",
+                             "avatar": 2, "role": "viewer", "skin": "arch", "is_admin": false, "can_edit": false });
+        let as_viewer = |mut data: Value| {
+            data["me"] = viewer.clone();
+            data
+        };
+        let dashboard = || {
+            with_common(json!({
+                "stats": { "items": 0, "revisions_in_work": 0, "revisions_in_review": 0, "revisions_released": 0,
+                           "open_changes": 0, "files": 0, "stored_bytes": 0 },
+                "checkouts": [], "reviews": [], "my_changes": [], "activity": [], "impact_groups": [],
+                "assigned_requests": [], "my_requests": [],
+            }))
+        };
+        let en = |id: &str| crate::i18n::t("en", id, &[]);
+
+        let html = render(env, "dashboard.html", dashboard());
+        for id in [
+            "empty.nothing_to_review",
+            "empty.no_checkouts",
+            "empty.no_open_changes",
+            "empty.action.new_change",
+        ] {
+            assert!(html.contains(&en(id)), "editor dashboard shows {id}");
+        }
+        assert!(
+            !html.contains(&en("empty.viewer_note")),
+            "no viewer note for editors"
+        );
+        assert!(!html.contains(&en("empty.no_checkouts.viewer")));
+
+        let html = render(env, "dashboard.html", as_viewer(dashboard()));
+        for id in [
+            "empty.nothing_to_review",
+            "empty.no_checkouts.viewer",
+            "empty.no_open_changes.viewer",
+            "empty.viewer_note.title",
+            "empty.viewer_note",
+            "empty.action.request_change",
+        ] {
+            assert!(html.contains(&en(id)), "viewer dashboard shows {id}");
+        }
+        assert!(
+            !html.contains(&en("empty.no_checkouts")) && !html.contains("href=\"/changes/new\""),
+            "viewers are not sent to editing they cannot do"
+        );
+
+        let mut german = as_viewer(dashboard());
+        german["lang"] = json!("de");
+        let html = render(env, "dashboard.html", german);
+        assert!(html.contains(&crate::i18n::t("de", "empty.viewer_note", &[])));
+        assert!(html.contains("Betrachter-Konto"));
+
+        // the vault explorer: no project group at all
+        let no_groups = || {
+            with_common(
+                json!({ "folders": [], "folder": "none", "entries": [], "limit": 500, "q": "",
+                                "selected": null, "back": "%2Fvault", "max_upload_mb": 512 }),
+            )
+        };
+        let html = render(env, "explorer.html", no_groups());
+        assert!(
+            html.contains(&en("empty.no_groups.editor")) && html.contains("/projects#new-project")
+        );
+        assert!(html.contains(&en("empty.folder_empty")));
+        let html = render(env, "explorer.html", as_viewer(no_groups()));
+        assert!(html.contains(&en("empty.no_groups.viewer")));
+        assert!(
+            !html.contains("/projects#new-project"),
+            "viewers cannot create groups"
+        );
+
+        // an empty project group
+        let empty_group = || {
+            with_common(json!({
+                "folders": [{ "id": ROCKET, "code": "ROCKET", "name": "Sounding rocket", "items": 0, "locked": 0 }],
+                "folder": ROCKET, "can_create": true, "entries": [], "limit": 500, "q": "", "selected": null,
+                "back": "%2Fvault", "max_upload_mb": 512 }))
+        };
+        let html = render(env, "explorer.html", empty_group());
+        assert!(html.contains(&en("empty.group_empty")));
+        assert!(html.contains(&en("empty.group_empty.editor_web")));
+        assert!(html.contains(&format!("href=\"/items/new?project={ROCKET}\"")));
+        assert!(html.contains("href=\"/import\"") && html.contains(&en("empty.action.import_bom")));
+        // a CAD editor who is not a member of the group (unrestricted groups
+        // are listed for everyone) cannot create items there: no buttons,
+        // ask a manager to be added
+        let mut outsider = empty_group();
+        outsider["can_create"] = json!(false);
+        outsider["me"]["role"] = json!("editor");
+        outsider["me"]["is_admin"] = json!(false);
+        let html = render(env, "explorer.html", outsider);
+        assert!(html.contains(&en("empty.group_empty.not_member")));
+        assert!(!html.contains(&en("empty.group_empty.editor_web")));
+        assert!(!html.contains("/items/new?project=") && !html.contains("href=\"/import\""));
+        let mut viewer_group = as_viewer(empty_group());
+        viewer_group["can_create"] = json!(false);
+        let html = render(env, "explorer.html", viewer_group);
+        assert!(
+            html.contains(&en("empty.group_empty"))
+                && html.contains(&en("empty.group_empty.viewer"))
+        );
+        assert!(!html.contains("/items/new?project=") && !html.contains("href=\"/import\""));
+
+        // a viewer's own check-outs: why there are none
+        let mut mine = as_viewer(no_groups());
+        mine["folder"] = json!("mine");
+        let html = render(env, "explorer.html", mine);
+        assert!(html.contains(&en("empty.no_checkouts.viewer")));
+        assert!(!html.contains("check it out, work on the files"));
+    }
+
     #[test]
     fn every_template_renders() {
         let env = environment("TeamCraft Test").expect("templates compile");
@@ -546,6 +663,8 @@ mod tests {
             ),
         );
         assert!(html.contains("You have nothing checked out"));
+
+        empty_states_name_the_next_step(&env);
 
         // Save As and the BOM comparison
         let html = render(

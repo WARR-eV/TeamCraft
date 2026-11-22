@@ -22,6 +22,10 @@ release; see [Separation of duties](../guide/changes.md#separation-of-duties).
 | CAD editor | `editor`  | read like a viewer; change items of their project groups, create project groups, review |
 | Admin      | `admin`   | everything, including restricted groups, plus users, all groups, lock overrides         |
 
+Viewers see a note on the dashboard and at the top of the desktop worklist
+that editing needs the CAD editor role and that an administrator of the
+server grants it (#423) – expect those requests to come to you.
+
 A project group can be **restricted** to its members: everybody else –
 viewers and CAD editors who are not members – gets "not found" for the
 group and everything in it. Viewers who are members read it. See

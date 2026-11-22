@@ -2,6 +2,11 @@
 
 ## Try it on your laptop
 
+> **Paused for the next releases** (since 2026-11-22, to make releases faster): the
+> installers *with local server* and the Windows x64 server download are not built.
+> Until they are back, use `teamcraft local` ([Try it on your computer](local-server.md)) or the
+> live demo.
+
 Download the desktop app **with local server** from the
 [Releases page](https://github.com/WARR-eV/TeamCraft/releases) (Windows x64,
 macOS Apple silicon, Linux x86_64) and start *TeamCraft Local*, an app of its
@@ -60,6 +65,18 @@ installations and the desktop app:
    the project group's folder tree. The item is created together with its
    files; its first revision *A* is *in work* and checked out to you.
 5. **Check in**, then release it with a change order.
+
+**Empty pages name the next step** (#423): with no project group yet, the
+vault and *Projects* offer *Create a project group* to CAD editors and tell
+viewers to ask a manager of a group to add them; an empty project group in
+the vault offers *New item* and *Import BOM* to those who may create items
+in it (its CAD editor members and administrators) and asks other CAD editors
+to have a manager of the group add them; the dashboard's empty cards
+(*Waiting for my review*, *Checked out by me*, *My open changes*) say how work
+arrives there. A **viewer account** sees a note on the dashboard that editing
+needs the CAD editor role and that an administrator of the server grants it –
+so the missing buttons are not a mystery. These texts come from the message
+catalogs and follow the browser's language (English, German).
 
 **Appearance:** TeamCraft follows the light or dark appearance of your
 operating system. The menu under your name (top right) and *Account →
