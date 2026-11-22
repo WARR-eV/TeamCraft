@@ -9,15 +9,21 @@
     "entries": [
       {
         "name": "status",
-        "effect": "edit",
+        "effect": "read",
         "input_schema": {"type": "object", "properties": {}},
         "slots": [{"kind": "ribbon", "name": "TeamCraft status"}]
       },
       {
         "name": "check",
-        "effect": "edit",
+        "effect": "read",
         "input_schema": {"type": "object", "properties": {}},
         "slots": [{"kind": "ribbon", "name": "Check for TeamCraft"}]
+      },
+      {
+        "name": "check-assembly",
+        "effect": "edit",
+        "input_schema": {"type": "object", "properties": {}},
+        "slots": [{"kind": "ribbon", "name": "Check assembly for TeamCraft"}]
       },
       {
         "name": "link",
@@ -42,7 +48,7 @@
       },
       {
         "name": "live",
-        "effect": "edit",
+        "effect": "read",
         "input_schema": {"type": "object", "properties": {}},
         "slots": [{"kind": "ribbon", "name": "TeamCraft live status"}]
       },
@@ -66,7 +72,7 @@
       }
     ],
     "commands": [
-      "document.metadata",
+      "document.inspect",
       "document.metadata.set",
       "document.metadata.remove",
       "assembly.bom",

@@ -6,7 +6,7 @@
 //! as `teamcraft` when installing it. The desktop app writes its heartbeat
 //! (`desktop.json`) and the state of each revision in the working folder
 //! (`state-<key>.json`); the plugin writes requests
-//! (`request-<key>.<time>.<action>.json`) that the desktop app carries out.
+//! (`request-<key>.<action>.json`) that the desktop app carries out.
 //! The format is the desktop app's too (`desktop/src/scbridge.rs`); the test
 //! vectors below are the same on both sides.
 //!
@@ -50,9 +50,11 @@ pub fn state_file(item: &str, revision: &str) -> String {
     format!("state-{}.json", key(item, revision))
 }
 
-/// `request-<key>.<time>.<action>.json`.
-pub fn request_file(item: &str, revision: &str, now: u64, action: &str) -> String {
-    format!("request-{}.{now}.{action}.json", key(item, revision))
+/// `request-<key>.<action>.json` – one name per revision and action: asking
+/// twice replaces the first request, and while the file is there the desktop
+/// app has not taken it yet.
+pub fn request_file(item: &str, revision: &str, action: &str) -> String {
+    format!("request-{}.{action}.json", key(item, revision))
 }
 
 /// A bridge file, checked: its schema, a version this plugin understands.
@@ -171,13 +173,10 @@ mod tests {
         assert_ne!(key("A_2D", "B"), key("A-", "B"));
         assert_eq!(state_file("PRT-000042", "A"), "state-PRT_2D000042.A.json");
         assert_eq!(
-            request_file("PRT-000042", "A", 1_700_000_000, "check_in"),
-            "request-PRT_2D000042.A.1700000000.check_in.json"
+            request_file("PRT-000042", "A", "check_in"),
+            "request-PRT_2D000042.A.check_in.json"
         );
-        for name in [
-            state_file("../x", ".."),
-            request_file("a b", "c", 1, "open"),
-        ] {
+        for name in [state_file("../x", ".."), request_file("a b", "c", "open")] {
             assert!(name
                 .bytes()
                 .all(|b| b.is_ascii_alphanumeric() || b"_.-".contains(&b)));

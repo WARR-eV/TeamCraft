@@ -1,0 +1,1 @@
+{"entry": "live", "design": "linked.sc", "grants": {"folders": [{"name": "teamcraft", "read": true, "write": true, "from": "bridge-pending"}]}, "expect": {"reply": {"result": {"pending": [{"action": "check_in"}]}}}}

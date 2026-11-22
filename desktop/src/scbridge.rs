@@ -5,7 +5,8 @@
 //! folder, `<working folder>/.teamcraft/solidcraft`, which the user grants
 //! the plugin as `teamcraft`. This app writes its heartbeat (`desktop.json`)
 //! and the state of each revision it shows (`state-<key>.json`); the plugin
-//! leaves requests (`request-<key>.<time>.<action>.json`) that this app picks
+//! leaves requests (`request-<key>.<action>.json`: one per revision and
+//! action, so asking twice replaces the first) that this app picks
 //! up, checks and hands to the user interface (event `solidcraft-request`).
 //!
 //! The plugin's side is `plugins/solidcraft/src/bridge.rs`; both use the same
@@ -169,7 +170,7 @@ pub fn check_request(
     let revision = v["revision"].as_str().unwrap_or("");
     let written = v["written_at"].as_u64().unwrap_or(0);
     // the name and the content must say the same
-    let expected = format!("{}.{written}.{action}", key(item, revision));
+    let expected = format!("{}.{action}", key(item, revision));
     if rest != expected {
         return Err("name and content differ".into());
     }
@@ -253,7 +254,7 @@ mod tests {
     }
 
     fn request(action: &str, at: u64) -> (String, Vec<u8>) {
-        let name = format!("request-PRT_2D000042.A.{at}.{action}.json");
+        let name = format!("request-PRT_2D000042.A.{action}.json");
         let body = json!({"schema": "teamcraft.solidcraft.request", "version": 1,
                           "action": action, "item_number": "PRT-000042", "revision": "A",
                           "written_at": at});

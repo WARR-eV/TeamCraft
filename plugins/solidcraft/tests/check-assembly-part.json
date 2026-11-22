@@ -1,0 +1,1 @@
+{"entry": "check-assembly", "design": "linked.sc", "expect": {"reply": {"result": {"ready": true}}}}

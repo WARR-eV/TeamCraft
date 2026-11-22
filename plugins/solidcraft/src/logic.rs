@@ -94,9 +94,10 @@ fn call(host: &mut dyn Host, command: &str, args: Value) -> Result<Value, EntryE
 }
 
 /// The entries of the manifest (`plugin.json`).
-pub const ENTRIES: [&str; 8] = [
+pub const ENTRIES: [&str; 9] = [
     "status",
     "check",
+    "check-assembly",
     "link",
     "unlink",
     "live",
@@ -110,6 +111,7 @@ pub fn execute(host: &mut dyn Host, entry: &str, params: &Value) -> Result<Value
     match entry {
         "status" => status(host),
         "check" => check(host),
+        "check-assembly" => check_assembly(host),
         "link" => link(host, params),
         "unlink" => unlink(host),
         "live" => live(host),
@@ -122,19 +124,33 @@ pub fn execute(host: &mut dyn Host, entry: &str, params: &Value) -> Result<Value
     }
 }
 
-/// The design's `metadata` as saved and SolidCraft's `properties` (its keys as text).
-type Properties = (Map<String, Value>, Map<String, Value>);
+/// The entries SolidCraft runs as `read`: it shows their result in the entry's
+/// dialog (an `edit` entry's dialog only closes). They call only commands
+/// SolidCraft classes as read – [`READ_COMMANDS`] – and read files.
+pub const READ_ENTRIES: [&str; 3] = ["status", "check", "live"];
+/// The read-classified commands the read entries use.
+pub const READ_COMMANDS: [&str; 1] = ["document.inspect"];
 
-/// The design's properties: (`metadata` as saved, SolidCraft's `properties`).
-fn properties(host: &mut dyn Host) -> Result<Properties, EntryError> {
-    let read = call(host, "document.metadata", json!({}))?;
-    let object = |name: &str| {
-        read.get(name)
+/// The open design as `document.inspect` reports it: its metadata as saved
+/// (SolidCraft's properties such as `part_number` are text keys in it, other
+/// tools' data under their reverse-DNS keys) and unsaved changes. (Its `path`
+/// is empty inside a plugin run: the entry works on a copy of the design.)
+struct Design {
+    metadata: Map<String, Value>,
+    dirty: bool,
+}
+
+/// The design (`document.inspect`, a read command: usable from read entries).
+fn design(host: &mut dyn Host) -> Result<Design, EntryError> {
+    let read = call(host, "document.inspect", json!({}))?;
+    Ok(Design {
+        metadata: read
+            .get("metadata")
             .and_then(Value::as_object)
             .cloned()
-            .unwrap_or_default()
-    };
-    Ok((object("metadata"), object("properties")))
+            .unwrap_or_default(),
+        dirty: read["dirty"].as_bool().unwrap_or(false),
+    })
 }
 
 fn text<'a>(map: &'a Map<String, Value>, key: &str) -> &'a str {
@@ -171,7 +187,8 @@ fn revision_url(tc: &Map<String, Value>) -> Option<String> {
 /// *TeamCraft status*: which item and revision the design belongs to, and
 /// whether its part number and revision still say the same.
 pub fn status(host: &mut dyn Host) -> Result<Value, EntryError> {
-    let (metadata, props) = properties(host)?;
+    let d = design(host)?;
+    let (metadata, props) = (d.metadata.clone(), d.metadata.clone());
     let part_number = text(&props, "part_number");
     let revision = text(&props, "revision");
     if damaged(&metadata) {
@@ -212,6 +229,11 @@ pub fn status(host: &mut dyn Host) -> Result<Value, EntryError> {
              “{part_number}”, revision “{revision}”. Write the item data again or correct them."
         ));
     }
+    if d.dirty {
+        out["unsaved"] = json!(true);
+        let m = out["message"].as_str().unwrap_or("").to_string();
+        out["message"] = json!(format!("{m} The design has unsaved changes."));
+    }
     Ok(out)
 }
 
@@ -236,11 +258,12 @@ fn file_name(path: &str) -> &str {
 }
 
 /// *Check for TeamCraft*: what keeps the design from going into TeamCraft
-/// cleanly – missing part numbers, a design that says another item than the
-/// one it is linked to, BOM rows TeamCraft cannot match, linked designs it
-/// cannot find by name. Reads only.
+/// cleanly – missing part number, a design that says another item than the
+/// one it is linked to, unsaved changes. A read entry: SolidCraft shows the
+/// findings. The BOM and linked designs: [`check_assembly`].
 pub fn check(host: &mut dyn Host) -> Result<Value, EntryError> {
-    let (metadata, props) = properties(host)?;
+    let d = design(host)?;
+    let (metadata, props) = (d.metadata.clone(), d.metadata.clone());
     let mut findings = Vec::new();
     let part_number = text(&props, "part_number");
     if part_number.is_empty() {
@@ -283,11 +306,25 @@ pub fn check(host: &mut dyn Host) -> Result<Value, EntryError> {
             }
         }
     }
-    check_bom(host, &mut findings);
-    check_links(host, &mut findings);
+    if d.dirty {
+        findings.push(finding(
+            "warning",
+            "The design has unsaved changes – save it, a check-in takes the saved file.".into(),
+        ));
+    }
+    findings.push(finding(
+        "info",
+        "The bill of materials and linked designs are checked by *Check assembly for TeamCraft*."
+            .into(),
+    ));
+    Ok(summary(findings))
+}
+
+/// `ready` and the summary of a list of findings.
+fn summary(findings: Vec<Value>) -> Value {
     let ready = findings.iter().all(|f| f["level"] == "info");
     let problems = findings.iter().filter(|f| f["level"] != "info").count();
-    Ok(json!({
+    json!({
         "ready": ready,
         "summary": if ready {
             "Ready for TeamCraft.".to_string()
@@ -295,7 +332,20 @@ pub fn check(host: &mut dyn Host) -> Result<Value, EntryError> {
             format!("{problems} thing(s) to fix before checking in to TeamCraft.")
         },
         "findings": findings,
-    }))
+    })
+}
+
+/// *Check assembly for TeamCraft*: the bill of materials and the linked
+/// designs – BOM rows TeamCraft cannot match, linked designs it cannot find
+/// by name. An `edit` entry only because SolidCraft classes `assembly.bom`
+/// and `component.links` as edit commands: it changes nothing. SolidCraft's
+/// dialog shows no result for an edit entry; the CLI, MCP and the assistant
+/// get it.
+pub fn check_assembly(host: &mut dyn Host) -> Result<Value, EntryError> {
+    let mut findings = Vec::new();
+    check_bom(host, &mut findings);
+    check_links(host, &mut findings);
+    Ok(summary(findings))
 }
 
 /// BOM rows TeamCraft cannot match: no part number, a quantity SolidCraft
@@ -442,7 +492,7 @@ pub fn link(host: &mut dyn Host, params: &Value) -> Result<Value, EntryError> {
     if !server.is_empty() && !(server.starts_with("https://") || server.starts_with("http://")) {
         return Err(input("server", "must start with https:// or http://"));
     }
-    let (metadata, _) = properties(host)?;
+    let metadata = design(host)?.metadata;
     // keep the ids the desktop app wrote when the item stays the same
     let mut tc = teamcraft(&metadata)
         .filter(|tc| text(tc, "item_number") == item_number)
@@ -515,7 +565,8 @@ const UPDATE_PLUGIN: &str = "The TeamCraft desktop app is newer than this plugin
 /// revision (bridge folder). Never fails because the desktop app is not
 /// running: it says so, and what it knew when it last ran.
 pub fn live(host: &mut dyn Host) -> Result<Value, EntryError> {
-    let (metadata, _) = properties(host)?;
+    let d = design(host)?;
+    let metadata = d.metadata;
     let (item, revision) = match identity(&metadata) {
         Ok(id) => id,
         Err(message) => return Ok(json!({"live": false, "message": message})),
@@ -573,6 +624,26 @@ pub fn live(host: &mut dyn Host) -> Result<Value, EntryError> {
         }
         (Read::Newer(_), _) => unreachable!("handled above"),
     };
+    let mut message = message;
+    // requests the desktop app has not taken yet (their file is still there)
+    let mut pending = Vec::new();
+    for action in bridge::ACTIONS {
+        let file = bridge::request_file(&item, &revision, action);
+        if let Read::Ok(r) = read_bridge(host, &file, "teamcraft.solidcraft.request")? {
+            let asked = r["written_at"].as_u64().unwrap_or(0);
+            pending.push(json!({"action": action, "asked": asked}));
+            message.push_str(&format!(
+                " Waiting for the desktop app: {} (asked {}).",
+                action.replace('_', "-"),
+                bridge::age(now, asked)
+            ));
+        }
+    }
+    out["pending"] = json!(pending);
+    if d.dirty {
+        out["unsaved"] = json!(true);
+        message.push_str(" The design has unsaved changes.");
+    }
     out["message"] = json!(message);
     Ok(out)
 }
@@ -595,13 +666,13 @@ fn read_bridge(host: &mut dyn Host, path: &str, schema: &str) -> Result<Read, En
 /// when it starts, within 10 minutes); a check-in always opens the desktop
 /// app's own check-in dialog, never runs by itself.
 pub fn ask_desktop(host: &mut dyn Host, action: &str) -> Result<Value, EntryError> {
-    let (metadata, _) = properties(host)?;
+    let metadata = design(host)?.metadata;
     let (item, revision) =
         identity(&metadata).map_err(|m| EntryError::Unsupported(m.to_string()))?;
     let now = host.now();
     let beat = read_bridge(host, "desktop.json", "teamcraft.solidcraft.desktop")?;
     let request = bridge::request(&item, &revision, action, now);
-    let file = bridge::request_file(&item, &revision, now, action);
+    let file = bridge::request_file(&item, &revision, action);
     host.write_file(&file, request.to_string().as_bytes())
         .map_err(|reason| EntryError::Command {
             command: format!("files.write-file {}/{file}", bridge::GRANT),
@@ -647,6 +718,8 @@ mod tests {
         /// The bridge folder.
         files: std::collections::BTreeMap<String, Vec<u8>>,
         clock: u64,
+        /// The design has unsaved changes.
+        dirty: bool,
     }
 
     impl Host for Fake {
@@ -655,30 +728,10 @@ mod tests {
             if let Some((_, why)) = self.fail.iter().find(|(c, _)| *c == command) {
                 return Err((*why).to_string());
             }
-            let props = |m: &Map<String, Value>| {
-                let mut p = Map::new();
-                for k in [
-                    "project",
-                    "part_number",
-                    "revision",
-                    "author",
-                    "organization",
-                    "description",
-                    "license",
-                ] {
-                    p.insert(
-                        k.into(),
-                        m.get(k)
-                            .filter(|v| v.is_string())
-                            .cloned()
-                            .unwrap_or(Value::Null),
-                    );
-                }
-                Value::Object(p)
-            };
             match command {
-                "document.metadata" => {
-                    Ok(json!({"metadata": self.metadata, "properties": props(&self.metadata)}))
+                // as SolidCraft answers it: the metadata as saved, unsaved changes, the file
+                "document.inspect" => {
+                    Ok(json!({"metadata": self.metadata, "dirty": self.dirty, "path": null}))
                 }
                 "document.metadata.set" => {
                     for (k, v) in args["values"].as_object().unwrap() {
@@ -779,7 +832,17 @@ mod tests {
             json!({"component": 4, "name": "Plate B", "path": "lib/plate.sc"}),
             json!({"component": 5, "name": "Bolt", "path": "bolt.sc"}),
         ];
-        let c = check(&mut f).unwrap();
+        // the design itself: check (a read entry)
+        let own = check(&mut f).unwrap();
+        assert!(own["findings"]
+            .to_string()
+            .contains("“TC-9999” is not the TeamCraft item TC-1042"));
+        assert!(
+            own["summary"].as_str().unwrap().starts_with("1 thing(s)"),
+            "{own}"
+        );
+        // the assembly: check_assembly (an edit entry, BOM and links)
+        let c = check_assembly(&mut f).unwrap();
         assert_eq!(c["ready"], false);
         let text: Vec<String> = c["findings"]
             .as_array()
@@ -788,10 +851,6 @@ mod tests {
             .map(|f| f["message"].as_str().unwrap().to_string())
             .collect();
         let has = |s: &str| text.iter().any(|t| t.contains(s));
-        assert!(
-            has("“TC-9999” is not the TeamCraft item TC-1042"),
-            "{text:?}"
-        );
         assert!(has("BOM item 1.1 (Bolt) has no part number"), "{text:?}");
         assert!(has("Part number TC-200 has two descriptions"), "{text:?}");
         assert!(
@@ -802,7 +861,7 @@ mod tests {
         assert!(has("by an absolute path"), "{text:?}");
         assert!(has("Two linked designs are named plate.sc"), "{text:?}");
         assert!(
-            c["summary"].as_str().unwrap().starts_with("6 thing(s)"),
+            c["summary"].as_str().unwrap().starts_with("5 thing(s)"),
             "{c}"
         );
     }
@@ -873,16 +932,16 @@ mod tests {
     fn a_failed_command_is_explained() {
         let mut refused = linked();
         refused.fail = vec![(
-            "document.metadata",
-            "permission denied: edit command document.metadata from read entry",
+            "document.inspect",
+            "permission denied: edit command document.inspect from read entry",
         )];
         let Err(EntryError::Command { command, reason }) = status(&mut refused) else {
             panic!("status must fail when the properties cannot be read");
         };
-        assert_eq!(command, "document.metadata");
+        assert_eq!(command, "document.inspect");
         assert!(reason.contains("permission denied") && reason.contains("matches your SolidCraft"));
         let mut closed = Fake {
-            fail: vec![("document.metadata", "no design is open")],
+            fail: vec![("document.inspect", "no design is open")],
             ..Fake::default()
         };
         let Err(EntryError::Command { reason, .. }) = check(&mut closed) else {
@@ -907,13 +966,13 @@ mod tests {
             ("assembly.bom", "evaluation failed"),
             ("component.links", "evaluation failed"),
         ];
-        let c = check(&mut f).unwrap();
+        let c = check_assembly(&mut f).unwrap();
         assert_eq!(c["ready"], false);
         let text = c["findings"].to_string();
         assert!(text.contains("bill of materials was not checked"), "{text}");
         assert!(text.contains("linked designs were not checked"), "{text}");
         // a plain part answers with no rows and no links: ready
-        assert_eq!(check(&mut linked()).unwrap()["ready"], true);
+        assert_eq!(check_assembly(&mut linked()).unwrap()["ready"], true);
     }
 
     /// TeamCraft data that is not an object is reported, and link repairs it.
@@ -1020,7 +1079,7 @@ mod tests {
         let mut f = linked();
         f.clock = 1_700_000_000;
         let r = ask_desktop(&mut f, "check_in").unwrap();
-        let file = "request-TC_2D1042.B.1700000000.check_in.json";
+        let file = "request-TC_2D1042.B.check_in.json";
         assert_eq!(r["file"], file);
         assert!(r["message"].as_str().unwrap().contains("when it starts"));
         let written: Value = serde_json::from_slice(&f.files[file]).unwrap();
@@ -1073,7 +1132,7 @@ mod tests {
             .map(|c| c.as_str().unwrap())
             .collect();
         for command in [
-            "document.metadata",
+            "document.inspect",
             "document.metadata.set",
             "document.metadata.remove",
             "assembly.bom",
@@ -1093,12 +1152,75 @@ mod tests {
         labels.sort_unstable();
         labels.dedup();
         assert_eq!(labels.len(), ENTRIES.len(), "one label per entry");
-        // SolidCraft refuses a command it does not class as `read` from a
-        // read entry, and it classes document.metadata, assembly.bom and
-        // component.links as edit commands. So every entry is `edit`; status
-        // and check only read.
+        // SolidCraft shows the result of a read entry only; a read entry may
+        // call only read-classified commands (document.inspect), so the entries
+        // that need assembly.bom, component.links, metadata writes or file
+        // writes are `edit`.
         for e in entries {
-            assert_eq!(e["effect"], "edit", "{}", e["name"]);
+            let name = e["name"].as_str().unwrap();
+            let effect = if READ_ENTRIES.contains(&name) {
+                "read"
+            } else {
+                "edit"
+            };
+            assert_eq!(e["effect"], effect, "{name}");
+        }
+    }
+
+    /// Unsaved changes are said, in check, status and live: a check-in takes
+    /// the saved file.
+    #[test]
+    fn unsaved_designs_are_said() {
+        let mut f = linked();
+        f.dirty = true;
+        let c = check(&mut f).unwrap();
+        assert_eq!(c["ready"], false);
+        assert!(c["findings"].to_string().contains("unsaved changes"));
+        let s = status(&mut f).unwrap();
+        assert_eq!(s["unsaved"], true);
+        assert!(s["message"].as_str().unwrap().ends_with("unsaved changes."));
+        assert_eq!(live(&mut f).unwrap()["unsaved"], true);
+    }
+
+    /// A request still in the folder is one the desktop app has not taken:
+    /// live says so; asking again replaces it.
+    #[test]
+    fn live_shows_requests_not_taken_yet() {
+        let mut f = linked();
+        f.clock = 10_000;
+        ask_desktop(&mut f, "check_in").unwrap();
+        f.clock = 10_120;
+        ask_desktop(&mut f, "check_in").unwrap();
+        assert_eq!(
+            f.files.keys().filter(|k| k.starts_with("request-")).count(),
+            1,
+            "one request per action"
+        );
+        f.clock = 10_180;
+        let l = live(&mut f).unwrap();
+        assert_eq!(l["pending"][0]["action"], "check_in");
+        let m = l["message"].as_str().unwrap();
+        assert!(
+            m.contains("Waiting for the desktop app: check-in (asked 1 min ago)"),
+            "{m}"
+        );
+    }
+
+    /// The read entries call only read-classified commands – anything else
+    /// makes SolidCraft refuse the whole run.
+    #[test]
+    fn read_entries_call_only_read_commands() {
+        let mut f = linked();
+        f.files.insert("desktop.json".into(), heartbeat(1, true));
+        f.files.insert(bridge::state_file("TC-1042", "B"), state(1));
+        status(&mut f).unwrap();
+        check(&mut f).unwrap();
+        live(&mut f).unwrap();
+        for (command, _) in &f.calls {
+            assert!(
+                READ_COMMANDS.contains(&command.as_str()) || command == "read-file",
+                "{command} from a read entry"
+            );
         }
     }
 }
