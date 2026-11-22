@@ -94,3 +94,4 @@
     - [As-built records](research/as-built.md)
     - [Fluent, STAR-CCM+ and Simcenter 3D files](research/solver-files.md)
     - [SolidCraft designs](research/solidcraft-design.md)
+    - [3D preview of SolidCraft designs without an export](research/solidcraft-3d-preview.md)
