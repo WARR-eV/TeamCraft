@@ -10,10 +10,12 @@
 // Web pages mount the viewer through data attributes on #viewer-canvas; the
 // desktop app calls TeamCraftViewer.mount(canvas, options) with its own loader.
 //
-// Mouse: drag = rotate, wheel = zoom, double-click = reset. Touch: one finger
-// rotates, pinch zooms. Keyboard (canvas focused): arrows rotate, +/- zoom,
-// 0 resets. Below the canvas a section plane (X, Y or Z, position, side)
-// cuts the model open.
+// Mouse: drag = rotate, right or middle drag (or Shift/Ctrl + drag) = pan –
+// which button does what is the *Mouse* setting below the canvas (#459) –,
+// wheel = zoom, double-click = reset. Touch: one finger rotates, two fingers
+// pan and pinch zooms. Keyboard (canvas focused): arrows rotate, Shift +
+// arrows pan, +/- zoom, 0 resets. Below the canvas a section plane (X, Y or
+// Z, position, side) cuts the model open.
 (function () {
   "use strict";
 
@@ -46,6 +48,56 @@
       }
     }
     return null;
+  }
+
+  /**
+   * The mouse schemes of the viewer (#459): which drag rotates and which pans.
+   * In every scheme a plain left drag rotates, and Shift or Ctrl + left drag
+   * and a drag with the left and right button held pan – the combinations
+   * people try first. The choice is kept per browser (localStorage).
+   */
+  var MOUSE_SCHEMES = [
+    { id: "left-rotate", label: "Left drag rotates · right or middle pans" },
+    { id: "right-rotate", label: "Right drag rotates · middle pans" },
+    { id: "middle-rotate", label: "Middle drag rotates · Shift + middle pans" },
+    { id: "middle-pan", label: "Middle drag pans · Shift + middle rotates" }
+  ];
+  var MOUSE_KEY = "teamcraft-viewer-mouse";
+
+  /**
+   * What a drag does in `scheme`: "rotate", "pan" or null (no button held).
+   * `buttons` is PointerEvent.buttons (1 left, 2 right, 4 middle); an unknown
+   * scheme is the first one.
+   */
+  function dragAction(scheme, buttons, shift, ctrl) {
+    var left = (buttons & 1) !== 0, right = (buttons & 2) !== 0, middle = (buttons & 4) !== 0;
+    if (!left && !right && !middle) return null;
+    if (left && right) return "pan";
+    var leftDrag = shift || ctrl ? "pan" : "rotate";
+    switch (scheme) {
+      case "right-rotate":
+        if (right) return "rotate";
+        if (middle) return "pan";
+        return leftDrag;
+      case "middle-rotate":
+        if (middle) return shift ? "pan" : "rotate";
+        if (right) return "pan";
+        return leftDrag;
+      case "middle-pan":
+        if (middle) return shift ? "rotate" : "pan";
+        if (right) return "pan";
+        return leftDrag;
+      default:
+        if (middle || right) return "pan";
+        return leftDrag;
+    }
+  }
+
+  /** The stored mouse scheme, or the first one. */
+  function storedMouseScheme() {
+    var id = null;
+    try { id = window.localStorage.getItem(MOUSE_KEY); } catch (e) { /* blocked */ }
+    return MOUSE_SCHEMES.some(function (s) { return s.id === id; }) ? id : MOUSE_SCHEMES[0].id;
   }
 
   /**
@@ -434,6 +486,7 @@
     // zUp: CAD convention (NX, CATIA, FreeCAD, 3D printing); toggle for Y-up exports.
     var view = { yaw: -0.6, pitch: 0.45, dist: 1, center: [0, 0, 0], radius: 1, zUp: true };
     var home = null;
+    var mouseScheme = storedMouseScheme();
     // Model and canvas colours from the skin tokens (skins.css); read again
     // when the system switches between light and dark (the System skin).
     var baseColor, clearColor;
@@ -589,6 +642,24 @@
       el.appendChild(decimals);
       el.appendChild(result);
 
+      // Mouse: which drag rotates and which pans (#459), kept per browser.
+      var mouse = document.createElement("select");
+      mouse.className = "small";
+      mouse.setAttribute("aria-label", "Mouse buttons");
+      mouse.title = "Which mouse drag rotates and which pans. Shift or Ctrl + left drag always pans.";
+      MOUSE_SCHEMES.forEach(function (s) {
+        var opt = document.createElement("option");
+        opt.value = s.id;
+        opt.textContent = s.label;
+        mouse.appendChild(opt);
+      });
+      mouse.value = mouseScheme;
+      mouse.addEventListener("change", function () {
+        mouseScheme = mouse.value;
+        try { window.localStorage.setItem(MOUSE_KEY, mouseScheme); } catch (e) { /* blocked */ }
+      });
+      el.appendChild(mouse);
+
       // Notes pinned to the model (design review), when the page offers them.
       if (notesApi) {
         var noteBtn = document.createElement("button");
@@ -664,7 +735,7 @@
       view.center = [(b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2];
       view.radius = Math.max(Math.hypot(size[0], size[1], size[2]) / 2, 1e-6);
       view.dist = view.radius * 2.8;
-      home = { yaw: view.yaw, pitch: view.pitch, dist: view.dist };
+      home = { yaw: view.yaw, pitch: view.pitch, dist: view.dist, center: view.center.slice() };
       function fmt(v) { return (Math.round(v * 100) / 100).toLocaleString(); }
       var what = mesh.indices
         ? (mesh.indices.length / 3).toLocaleString() + " triangles · " + mesh.parts.toLocaleString() + (mesh.parts === 1 ? " body" : " bodies")
@@ -762,9 +833,28 @@
       redraw();
     }
 
+    // Moves the point the view turns around along the screen by (dx, dy) CSS
+    // pixels, so the model follows the pointer at the depth of that point.
+    // Rows 0 and 1 of the view rotation are the screen's right and up in
+    // model space (see `back` in pick); the point stays within a few model
+    // radii of the model's centre, so the model cannot be lost.
+    function pan(dx, dy) {
+      if (!home) return;
+      var rot = multiply(rotationX(view.pitch), rotationY(view.yaw));
+      if (view.zUp) rot = multiply(rot, rotationX(-Math.PI / 2));
+      var perPixel = 2 * view.dist * Math.tan(Math.PI / 8) / Math.max(canvas.clientHeight, 1);
+      var limit = view.radius * 4;
+      for (var i = 0; i < 3; i++) {
+        var c = view.center[i] - (rot[i * 4] * dx - rot[i * 4 + 1] * dy) * perPixel;
+        view.center[i] = Math.max(home.center[i] - limit, Math.min(home.center[i] + limit, c));
+      }
+      redraw();
+    }
+
     function reset() {
       if (!home) return;
       view.yaw = home.yaw; view.pitch = home.pitch; view.dist = home.dist;
+      view.center = home.center.slice();
       redraw();
     }
 
@@ -778,8 +868,12 @@
       pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
       downAt = { x: e.clientX, y: e.clientY };
     });
-    // a click (not a drag) in measure mode picks a point
+    // right and middle drags pan or rotate: no context menu, no autoscroll
+    canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+    canvas.addEventListener("mousedown", function (e) { if (e.button === 1) e.preventDefault(); });
+    // a left click (not a drag) in measure mode picks a point
     canvas.addEventListener("pointerup", function (e) {
+      if (e.button !== 0) return;
       if (!(measure.on || noting) || !downAt || Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 4) return;
       var rect = canvas.getBoundingClientRect();
       var hit = pick(e.clientX - rect.left, e.clientY - rect.top);
@@ -805,8 +899,15 @@
         var d = Math.hypot(e.clientX - other.x, e.clientY - other.y);
         if (pinch) zoom(pinch / Math.max(d, 1));
         pinch = d;
+        // two fingers moving together pan: the midpoint moves half as far
+        pan((e.clientX - prev.x) / 2, (e.clientY - prev.y) / 2);
       } else {
-        rotate((e.clientX - prev.x) * 0.01, (e.clientY - prev.y) * 0.01);
+        var dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+        // touch and pen: one contact rotates, like a left drag
+        var buttons = e.pointerType === "mouse" ? e.buttons : 1;
+        var action = dragAction(mouseScheme, buttons, e.shiftKey, e.ctrlKey);
+        if (action === "pan") pan(dx, dy);
+        else if (action === "rotate") rotate(dx * 0.01, dy * 0.01);
       }
       pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
     });
@@ -821,12 +922,12 @@
     canvas.addEventListener("dblclick", reset);
     canvas.addEventListener("keydown", function (e) {
       if (e.ctrlKey || e.metaKey || e.altKey) return; // page shortcuts (zoom, …)
-      var step = 0.12;
+      var step = 0.12, shift = 40; // radians to turn, CSS pixels to pan
       switch (e.key) {
-        case "ArrowLeft": rotate(-step, 0); break;
-        case "ArrowRight": rotate(step, 0); break;
-        case "ArrowUp": rotate(0, -step); break;
-        case "ArrowDown": rotate(0, step); break;
+        case "ArrowLeft": if (e.shiftKey) pan(-shift, 0); else rotate(-step, 0); break;
+        case "ArrowRight": if (e.shiftKey) pan(shift, 0); else rotate(step, 0); break;
+        case "ArrowUp": if (e.shiftKey) pan(0, -shift); else rotate(0, -step); break;
+        case "ArrowDown": if (e.shiftKey) pan(0, shift); else rotate(0, step); break;
         case "+": case "=": zoom(0.85); break;
         case "-": case "_": zoom(1 / 0.85); break;
         case "0": reset(); break;
@@ -943,7 +1044,7 @@
     };
   }
 
-  window.TeamCraftViewer = { mount: mount, checkMesh: checkMesh };
+  window.TeamCraftViewer = { mount: mount, checkMesh: checkMesh, dragAction: dragAction, MOUSE_SCHEMES: MOUSE_SCHEMES };
 
   // Web pages: <canvas id="viewer-canvas" data-src [data-name]>.
   var canvas = document.getElementById("viewer-canvas");
