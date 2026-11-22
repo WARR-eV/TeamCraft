@@ -132,10 +132,13 @@ Revisions with only neutral files (STEP, PDF) show no picture there.
 **In the lists** (#420) the same picture heads each row: the item list and
 its search results, the vault explorer and, in the desktop app, Home
 (*Files*, *All items*, *Structure*) and the search. A stand-alone JT file
-comes after the native files. The list answer names the picture of every row
+comes after the native files. A revision with only neutral files (STEP, STL,
+glTF …) has no list picture yet, even when it has a 3D view: rendering one
+from the 3D preview is left as a follow-up. The list answer names the picture of every row
 (one query for the whole page, never one per row); the images load lazily,
 only for the rows in view, and are cached by the file's content hash (ETag,
-a repeated request answers *304 Not Modified*). A row without a picture
+a repeated request answers *304 Not Modified*; not for an assembly whose
+picture is put together from its parts, which changes with them). A row without a picture
 keeps its place and shows nothing (web) or the type icon (desktop). The
 picture of a revision on its own is `GET /revisions/{id}/thumbnail` (web)
 and `GET /api/v1/revisions/{id}/thumbnail` (REST API) – 404 when it has

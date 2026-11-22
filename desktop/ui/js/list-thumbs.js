@@ -15,6 +15,21 @@ var listThumbUrls = {};
 var listThumbOrder = [];
 var LIST_THUMB_MAX = 300;
 var listThumbObserver = null;
+// The cells being watched. A row can leave the page before it ever comes
+// into view (a long list drawn again on Refresh, sort or navigation); the
+// observer would keep such a cell, and its row, alive. So the first cell of
+// each new drawing lets go of the watched cells that are no longer on the page.
+var listThumbCells = new Set();
+var listThumbBatch = false;
+
+function listThumbForget(ico) {
+  listThumbObserver.unobserve(ico);
+  listThumbCells.delete(ico);
+}
+
+function listThumbPrune() {
+  listThumbCells.forEach(function (ico) { if (!ico.isConnected) listThumbForget(ico); });
+}
 
 /** The blob URL of a picture, fetched once per content hash. */
 function listThumbUrl(sha, id) {
@@ -51,13 +66,19 @@ function listThumbWatch(ico) {
     listThumbObserver = new IntersectionObserver(function (entries) {
       entries.forEach(function (en) {
         // a row that left the page (the list was drawn again) is let go
-        if (!en.target.isConnected) { listThumbObserver.unobserve(en.target); return; }
+        if (!en.target.isConnected) { listThumbForget(en.target); return; }
         if (!en.isIntersecting) return;
-        listThumbObserver.unobserve(en.target);
+        listThumbForget(en.target);
         listThumbLoad(en.target);
       });
     }, { rootMargin: "200px 0px" });
   }
+  if (!listThumbBatch) {
+    listThumbBatch = true;
+    listThumbPrune();
+    setTimeout(function () { listThumbBatch = false; }, 0);
+  }
+  listThumbCells.add(ico);
   listThumbObserver.observe(ico);
 }
 

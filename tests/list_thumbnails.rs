@@ -1,7 +1,8 @@
 //! Thumbnails in lists (#420): the main thumbnail of a revision, its route
 //! on web and API (read rights, ETag, 404 without a picture) and the
 //! thumbnail fields of the item search and the vault explorer, filled for a
-//! whole page in one batched query.
+//! whole page in one batched query (the statement count of a list page does
+//! not grow with its rows).
 
 mod common;
 
@@ -303,5 +304,111 @@ async fn thumbnails_of_many_revisions_in_one_call() {
         .await
         .unwrap()
         .is_empty());
+    app.teardown().await;
+}
+
+/// The SQL statements sqlx runs while a future is polled on this thread
+/// (sqlx reports every statement as a `sqlx::query` tracing event). The
+/// tests run on a current-thread runtime, so the router's work is seen and
+/// other tests' work is not.
+#[derive(Clone, Default)]
+struct Statements(std::sync::Arc<std::sync::Mutex<Vec<String>>>);
+
+impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for Statements {
+    fn on_event(&self, event: &tracing::Event<'_>, _: tracing_subscriber::layer::Context<'_, S>) {
+        if event.metadata().target() != "sqlx::query" {
+            return;
+        }
+        let mut text = String::new();
+        event.record(
+            &mut |field: &tracing::field::Field, value: &dyn std::fmt::Debug| {
+                if field.name() == "message" || field.name() == "db.statement" {
+                    text.push_str(&format!("{value:?} "));
+                }
+            },
+        );
+        self.0.lock().unwrap().push(text);
+    }
+}
+
+async fn statements_of<F: std::future::Future>(work: F) -> Vec<String> {
+    use tracing_subscriber::layer::SubscriberExt;
+    let seen = Statements::default();
+    {
+        let _scope =
+            tracing::subscriber::set_default(tracing_subscriber::registry().with(seen.clone()));
+        work.await;
+    }
+    let mut statements = seen.0.lock().unwrap();
+    std::mem::take(&mut *statements)
+}
+
+/// The list paths ask for the thumbnails of a page in one go: the number of
+/// statements of the item search, the structure roots and the vault explorer
+/// stays the same whether the page has 3 or 9 items with a picture (#420).
+#[tokio::test]
+async fn list_query_count_stays_constant() {
+    let app = app_or_skip!();
+    let (_, eng) = app.user_in("eng", Role::Editor, &["GEARBOX"]).await;
+    let cookie = app.login("eng").await;
+    let png = tiny_png(16, 16);
+    let pages = [
+        "/api/v1/items?project=GEARBOX&q=Counted",
+        "/api/v1/projects/GEARBOX/structure",
+        "/vault?q=Counted",
+    ];
+    let measure = |uri: &'static str| {
+        let (app, eng, cookie) = (&app, &eng, &cookie);
+        async move {
+            statements_of(async {
+                let r = if uri.starts_with("/api/") {
+                    app.api(Method::GET, uri, eng, None).await
+                } else {
+                    app.get_page(uri, Some(cookie.as_str())).await
+                };
+                assert_eq!(r.status, StatusCode::OK, "{uri}: {}", r.text());
+            })
+            .await
+        }
+    };
+    let mut before = Vec::new();
+    for (round, range) in [0..3, 3..9].into_iter().enumerate() {
+        for n in range {
+            let number = new_part(&app, &eng, &format!("Counted {n}")).await;
+            upload(&app, &eng, &number, &[("c.ipt", &inventor_file(&png))]).await;
+        }
+        let mut counts = Vec::new();
+        for uri in pages {
+            // once before counting: first-use updates (token, session) are not
+            // part of the list. Work left over from the uploads (previews, text
+            // index) only adds statements, so the smallest of three runs counts.
+            measure(uri).await;
+            let mut fewest = measure(uri).await;
+            for _ in 0..2 {
+                let run = measure(uri).await;
+                if run.len() < fewest.len() {
+                    fewest = run;
+                }
+            }
+            counts.push(fewest);
+        }
+        if round == 0 {
+            before = counts;
+        } else {
+            for ((uri, small), large) in pages.iter().zip(&before).zip(&counts) {
+                assert!(!small.is_empty(), "{uri}: statements are seen");
+                assert_eq!(
+                    small.len(),
+                    large.len(),
+                    "{uri}: 3 items ran {small:#?}, 9 items ran {large:#?}"
+                );
+            }
+        }
+    }
+    // the rows carry their thumbnails
+    let r = app.api(Method::GET, pages[0], &eng, None).await;
+    let items = r.json()["items"].as_array().unwrap().clone();
+    assert_eq!(items.len(), 9);
+    assert!(items.iter().all(|i| i["thumbnail_file_id"].is_string()));
     app.teardown().await;
 }

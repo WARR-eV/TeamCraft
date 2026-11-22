@@ -26,7 +26,8 @@ see the notices in the README.
   images load lazily (web `loading="lazy"`, desktop only for rows in view)
   and are cached by content hash. New: `GET /revisions/{id}/thumbnail` on
   web and REST API (404 without a picture or read access); thumbnail
-  responses answer `If-None-Match` with 304. Similar-part hits use the same
+  responses answer `If-None-Match` with 304 (not for assemblies composed from
+  their parts' previews, whose picture changes with a component). Similar-part hits use the same
   picture rule.
 
 ## [0.2.12] - 2026-11-22

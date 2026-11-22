@@ -1237,7 +1237,8 @@ async fn rendered_thumbnail(
 /// SOLIDWORKS parts and assemblies).
 /// Shared with the REST API.
 /// An `If-None-Match` with the image's ETag (`"<sha256>-thumb"`) answers
-/// 304 without reading or rendering the image again.
+/// 304 without reading or rendering the image again – except for formats
+/// whose picture may be composed from component parts (assemblies).
 pub(crate) async fn thumbnail_response(
     st: &AppState,
     me: &Actor,
@@ -1251,10 +1252,17 @@ pub(crate) async fn thumbnail_response(
         ));
     }
     let etag = format!("\"{}-thumb\"", f.sha256);
-    let not_modified = request
-        .get(header::IF_NONE_MATCH)
-        .and_then(|v| v.to_str().ok())
-        .is_some_and(|v| v.split(',').any(|t| t.trim() == etag));
+    // An assembly's picture may be put together from its parts' previews
+    // (`services::assemblies`): it changes with a component while the
+    // assembly file – and so its ETag – stays the same. Only a picture that
+    // depends on the file alone answers 304.
+    let composed = thumbnail::rendered(&f.format)
+        && crate::preview::PreviewFormat::of_format(&f.format).is_some_and(|p| p.may_be_assembly());
+    let not_modified = !composed
+        && request
+            .get(header::IF_NONE_MATCH)
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|v| v.split(',').any(|t| t.trim() == etag));
     if not_modified {
         return Response::builder()
             .status(StatusCode::NOT_MODIFIED)

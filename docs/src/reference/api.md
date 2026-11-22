@@ -512,7 +512,9 @@ part before a model file before the drawing before a JT file, the first by
 name on a tie (the picture at the top of the revision page). It is the
 image of `GET /files/{id}/thumbnail` of that file (PNG, BMP or JPEG) with
 `ETag: "<sha256>-thumb"`; a request with that `If-None-Match` answers
-`304 Not Modified` (also on `/files/{id}/thumbnail`). 404 when no file has a
+`304 Not Modified` (also on `/files/{id}/thumbnail`) – except for assemblies
+whose picture may be put together from their parts' previews (it changes
+with a component while the assembly file stays the same). 404 when no file has a
 picture, and when the revision is unknown or in a project group the caller
 may not read.
 

@@ -754,7 +754,9 @@ needs an issue with a reason first (see *Direction*).
   review is #408: quick wins done (#409 check-in icon, #410 one vocabulary + glossary, #411 web check-out wording
   and *Get TeamCraft Desktop*, #412 preview at the top of the revision page, #413 no hash column, #414 revision vs
   version explained), #421 section nav of the revision page, #417 right-click menus in the desktop app, #420
-  thumbnails in the item list, search, vault explorer and the desktop Home views; left: the daily CAD loop (#415, #416,
+  thumbnails in the item list, search, vault explorer and the desktop Home views (left from #420: a
+  revision with only STEP or mesh files gets no list picture yet – a fallback rendered from its 3D preview needs
+  `thumbnail::supports` and `cadformat` widened); left: the daily CAD loop (#415, #416,
   #418, #419) and onboarding (#422–#424)
 - [ ] Responsive pages on large data (1M files, 100k items, 10k-line BOMs – see the scale targets)
 - [ ] Faster opening of large CAD files and assemblies
