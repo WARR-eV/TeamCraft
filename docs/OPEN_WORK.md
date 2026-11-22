@@ -159,7 +159,7 @@ feature milestone – the features in *What works* are enough; what is missing i
 - [ ] Desktop: report a problem from any error (#381). Done: *Report…* on every toast and dialog error, *Help → Report a
   Problem…*, redacted prefilled report (`desktop/src/report.rs`), *Open issue form* / *Copy* / *Save*, own tracker
   setting, *Copy details* on web error pages. Left: screenshot and affected-file attachments, the key inputs of
-  each action (most messages name only the action), the server version in the report, a request id on web errors
+  each action (most messages name only the action), a request id on web errors (the server version in the report: done)
   (the tracker as a desktop policy: done, `ReportUrl`)
 - [ ] Desktop: one-click update (#377). Done: update window (release notes, *Skip this version*, *Remind me later*),
   *Help → Check for Updates…*, download of this installation's file verified against `SHA256SUMS.txt`, Windows

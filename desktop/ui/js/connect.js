@@ -82,6 +82,7 @@ export function initConnect() {
     // a saved connection to that server comes back signed in, with its own
     // working folder (src/profiles.rs)
     call("set_server", { url: url }).then(function () {
+      state.serverVersion = undefined; // another server: ask its version again (report.js)
       return call("session");
     }).then(function (s) {
       state.session = s;

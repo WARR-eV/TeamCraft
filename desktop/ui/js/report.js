@@ -21,6 +21,11 @@ export function reportDialog(failure) {
     inputs: (failure.inputs || []).map(function (kv) { return [String(kv[0]), String(kv[1])]; }),
     server_version: state.serverVersion || null
   };
+  // the server's version, asked once per app run (null when it does not answer)
+  var versionAsked = state.serverVersion !== undefined ? Promise.resolve() : call("server_version").then(function (v) {
+    state.serverVersion = v || null;
+    problem.server_version = state.serverVersion;
+  }, function () { state.serverVersion = null; });
   function rebuild() {
     problem.answer = answer.value;
     problem.log = withLog.checked ? recent : null;
@@ -61,7 +66,7 @@ export function reportDialog(failure) {
       }).catch(function (e) { d.fail(e); });
     } }
   ], { wide: true });
-  rebuild().catch(function (e) { preview.value = errorText(e); });
+  versionAsked.then(rebuild).catch(function (e) { preview.value = errorText(e); });
 }
 
 reportHook.open = reportDialog;

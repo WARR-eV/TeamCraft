@@ -122,6 +122,10 @@ see the notices in the README.
 
 ### Fixed
 
+- **Desktop: problem reports name the server version** (#381). *Report a
+  problem* always left it out (nothing set it); the app now asks the server
+  (`GET /api/v1`) once per run and per server switch.
+
 - **CI on `main` is green again.** The usage statistics page (#383) gives
   its table headers a `scope` (accessibility check), its background and
   reporting functions are named in the audit guard's `NOT_AUDITED` list with

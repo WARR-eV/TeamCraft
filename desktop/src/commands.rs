@@ -351,6 +351,20 @@ pub async fn server_notice(state: State<'_, AppState>) -> CmdResult<Option<Strin
         .and_then(|server| crate::compat::notice(env!("CARGO_PKG_VERSION"), server)))
 }
 
+/// The version the server says it runs (`GET /api/v1`), for problem reports
+/// (#381); `null` when it does not answer. Needs no sign-in.
+#[tauri::command]
+pub async fn server_version(state: State<'_, AppState>) -> CmdResult<Option<String>> {
+    let api = api_of(&state)?;
+    let Ok(index) = api.json(Method::GET, "", None).await else {
+        return Ok(None);
+    };
+    Ok(index["version"]
+        .as_str()
+        .filter(|v| v.len() <= 32 && v.bytes().all(|b| b.is_ascii_alphanumeric() || b".-+".contains(&b)))
+        .map(str::to_string))
+}
+
 fn store_token(state: &State<'_, AppState>, token: String) -> CmdResult<()> {
     let mut s = state.settings.lock().expect("settings lock");
     s.save_token(&state.config_dir, Some(token))
