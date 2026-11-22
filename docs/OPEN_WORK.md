@@ -772,7 +772,9 @@ needs an issue with a reason first (see *Direction*).
   states that name the next step (web and desktop, by role, i18n catalogs), #420 thumbnails in the item list,
   search, vault explorer and the desktop Home views (left from #420: a revision with only STEP or mesh files gets
   no list picture yet – a fallback rendered from its 3D preview needs `thumbnail::supports` and `cadformat`
-  widened); left: the daily CAD loop (#415, #416, #418, #419) and onboarding (#422, #424); the other empty states
+  widened), #419 BOM components picked by search (number, name, file name) in web and desktop, with Add line /
+  quantity / remove in the desktop *Structure* tab; left: the daily CAD loop (#415, #416, #418) and onboarding (#422,
+  #424); the other empty states
   (detail tabs, admin pages) still in English only;
   #423 left: a *Get…* hint for viewers (they may get read-only copies, but *New on this computer* is shown to CAD
   editors only) and a check whether the working folder really lacks the active group's files

@@ -471,7 +471,10 @@ pub async fn find(
 
 /// Per revision the file of its main thumbnail (the rule of
 /// `services::thumbnails`, the same picture as in the lists).
-async fn thumbnails(pool: &PgPool, revision_ids: &[Uuid]) -> AppResult<HashMap<Uuid, Uuid>> {
+pub(crate) async fn thumbnails(
+    pool: &PgPool,
+    revision_ids: &[Uuid],
+) -> AppResult<HashMap<Uuid, Uuid>> {
     Ok(super::thumbnails::main_for_revisions(pool, revision_ids)
         .await?
         .into_iter()

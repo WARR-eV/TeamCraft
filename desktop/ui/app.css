@@ -1344,3 +1344,14 @@ pre.release-notes {
 
 /* right-click menu of an item (#417, item-menu.js): busy while its revision loads */
 body.menu-loading, body.menu-loading * { cursor: progress; }
+
+/* Structure tab: Add line… component picker and editable BOM lines (#419, js/bom-lines.js) */
+.picker-list { list-style: none; margin: 4px 0 0; padding: 4px 0; max-height: 18rem; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: var(--radius-xs); background: var(--surface); }
+.picker-list:empty { display: none; }
+.picker-option { display: flex; gap: 8px; align-items: center; padding: 4px 8px; cursor: pointer; }
+.picker-option:hover, .picker-option[aria-selected="true"] { background: var(--selected); }
+.picker-thumb { flex: none; width: 36px; height: 36px; object-fit: contain; border-radius: var(--radius-xs); background: var(--surface-sunken); }
+.picker-main { display: flex; flex-direction: column; min-width: 0; }
+.picker-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+td input.qty { width: 6.5em; text-align: right; }

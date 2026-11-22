@@ -462,6 +462,25 @@ pub(super) async fn item_duplicates(
     Ok(Json(json!(found)))
 }
 
+#[derive(Deserialize)]
+pub(super) struct SuggestQuery {
+    #[serde(default)]
+    q: String,
+    limit: Option<i64>,
+}
+
+/// `GET /api/v1/items/suggest?q=&limit=`: the component picker of the BOM
+/// (desktop *Add line*, #419) – readable items matching number, name or file
+/// name, with the latest revision and a file with a preview image.
+pub(super) async fn item_suggest(
+    State(st): State<AppState>,
+    ApiUser(me): ApiUser,
+    Query(q): Query<SuggestQuery>,
+) -> AppResult<Json<Value>> {
+    let found = items::suggest(&st.db, &me, &q.q, q.limit).await?;
+    Ok(Json(json!({ "items": found })))
+}
+
 pub(super) async fn get_item(
     State(st): State<AppState>,
     ApiUser(me): ApiUser,

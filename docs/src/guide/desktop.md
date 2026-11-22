@@ -86,6 +86,19 @@ check-outs and reviews, and a **local working folder**:
   the counts existed – are ticked; *Apply* adds and corrects them in one step (the same plan as *Create BOM from CAD
   references…* in the web UI). A
   quantity the CAD file does not tell never replaces an existing one;
+* *Add line…* (also in the *Structure* tab of a revision you have checked
+  out) adds a single component: type part of its number, name or file name
+  and choose one of the matching items – shown with the preview image from
+  the CAD file, revision, state and project group (↑/↓ and Enter work too, Esc closes the list);
+  enter quantity, find number (empty = next free one) and notes, *Add*. An
+  exact item number works without choosing. Only items you may read are
+  offered (restricted groups you are not in stay hidden). Under your
+  check-out the quantity of every first-level line is an input – a change is
+  saved when you leave it or press Enter (Esc restores it) – and *Remove*
+  deletes a line after a confirmation; the tab reloads after each change.
+  These use the same REST routes as the web UI (`GET /items/suggest`,
+  `POST …/bom`, `PATCH`/`DELETE /bom-lines/{id}`); an older server without
+  the suggest route is searched through `GET /items?q=`;
 * the *Graph* tab draws a navigable reference and BOM graph around the
   revision: the focused item in the middle, its BOM children and references
   below (*ref*), the assemblies that use it above (*uses*). Every node is a

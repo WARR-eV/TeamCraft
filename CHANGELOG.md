@@ -15,6 +15,17 @@ see the notices in the README.
 
 ### Added
 
+- **BOM components picked by search** (#419, UX B5 of #408): *Add component*
+  on the web BOM card lists matching items as you type part of their number,
+  name or file name – with the preview image from the CAD file, latest
+  revision, state, project group and the file name that matched; ↑/↓, Enter
+  and Esc work, and without JavaScript the field still takes the exact item
+  number. The desktop app's *Structure* tab gets *Add line…* with the same
+  picker, an editable quantity and *Remove* on every first-level line of an
+  own check-out. New routes: `GET /items/suggest` (web session) and
+  `GET /api/v1/items/suggest`; both use the item search with the user's read
+  rights, so items of restricted groups the user is not in never appear (at
+  most 10 rows, nothing for fewer than 2 characters).
 - **Request ids** (#381): every answer of the server carries an
   `x-request-id` header (a new UUID, or a reverse proxy's own id of 1–64
   characters `[A-Za-z0-9-]`), the request's log line records it as

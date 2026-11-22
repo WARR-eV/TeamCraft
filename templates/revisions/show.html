@@ -870,7 +870,12 @@
   {% if can.edit %}
   <h3>Add component</h3>
   <form class="inline fields" method="post" action="/revisions/{{ rev.id }}/bom/lines">
-    <label>Item <input class="item-no" type="text" name="child" placeholder="e.g. PRT-000012" required></label>
+    <span class="picker">
+      <label>Item <input class="item-no" type="text" name="child" placeholder="e.g. PRT-000012" required
+        autocomplete="off" data-suggest="/items/suggest" data-suggest-placeholder="Number, name or file name"
+        role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="component-suggestions"></label>
+      <ul class="picker-list hidden" id="component-suggestions" role="listbox" aria-label="Matching items"></ul>
+    </span>
     <label>Qty <input class="qty" type="text" name="quantity" value="1" inputmode="decimal" required></label>
     <label>Find no. <input class="find" type="text" name="find_number" placeholder="auto" inputmode="numeric"></label>
     <label class="grow">Notes <input type="text" name="notes" placeholder="optional" maxlength="500"></label>

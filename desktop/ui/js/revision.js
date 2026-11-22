@@ -17,6 +17,7 @@ import { addFilesDialog, checkinDialog, doCancelCheckout, doCheckout, doObsolete
 import { openChange } from "./change.js";
 import { openRequest, requestChangeDialog } from "./requests.js";
 import { bomFromCadDialog, importBomDialog } from "./bom-import.js";
+import { addLineDialog, quantityInput, removeLineButton } from "./bom-lines.js";
 import { cadTargetChip, groupDefault, mainCadFile, openWithCad } from "./cad-open.js";
 import { incompleteGet, notOpenedText } from "./get-rules.js";
 import { revisionInputs } from "./report-inputs.js";
@@ -613,6 +614,8 @@ export function showVersions(tab, f, canRestore) {
 export function revStructure(tab, el) {
   var rule = tab.bomRule || "latest";
   var d = tab.data, rev = d.rev;
+  // my check-out: the lines of this revision can be added, edited and removed (#419)
+  var mine = rev.checked_out_by === state.me.id;
   var head = h("div.panel-head", null, [
     h("h2", { text: "Product structure" }),
     h("div.row", null, [
@@ -627,6 +630,12 @@ export function revStructure(tab, el) {
         type: "button", title: "Save the structure with this revision rule and all its files as ZIP",
         on: { click: function () { savePackage(rev, rule); } }
       }, "Pack and Go…"),
+      canEdit() ? h("button.small", {
+        type: "button", disabled: !mine,
+        title: mine ? "Add a component – search by number, name or file name"
+          : rev.checked_out_by ? "Checked out by " + rev.checked_out_by_name : "Check out first – BOM lines are added under your check-out",
+        on: { click: function () { addLineDialog(rev); } }
+      }, "Add line…") : null,
       canEdit() ? h("button.small", {
         type: "button", disabled: rev.checked_out_by !== state.me.id,
         title: rev.checked_out_by === state.me.id ? "Add the lines of a BOM exported by the CAD program (CSV, Excel, STEP assembly)"
@@ -655,7 +664,7 @@ export function revStructure(tab, el) {
         tree.root.name, badge(tree.root.state), "", "",
         fmtNum(tree.total_mass_kg, 3) + " kg" + (tree.mass_complete ? "" : " ⚠"),
         fmtNum(tree.total_cost, 2) + " €" + (tree.cost_complete ? "" : " ⚠")
-      ],
+      ].concat(mine ? [""] : []),
       cls: "selected"
     }];
     function walk(nodes, depth) {
@@ -669,24 +678,26 @@ export function revStructure(tab, el) {
         var indent = h("span.indent");
         indent.style.width = (depth * 1.2) + "rem";
         var r = n.revision;
+        // the lines of this revision itself (first level) under my check-out
+        var editable = mine && depth === 1 && !n.restricted;
         rows.push({
           cells: [
             h("span", null, [indent, twisty, h("span.mono", { text: String(n.find_number) + "  " }), h("span.mono", { text: n.item_number + (r ? "/" + r.code : "") })]),
             n.restricted ? h("span.muted", { text: "Restricted item – in a project group you are not a member of" })
               : r ? r.name : h("span.warn-text", { text: "no " + (rule === "released" ? "released " : "") + "revision" }),
             r ? badge(r.state) : "",
-            fmtNum(n.quantity, 6) + " " + n.unit,
+            editable ? h("span.nowrap", null, [quantityInput(n), " " + n.unit]) : fmtNum(n.quantity, 6) + " " + n.unit,
             n.notes || "",
             fmtNum(n.total_mass_kg, 3) + " kg" + (n.mass_complete ? "" : " ⚠"),
             fmtNum(n.total_cost, 2) + " €" + (n.cost_complete ? "" : " ⚠")
-          ],
+          ].concat(mine ? [editable ? removeLineButton(n) : ""] : []),
           open: r ? function () { openRevision(n.item_number, r.code); } : null
         });
         if (hasChildren && !collapsed) walk(n.children, depth + 1);
       });
     }
     walk(tree.children, 1);
-    panel.appendChild(table(["Find no. / item", "Name", "State", "Qty", "Notes", "Mass", "Cost"], rows, { numeric: [3, 5, 6] }));
+    panel.appendChild(table(["Find no. / item", "Name", "State", "Qty", "Notes", "Mass", "Cost"].concat(mine ? [""] : []), rows, { numeric: [3, 5, 6] }));
     panel.appendChild(h("p.hint", { text: tree.line_count + " lines" + (tree.unresolved_count ? " · " + tree.unresolved_count + " without a matching revision" : "") +
       (tree.restricted_lines ? " · mass and cost exclude " + tree.restricted_lines + " restricted line" + (tree.restricted_lines === 1 ? "" : "s") : "") +
       " · double-click a line to open it · ⚠ = incomplete mass or cost" }));
