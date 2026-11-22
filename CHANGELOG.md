@@ -13,6 +13,24 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Fixed
+
+- CI: `tests/checkin_bom.rs` (#407) compared with one-element arrays built
+  by `[x.clone()]`, which clippy refuses (`cloned_ref_to_slice_refs`); it
+  uses `std::slice::from_ref` now. Server and desktop are clippy-clean on
+  all targets.
+
+### Added
+
+- **Panning in the 3D viewer** (#459), in the browser and the desktop app:
+  every drag only rotated before. Right or middle drag, Shift or Ctrl + drag,
+  a drag with both buttons, two fingers on a touch screen and Shift + arrow
+  keys move the model sideways; *Reset view* centres it again. The new
+  **mouse setting** below the view chooses which button rotates and which
+  pans (left, right or middle drag rotates; Shift + middle pans or rotates),
+  kept per browser and app. Right and middle drags no longer open the
+  context menu or start autoscroll on the canvas.
+
 ## [0.2.13] - 2026-11-22
 
 ### Fixed

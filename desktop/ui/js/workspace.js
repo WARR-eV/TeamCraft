@@ -68,7 +68,7 @@ export function revViewer(tab, el) {
       }, f.filename + "  v" + f.version);
     }))),
     h("div", null, [h("div.viewer-stage", null, [canvas, overlay]), h("div.viewer-bar", null, [status, h("div.row", null, [upBtn, resetBtn, stlBtn])]),
-      h("p.hint", { text: "Drag to rotate, wheel to zoom, arrow keys to turn, double-click to reset." })])
+      h("p.hint", { text: "Drag to rotate, right-drag or Shift + drag to pan (other buttons: the mouse setting below the view), wheel to zoom, arrow keys to turn, double-click to reset." })])
   ]));
   // the server converts the file into a mesh (pure Rust) – the app only draws it
   var versionId = tab.viewerVersion;

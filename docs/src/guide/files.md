@@ -59,7 +59,20 @@ group below the list, e.g. *2 files in other CAD formats (SolidWorks, Inventor)*
 
 Meshes, point clouds and STEP models open in a WebGL viewer in the browser
 and in the desktop app. Drag to rotate, wheel or pinch to zoom, arrow keys to
-turn, double-click to reset; *Z up / Y up* switches the convention. Below the
+turn, double-click to reset; *Z up / Y up* switches the convention.
+**Panning** (moving the model sideways): right or middle drag, Shift or Ctrl +
+drag, both buttons held, two fingers on a touch screen, or Shift + arrow
+keys; *Reset view* centres the model again. Which button rotates and which
+pans is the **mouse setting** below the view, kept per browser and app:
+
+| Setting                                    | Rotate             | Pan                                     |
+|--------------------------------------------|--------------------|-----------------------------------------|
+| *Left drag rotates · right or middle pans* (default) | left drag | right or middle drag                  |
+| *Right drag rotates · middle pans*         | right or left drag | middle drag                             |
+| *Middle drag rotates · Shift + middle pans* | middle or left drag | Shift + middle drag, right drag        |
+| *Middle drag pans · Shift + middle rotates* | Shift + middle or left drag | middle or right drag           |
+
+Shift or Ctrl + left drag and a drag with both buttons always pan. Below the
 model, *Section X / Y / Z* cuts it open along a plane: the slider moves the
 plane through the model (its position is shown in model units), *flip* keeps
 the other side – for a look inside housings and assemblies. *Measure* picks

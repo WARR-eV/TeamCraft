@@ -330,7 +330,8 @@ account under a random computer name and can look at everything but change
 nothing. The app uses the same skins
 and 3D viewer as the web interface; the models are converted by the server,
 and *Loading* or the reason a model cannot be shown appears on the canvas of
-the *3D viewer* tab (see [Files](files.md)); point clouds (PTS, XYZ, LAS, E57) have no
+the *3D viewer* tab (see [Files](files.md), also for rotating, panning and
+the mouse setting below the view); point clouds (PTS, XYZ, LAS, E57) have no
 *Export STL*, and a thinned cloud says so below the view. *Settings → Appearance*: *TeamCraft* (the
 default) follows the light or dark
 appearance of the operating system and switches with it, *TeamCraft Light*
