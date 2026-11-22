@@ -23,9 +23,11 @@ this page; the MVPs are follow-up issues.
   reusing a running Inventor (`desktop/src/cadlaunch.rs`, #350).
 - Files that are not checked out by the user are made **read-only** in the
   working folder (`desktop/src/layout.rs` `read_only_wanted`,
-  `desktop/src/workspace.rs` `set_read_only`). Inventor and NX already refuse
-  to save over a read-only file, so the add-in's warning comes *on top of* a
-  protection that works without it.
+  `desktop/src/workspace.rs` `set_read_only`). Inventor and NX are expected to
+  refuse to save over a read-only file *(verify: no official source found; the
+  manual test script in section 6 checks it in both programs)*, so the add-in's
+  warning comes *on top of* that protection. It is a **soft stop**: a user can
+  clear the read-only flag or use *Save As*.
 - The SolidCraft plugin talks to the desktop app through a bridge folder
   ([Talking to the desktop app from inside SolidCraft](solidcraft-bridge.md),
   `desktop/src/scbridge.rs`): the plugin holds **no token**, its requests are
@@ -88,9 +90,14 @@ behaviour was not studied.
   | Scope | Folder |
   |-------|--------|
   | all users, any version | `%ALLUSERSPROFILE%\Autodesk\Inventor Addins\` |
-  | all users, one version (2024+) | `%PROGRAMFILES%\Autodesk\Inventor 20xx\Bin\Addins\` |
+  | all users, one version | `%ALLUSERSPROFILE%\Autodesk\Inventor 20xx\Addins\` |
+  | all users, one version (newer releases, *verify*) | `%PROGRAMFILES%\Autodesk\Inventor 20xx\Bin\Addins\` |
   | this user, one version | `%APPDATA%\Autodesk\Inventor 20xx\Addins\` |
   | this user, any version | `%APPDATA%\Autodesk\ApplicationPlugins\` |
+
+  The `%ALLUSERSPROFILE%` version folder is the long-documented one; whether
+  A1 also lists the Program Files folder, and since which Inventor release, is
+  *verify* on the 2026 help before IT install guidance relies on it.
 
 - **Runtime per version:**
 
@@ -170,7 +177,8 @@ reference when the MVP is written.
 id for removal. They report **after** the fact; a callback *before* a part is
 modified or saved was not found in the public reference – so the NX add-in
 warns when a part that is not checked out is opened for editing and after it
-was saved, and relies on the read-only file for the hard stop.
+was saved, and relies on the read-only file as a stop – a soft one (refusal
+*verify*, see above; the flag can be cleared, *Save As* bypasses it).
 
 ### 3. UI
 
@@ -199,8 +207,8 @@ the file system freely. Options:
   app keeps the only token.
 - Requests from the add-in are **untrusted intents**: a path must be inside
   the working folder and belong to a revision the desktop app knows; only the
-  known actions; size-limited messages. *Check out* asks the user unless the
-  user ticked *check out without asking from CAD add-ins*; *save and check
+  known actions; size-limited messages. *Check out* **always** asks the user,
+  as in the SolidCraft bridge (no opt-out); *save and check
   in* opens the desktop app's own check-in dialog; *show* only shows.
 - The desktop app never acts on add-in events alone (an event only refreshes
   the state or raises a warning).
@@ -215,6 +223,11 @@ Newline-delimited JSON over the pipe/socket, each message ≤ 16 KiB, `schema
 "teamcraft.cad"`, major `version 1`; unknown fields ignored, a newer major
 ends with "update the add-in" / "update TeamCraft".
 
+`watch` is **incremental**: it adds and removes paths from the desktop app's
+watch list, at most 64 paths per message (an assembly that loads hundreds of
+documents sends several messages), so no message exceeds the size limit; the
+list is reset on every `hello`.
+
 ```text
 pipe:   \\.\pipe\teamcraft-cad-<user SID>        (Windows, ACL: this user only)
 socket: $XDG_RUNTIME_DIR/teamcraft/cad.sock      (Linux, 0600)
@@ -222,8 +235,8 @@ socket: $XDG_RUNTIME_DIR/teamcraft/cad.sock      (Linux, 0600)
 add-in → desktop
   {"t":"hello","schema":"teamcraft.cad","version":1,
    "cad":"inventor","cad_version":"2026.2","addin_version":"0.1.0"}
-  {"t":"watch","paths":["C:/…/TeamCraft/ACME/1002-A/bracket.ipt"]}   # open documents
-  {"t":"event","kind":"opened|first_change|saved|saved_as|closed",
+  {"t":"watch","add":["C:/…/TeamCraft/ACME/1002-A/bracket.ipt"],"remove":[]}  # open documents, incremental
+  {"t":"event","kind":"opened|first_change|saved|saved_as|renamed|closed",
    "path":"…","old_path":"…"}                                       # old_path for saved_as/renamed
   {"t":"intent","id":7,"action":"check_out|check_in|get_latest|show","path":"…"}
 
@@ -280,7 +293,8 @@ The texts the add-in shows come from the desktop app (already translated,
   Windows machine (later a self-hosted runner, if one is offered) and checked
   with a **manual test script**: install from the desktop app, open a
   checked-out and a not-checked-out file, change, save, save as, close,
-  desktop app stopped, two CAD versions side by side.
+  desktop app stopped, two CAD versions side by side, and **save over a
+  read-only file** in Inventor and in NX (record whether each refuses).
 - The desktop side (pipe/socket listener, intent checks) is Rust and tested
   in CI like `scbridge.rs`.
 - **FreeCAD as reference implementation** (see below): an add-in that CI can
@@ -312,7 +326,7 @@ The texts the add-in shows come from the desktop app (already translated,
 | Program | Decision |
 |---------|----------|
 | **Inventor** | **Build the MVP** (follow-up issue *Inventor add-in MVP*): .NET 8 add-in, registry-free `.addin`, ribbon tab + dockable status window, events open / first change / save / save as / close, actions *Check out*, *Save and check in*, *Get latest*, *Show in TeamCraft*, warning on a change to a file not checked out; Inventor 2025–2027 |
-| **NX** | **Build the MVP after the licence check** (follow-up issue *NX add-in MVP*): Windows first, .NET startup application, signed if the academic licence has an author licence – otherwise a journal with status and intents first; events opened / saved / saved as / renamed / closed (no "before modify": the read-only file is the stop); Linux later as a C++ or Python shell |
+| **NX** | **Build the MVP after the licence check** (follow-up issue *NX add-in MVP*): Windows first, .NET startup application, signed if the academic licence has an author licence – otherwise a journal with status and intents first; events opened / saved / saved as / renamed / closed (no "before modify": the read-only file is a soft stop, refusal *verify*); Linux later as a C++ or Python shell |
 | Shared | per-user local IPC (named pipe / Unix socket), protocol `teamcraft.cad` v1 above, CAD-independent `netstandard2.0` core with a fake host, desktop *Settings → CAD add-ins*, policy `CadAddins` |
 
 ## P2: short assessments
