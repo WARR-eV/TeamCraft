@@ -65,6 +65,59 @@ see the notices in the README.
   then English); the desktop app has *Settings → Language*. Guard tests check
   IDs, placeholders and plural forms. Translated so far: the web header and
   the desktop *Settings* dialog.
+- **Usage statistics** (#383). The desktop apps send their own TeamCraft
+  server one anonymous report per day of use (`POST /api/v1/usage`: a random
+  installation id, versions, system, package, active minutes, counts of fixed
+  actions and STEP exports – never content; *Settings → Privacy → Show what is
+  sent*). *Admin → Usage statistics* shows installations and action counts
+  and can share an aggregate (sizes in classes, features on/off) with the
+  TeamCraft developers once a day – **off by default**, sent only to
+  `TEAMCRAFT_USAGE_STATISTICS_URL`; `TEAMCRAFT_USAGE_STATISTICS`,
+  `DO_NOT_TRACK` and `TEAMCRAFT_NO_TELEMETRY` fix it, `teamcraft local` and
+  live demos never send. New page *Privacy: what TeamCraft sends*.
+- **Desktop: report a problem from any error** (#381). Every error message
+  (and *Help → Report a Problem…*) opens one review dialog, prefilled with
+  the action, its key inputs, the error and the versions, optionally the
+  session's recent error messages – redacted like crash reports. Nothing is
+  sent without a click: *Open issue form* (GitHub or the tracker under
+  *Settings → Report problems to*), *Copy report*, *Save report…*. Web error
+  pages get *Copy details*.
+- **Desktop: update window with verified downloads** (#377). The update
+  notice opens a window with the release notes, *Update now* / *Download*,
+  *Skip this version*, *Remind me later* (three days) and the release page.
+  *Update now* downloads this installation's file (MSI, setup.exe, portable
+  zip, dmg, AppImage) and checks it against the release's `SHA256SUMS.txt` –
+  a mismatch or missing line deletes it; a verified Windows installer starts
+  after a question and the app closes, a `.dmg` opens. Package installations
+  get the package-manager way. *Help → Check for Updates…* checks at once.
+- **Desktop: managed deployment policies** (#378). IT departments preset
+  `ServerUrl` (+ `AllowOtherServers`), `CheckForUpdates`,
+  `CrashReportPrompt`, `WorkspaceRoot`, `OrganizationName` and
+  `UsageStatistics` per computer or user: Windows registry
+  (`Software\Policies\TeamCraft`, HKLM wins; ADMX/ADML templates for Group
+  Policy and Intune), a macOS configuration profile, or
+  `/etc/teamcraft/policies.json` on Linux. Read once at start, never sent;
+  wrong types count as not set; fixed settings show *Set by your
+  organization*, and *Managed by …* appears in Settings and About. The
+  templates ship with each release as
+  `teamcraft-desktop-policies-<version>.zip`.
+
+### Fixed
+
+- **Desktop: a slow STEP export no longer holds the check-in hostage**
+  (#342). With *Create STEP exports* ticked, the files are uploaded first
+  (parked), then exported, then checked in with the STEP files. *Cancel*
+  during an export skips it and ends the Inventor or Solid Edge the export
+  started; the progress shows how long the export has taken. Calls Inventor
+  rejects while busy are retried for a minute, and the whole error output of
+  a failed export is kept in `export-logs/` (named in the message).
+
+### Changed
+
+- **Desktop: checked-out files stand out in Home** (#362). A checked-out row
+  in the *Files* view and the *Structure* tree gets one marker in the lock
+  colour – a bar at its left edge and a light tint of the row – whoever holds
+  the lock; the text colour is unchanged.
 
 ## [0.2.11] - 2026-11-21
 

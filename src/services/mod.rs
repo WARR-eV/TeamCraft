@@ -61,6 +61,7 @@ pub mod simulations;
 pub mod stats;
 pub mod structure;
 pub mod uploads;
+pub mod usage;
 pub mod users;
 pub mod webhooks;
 pub mod workset;

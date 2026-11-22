@@ -28,6 +28,7 @@ export function disposeViewer() {
 
 export function revViewer(tab, el) {
   var files = tab.data.files.filter(function (f) { return previewFormat(f); });
+  if (files.length) call("usage_count", { action: "open_3d_preview" }).catch(function () {});
   if (!files.length) {
     el.appendChild(h("p.empty", { text: "No 3D files (STEP, STL, OBJ, 3MF, glTF, PLY, point clouds, simulation results, …) – native CAD files (SolidWorks, NX, Creo, CATIA, …) are shown in 3D through a STEP export next to them." }));
     return;
@@ -471,13 +472,14 @@ export function checkinDialog(tab, park) {
     var progressLine = h("p.small.muted.hidden", { role: "status" });
     // Like the CAD add-ins of PDM systems: viewables at check-in.
     var exportable = boxes.filter(function (b) { return exportProgram(b.name, programs); });
-    // off by default (#342): a slow or failed export through the CAD program
-    // runs before the upload and takes the whole check-in down with it
+    // off by default (#342): an export through the CAD program can take many
+    // minutes for a large assembly; the files are uploaded before it runs
     var withStep = h("input", { type: "checkbox", checked: false });
     var stepNote = exportable.length ? h("label.check", null, [withStep,
       "Create STEP exports with " + exportable.map(function (b) { return PROGRAM_LABEL[exportProgram(b.name, programs)]; })
         .filter(function (v, i, a) { return a.indexOf(v) === i; }).join(" / ") +
-      " first, for the 3D preview (" + exportable.length + (exportable.length === 1 ? " file)" : " files)")]) : null;
+      " for the 3D preview (" + exportable.length + (exportable.length === 1 ? " file" : " files") +
+      ") – your files are uploaded first, a slow export can be skipped"]) : null;
     var body = h("div.stack", null, [
       h("p.small.muted", null, ["From ", h("span.mono", { text: ws.dir })]),
       candidates.length ? h("div.stack", null, boxes.map(function (b) {
@@ -499,17 +501,28 @@ export function checkinDialog(tab, park) {
       field("Comment", comment, "stored with every new version"),
       progressLine
     ]);
-    // While the check-in runs the dialog stays open (no Escape, no backdrop):
-    // Cancel stops it before the next STEP export, between two chunks of a
-    // large file or half-way through the request with the small files –
-    // nothing is stored, the revision stays checked out. Once every byte is
-    // sent the server finishes the check-in; the dialog then says so.
-    var running = false, cancelled = false;
+    // While the check-in runs the dialog stays open (no Escape, no backdrop).
+    // Without STEP exports Cancel stops it between two chunks of a large file
+    // or half-way through the request with the small files – nothing is
+    // stored, the revision stays checked out. Once every byte is sent the
+    // server finishes the check-in; the dialog then says so.
+    // With STEP exports (#342) the ticked files go to the server first,
+    // parked (the lock stays), so a slow or failed export never costs the
+    // check-in; during an export Cancel skips it (the CAD program it started
+    // is ended), and the check-in follows with the STEP files written so far.
+    var running = false, cancelled = false, phase = "", skipping = false;
     var opts = { wide: true };
     function stopped() { return { status: 499, message: "Cancelled." }; }
     dialog((park ? "Park " : "Check in ") + rev.item_number + "/" + rev.code, body, [
       { label: "Cancel", onClick: function (d) {
         if (!running) { d.close(); return; }
+        if (phase === "export") {
+          if (skipping) return;
+          skipping = true;
+          progressLine.textContent = "Skipping the STEP exports …";
+          call("cad_export_cancel").catch(function () {});
+          return;
+        }
         if (cancelled) return;
         cancelled = true;
         progressLine.textContent = "Stopping …";
@@ -525,43 +538,82 @@ export function checkinDialog(tab, park) {
       if (running) return;
       var files = boxes.filter(function (b) { return b.input.checked; }).map(function (b) { return b.name; });
       if (parking && !files.length) { d.fail("Tick the files to park – parking keeps the check-out and uploads only those."); return; }
-      running = true; cancelled = false; opts.modal = true;
+      running = true; cancelled = false; skipping = false; opts.modal = true;
       var toExport = stepNote && withStep.checked ? files.filter(function (n) { return exportProgram(n, programs); }) : [];
+      var ref = rev.item_number + "/" + rev.code;
+      var args = { project: rev.project_code, item: rev.item_number, code: rev.code, comment: comment.value };
       function show(text) { if (!cancelled) { progressLine.textContent = text; progressLine.classList.remove("hidden"); } }
-      // one export after the other: the CAD program handles one document at a
-      // time. A failed export never stops the check-in (#342, #368): the file
-      // goes without its STEP and the result says why.
-      var exportFailures = [];
-      var exported = toExport.reduce(function (chain, name) {
-        return chain.then(function () {
-          if (cancelled) throw stopped();
-          show("Exporting " + name + " to STEP with " + PROGRAM_LABEL[exportProgram(name, programs)] + " …");
-          return exportStep(rev, name).then(function (step) { if (files.indexOf(step) < 0) files.push(step); },
-            function (e) { if (cancelled) throw stopped(); exportFailures.push(name + ": " + errorText(e)); });
-        });
-      }, Promise.resolve());
-      exported.then(function () {
-        if (cancelled) throw stopped();
-        show(parking ? "Parking …" : "Checking in …");
+      function upload(command, names, text) {
+        phase = "upload";
+        show(text);
         uploadWatcher = function (p) { show(uploadLine(p)); };
-        return call(parking ? "workspace_park" : "workspace_checkin", { project: rev.project_code, item: rev.item_number, code: rev.code, files: files, comment: comment.value });
-      }).then(function () {
-        running = false; uploadWatcher = null;
+        return call(command, Object.assign({}, args, { files: names })).then(function (r) { uploadWatcher = null; return r; });
+      }
+      var steps = [], exportFailures = [], stored = false;
+      // one export after the other: the CAD program handles one document at a
+      // time. A failed or skipped export never stops the check-in (#342,
+      // #368): the file goes without its STEP and the result says why.
+      function exportAll() {
+        phase = "export";
+        return toExport.reduce(function (chain, name) {
+          return chain.then(function () {
+            if (skipping) { exportFailures.push(name + ": skipped"); return; }
+            var started = Date.now();
+            var what = "Exporting " + name + " to STEP with " + PROGRAM_LABEL[exportProgram(name, programs)];
+            function tick() { show(what + " … " + elapsedText(Date.now() - started) + " – your files are on the server; Cancel skips the export"); }
+            tick();
+            var timer = setInterval(tick, 1000);
+            return exportStep(rev, name).then(function (step) {
+              clearInterval(timer);
+              if (steps.indexOf(step) < 0 && files.indexOf(step) < 0) steps.push(step);
+            }, function (e) {
+              clearInterval(timer);
+              exportFailures.push(name + ": " + (skipping ? "skipped" : errorText(e)));
+            });
+          });
+        }, Promise.resolve());
+      }
+      var done;
+      if (!toExport.length) {
+        done = upload(parking ? "workspace_park" : "workspace_checkin", files, parking ? "Parking …" : "Checking in …");
+      } else {
+        done = upload("workspace_park", files, "Uploading " + files.join(", ") + " …").then(function () {
+          stored = true;
+          if (cancelled) throw stopped();
+          return exportAll();
+        }).then(function () {
+          if (cancelled) throw stopped();
+          if (parking && !steps.length) return null;
+          return upload(parking ? "workspace_park" : "workspace_checkin", steps, parking ? "Parking the STEP exports …" : "Checking in …");
+        });
+      }
+      done.then(function () {
+        running = false; uploadWatcher = null; phase = "";
         setStatus("");
         d.close();
-        toast((parking ? "Parked " + files.join(", ") + " on the server – " + rev.item_number + "/" + rev.code + " stays checked out to you"
-          : "Checked in " + rev.item_number + "/" + rev.code + (files.length ? " with " + files.join(", ") : "")) +
+        var all = files.concat(steps);
+        toast((parking ? "Parked " + all.join(", ") + " on the server – " + ref + " stays checked out to you"
+          : "Checked in " + ref + (all.length ? " with " + all.join(", ") : "")) +
           (cancelled ? " – the server already had every file when you cancelled" : "") +
           (exportFailures.length ? ". No STEP export for " + exportFailures.join("; ") : ""),
           cancelled || exportFailures.length ? "info" : null);
         reloadActive();
         refreshWorklistCount();
       }, function (err) {
-        running = false; uploadWatcher = null; opts.modal = false;
+        running = false; uploadWatcher = null; opts.modal = false; phase = "";
         setStatus("");
+        if (stored) {
+          // the chosen files are on the server already: never offer to send them again
+          d.close();
+          toast(files.join(", ") + " are on the server (parked) and " + ref + " is still checked out to you – " +
+            (cancelled || isCancelled(err) ? "the check-in was cancelled." : "the check-in failed: " + errorText(err)), cancelled || isCancelled(err) ? "info" : "error");
+          reloadActive();
+          refreshWorklistCount();
+          return;
+        }
         if (cancelled || isCancelled(err)) {
           d.close();
-          toast("Check-in of " + rev.item_number + "/" + rev.code + " cancelled – nothing was stored; the revision is still checked out to you.", "info");
+          toast("Check-in of " + ref + " cancelled – nothing was stored; the revision is still checked out to you.", "info");
           reloadActive();
           return;
         }
@@ -570,6 +622,12 @@ export function checkinDialog(tab, park) {
       });
     }
   }, function (err) { toast(errorText(err), "error"); });
+}
+
+/** `0:07`, `12:34` – how long an export has been running. */
+export function elapsedText(ms) {
+  var s = Math.max(0, Math.floor(ms / 1000));
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
 }
 
 export function editDialog(tab) {

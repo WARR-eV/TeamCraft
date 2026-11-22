@@ -20,12 +20,15 @@ use tokio::sync::Notify;
 use crate::{
     acp, addfiles,
     api::{self, Api, ApiError, Transfer},
-    bomimport, cadexport, cadlaunch, folderimport, layout, localserver, profiles, scprops,
+    bomimport, cadexport, cadlaunch, folderimport, layout, localserver, policy, profiles, scprops,
     settings::{self, Settings, TokenStorage},
     signin, update, workspace, AppState,
 };
 
 type CmdResult<T> = Result<T, ApiError>;
+
+/// A setting a policy fixes (#378) cannot be changed in the app.
+const MANAGED: &str = "This setting is set by your organization.";
 
 pub(crate) fn snapshot(state: &State<'_, AppState>) -> Settings {
     state.settings.lock().expect("settings lock").clone()
@@ -57,7 +60,12 @@ fn signed_in_api(state: &State<'_, AppState>) -> CmdResult<Api> {
 
 /// The default working folder (`Documents/TeamCraft`); connections after the
 /// first get theirs next to it (src/profiles.rs).
-fn default_workspace(app: &AppHandle) -> PathBuf {
+/// The root of new working folders: the policy `WorkspaceRoot` (#378), else
+/// `Documents/TeamCraft`.
+pub(crate) fn default_workspace(app: &AppHandle) -> PathBuf {
+    if let Some(root) = &policy::current().workspace_root {
+        return root.clone();
+    }
     app.path()
         .document_dir()
         .or_else(|_| app.path().home_dir())
@@ -100,12 +108,17 @@ pub struct Session {
     pub checkout_parts: bool,
     /// After a crash, ask at the next start whether to share the report.
     pub crash_prompt: bool,
+    /// *Settings → Report problems to* (#381); `None` = GitHub.
+    pub report_url: Option<String>,
     /// A *with local server* installation: the connect screen offers *Try
     /// TeamCraft on this computer* (src/localserver.rs).
     pub local_server_available: bool,
     /// The configured server is the local test server: the UI starts it
     /// (`local_server_start`) before it signs in or opens the main window.
     pub local_server_in_use: bool,
+    /// Managed deployment policies (#378): the organisation and the settings
+    /// fixed by a policy.
+    pub policy: policy::PolicyView,
 }
 
 #[tauri::command]
@@ -113,9 +126,10 @@ pub fn session(app: AppHandle, state: State<'_, AppState>) -> Session {
     let s = snapshot(&state);
     Session {
         token_storage: s.token.as_ref().and(s.token_storage),
-        update_check: s.update_check != Some(false),
+        update_check: policy::current().update_check(s.update_check),
         checkout_parts: s.checkout_parts != Some(false),
-        crash_prompt: s.crash_prompt != Some(false),
+        report_url: s.report_url.clone(),
+        crash_prompt: policy::current().crash_prompt(s.crash_prompt),
         server_url: s.server_url.clone(),
         signed_in: s.token.is_some(),
         skin: s.skin.clone().unwrap_or_else(|| "teamcraft".into()),
@@ -125,6 +139,7 @@ pub fn session(app: AppHandle, state: State<'_, AppState>) -> Session {
         zoom: s.zoom.unwrap_or(1.0),
         local_server_available: localserver::sidecar().is_some(),
         local_server_in_use: local_server_in_use(&s),
+        policy: policy::current().view(),
     }
 }
 
@@ -143,6 +158,11 @@ fn local_server_in_use(s: &Settings) -> bool {
 /// window or `teamcraft local` on the command line) is used as it is.
 #[tauri::command]
 pub async fn local_server_start(app: AppHandle, state: State<'_, AppState>) -> CmdResult<String> {
+    if policy::current().server_locked() {
+        return Err(ApiError::local(
+            "Your organization set the TeamCraft server – the local test server cannot be used.",
+        ));
+    }
     {
         let mut running = state.local_server.lock().expect("local server lock");
         if let Some(r) = running.as_mut() {
@@ -208,6 +228,9 @@ pub async fn set_server(
     url: String,
 ) -> CmdResult<String> {
     let base = settings::normalize_server_url(&url).map_err(ApiError::local)?;
+    policy::current()
+        .check_server(&base)
+        .map_err(ApiError::local)?;
     let api = Api {
         client: state.client.clone(),
         base: base.clone(),
@@ -262,6 +285,16 @@ pub fn connections(state: State<'_, AppState>) -> Vec<profiles::ProfileView> {
 /// Switches to a saved connection; the UI reloads afterwards.
 #[tauri::command]
 pub fn switch_connection(state: State<'_, AppState>, id: String) -> CmdResult<()> {
+    let target = snapshot(&state)
+        .profiles
+        .iter()
+        .find(|p| p.id == id)
+        .map(|p| p.server_url.clone());
+    if let Some(server) = target {
+        policy::current()
+            .check_server(&server)
+            .map_err(ApiError::local)?;
+    }
     stop_agent(&state);
     change_connection(&state, |s, dir, parking| {
         profiles::switch(s, dir, &settings::OsKeychain, parking, &id)
@@ -654,6 +687,7 @@ pub async fn workspace_checkout(
     item: String,
     code: String,
 ) -> CmdResult<workspace::Downloaded> {
+    usage(&state, |u| u.count("checkout"));
     let api = signed_in_api(&state)?;
     api.json(
         Method::POST,
@@ -727,6 +761,7 @@ pub async fn workspace_get(
     code: String,
     rule: Option<String>,
 ) -> CmdResult<workspace::Downloaded> {
+    usage(&state, |u| u.count("get_files"));
     let api = signed_in_api(&state)?;
     let (cancel, mut progress) = progress_events(&app, &state);
     workspace::get_structure(
@@ -779,6 +814,7 @@ pub async fn workspace_checkin(
     files: Vec<String>,
     comment: String,
 ) -> CmdResult<Value> {
+    usage(&state, |u| u.count("checkin"));
     let api = signed_in_api(&state)?;
     let root = workspace_root(&app, &state);
     let cancel = new_upload(&state);
@@ -812,6 +848,7 @@ pub async fn workspace_park(
     files: Vec<String>,
     comment: String,
 ) -> CmdResult<Value> {
+    usage(&state, |u| u.count("park"));
     let api = signed_in_api(&state)?;
     let root = workspace_root(&app, &state);
     let cancel = new_upload(&state);
@@ -973,7 +1010,7 @@ pub struct UpdateNotice {
 #[tauri::command]
 pub async fn check_update(state: State<'_, AppState>) -> CmdResult<Option<UpdateNotice>> {
     let s = snapshot(&state);
-    if s.update_check == Some(false) {
+    if !policy::current().update_check(s.update_check) {
         return Ok(None);
     }
     let mut latest = s.update_latest.clone();
@@ -988,16 +1025,177 @@ pub async fn check_update(state: State<'_, AppState>) -> CmdResult<Option<Update
     }
     let current = env!("CARGO_PKG_VERSION");
     Ok(latest
-        .filter(|v| update::is_newer(v, current) && s.update_dismissed.as_ref() != Some(v))
+        .filter(|v| {
+            update::notice_due(
+                v,
+                current,
+                s.update_dismissed.as_deref(),
+                s.update_remind_until,
+                now,
+            )
+        })
         .map(|version| UpdateNotice { version, current }))
 }
 
-/// Hides the notice of this release version (a newer one shows again).
+/// *Skip this version*: hides the notice of this release version (a newer
+/// one shows again).
 #[tauri::command]
 pub fn dismiss_update(state: State<'_, AppState>, version: String) -> CmdResult<()> {
     let version = update::tag_version(&version)
         .ok_or_else(|| ApiError::local(format!("'{version}' is not a version.")))?;
     update_settings(&state, |s| s.update_dismissed = Some(version))?;
+    Ok(())
+}
+
+/// *Remind me later*: no notice for three days (#377).
+#[tauri::command]
+pub fn update_remind_later(state: State<'_, AppState>) -> CmdResult<()> {
+    let until = update::now_secs() + update::REMIND_LATER_SECS;
+    update_settings(&state, |s| s.update_remind_until = Some(until))?;
+    Ok(())
+}
+
+/// The answer of *Help → Check for updates*.
+#[derive(Serialize)]
+pub struct UpdateCheck {
+    pub current: &'static str,
+    /// The latest release, `None` when none is published yet.
+    pub latest: Option<String>,
+    pub newer: bool,
+}
+
+/// *Help → Check for updates*: asks GitHub now – also when the daily check
+/// is switched off – and says whether a newer release is out (#377).
+#[tauri::command]
+pub async fn check_update_now(state: State<'_, AppState>) -> CmdResult<UpdateCheck> {
+    // policy CheckForUpdates = 0 (#378): no checks at all, also on demand
+    if policy::current().check_for_updates == Some(false) {
+        return Err(ApiError::local(MANAGED));
+    }
+    let latest = update::latest_release()
+        .await
+        .map_err(|e| ApiError::local(format!("The release check did not work: {e}")))?;
+    let now = update::now_secs();
+    update_settings(&state, |s| {
+        s.update_checked_at = Some(now);
+        s.update_latest = latest.clone();
+        // asked on purpose: a running *Remind me later* ends
+        s.update_remind_until = None;
+    })?;
+    let current = env!("CARGO_PKG_VERSION");
+    Ok(UpdateCheck {
+        newer: latest
+            .as_deref()
+            .is_some_and(|v| update::is_newer(v, current)),
+        latest,
+        current,
+    })
+}
+
+/// What the update window shows for a release: its notes, how this copy was
+/// installed and what *Update now* does for it.
+#[derive(Serialize)]
+pub struct UpdateOffer {
+    pub version: String,
+    pub current: &'static str,
+    pub notes: String,
+    pub install: update::InstallKind,
+    /// The release file *Update now* downloads; `None` = release page only.
+    pub asset: Option<String>,
+    /// For package installations: how to update.
+    pub package_hint: Option<&'static str>,
+}
+
+/// The release of `version` for the update window (#377).
+#[tauri::command]
+pub async fn update_offer(version: String) -> CmdResult<UpdateOffer> {
+    let release = update::release(&version)
+        .await
+        .map_err(|e| ApiError::local(format!("The release could not be loaded: {e}")))?;
+    let install = update::this_install();
+    let names: Vec<String> = release.assets.iter().map(|(n, _)| n.clone()).collect();
+    let asset = update::pick_asset(
+        install,
+        std::env::consts::ARCH,
+        &release.version,
+        localserver::sidecar().is_some(),
+        &names,
+    )
+    .map(str::to_string);
+    Ok(UpdateOffer {
+        package_hint: (install == update::InstallKind::Package)
+            .then(|| update::package_hint(std::env::var_os("FLATPAK_ID").is_some())),
+        version: release.version,
+        current: env!("CARGO_PKG_VERSION"),
+        notes: release.notes,
+        install,
+        asset,
+    })
+}
+
+/// The update file downloaded and verified last: the only one
+/// [`update_install`] starts – never a path from the web view.
+static VERIFIED_UPDATE: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+
+/// *Update now* / *Download*: downloads this install's file of `version`
+/// into the Downloads folder and checks it against the release's
+/// `SHA256SUMS.txt`; a mismatch deletes it (#377). Returns the file's path.
+#[tauri::command]
+pub async fn update_download(app: AppHandle, version: String) -> CmdResult<String> {
+    let release = update::release(&version)
+        .await
+        .map_err(|e| ApiError::local(format!("The release could not be loaded: {e}")))?;
+    let names: Vec<String> = release.assets.iter().map(|(n, _)| n.clone()).collect();
+    let name = update::pick_asset(
+        update::this_install(),
+        std::env::consts::ARCH,
+        &release.version,
+        localserver::sidecar().is_some(),
+        &names,
+    )
+    .ok_or_else(|| ApiError::local("This release has no download for this installation."))?
+    .to_string();
+    let dir = app
+        .path()
+        .download_dir()
+        .or_else(|_| app.path().home_dir())
+        .map_err(|e| ApiError::local(e.to_string()))?;
+    let file = update::download_verified(&release, &name, &dir)
+        .await
+        .map_err(ApiError::local)?;
+    *VERIFIED_UPDATE.lock().expect("update lock") = Some(file.clone());
+    Ok(file.to_string_lossy().into_owned())
+}
+
+/// Starts the verified update: a Windows installer runs and the app closes
+/// (the installer replaces it); a `.dmg` opens for dragging the app to
+/// *Applications*; anything else is shown in its folder.
+#[tauri::command]
+pub fn update_install(app: AppHandle) -> CmdResult<()> {
+    let file = VERIFIED_UPDATE
+        .lock()
+        .expect("update lock")
+        .clone()
+        .filter(|f| f.is_file())
+        .ok_or_else(|| ApiError::local("Download and verify the update first."))?;
+    let name = file
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let installer = name.ends_with(".msi") || name.ends_with("-setup.exe");
+    if installer || name.ends_with(".dmg") {
+        app.opener()
+            .open_path(file.to_string_lossy().to_string(), None::<&str>)
+            .map_err(|e| ApiError::local(format!("The update could not be started: {e}")))?;
+        if installer {
+            app.exit(0);
+        }
+    } else {
+        app.opener()
+            .reveal_item_in_dir(&file)
+            .map_err(|e| ApiError::local(format!("The folder could not be opened: {e}")))?;
+    }
     Ok(())
 }
 
@@ -1011,6 +1209,9 @@ pub fn set_checkout_parts(state: State<'_, AppState>, enabled: bool) -> CmdResul
 /// Switches the daily release check on or off.
 #[tauri::command]
 pub fn set_update_check(state: State<'_, AppState>, enabled: bool) -> CmdResult<()> {
+    if policy::current().check_for_updates.is_some() {
+        return Err(ApiError::local(MANAGED));
+    }
     update_settings(&state, |s| s.update_check = Some(enabled))?;
     Ok(())
 }
@@ -1041,7 +1242,7 @@ pub fn crash_reports(state: State<'_, AppState>) -> Option<CrashReports> {
         count: reports.len(),
         kinds: reports.iter().map(|r| r.kind.clone()).collect(),
         text: crate::crash::combined(&reports),
-        ask: snapshot(&state).crash_prompt != Some(false),
+        ask: policy::current().crash_prompt(snapshot(&state).crash_prompt),
     })
 }
 
@@ -1075,6 +1276,9 @@ pub fn crash_reports_discard() {
 /// Settings → ask after a crash whether to share the report.
 #[tauri::command]
 pub fn set_crash_prompt(state: State<'_, AppState>, enabled: bool) -> CmdResult<()> {
+    if policy::current().crash_report_prompt.is_some() {
+        return Err(ApiError::local(MANAGED));
+    }
     update_settings(&state, |s| s.crash_prompt = Some(enabled))?;
     Ok(())
 }
@@ -1595,15 +1799,31 @@ pub async fn cad_export_step(
             "{file} is not in the working folder – check out or use “Get files” first."
         )));
     };
+    let program = cadexport::program_for(&input);
     let output = tokio::task::spawn_blocking(move || cadexport::export_step(&input))
         .await
         .map_err(|e| ApiError::local(format!("The export stopped: {e}")))?
         .map_err(ApiError::local)?;
+    // usage statistics (#383): which program exported, never the file
+    let name = match program {
+        Some(cadexport::CadProgram::Inventor) => "inventor",
+        Some(cadexport::CadProgram::SolidEdge) => "solid-edge",
+        Some(cadexport::CadProgram::SolidCraft) => "solidcraft",
+        None => "",
+    };
+    usage(&state, |u| u.count_export(name));
     Ok(output
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or_default()
         .to_string())
+}
+
+/// *Skip the export* in the check-in dialog (#342): stops the running STEP
+/// export; the check-in goes on without it.
+#[tauri::command]
+pub fn cad_export_cancel() {
+    cadexport::cancel();
 }
 
 /// Writes the item number, revision and name (and TeamCraft's ids) into the
@@ -1676,6 +1896,7 @@ pub async fn workspace_open_cad(
     file: String,
     wish: cadlaunch::Wish,
 ) -> CmdResult<cadlaunch::OpenPlan> {
+    usage(&state, |u| u.count("open_cad"));
     let api = signed_in_api(&state)?;
     let root = workspace_root(&app, &state);
     let (_, found) =
@@ -2306,4 +2527,142 @@ pub async fn workspace_add_files(
     addfiles::record(&root, &item, &code, &done)
         .map_err(|e| ApiError::local(format!("Cannot remember the added files: {e}")))?;
     Ok(json!({ "copied": copied, "skipped": skipped }))
+}
+
+// ------------------------------------------------------- usage counts (#383)
+
+/// Counts for the own server's usage statistics (src/usage.rs): rolls the
+/// day, applies `change` and saves; a failure to save is ignored – counting
+/// never gets in the way.
+pub(crate) fn usage(state: &State<'_, AppState>, change: impl FnOnce(&mut crate::usage::Usage)) {
+    let mut s = state.settings.lock().expect("settings lock");
+    // desktop policy UsageStatistics = 0 (#378): nothing is counted, kept or sent
+    if policy::current().usage_statistics == Some(false) {
+        if s.usage != crate::usage::Usage::default() {
+            s.usage = crate::usage::Usage::default();
+            let _ = s.save(&state.config_dir);
+        }
+        return;
+    }
+    let today = crate::usage::today_utc();
+    s.usage.roll(&today, crate::usage::package(), None);
+    change(&mut s.usage);
+    let _ = s.save(&state.config_dir);
+}
+
+/// Counts one of the fixed actions the UI performs (unknown names are
+/// ignored).
+#[tauri::command]
+pub fn usage_count(state: State<'_, AppState>, action: String) {
+    usage(&state, |u| u.count(&action));
+}
+
+/// One more minute with the window in front (the UI asks once a minute).
+#[tauri::command]
+pub fn usage_tick(state: State<'_, AppState>) {
+    usage(&state, |u| u.tick());
+}
+
+/// Sends a finished day's report to the server the app is signed in to
+/// (`POST /api/v1/usage`); kept for *Show what is sent*. A failure is
+/// silent – the report is replaced by the next day's.
+#[tauri::command]
+pub async fn usage_flush(state: State<'_, AppState>) -> CmdResult<()> {
+    usage(&state, |_| {});
+    if policy::current().usage_statistics == Some(false) {
+        return Ok(());
+    }
+    let Some(pending) = snapshot(&state).usage.pending.clone() else {
+        return Ok(());
+    };
+    let api = signed_in_api(&state)?;
+    if api
+        .json(Method::POST, "/usage", Some(&pending))
+        .await
+        .is_ok()
+    {
+        let mut s = state.settings.lock().expect("settings lock");
+        s.usage.pending = None;
+        s.usage.last_sent = Some(pending);
+        let _ = s.save(&state.config_dir);
+    }
+    Ok(())
+}
+
+/// *Settings → Privacy → Show what is sent*: the report being counted
+/// today, a finished one waiting to be sent, and the one sent last.
+#[tauri::command]
+pub fn usage_show(state: State<'_, AppState>) -> Value {
+    usage(&state, |_| {});
+    let s = snapshot(&state);
+    json!({
+        "today": crate::usage::report(&s.usage, crate::usage::package(), None),
+        "pending": s.usage.pending,
+        "last_sent": s.usage.last_sent,
+    })
+}
+// ------------------------------------------------------ report a problem (#381)
+
+/// The prefilled, redacted report of a failure for the review dialog.
+#[tauri::command]
+pub fn problem_report(problem: crate::report::Problem) -> Value {
+    let home = crate::report::home();
+    json!({
+        "title": crate::report::title(&problem, home.as_deref()),
+        "body": crate::report::body(&problem, home.as_deref()),
+        "target": "github",
+    })
+}
+
+/// *Open issue form*: the reviewed text in a new issue on GitHub, or in the
+/// tracker set under *Settings → Report problems to*. Returns whether the
+/// text had to be cut in the address (the UI then copies the full text).
+#[tauri::command]
+pub fn problem_report_open(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    title: String,
+    body: String,
+) -> CmdResult<bool> {
+    let base = snapshot(&state)
+        .report_url
+        .unwrap_or_else(|| crate::crash::ISSUE_URL.to_string());
+    let (url, cut) = crate::report::form_url(&base, &title, &body).map_err(ApiError::local)?;
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| ApiError::local(format!("The browser could not be opened: {e}")))?;
+    Ok(cut)
+}
+
+/// *Save report…*: the reviewed text into a file the user picks.
+#[tauri::command]
+pub async fn problem_report_save(app: AppHandle, text: String) -> CmdResult<Option<PathBuf>> {
+    let Some(path) = ask_save_path(
+        &app,
+        "teamcraft-problem-report.md",
+        ("Markdown", &["md", "txt"]),
+    )
+    .await?
+    else {
+        return Ok(None);
+    };
+    std::fs::write(&path, text)
+        .map_err(|e| ApiError::local(format!("The report could not be saved: {e}")))?;
+    Ok(Some(path))
+}
+
+/// *Settings → Report problems to*: an http(s) address of the operator's
+/// tracker (`title` and `body` are added as query parameters); empty = the
+/// TeamCraft issue form on GitHub.
+#[tauri::command]
+pub fn set_report_url(state: State<'_, AppState>, url: String) -> CmdResult<()> {
+    let url = url.trim();
+    let value = if url.is_empty() {
+        None
+    } else {
+        crate::report::form_url(url, "", "").map_err(ApiError::local)?;
+        Some(url.to_string())
+    };
+    update_settings(&state, |s| s.report_url = value)?;
+    Ok(())
 }

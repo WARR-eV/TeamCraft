@@ -16,6 +16,17 @@
       <a class="button" href="/" data-back>Back</a>
       <a class="button primary" href="/">Dashboard</a>
     </div>
+    {% if version %}
+    <details class="error-details">
+      <summary>Details for a bug report</summary>
+      <pre id="error-details">TeamCraft {{ version }}
+Error {{ status }} {{ reason }}
+{{ message }}
+Page: {{ path }}
+Time: {{ time }}</pre>
+      <button type="button" data-copy="error-details">Copy details</button>
+    </details>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

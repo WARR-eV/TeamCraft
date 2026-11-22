@@ -299,6 +299,8 @@ pub fn local_variables(
             "TEAMCRAFT_VAULT_DIR",
             data_dir.join("vault").to_string_lossy().to_string(),
         ),
+        // a test installation never shares usage statistics (#383)
+        ("TEAMCRAFT_NO_TELEMETRY", "1".to_string()),
     ])
 }
 
@@ -820,5 +822,9 @@ mod tests {
         assert_eq!(config.bind_addr.port(), 8099);
         assert_eq!(config.public_url, "http://127.0.0.1:8099");
         assert_eq!(config.vault_dir, Path::new("/data").join("vault"));
+        assert!(
+            config.usage.never,
+            "a test installation never shares usage statistics"
+        );
     }
 }

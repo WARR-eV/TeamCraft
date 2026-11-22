@@ -598,6 +598,11 @@ with `bash -n` and `shellcheck` (CI runs both).
 3. The workflow builds everything again from the tag, writes
    `SHA256SUMS.txt` and creates the GitHub Release with generated notes –
    as a **pre-release** for `0.x` and suffixed versions (`1.0.0-rc.1`).
+   The desktop app's *Update now* (#377) picks its file by these names
+   (`TeamCraft_<version>_x64_en-US.msi`, `_x64-setup.exe`, `_x64_portable.zip`,
+   `_aarch64.dmg`, `_amd64.AppImage`, `TeamCraft-with-local-server_…`) and
+   checks it against `SHA256SUMS.txt` – rename an asset only together with
+   `desktop/src/update.rs` `pick_asset`.
 
 The installers are not code-signed yet (macOS: ad-hoc signature, Windows:
 unsigned); signing needs certificates as repository secrets and is a

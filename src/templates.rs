@@ -53,6 +53,7 @@ pub const TEMPLATES: &[(&str, &str)] = embed![
     "admin/webhook_edit.html",
     "admin/branding.html",
     "admin/ai.html",
+    "admin/usage.html",
     "desktop/authorize.html",
     "formats.html",
     "imports/upload.html",
@@ -621,6 +622,19 @@ mod tests {
             "error.html",
             json!({ "status": 404, "reason": "Not Found", "message": "gone", "flash": null, "local_login": true }),
         );
+        // *Copy details* (#381): status, message, page, time and version
+        let html = render(
+            &env,
+            "error.html",
+            json!({ "status": 500, "reason": "Internal Server Error", "message": "Something went wrong <b>",
+                    "flash": null, "local_login": true, "path": "/items/PRT-000042",
+                    "time": "2026-11-22 08:00:00 UTC", "version": "0.2.12" }),
+        );
+        assert!(
+            html.contains("data-copy=\"error-details\"")
+                && html.contains("Page: /items/PRT-000042")
+        );
+        assert!(html.contains("Something went wrong &lt;b&gt;"), "escaped");
         // a hosted live demo: the account on the login page, the banner on every page
         let demo = json!({ "username": "demo", "password": "try-it-<out>" });
         let html = render(
@@ -2150,6 +2164,40 @@ mod tests {
                 assert!(html.contains("set (not shown)"));
             }
         }
+        // usage statistics (#383): off and nothing reported, on with reports
+        let html = render(
+            &env,
+            "admin/usage.html",
+            with_common(json!({
+                "sharing": { "on": false, "fixed_by": null, "destination": false },
+                "desktop": { "days": 30, "installations": 0, "active_minutes": 0, "versions": {},
+                             "os": {}, "packages": {}, "actions": {}, "cad_exports": {} },
+                "next": "{\"v\": 1}", "last": null, "last_sent_at": null,
+                "actions": crate::services::usage::ACTIONS,
+            })),
+        );
+        assert!(
+            html.contains("Share anonymous usage statistics")
+                && html.contains("No desktop app has reported yet")
+        );
+        let html = render(
+            &env,
+            "admin/usage.html",
+            with_common(json!({
+                "sharing": { "on": true, "fixed_by": "TEAMCRAFT_USAGE_STATISTICS", "destination": false },
+                "desktop": { "days": 30, "installations": 2, "active_minutes": 75,
+                             "versions": { "0.2.9": 1, "0.3.0": 1 }, "os": { "windows": 2 },
+                             "packages": { "msi": 2 }, "actions": { "checkin": 6 },
+                             "cad_exports": { "inventor": 1 } },
+                "next": "{\"v\": 1}", "last": "{\"v\": 1}", "last_sent_at": "2026-11-21 08:00 UTC",
+                "actions": crate::services::usage::ACTIONS,
+            })),
+        );
+        assert!(
+            html.contains("Set by TEAMCRAFT_USAGE_STATISTICS")
+                && html.contains("nothing leaves the server yet")
+        );
+        assert!(html.contains("0.3.0") && html.contains("STEP export: inventor"));
         let html = render(
             &env,
             "admin/webhook_edit.html",

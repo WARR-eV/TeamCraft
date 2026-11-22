@@ -145,10 +145,31 @@ feature milestone – the features in *What works* are enough; what is missing i
 *Clients and packaging*
 
 - [ ] Flatpak on Flathub with offline cargo sources; AUR packages published. Done: the desktop app's update notice
-  (daily GitHub release check, opt-out, a link only – no silent auto-update). Binaries and installers stay **unsigned**
+  (daily GitHub release check, opt-out; an update window with a checksum-verified download, #377 – no silent
+  auto-update). Binaries and installers stay **unsigned**
   (no code signing or notarisation): the checksums
   in `SHA256SUMS.txt` and the build provenance are the verification, and the docs explain the first start past
   SmartScreen and Gatekeeper
+- [x] Usage statistics (#383): desktop → own server always (anonymous daily report, fixed fields, *Show what is
+  sent*), *Admin → Usage statistics*, sharing an aggregate with the developers off by default
+  (`TEAMCRAFT_USAGE_STATISTICS[_URL]`, `DO_NOT_TRACK`, `TEAMCRAFT_NO_TELEMETRY`). Left: a collection service run
+  by the project (where, who operates it, retention) and its published results; counting `new_item`, `release`,
+  `search`, `assistant`, `import_*`, `cancel_checkout` in the desktop UI (the names are accepted already); the
+  desktop policy `UsageStatistics` (#378) once the developers' share is decided per desktop
+- [ ] Desktop: report a problem from any error (#381). Done: *Report…* on every toast and dialog error, *Help → Report a
+  Problem…*, redacted prefilled report (`desktop/src/report.rs`), *Open issue form* / *Copy* / *Save*, own tracker
+  setting, *Copy details* on web error pages. Left: screenshot and affected-file attachments, the key inputs of
+  each action (most messages name only the action), the server version in the report, a request id on web errors,
+  the tracker as a desktop policy (#378)
+- [ ] Desktop: one-click update (#377). Done: update window (release notes, *Skip this version*, *Remind me later*),
+  *Help → Check for Updates…*, download of this installation's file verified against `SHA256SUMS.txt`, Windows
+  installers started, `.dmg` opened. Left: swapping a portable zip or AppImage in place with *Restart now*, a
+  signature on the checksum list (release key built into the app), the *server needs desktop x.y* hint, a manual
+  test script per install type for each RC
+- [x] Desktop: managed deployment policies (#378) – Windows registry with ADMX/ADML templates, macOS configuration
+  profile, `/etc/teamcraft/policies.json`; fixed server, updates, crash prompts, working folder, organisation name,
+  `UsageStatistics` (read for #383). Left: a manual test per OS (Group Policy, Intune, an MDM profile), a German ADML,
+  a per-machine MSI checked for silent installs
 - [ ] Desktop app run and tested on Windows x64/ARM64, macOS and Linux for each RC (a short manual test script in
   `docs/src/dev/release-checklist.md`)
 - [x] One download to try TeamCraft on a laptop: desktop installers *with local server* (Windows x64, macOS Apple
@@ -664,6 +685,10 @@ real files and belong to section 3 once such files are at hand.
 - [ ] Test the STEP export (built) with real files on Windows – the preview images are verified with the NIST Inventor
   2021 files. Inventor 2027 is registered for COM in the Windows 11 ARM64 test VM (`Inventor.Application`,
   `Inventor.exe /Automation`, found by the app's registry check); the export itself was not tried there yet
+- [x] Desktop: a slow or failed STEP export never costs the check-in (#342): files uploaded first, exports skippable
+  (the started Inventor is ended), busy COM calls retried, the whole error output in `export-logs/`. Left: STEP
+  export of large assemblies in the background after the check-in (a new version of the STEP later), parts-only
+  or size limits, `TranslatorAddIn.SaveCopyAs` with translator options; a manual test on Windows
 - [ ] Test the BOM import with real exports of the BOM editor (structured and parts only); *Phantom* components are
   imported as normal sub-assemblies today (*Reference* components are skipped)
 - [ ] Extend the Inventor part of the tutorial: Pack and Go, `.ipj`, Design Assistant for broken references

@@ -278,8 +278,27 @@ export function errorText(err) {
 
 export function setStatus(text) { $("status-msg").textContent = text || ""; }
 
-export function toast(text, kind) {
-  var el = h("div.toast" + (kind ? "." + kind : ""), { role: kind === "error" ? "alert" : "status", text: text });
+/** *Report a problem* (#381): report.js sets `open(failure)`; error
+ *  messages then offer *Report…*. */
+export var reportHook = { open: null };
+
+/** Remembers an error message for the report's recent messages (the last 50). */
+function rememberError(text) {
+  state.recentErrors = (state.recentErrors || []).concat([new Date().toISOString().slice(11, 19) + " " + text]).slice(-50);
+}
+
+/** A message at the bottom; `action` names what failed, for *Report…*. */
+export function toast(text, kind, action) {
+  var el = h("div.toast" + (kind ? "." + kind : ""), { role: kind === "error" ? "alert" : "status" }, [h("span", { text: text })]);
+  if (kind === "error") {
+    rememberError((action ? action + ": " : "") + text);
+    if (reportHook.open) {
+      el.appendChild(h("button.link.small", { type: "button", on: { click: function () {
+        el.remove();
+        reportHook.open({ action: action || "", error: text });
+      } } }, "Report…"));
+    }
+  }
   $("toasts").appendChild(el);
   setTimeout(function () {
     el.classList.add("leaving"); // app.css fades it out in 150 ms
@@ -312,7 +331,7 @@ export function run(statusText, fn) {
     return v;
   }, function (err) {
     setStatus("");
-    toast(errorText(err), "error");
+    toast(errorText(err), "error", statusText);
     throw err;
   });
 }
@@ -342,7 +361,16 @@ export function dialog(title, body, actions, opts) {
   var backdrop = h("div.dialog-backdrop", { on: { mousedown: function (e) { if (e.target === backdrop && !opts.modal) close(); } } }, form);
   function close() { backdrop.remove(); document.removeEventListener("keydown", onKey); }
   function onKey(e) { if (e.key === "Escape" && !opts.modal) close(); }
-  function fail(err) { errorEl.textContent = errorText(err); errorEl.classList.remove("hidden"); }
+  function fail(err) {
+    var text = errorText(err);
+    errorEl.replaceChildren(h("span", { text: text }));
+    rememberError(title + ": " + text);
+    // *Report…* (#381): the dialog's title is the action that failed
+    if (reportHook.open) {
+      errorEl.append(" ", h("button.link.small", { type: "button", on: { click: function () { reportHook.open({ action: title, error: text }); } } }, "Report…"));
+    }
+    errorEl.classList.remove("hidden");
+  }
   var handle = { close: close, fail: fail, form: form };
   document.addEventListener("keydown", onKey);
   root.appendChild(backdrop);
