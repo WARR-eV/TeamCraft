@@ -15,6 +15,16 @@ see the notices in the README.
 
 ### Added
 
+- **SolidCraft plugin: answers you can see.** SolidCraft shows the result of a
+  plugin entry only for read entries, so *TeamCraft status*, *Check for
+  TeamCraft* and *TeamCraft live status* are read entries again, over
+  `document.inspect`; until now their answers never appeared in SolidCraft's
+  dialog. *check* and *live* also say when the design has unsaved changes.
+  The BOM and linked-design checks moved to *Check assembly for TeamCraft*
+  (an edit entry: its findings go to the CLI, MCP and the assistant).
+  Requests now have one file per revision and action, so asking twice does
+  not ask twice, and *live* shows requests the desktop app has not taken yet.
+  16 cases pass on SolidCraft 0.45.0.
 - **Desktop: the problem-report tracker as a policy** (#378, #381). The
   managed-deployment policy `ReportUrl` (registry, macOS profile,
   `/etc/teamcraft/policies.json`; ADMX/ADML and examples updated) names the

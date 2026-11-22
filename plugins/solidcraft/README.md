@@ -20,22 +20,27 @@ table) and a row in the Plugins menu.
 
 | Entry | Effect | What it does |
 |-------|--------|--------------|
-| **status** – *TeamCraft status* | edit¹ | The TeamCraft item and revision the design belongs to, the page of the revision on the server, and whether the design's part number and revision still say the same. |
-| **check** – *Check for TeamCraft* | edit¹ | What keeps the design from going into TeamCraft cleanly: no part number, a part number or revision that differs from the linked item, BOM rows without a part number, one part number with two descriptions, quantities SolidCraft cannot add up, linked designs with an absolute path or two linked designs with the same file name. `ready` is true when only notes are left. |
+| **status** – *TeamCraft status* | read | The TeamCraft item and revision the design belongs to, the page of the revision on the server, and whether the design's part number and revision still say the same. |
+| **check** – *Check for TeamCraft* | read | What keeps the design from going into TeamCraft cleanly: no part number, a part number or revision that differs from the linked item, unsaved changes. `ready` is true when only notes are left. |
+| **check-assembly** – *Check assembly for TeamCraft* | edit¹ | The bill of materials and the linked designs: BOM rows without a part number, one part number with two descriptions, quantities SolidCraft cannot add up, linked designs with an absolute path or two linked designs with the same file name. |
 | **link** – *Link to TeamCraft item* | edit | Writes item number, revision and (optional) name into the design properties (*Part number*, *Revision*, *Description*) and TeamCraft's object – for designs edited without the desktop app. Ids written by the desktop app are kept while the item stays the same. One undo step; save the design afterwards. |
 | **unlink** – *Unlink from TeamCraft* | edit | Removes TeamCraft's object; part number and revision stay. |
-| **live** – *TeamCraft live status* | edit¹ | What the TeamCraft desktop app last shared about this revision: who has it checked out, the latest revision on the server, local changes – and whether the desktop app runs and reaches the server. Needs the folder (below). |
+| **live** – *TeamCraft live status* | read | What the TeamCraft desktop app last shared about this revision: who has it checked out, local changes, requests it has not taken yet, unsaved changes – and whether the desktop app runs and reaches the server. Needs the folder (below). |
 | **check-out** – *Check out in TeamCraft* | edit | Asks the desktop app to check out this revision; it asks you before it does. Needs the folder. |
 | **check-in** – *Check in with TeamCraft* | edit | Asks the desktop app to open its check-in dialog for this revision. Save the design first. Needs the folder. |
 | **open** – *Open in TeamCraft* | edit | Asks the desktop app to show this revision. Needs the folder. |
 
-¹ *status*, *check* and *live* only read. They are declared `edit` because SolidCraft
-classes `document.metadata`, `assembly.bom` and `component.links` as edit
-commands and refuses them from a read entry (*permission denied: edit command
-document.metadata from read entry*).
+SolidCraft shows the result of a **read** entry in its dialog; an **edit**
+entry's dialog just closes with *done*. *status*, *check* and *live* are read
+entries over `document.inspect`, so their answers are shown.
+
+¹ *check-assembly* only reads, but SolidCraft classes `assembly.bom` and
+`component.links` as edit commands and refuses them from a read entry, so it
+is an edit entry: its findings reach the CLI, MCP and the assistant, while
+SolidCraft's dialog only says *done*.
 
 SolidCraft commands it calls (declared in `plugin.json`, none of them reads
-or writes files): `document.metadata`, `document.metadata.set`,
+or writes files): `document.inspect`, `document.metadata.set`,
 `document.metadata.remove`, `assembly.bom`, `component.links`.
 
 ## The folder shared with the desktop app
@@ -75,7 +80,7 @@ not running never makes it fail. What it says when something does go wrong:
   cannot catch it (SolidCraft 0.45). So the plugin only calls commands that
   answer on any design – a part without components gives an empty BOM and no
   links – and checks its input before it writes. On a host that hands the
-  error back, the plugin adds what to do, and *check* reports a BOM or link
+  error back, the plugin adds what to do, and *check-assembly* reports a BOM or link
   list it could not read as a warning instead of *ready*.
 
 ## Build
