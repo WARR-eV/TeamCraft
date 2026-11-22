@@ -7,7 +7,7 @@
   "nav.requests.title": "Änderungsanträge (ECR): ein Problem melden, eine Änderung vorschlagen",
   "nav.changes": "Änderungen",
   "nav.projects": "Projekte",
-  "nav.search": "Artikel suchen",
+  "nav.search": "Nummern, Namen, Dateien suchen …",
   "nav.notifications": "Benachrichtigungen",
   "nav.notifications.unread": { "one": "{count} ungelesene Benachrichtigung", "other": "{count} ungelesene Benachrichtigungen" },
   "settings.title": "Einstellungen",

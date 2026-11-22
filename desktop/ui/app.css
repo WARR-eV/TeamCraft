@@ -1326,3 +1326,6 @@ pre.release-notes {
   white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 13px;
   background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
 }
+
+/* right-click menu of an item (#417, item-menu.js): busy while its revision loads */
+body.menu-loading, body.menu-loading * { cursor: progress; }

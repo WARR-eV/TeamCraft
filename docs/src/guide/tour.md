@@ -44,7 +44,7 @@ Use two browsers (or a private window) for the two-person steps.
 
 ## 5. Change and release
 
-1. As erika: *Release via new change…*, add rolf as reviewer, *Submit*.
+1. As erika: *More → Release…*, add rolf as reviewer, *Submit*.
 2. As rolf: the bell shows the review request; **Approve**. The hub is
    released; dependents get *Check needed*.
 3. *Revise* the released hub: revision B is in work and checked out.

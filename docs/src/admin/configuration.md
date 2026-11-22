@@ -35,6 +35,7 @@ read by `src/config.rs` in sync.
 |---------------------------|----------------------------------|----------------------------------------------------------------------------------------------------------------------|
 | `TEAMCRAFT_BIND_ADDR`     | `127.0.0.1:8080`                 | address to listen on (`0.0.0.0:8080` to serve the network)                                                           |
 | `TEAMCRAFT_PUBLIC_URL`    | `http://localhost:<port>`        | external URL: SSO redirects, CSRF origin check; for `https://` also `Secure` cookies and `Strict-Transport-Security` |
+| `TEAMCRAFT_DESKTOP_DOWNLOAD_URL` | the project's release page | where the web UI's *Get TeamCraft Desktop* links point (dashboard, revision page) – your own download page for installers you host; `off` hides the links; must start with `http://` or `https://` |
 | `TEAMCRAFT_INSTANCE_NAME` | `TeamCraft`                      | default header name, page titles, e-mails; administrators override it under *Admin → Branding*                       |
 | `TEAMCRAFT_LOG_FORMAT`    | `text`                           | `text` or `json`                                                                                                     |
 | `RUST_LOG`                | `info,tower_http=info,sqlx=warn` | log filter                                                                                                           |

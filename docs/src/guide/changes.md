@@ -64,7 +64,7 @@ audit log and in the status history of the request.
 A change collects one or more revisions *in work*, a title, description,
 priority and reviewers.
 
-1. **Draft** – the author adds revisions (*Release via new change…* on a
+1. **Draft** – the author adds revisions (*More → Release…* on a
    revision page) and reviewers – or the draft is created from an accepted
    change request.
 2. **Submit** – the revisions move to *In Review*; they are frozen.

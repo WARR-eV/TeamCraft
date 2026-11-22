@@ -139,6 +139,28 @@ fn preview_of(file: &FileRecord) -> Option<PreviewFormat> {
     PreviewFormat::of_format(&file.format).or_else(|| PreviewFormat::of(&file.filename))
 }
 
+/// The file whose picture heads the revision page (#412): a native file with
+/// a preview image (stored in the file or rendered from its 3D preview) –
+/// the assembly before the part before a model file before the drawing, the
+/// same order as the desktop app's main CAD file; the first by name on a tie.
+fn main_thumbnail(files: &[FileRecord]) -> Option<&FileRecord> {
+    files
+        .iter()
+        .filter_map(|f| {
+            let info = f.format_info.filter(|i| i.thumbnail)?;
+            let rank = match info.kind {
+                FormatKind::Assembly => 0,
+                FormatKind::Part => 1,
+                FormatKind::Model => 2,
+                FormatKind::Drawing => 3,
+                _ => return None,
+            };
+            Some((rank, f.filename.to_lowercase(), f))
+        })
+        .min_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)))
+        .map(|(_, _, f)| f)
+}
+
 /// Uses listed in the "Where used" card; a standard part can have tens of
 /// thousands (the REST API and MCP have the full reports).
 const WHERE_USED_SHOWN: usize = 200;
@@ -249,6 +271,15 @@ pub async fn show(
             None
         }
     };
+    // the picture next to the title block (#412), linked to its 3D view
+    let main_thumbnail = main_thumbnail(&file_list).map(|f| {
+        json!({
+            "id": f.id,
+            "filename": f.filename,
+            "sha256": f.sha256,
+            "preview": preview_of(f).is_some(),
+        })
+    });
     // Native CAD files can only be viewed in 3D through a neutral export.
     let native_without_preview = !file_list.iter().any(|f| preview_of(f).is_some())
         && file_list.iter().any(|f| {
@@ -492,6 +523,7 @@ pub async fn show(
             "files": attachments,
             "file_bases": file_bases,
             "native_without_preview": native_without_preview,
+            "main_thumbnail": main_thumbnail,
             "similar": similar_parts,
             "lines": lines,
             "cad_structure": cad_structure,
@@ -1606,8 +1638,58 @@ pub async fn delete_file(
 
 #[cfg(test)]
 mod tests {
+    use crate::models::FileRecord;
     use crate::services::references::FileReferrer;
     use uuid::Uuid;
+
+    fn file(filename: &str, format: &str) -> FileRecord {
+        FileRecord {
+            id: Uuid::new_v4(),
+            revision_id: Uuid::nil(),
+            filename: filename.into(),
+            content_type: "application/octet-stream".into(),
+            size_bytes: 1,
+            sha256: "0".repeat(64),
+            uploaded_by: Uuid::nil(),
+            uploaded_by_name: "Mia".into(),
+            uploaded_at: chrono::Utc::now(),
+            version: 1,
+            format: format.into(),
+            folder: String::new(),
+            retention: "all".into(),
+            solver_summary: None,
+            solver_line: None,
+            format_info: crate::cadformat::info(format),
+        }
+    }
+
+    #[test]
+    fn the_page_picture_is_the_assembly_before_the_part_before_the_drawing() {
+        let name = |files: &[FileRecord]| super::main_thumbnail(files).map(|f| f.filename.clone());
+        // no file with a preview image: no picture (STEP, PDF, notes)
+        let neutral = [file("bracket.stp", "step"), file("notes.txt", "")];
+        assert_eq!(name(&neutral), None);
+        let mut files = vec![
+            file("Bracket.idw", "inventor-drawing"),
+            file("bracket.stp", "step"),
+            file("Bracket.ipt", "inventor-part"),
+        ];
+        assert_eq!(name(&files).as_deref(), Some("Bracket.ipt"));
+        files.push(file("Frame.iam", "inventor-assembly"));
+        assert_eq!(name(&files).as_deref(), Some("Frame.iam"));
+        // a tie goes to the first by name, whatever the case
+        let parts = [
+            file("b.ipt", "inventor-part"),
+            file("A.ipt", "inventor-part"),
+        ];
+        assert_eq!(name(&parts).as_deref(), Some("A.ipt"));
+        // only the drawing has a picture: it heads the page
+        let drawing = [
+            file("Bracket.idw", "inventor-drawing"),
+            file("bracket.stp", "step"),
+        ];
+        assert_eq!(name(&drawing).as_deref(), Some("Bracket.idw"));
+    }
 
     fn referrer(number: &str, filename: &str, referenced: &str) -> FileReferrer {
         FileReferrer {

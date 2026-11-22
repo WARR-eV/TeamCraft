@@ -722,6 +722,31 @@
     btn.addEventListener("click", function () { window.print(); });
   });
 
+  // Section nav of the revision page (#421): the first section in view (in
+  // page order) gets aria-current; without IntersectionObserver the links
+  // simply jump.
+  (function () {
+    var nav = document.querySelector("[data-section-nav]");
+    if (!nav || !("IntersectionObserver" in window)) return;
+    var links = Array.prototype.slice.call(nav.querySelectorAll('a[href^="#"]'));
+    var inView = {};
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { inView[e.target.id] = e.isIntersecting; });
+      var current = null;
+      links.forEach(function (a) {
+        if (!current && inView[a.getAttribute("href").slice(1)]) current = a;
+      });
+      links.forEach(function (a) {
+        if (a === current) a.setAttribute("aria-current", "true");
+        else a.removeAttribute("aria-current");
+      });
+    }, { rootMargin: "-120px 0px -55% 0px" });
+    links.forEach(function (a) {
+      var section = document.getElementById(a.getAttribute("href").slice(1));
+      if (section) observer.observe(section);
+    });
+  })();
+
   // Copy buttons: <button data-copy="id"> copies the element's text,
   // <button data-copy-text="PRT-000042"> the given text (item lists).
   document.querySelectorAll("[data-copy], [data-copy-text]").forEach(function (btn) {

@@ -169,3 +169,51 @@ fn drop_zone_uses_the_chunked_upload_script() {
     assert!(start < submit);
     assert!(js.contains("data-chunked"));
 }
+
+/// The section nav of the revision page (#421) links every card that is on
+/// the page, and the browser's check-out says that it copies no files (#411).
+#[tokio::test]
+async fn revision_page_has_a_section_nav_and_says_the_web_check_out_copies_no_files() {
+    let app = app_or_skip!();
+    let (_, token) = app.user_in("leo", Role::Editor, &["ROVER"]).await;
+    let rev = new_item(&app, &token, "part").await;
+    let leo = app.login("leo").await;
+    let page = format!("/revisions/{rev}");
+
+    let html = app.get_page(&page, Some(&leo)).await.text();
+    assert!(html.contains("data-section-nav"), "{html}");
+    for id in [
+        "overview",
+        "lifecycle",
+        "revisions",
+        "files",
+        "bom",
+        "references",
+        "where-used",
+        "changes",
+        "history",
+    ] {
+        assert!(
+            html.contains(&format!("href=\"#{id}\"")),
+            "nav link to #{id}"
+        );
+        assert!(html.contains(&format!("id=\"{id}\"")), "card #{id}");
+    }
+    // a part has no simulation or as-built cards, so no links to them
+    assert!(!html.contains("href=\"#simulation-results\""));
+    assert!(!html.contains("href=\"#deviations\""));
+
+    // free revision: the check-out notice says what the browser does not do
+    let r = app
+        .post_form(
+            &format!("/revisions/{rev}/cancel-checkout"),
+            Some(&leo),
+            ORIGIN,
+            &[],
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::SEE_OTHER);
+    let html = app.get_page(&page, Some(&leo)).await.text();
+    assert!(html.contains("only takes the lock"), "{html}");
+    assert!(html.contains("Check out and open"));
+}

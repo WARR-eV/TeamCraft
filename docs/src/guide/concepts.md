@@ -1,5 +1,7 @@
 # Concepts
 
+The words used here are explained in short in the [Glossary](glossary.md).
+
 ## Items and revisions
 
 An **item** is a part, assembly, document, software component, simulation
@@ -10,6 +12,12 @@ scheme of its project group (built in: `PRT-000042`, `ASM-…`, `DOC-…`,
 is kept in **revisions** `A, B, …, Y, AA, …` (I, O, Q, S, X and Z are
 skipped, as in ASME Y14.35). A revision carries the attributes (name,
 description, material, mass, unit cost), the files and the bill of materials.
+
+Under the title block of the revision page, a bar of links jumps to each
+card – *Overview*, *Lifecycle*, *Revisions*, *Files*, *Structure* (the BOM),
+*References*, *Where used*, *Changes*, *History* and the cards only some items
+have (similar parts, simulation results, as-built records, alternates). It
+stays at the top while you scroll and marks the card in view (#421).
 
 Next to the number on the revision page, *Copy number* puts the item number
 on the clipboard (the item list has a small copy button per row), and *Label* opens a printable label with a QR code.
@@ -38,12 +46,11 @@ data never changes – further work happens in a new revision (*Revise*).
 
 ## Project groups and roles
 
-| Role | May |
-| Viewer | read internal project groups and the restricted groups they belong to, raise and discuss change requests |
-| Viewer | read everything, raise and discuss change requests |
-| CAD editor | create and change items of the project groups they belong to, create project groups, review changes,
-triage and decide change requests on their groups |
-| Admin | everything, plus users, all project groups and lock overrides |
+| Role       | May                                                                                                                                      |
+|------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| Viewer     | read internal project groups and the restricted groups they belong to, raise and discuss change requests                                 |
+| CAD editor | create and change items of the project groups they belong to, create project groups, review changes, triage and decide change requests on their groups |
+| Admin      | everything, plus users, all project groups and lock overrides                                                                            |
 
 Every item belongs to a **project group** – a product or product line, a
 machine, a customer project, a building, a vehicle or a rover. CAD editors start their own groups and become their

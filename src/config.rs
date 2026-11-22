@@ -102,6 +102,7 @@ pub const KNOWN_VARIABLES: &[&str] = &[
     "TEAMCRAFT_DB_USER",
     "TEAMCRAFT_DEMO_PASSWORD",
     "TEAMCRAFT_DEMO_USER",
+    "TEAMCRAFT_DESKTOP_DOWNLOAD_URL",
     "TEAMCRAFT_ENV_FILE",
     "TEAMCRAFT_INSTANCE_NAME",
     "TEAMCRAFT_LOCAL_AGENTS",
@@ -256,6 +257,10 @@ pub struct Config {
     pub public_url: String,
     /// Name shown in the UI header and page titles.
     pub instance_name: String,
+    /// Where the web UI sends users to get TeamCraft Desktop (#411):
+    /// `TEAMCRAFT_DESKTOP_DOWNLOAD_URL`, the project's release page by
+    /// default; `None` (`off`) hides the links.
+    pub desktop_download_url: Option<String>,
     /// PostgreSQL connection options (contains the password – never log it).
     pub database: PgConnectOptions,
     /// Password of the database connection, for tools that receive it in
@@ -965,6 +970,9 @@ impl Config {
             .get("TEAMCRAFT_INSTANCE_NAME")?
             .unwrap_or_else(|| "TeamCraft".to_string());
 
+        let desktop_download_url =
+            desktop_download_url(env.get("TEAMCRAFT_DESKTOP_DOWNLOAD_URL")?)?;
+
         let (database, database_display, database_password) = database_options(&env)?;
 
         let db_max_connections =
@@ -1291,6 +1299,7 @@ impl Config {
             bind_addr,
             public_url,
             instance_name,
+            desktop_download_url,
             database,
             database_password,
             database_display,
@@ -2710,5 +2719,52 @@ mod tests {
             stale_prefixes.is_empty(),
             "documented prefix matches nothing: {stale_prefixes:?}"
         );
+    }
+}
+
+/// Release page of the desktop installers, linked from the web UI unless
+/// `TEAMCRAFT_DESKTOP_DOWNLOAD_URL` names another page (#411).
+pub const DEFAULT_DESKTOP_DOWNLOAD_URL: &str =
+    "https://github.com/WARR-eV/TeamCraft/releases/latest";
+
+/// `TEAMCRAFT_DESKTOP_DOWNLOAD_URL`: unset or empty = the project's release
+/// page, `off` = no links, otherwise an http(s) URL.
+fn desktop_download_url(value: Option<String>) -> Result<Option<String>> {
+    let value = value.map(|v| v.trim().to_string()).unwrap_or_default();
+    if value.is_empty() {
+        return Ok(Some(DEFAULT_DESKTOP_DOWNLOAD_URL.to_string()));
+    }
+    if value.eq_ignore_ascii_case("off") {
+        return Ok(None);
+    }
+    if !(value.starts_with("https://") || value.starts_with("http://")) {
+        bail!("TEAMCRAFT_DESKTOP_DOWNLOAD_URL must start with http:// or https:// (or be off)");
+    }
+    Ok(Some(value))
+}
+
+#[cfg(test)]
+mod desktop_download_tests {
+    use super::*;
+
+    #[test]
+    fn desktop_download_url_defaults_turns_off_and_checks_the_scheme() {
+        assert_eq!(
+            desktop_download_url(None).unwrap().as_deref(),
+            Some(DEFAULT_DESKTOP_DOWNLOAD_URL)
+        );
+        assert_eq!(
+            desktop_download_url(Some("  ".into())).unwrap().as_deref(),
+            Some(DEFAULT_DESKTOP_DOWNLOAD_URL)
+        );
+        assert_eq!(desktop_download_url(Some("OFF".into())).unwrap(), None);
+        assert_eq!(
+            desktop_download_url(Some(" https://intranet.example.org/teamcraft ".into()))
+                .unwrap()
+                .as_deref(),
+            Some("https://intranet.example.org/teamcraft")
+        );
+        assert!(desktop_download_url(Some("javascript:alert(1)".into())).is_err());
+        assert!(desktop_download_url(Some("ftp://example.org".into())).is_err());
     }
 }

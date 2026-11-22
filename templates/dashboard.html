@@ -21,6 +21,7 @@
     </p>
   </div>
   <div class="actions">
+    {% if desktop_download_url %}<a class="button ghost" href="{{ desktop_download_url }}" rel="noopener" title="The desktop app for CAD work: a working folder per project group, Check out and open in your CAD program, Check in">Get TeamCraft Desktop</a>{% endif %}
     {% if me.can_edit %}
     {#- New item is the primary action on Home, in the desktop app as well -#}
     <a class="button" href="/changes/new">New change</a>

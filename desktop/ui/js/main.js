@@ -28,6 +28,7 @@ import { loadLanguage } from "/static/shared/js/i18n.js";
 import { reportDialog } from "./report.js";
 import { checkCrashReports, initCrashWatch } from "./crash.js";
 import { onSolidcraftRequest } from "./solidcraft-bridge.js";
+import { initItemMenu } from "./item-menu.js";
 
 // ======================================================================
 // Zoom: Ctrl + mouse wheel (trackpads: pinch), Ctrl/Cmd + + / - / 0
@@ -129,6 +130,7 @@ export function boot() {
   initCrashWatch();
   initConnect();
   initShell();
+  initItemMenu();
   initZoom();
   TAURI.event.listen("menu", function (e) { handleMenu(e.payload); });
   // large files are sent in resumable chunks: show how far they are

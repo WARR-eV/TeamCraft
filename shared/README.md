@@ -8,6 +8,7 @@ research page *Sharing UI code between the web UI and the desktop app*
 ```text
 css/skins.css      design tokens and skins (colours, radii, spacing, density, fonts)
 css/assistant.css  the "Ask TeamCraft" panel (a drawer on the web, inline in the desktop's Agent tab)
+css/components.css small components of both apps (the help tip "?" next to a term, #414)
 fonts/             Montserrat, Oswald (variable WOFF2) and their SIL OFL texts
 js/viewer.js       3D preview (WebGL2, TCMESH01), still a classic script
 js/assistant.js    "Ask TeamCraft" sidebar: ES module, mount(host, {api, getContext, link, …}) – no fetch, no invoke

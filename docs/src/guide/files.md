@@ -2,7 +2,10 @@
 
 ## Versions and rollback
 
-Every upload of a file name is a new **version** with an optional comment.
+Every upload of a file name is a new **version** with an optional comment
+(the **?** next to *Version* says it in one sentence; versions are the history
+inside a [revision](glossary.md)). The SHA-256 of a version is in the tooltip
+of its version number and under *⋯ → Copy SHA-256*.
 The revision page lists the version history of every file; any version can
 be downloaded (`name.v2.ext`), previewed, or **restored** – a rollback that
 stores the old content as a new version, so history is never rewritten.
@@ -118,6 +121,13 @@ canvas and, when the file has
 several fields, a selector – see [Simulations](simulation.md#results-in-3d).
 
 ## Previews of native CAD files
+
+**At the top of the revision page** (#412) stands the picture of the
+revision's main model next to the title block: the preview image of a native
+file – the assembly before the part before a model file (NX, Fusion …)
+before the drawing, the first by name when there are several. A click opens
+its 3D view (or the picture itself when the file has no 3D preview).
+Revisions with only neutral files (STEP, PDF) show no picture there.
 
 Native CAD files (Inventor, Solid Edge, SolidWorks, NX, Creo, CATIA, …) are
 proprietary; TeamCraft does not read their exact geometry (see

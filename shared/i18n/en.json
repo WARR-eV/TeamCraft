@@ -7,7 +7,7 @@
   "nav.requests.title": "Change requests (ECR): report a problem, propose a change",
   "nav.changes": "Changes",
   "nav.projects": "Projects",
-  "nav.search": "Search items",
+  "nav.search": "Search numbers, names, files …",
   "nav.notifications": "Notifications",
   "nav.notifications.unread": { "one": "{count} unread notification", "other": "{count} unread notifications" },
   "settings.title": "Settings",

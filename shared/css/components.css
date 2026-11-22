@@ -1,0 +1,46 @@
+/* SPDX-License-Identifier: MPL-2.0 */
+/* Small components of both apps (shared/README.md, rule 10): a class styled
+ * here is styled nowhere else. Tokens only – the colours come from skins.css. */
+
+/* "?" next to a term (issue 414) – web: templates/macros.html `help`, desktop:
+ * js/revision.js `helpTip`. The text is the accessible name and the tooltip,
+ * shown on hover and on keyboard focus. */
+.help-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15em;
+  height: 1.15em;
+  margin-left: 0.3em;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  font-size: 0.75em;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: help;
+  vertical-align: middle;
+}
+.help-tip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.help-tip:hover::after,
+.help-tip:focus::after {
+  content: attr(data-help);
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  top: calc(100% + 6px);
+  width: max-content;
+  max-width: 32ch;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-pop);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.35;
+  white-space: normal;
+  text-align: left;
+}

@@ -130,6 +130,10 @@ impl AppState {
             .with_scanner(config.clamd.clone());
         let mut templates =
             templates::environment(&config.instance_name).context("loading templates failed")?;
+        // "Get TeamCraft Desktop" links of the web UI (#411); unset = no links
+        if let Some(url) = &config.desktop_download_url {
+            templates.add_global("desktop_download_url", url.clone());
+        }
         if let Some(a) = &config.assistant {
             // privacy wording of the assistant panels: where the data goes
             templates.add_global(

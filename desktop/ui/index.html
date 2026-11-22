@@ -6,6 +6,7 @@
   <title>TeamCraft</title>
   <link rel="stylesheet" href="/static/shared/css/skins.css">
   <link rel="stylesheet" href="/static/shared/css/assistant.css">
+  <link rel="stylesheet" href="/static/shared/css/components.css">
   <link rel="stylesheet" href="app.css">
   <script src="/static/shared/js/viewer.js" defer></script>
   <script type="module" src="js/main.js"></script>
@@ -67,7 +68,7 @@
     </div>
     <form id="search-form" class="global-search" role="search">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-      <input id="search-input" type="search" placeholder="Search numbers, names, materials, file contents …" aria-label="Search">
+      <input id="search-input" type="search" placeholder="Search numbers, names, files …" aria-label="Search">
       <kbd id="search-kbd" aria-hidden="true">Ctrl F</kbd>
     </form>
     <div class="userbox">
@@ -129,7 +130,7 @@
     <span id="status-server" class="status-server"></span>
     <span id="status-msg" class="status-msg" role="status"></span>
     <span id="status-get" class="status-get hidden" role="status"><progress id="status-get-bar" max="1" value="0"></progress><span id="status-get-text" class="status-get-text"></span><button id="status-get-cancel" type="button" title="Stop after the current part of the file – the files copied so far stay; the next Get continues">Cancel</button></span>
-    <span id="status-update" class="status-update hidden"><button id="status-update-open" type="button" title="Opens the release page in the browser – the app installs nothing itself"></button><button id="status-update-dismiss" type="button" title="Hide this notice until the next version" aria-label="Hide the update notice">×</button></span>
+    <span id="status-update" class="status-update hidden"><button id="status-update-open" type="button" title="Opens the update window: what is new, and a download of the new version checked against the release checksums"></button><button id="status-update-dismiss" type="button" title="Hide this notice until the next version" aria-label="Hide the update notice">×</button></span>
     <button id="status-zoom" class="status-zoom hidden" type="button" title="Zoom – Ctrl + mouse wheel, Ctrl + + / − / 0; click for 100 %"></button>
     <span id="status-ws" class="status-ws"></span>
   </footer>
