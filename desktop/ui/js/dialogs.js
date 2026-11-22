@@ -10,6 +10,7 @@ import { newItemFolder } from "./files-view.js";
 import { describeFromDesign, formatKinds } from "./folder-import.js";
 import { newItemFindings, newItemKeyText, newItemPlacement, newItemSummary } from "./new-files.js";
 import { openRevision } from "./revision.js";
+import { revisionInputs } from "./report-inputs.js";
 
 // ======================================================================
 // Dialogs: new item, settings, about
@@ -264,6 +265,11 @@ export function openNewItemDialog(opts) {
       runCheck(token).catch(function (err) { if (token === inspection) { findings = null; showInfo(); info.appendChild(line(".notice.error", errorText(err))); } });
     }, 400);
   }
+  // *Report…* (#381): what the new item was to be, never its description
+  function newItemInputs() {
+    return [["group", group()], ["type", type.value], ["item folder", itemFolder()], ["number", number.value.trim()],
+      ["files", paths.map(baseName).join(", ")]];
+  }
   dialog("New item", h("div.stack", null, [
     field("Files", h("div.stack", null, [pick, fileList]), "the CAD model with its drawing and a STEP export for the 3D preview – uploaded right after the item is created; files in the working folder keep their folder"),
     h("div.grid-2", null, [field("Type", type), field("Project group", project)]),
@@ -313,7 +319,8 @@ export function openNewItemDialog(opts) {
           if (err && err.createdRevision) {
             var rev = err.createdRevision;
             d.close();
-            toast("Created " + rev.item_number + "/" + rev.code + ", but the files could not be uploaded: " + errorText(err), "error");
+            toast("Created " + rev.item_number + "/" + rev.code + ", but the files could not be uploaded: " + errorText(err), "error",
+              "Uploading the files of the new item", revisionInputs(rev, [["files", paths.map(baseName).join(", ")]]));
             afterCreate(rev);
             return;
           }
@@ -321,7 +328,7 @@ export function openNewItemDialog(opts) {
         });
       }
     }
-  ], { wide: true });
+  ], { wide: true, inputs: newItemInputs });
   function afterCreate(rev) {
     openRevision(rev.item_number, rev.code);
     if (createdIn) delete state.expanded[createdIn];

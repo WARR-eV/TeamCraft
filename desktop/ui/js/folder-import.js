@@ -489,7 +489,11 @@ export function openImportFolderDialog() {
     { label: "Close", onClick: function (d) { stop = true; d.close(); } },
     { label: "Scan", onClick: function (d) { if (!running) scanNow(d); } },
     { label: "Import", primary: true, submit: true, onClick: importNow }
-  ], { wide: true });
+  ], { wide: true, inputs: function () {
+    // *Report…* (#381): the folder's name (not its path) and the options
+    return [["folder", folder.value], ["group", project.value], ["numbers from names", fromNames.checked ? "yes" : "no"],
+      ["documents item", extras.checked ? "yes" : "no"], ["bom", bom.checked ? "yes" : "no"]];
+  } });
 }
 
 /** The report line of the BOM lines created from the CAD references. */

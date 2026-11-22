@@ -756,13 +756,15 @@ mod tests {
             "error.html",
             json!({ "status": 500, "reason": "Internal Server Error", "message": "Something went wrong <b>",
                     "flash": null, "local_login": true, "path": "/items/PRT-000042",
-                    "time": "2026-11-22 08:00:00 UTC", "version": "0.2.12" }),
+                    "time": "2026-11-22 08:00:00 UTC", "version": "0.2.12",
+                    "request_id": "0b7c6f0e-4d3a-4c1e-9a55-2f1d8e6b7a90" }),
         );
         // (MiniJinja escapes `/` in text as `&#x2f;`; the copied text is decoded)
         assert!(
             html.contains("data-copy=\"error-details\"")
                 && html.contains("Page: &#x2f;items&#x2f;PRT-000042")
         );
+        assert!(html.contains("Request id: 0b7c6f0e-4d3a-4c1e-9a55-2f1d8e6b7a90"));
         assert!(html.contains("Something went wrong &lt;b&gt;"), "escaped");
         // a hosted live demo: the account on the login page, the banner on every page
         let demo = json!({ "username": "demo", "password": "try-it-<out>" });

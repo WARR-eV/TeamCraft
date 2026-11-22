@@ -318,7 +318,8 @@ end-to-end tests against a real PostgreSQL.
   saved in the working folder (group and folder taken from where they are,
   duplicates refused, the worklist suggesting the parts and assemblies that
   belong to no item yet), an Agent view, crash reports the user
-  decides about and an update notice (never installs anything itself). The
+  decides about, *Report…* on every error (a reviewed, redacted report with
+  the action and its key inputs; nothing is sent without a click) and an update notice (never installs anything itself). The
   download *with local server* also runs a private test server with its own
   database on the laptop (*Try TeamCraft on this computer*).
 - **REST API** – everything the UI does, with personal access tokens.

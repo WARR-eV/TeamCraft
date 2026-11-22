@@ -15,6 +15,20 @@ see the notices in the README.
 
 ### Added
 
+- **Request ids** (#381): every answer of the server carries an
+  `x-request-id` header (a new UUID, or a reverse proxy's own id of 1–64
+  characters `[A-Za-z0-9-]`), the request's log line records it as
+  `request_id`, and the web UI's error pages show it under *Details for a bug
+  report* and in *Copy details*.
+- **Desktop: key inputs in problem reports** (#381): *Report…* on an error
+  now names what the action worked on – project group, item, revision, file
+  and format, the ticked files of a check-in, the options of a BOM or folder
+  import – for check-out, check-in and park, *Get files*, opening files, the
+  3D preview and STL export, STEP exports, new items, adding files, BOM and
+  folder imports and request attachments. Names and short values only (a path
+  is reduced to its file name, at most 12 values of 200 characters); a 3D
+  preview that cannot be loaded from the server now also shows an error
+  message with *Report…*.
 - SolidCraft design properties (#367): part number, revision, description, project, author, organisation and licence are read from `.sc` designs at upload and check-in (bounded, text values only, migration `0078_file_properties`), listed under the file on the revision page and in the desktop app, returned as `properties`/`properties_line` with the file in the REST API (and `design_properties` in the MCP file briefs), and found by the full-text search. The revision page – web and desktop – shows a notice when they differ from the item number, revision code or name (`property_mismatches` of `GET /api/v1/items/{n}/revisions/{c}`) – worked out on every view, nothing is changed automatically. A new item created in the web UI with a design and no name takes the design's description; the desktop's *New item* (and *Create items…* of the worklist) and *Import a CAD folder* fill an empty description from it.
 - **Thumbnails in lists** (#420): the picture of a revision's main model (the
   rule of the revision page, now in `services::thumbnails`; a stand-alone JT

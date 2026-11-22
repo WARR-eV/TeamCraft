@@ -160,9 +160,13 @@ feature milestone – the features in *What works* are enough; what is missing i
   desktop policy `UsageStatistics` (#378) once the developers' share is decided per desktop
 - [ ] Desktop: report a problem from any error (#381). Done: *Report…* on every toast and dialog error, *Help → Report a
   Problem…*, redacted prefilled report (`desktop/src/report.rs`), *Open issue form* / *Copy* / *Save*, own tracker
-  setting, *Copy details* on web error pages. Left: screenshot and affected-file attachments, the key inputs of
-  each action (most messages name only the action), a request id on web errors (the server version in the report: done)
-  (the tracker as a desktop policy: done, `ReportUrl`)
+  setting, *Copy details* on web error pages, the server version in the report, the tracker as a desktop policy
+  (`ReportUrl`), a request id on every answer and web error page (`x-request-id`, in the log line), the key inputs
+  of the main actions (check-out/in, park, get, open, 3D preview, STEP/STL export, new item, add files, BOM and
+  folder import, request attachments). Left: screenshot and affected-file attachments (pending a decision: what a
+  screenshot may show, and the warning for a file that leaves the organisation); key inputs for the remaining
+  smaller actions (change orders, requests, settings); *Report…* on inline error notices (new-item duplicate check, BOM
+  preview "No BOM lines found", the 3D viewer's canvas overlay incl. parse and graphics-memory errors)
 - [ ] Desktop: one-click update (#377). Done: update window (release notes, *Skip this version*, *Remind me later*),
   *Help → Check for Updates…*, download of this installation's file verified against `SHA256SUMS.txt`, Windows
   installers started, `.dmg` opened. Left: swapping a portable zip or AppImage in place with *Restart now*, a

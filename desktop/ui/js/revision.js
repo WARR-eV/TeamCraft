@@ -19,6 +19,7 @@ import { openRequest, requestChangeDialog } from "./requests.js";
 import { bomFromCadDialog, importBomDialog } from "./bom-import.js";
 import { cadTargetChip, groupDefault, mainCadFile, openWithCad } from "./cad-open.js";
 import { incompleteGet, notOpenedText } from "./get-rules.js";
+import { revisionInputs } from "./report-inputs.js";
 
 /** Opens a revision tab; `viewerFile` (a file id) picks the file of its 3D viewer. */
 export function openRevision(number, code, sub, viewerFile) {
@@ -475,13 +476,17 @@ export function checkOutAndOpen(tab, file) {
   doCheckout(tab, function (r) {
     var why = incompleteGet(r);
     if (why) { toast(notOpenedText(file.filename, why) + " The check-out stays.", "info"); return; }
-    openWithCad(rev, file).catch(function (e) { toast(errorText(e), "error"); });
+    openWithCad(rev, file).catch(function (e) {
+      toast(errorText(e), "error", "Opening " + file.filename + " in the CAD program", revisionInputs(rev, [["file", file.filename], ["format", file.format]]));
+    });
   });
 }
 
 /** Opens a CAD file of my own check-out from the working folder. */
 export function openCadFile(tab, file) {
-  openWithCad(tab.data.rev, file).catch(function (e) { toast(errorText(e), "error"); });
+  openWithCad(tab.data.rev, file).catch(function (e) {
+    toast(errorText(e), "error", "Opening " + file.filename + " in the CAD program", revisionInputs(tab.data.rev, [["file", file.filename], ["format", file.format]]));
+  });
 }
 
 export function revFiles(tab, el) {

@@ -892,6 +892,10 @@ async fn html_errors(State(st): State<AppState>, req: Request, next: Next) -> Re
         .unwrap_or_else(|| "/".into());
     let is_get = req.method() == Method::GET;
     let skin = skin_from_cookie(req.headers());
+    let request_id = req
+        .extensions()
+        .get::<crate::RequestId>()
+        .map(|r| r.0.clone());
     let response = next.run(req).await;
     // The viewer fetches preview meshes itself and shows the JSON error message.
     let path = target.split('?').next().unwrap_or("");
@@ -930,6 +934,8 @@ async fn html_errors(State(st): State<AppState>, req: Request, next: Next) -> Re
         "path": path,
         "time": chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string(),
         "version": env!("CARGO_PKG_VERSION"),
+        // the `x-request-id` of this answer: matches the server log line
+        "request_id": request_id,
         "skin": skin,
         "branding": branding,
     });
