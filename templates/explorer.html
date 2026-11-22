@@ -40,10 +40,11 @@
     {% if entries %}
     <div class="table-wrap">
     <table>
-      <thead><tr><th scope="col">Item</th><th scope="col">Rev</th><th scope="col">Name</th><th scope="col">State</th><th scope="col">Lock</th><th scope="col" class="num">Files</th></tr></thead>
+      <thead><tr><th scope="col" class="thumb-col"><span class="visually-hidden">Preview</span></th><th scope="col">Item</th><th scope="col">Rev</th><th scope="col">Name</th><th scope="col">State</th><th scope="col">Lock</th><th scope="col" class="num">Files</th></tr></thead>
       <tbody>
       {% for e in entries %}
         <tr data-tc-row="{{ e.number }}" class="{% if selected and selected.rev.id == e.revision_id %}selected{% endif %}">
+          <td class="thumb-col">{% if e.thumbnail_file_id %}<img class="list-thumb" src="/files/{{ e.thumbnail_file_id }}/thumbnail?v={{ e.thumbnail_sha256 }}" alt="" loading="lazy" decoding="async" width="40" height="40" data-hide-broken>{% endif %}</td>
           <td class="nowrap"><a class="mono" href="{{ '/vault?folder=' ~ folder ~ ('&q=' ~ q if q else '') ~ '&rev=' ~ e.revision_id }}"{% if selected and selected.rev.id == e.revision_id %} aria-current="true"{% endif %}>{{ e.number }}</a></td>
           <td>{{ m.revbox(e.code) }}</td>
           <td class="ellipsis" title="{{ e.name }}">{{ e.name }}{% if folder in ["mine", "locked", "search"] and e.project_code %} <span class="muted small">{{ e.project_code }}</span>{% endif %}</td>

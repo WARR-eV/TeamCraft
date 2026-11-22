@@ -13,6 +13,23 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Added
+
+- **Thumbnails in lists** (#420): the picture of a revision's main model (the
+  rule of the revision page, now in `services::thumbnails`; a stand-alone JT
+  file after the native files) heads every row of the web item list and its
+  search results, the vault explorer, and the desktop app's Home *Files*,
+  *All items*, *Structure* and the search. The list answers carry
+  `thumbnail_file_id` / `thumbnail_sha256` (`GET /items`, `/favorites`, the
+  structure levels) or per file `thumbnail` / `sha256` (`GET
+  /projects/{code}/files`), filled for the whole page in one query; the
+  images load lazily (web `loading="lazy"`, desktop only for rows in view)
+  and are cached by content hash. New: `GET /revisions/{id}/thumbnail` on
+  web and REST API (404 without a picture or read access); thumbnail
+  responses answer `If-None-Match` with 304 (not for assemblies composed from
+  their parts' previews, whose picture changes with a component). Similar-part hits use the same
+  picture rule.
+
 ### Changed
 
 - **Usage statistics: the desktop app counts every listed action** (#383).

@@ -1247,6 +1247,14 @@ ul.file-refs { margin-bottom: var(--space-3); }
   border: 1px solid var(--border); border-radius: 4px; background: #fff;
 }
 .similar-main { min-width: 0; overflow-wrap: anywhere; }
+/* main thumbnail of a revision in the item list, search and explorer (#420):
+   a fixed column, so a row without a picture (or a missing one) keeps its place */
+th.thumb-col, td.thumb-col { width: 2.5rem; padding-top: 0.15rem; padding-bottom: 0.15rem; }
+.list-thumb {
+  width: 2.5rem; height: 2.5rem; object-fit: contain; display: block;
+  border: 1px solid var(--border); border-radius: 4px; background: #fff;
+}
+td.thumb-col .thumb-link { margin: 0; display: block; }
 .similar-why { display: block; color: var(--text-dim); font-size: 0.8rem; margin-top: 0.15rem; }
 .similar-score { display: flex; align-items: center; gap: var(--space-2); font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; }
 .similar-score meter {

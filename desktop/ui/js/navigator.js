@@ -20,6 +20,7 @@ import { renderFiles } from "./browser.js";
 import { ageText, batchSummary, newItemFindings, newItemPlacement } from "./new-files.js";
 import { checkedOutClass, favouriteKey, normalizeFavourite, suggestionKey } from "./files-view.js";
 import { cutLevel, describeNode, normalizeMode, pathKey, quantityText, rootNodes, usageBadge } from "./structure.js";
+import { thumbIco } from "./list-thumbs.js";
 import { emptyActionLabel, emptyGroupHint, noGroupsHint, noNewFilesHint, worklistHint } from "./empty-rules.js";
 import { t } from "/static/shared/js/i18n.js";
 
@@ -85,7 +86,7 @@ export function itemNode(it, opts) {
     on: { click: function () { openRevision(it.number, it.latest_code); } }
   }, [
     h("span.twisty", null, opts.indent ? "" : ""),
-    h("span.ico", { text: typeIcon(it.item_type) }),
+    thumbIco(typeIcon(it.item_type), it),
     h("span.label", null, label.concat([it.matched_file ? h("span.dim", { text: " · " + it.matched_file }) : null])),
     h("span.meta", null, badge(it.latest_state))
   ]));
@@ -814,7 +815,7 @@ export function structureNode(n, parentKey) {
       openRevision(n.item_number, n.code);
     } }
   }, [
-    twisty, h("span.ico", { text: n.item_type ? typeIcon(n.item_type) : "•" }),
+    twisty, thumbIco(n.item_type ? typeIcon(n.item_type) : "•", n),
     d.kind === "revision"
       ? h("span.label", null, [h("span.mono", { text: d.label }), " ", n.name])
       : h("span.label.dim", { text: d.kind === "restricted" ? d.placeholder : d.label + " – " + d.placeholder }),

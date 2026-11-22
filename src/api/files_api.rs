@@ -147,8 +147,19 @@ pub(super) async fn file_thumbnail(
     State(st): State<AppState>,
     ApiUser(me): ApiUser,
     Path(id): Path<Uuid>,
+    headers: axum::http::HeaderMap,
 ) -> AppResult<Response> {
-    web::thumbnail_response(&st, &me, id).await
+    web::thumbnail_response(&st, &me, id, &headers).await
+}
+
+/// The main thumbnail of a revision (#420), see `services::thumbnails`.
+pub(super) async fn revision_thumbnail(
+    State(st): State<AppState>,
+    ApiUser(me): ApiUser,
+    Path(id): Path<Uuid>,
+    headers: axum::http::HeaderMap,
+) -> AppResult<Response> {
+    web::revision_thumbnail_response(&st, &me, id, &headers).await
 }
 
 pub(super) async fn delete_file(

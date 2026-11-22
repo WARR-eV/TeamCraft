@@ -624,7 +624,8 @@ mod tests {
                             "project_code": "ROCKET", "revision_id": revision("in_work", true)["id"],
                             "code": "A", "name": "Bracket <b>",
                             "state": "in_work", "checked_out_by": ME, "checked_out_by_name": "Max Muster",
-                            "checked_out_at": TS, "updated_at": TS, "file_count": 2 });
+                            "checked_out_at": TS, "updated_at": TS, "file_count": 2,
+                            "thumbnail_file_id": OTHER, "thumbnail_sha256": "cd34" });
         let html = render(
             &env,
             "explorer.html",
@@ -649,6 +650,10 @@ mod tests {
         ] {
             assert!(html.contains(expected), "vault explorer shows {expected}");
         }
+        assert!(
+            html.contains(&format!("src=\"/files/{OTHER}/thumbnail?v=cd34\"")),
+            "the vault explorer shows the main thumbnail (#420)"
+        );
         let html = render(
             &env,
             "explorer.html",
@@ -797,7 +802,8 @@ mod tests {
                 "items": [{ "id": ME, "number": "PRT-000001", "item_type": "part", "unit": "each", "project_code": null,
                             "created_at": TS, "latest_revision_id": OTHER, "latest_code": "A", "latest_state": "in_work",
                             "name": "Bracket", "matched_file": "bracket.step", "classification": "purchased",
-                            "attributes": { "vendor": "Bosch" } }],
+                            "attributes": { "vendor": "Bosch" },
+                            "thumbnail_file_id": ROCKET, "thumbnail_sha256": "ab12" }],
                 "pagination": page(), "base_query": "q=a%20b",
                 "filter": { "q": "a b", "type": "part", "project": "", "state": "", "system": "creo",
                             "class": "purchased", "attr": "vendor", "value": "Bo" },
@@ -823,6 +829,10 @@ mod tests {
             "saved searches keep the class"
         );
         assert!(html.contains("is not a number"), "filter errors are shown");
+        assert!(
+            html.contains(&format!("src=\"/files/{ROCKET}/thumbnail?v=ab12\"")),
+            "the item list shows the main thumbnail (#420)"
+        );
 
         let html = render(
             &env,

@@ -44,8 +44,9 @@ pub(crate) use branding::image as branding_image;
 pub(crate) use imports::{options_from as import_options, receive as receive_import};
 pub(crate) use requests::{attachment_response, receive_attachment};
 pub(crate) use revisions::{
-    file_response, mesh_response, receive_uploads, take_session_uploads, thumbnail_response,
-    upload_files, version_response, warm_previews, Received,
+    file_response, mesh_response, receive_uploads, revision_thumbnail_response,
+    take_session_uploads, thumbnail_response, upload_files, version_response, warm_previews,
+    Received,
 };
 
 use axum::{
@@ -153,6 +154,10 @@ pub fn router(state: &AppState) -> Router<AppState> {
             post(revisions::cancel_checkout),
         )
         .route("/revisions/{id}/revise", post(revisions::revise))
+        .route(
+            "/revisions/{id}/thumbnail",
+            get(revisions::revision_thumbnail),
+        )
         .route("/revisions/{id}/obsolete", post(revisions::obsolete))
         .route(
             "/revisions/{id}/files",

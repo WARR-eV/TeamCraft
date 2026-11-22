@@ -11,6 +11,7 @@ import { emptyGroupHint } from "./empty-rules.js";
 import { openRevision } from "./revision.js";
 import { canEdit, canEditProject } from "./shell.js";
 import { newItemDialog } from "./dialogs.js";
+import { thumbIco } from "./list-thumbs.js";
 import { checkedOutClass, countText, entryIconType, entryName, entryRevision, entryTitle, favouritePath, favouriteSuggestions, folderKey, groupTotal, mergeEntries, parentFolder, remaining, sortEntries, sortFolders } from "./files-view.js";
 
 /** Entries asked for per request (the server's maximum). */
@@ -234,7 +235,7 @@ function entryNode(p, path, e) {
   var node = row("div.node.file" + checkedOutClass(e) + (state.active === key ? ".selected" : ""), {
     title: entryTitle(e, label), "data-item": e.item_number, "data-rev": e.code
   }, [
-    h("span.twisty"), h("span.ico", { text: typeIcon(entryIconType(e)) }),
+    h("span.twisty"), thumbIco(typeIcon(entryIconType(e)), e),
     h("span.label", null, [h("span.fname", { text: entryName(e) }), h("span.dim.mono", { text: " " + entryRevision(e) })]),
     h("span.meta", null, meta)
   ], function () { remember(p, path); openRevision(e.item_number, e.code); });

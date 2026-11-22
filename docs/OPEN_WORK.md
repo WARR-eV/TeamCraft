@@ -763,8 +763,11 @@ needs an issue with a reason first (see *Direction*).
   review is #408: quick wins done (#409 check-in icon, #410 one vocabulary + glossary, #411 web check-out wording
   and *Get TeamCraft Desktop*, #412 preview at the top of the revision page, #413 no hash column, #414 revision vs
   version explained), #421 section nav of the revision page, #417 right-click menus in the desktop app, #423 empty
-  states that name the next step (web and desktop, by role, i18n catalogs); left: the daily CAD loop (#415, #416,
-  #418–#420) and onboarding (#422, #424); the other empty states (detail tabs, admin pages) still in English only;
+  states that name the next step (web and desktop, by role, i18n catalogs), #420 thumbnails in the item list,
+  search, vault explorer and the desktop Home views (left from #420: a revision with only STEP or mesh files gets
+  no list picture yet – a fallback rendered from its 3D preview needs `thumbnail::supports` and `cadformat`
+  widened); left: the daily CAD loop (#415, #416, #418, #419) and onboarding (#422, #424); the other empty states
+  (detail tabs, admin pages) still in English only;
   #423 left: a *Get…* hint for viewers (they may get read-only copies, but *New on this computer* is shown to CAD
   editors only) and a check whether the working folder really lacks the active group's files
 - [ ] Responsive pages on large data (1M files, 100k items, 10k-line BOMs – see the scale targets)
