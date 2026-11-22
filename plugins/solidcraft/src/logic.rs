@@ -62,8 +62,11 @@ pub fn execute(host: &mut dyn Host, entry: &str, params: &Value) -> Result<Value
     }
 }
 
+/// The design's `metadata` as saved and SolidCraft's `properties` (its keys as text).
+type Properties = (Map<String, Value>, Map<String, Value>);
+
 /// The design's properties: (`metadata` as saved, SolidCraft's `properties`).
-fn properties(host: &mut dyn Host) -> Result<(Map<String, Value>, Map<String, Value>), EntryError> {
+fn properties(host: &mut dyn Host) -> Result<Properties, EntryError> {
     let read = call(host, "document.metadata", json!({}))?;
     let object = |name: &str| {
         read.get(name)
