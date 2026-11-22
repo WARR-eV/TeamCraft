@@ -13,12 +13,17 @@ see the notices in the README.
 
 ## [Unreleased]
 
+## [0.2.13] - 2026-11-22
+
 ### Fixed
 
 - CI: the self-test of `scripts/ci-changes.sh` expected a desktop UI script
   (`desktop/ui/js/local-changes.js`, #416) to skip the desktop Rust jobs,
   but the table now runs them for every desktop UI script (#448); the
   `changes` job of every workflow failed on `main`.
+- CI: the desktop tests of *Local changes* (#416) built one-element slices
+  with `&[x.clone()]`, which clippy 1.100 refuses
+  (`cloned_ref_to_slice_refs`); they use `std::slice::from_ref` now.
 
 ### Added
 
@@ -1638,7 +1643,8 @@ Changes since the `v0.2.0` tag.
   app keeps the private file and shows a warning. Server addresses with plain
   `http://` to another computer get a warning.
 
-[Unreleased]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.12...HEAD
+[Unreleased]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.13...HEAD
+[0.2.13]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.12...v0.2.13
 [0.2.12]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.11...v0.2.12
 [0.2.11]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.10...v0.2.11
 [0.2.10]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.9...v0.2.10
