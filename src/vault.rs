@@ -110,6 +110,24 @@ impl Vault {
         self
     }
 
+    /// Refuses a file of `size` bytes right away when the scanner could not
+    /// check it and the administrator did not allow unscanned large files
+    /// (`TEAMCRAFT_CLAMD_OVERSIZE`, GHSA-qw27-m6gj-m6wm) – before a chunked
+    /// upload sends gigabytes that would be refused at the end.
+    pub fn check_scannable(&self, size: u64) -> AppResult<()> {
+        match self.scanner.as_deref() {
+            Some(s) if size > s.max_bytes && s.oversize == crate::malware::Oversize::Refuse => {
+                Err(AppError::PayloadTooLarge(format!(
+                    "The file is larger than the malware scanner checks ({} MiB). An \
+                     administrator can raise the limit (TEAMCRAFT_CLAMD_MAX_MB together with \
+                     clamd's StreamMaxLength).",
+                    s.max_bytes / (1024 * 1024)
+                )))
+            }
+            _ => Ok(()),
+        }
+    }
+
     /// Refuses infected content (400) and fails closed (503) when the
     /// scanner cannot be asked; without a scanner nothing happens.
     async fn ensure_clean(&self, path: &Path, size: u64) -> AppResult<()> {
@@ -580,6 +598,7 @@ mod tests {
             addr: crate::malware::tests::fake_clamd().await,
             max_bytes: 1024 * 1024,
             timeout: Duration::from_secs(5),
+            oversize: crate::malware::Oversize::Refuse,
         };
         let vault = Vault::open(&root)
             .await
@@ -603,6 +622,17 @@ mod tests {
         let staged = vault.hash_staged(session).await.unwrap();
         assert!(vault.adopt_staged(session, &staged.sha256).await.is_err());
         assert!(!vault.exists(&staged.sha256).await);
+        // too large to scan: refused before a chunked upload starts
+        assert!(matches!(
+            vault.check_scannable(2 * 1024 * 1024),
+            Err(AppError::PayloadTooLarge(_))
+        ));
+        assert!(vault.check_scannable(1024).is_ok());
+        assert!(Vault::open(&root)
+            .await
+            .unwrap()
+            .check_scannable(u64::MAX)
+            .is_ok());
         fs::remove_dir_all(root).await.ok();
     }
 

@@ -12,9 +12,9 @@
 //! expired ID token; a wrong `aud` or `iss`; an ID token without subject; an
 //! error from the provider. Nothing of these signs anybody in.
 //!
-//! ID token signatures are not verified by design: the token comes straight
-//! from the token endpoint (OpenID Connect Core 1.0, 3.1.3.7 step 6, see
-//! `src/oidc.rs`); a test pins that behaviour.
+//! ID token signatures are verified against the provider's `jwks_uri` (ES256
+//! here) or, for HS256, the client secret (GHSA-864x-fmpf-4p73, F6): a changed
+//! payload, `alg: none` or a key the provider does not publish signs nobody in.
 //!
 //! Offboarding driven by the identity provider (issue #173, step 9): the
 //! provider signs back-channel logout tokens with an ES256 key it publishes at
@@ -53,7 +53,14 @@ enum Tweak {
     OtherAudience,
     OtherIssuer,
     NoSubject,
+    /// The ID token's payload changed after signing.
     BadSignature,
+    /// `alg: none`, no signature.
+    Unsigned,
+    /// Signed with a key the provider does not publish.
+    ForeignKey,
+    /// HS256 with the client secret (OpenID Connect Core 10.1).
+    ClientSecret,
     /// A fresh sign-in: `auth_time` = now (asked for with `max_age=0`).
     Fresh,
 }
@@ -84,10 +91,15 @@ fn es256_key_pair() -> EcdsaKeyPair {
     EcdsaKeyPair::from_pkcs8(alg, pkcs8.as_ref(), &rng).unwrap()
 }
 
-/// A JWS (compact form) of `claims`, signed with `key` under [`KEY_ID`].
+/// A logout token (compact JWS) of `claims`, signed with `key` under [`KEY_ID`].
 fn sign_es256(key: &EcdsaKeyPair, claims: &Value) -> String {
     let header = json!({ "alg": "ES256", "kid": KEY_ID, "typ": "logout+jwt" });
-    let message = format!("{}.{}", b64(&header), b64(claims));
+    sign_jws(key, &header, claims)
+}
+
+/// A compact JWS of `claims` under `header`, signed with the ES256 `key`.
+fn sign_jws(key: &EcdsaKeyPair, header: &Value, claims: &Value) -> String {
+    let message = format!("{}.{}", b64(header), b64(claims));
     let rng = ring::rand::SystemRandom::new();
     let signature = key.sign(&rng, message.as_bytes()).unwrap();
     format!("{message}.{}", URL_SAFE_NO_PAD.encode(signature.as_ref()))
@@ -205,7 +217,11 @@ async fn token(
         "name": "Erika SSO", "groups": ["teamcraft-editors"],
     });
     match grant.tweak {
-        Tweak::None | Tweak::BadSignature => {}
+        Tweak::None
+        | Tweak::BadSignature
+        | Tweak::Unsigned
+        | Tweak::ForeignKey
+        | Tweak::ClientSecret => {}
         Tweak::WrongNonce => claims["nonce"] = json!("not-the-nonce"),
         Tweak::Expired => claims["exp"] = json!(now - 3600),
         Tweak::OtherAudience => claims["aud"] = json!("another-app"),
@@ -213,16 +229,25 @@ async fn token(
         Tweak::NoSubject => claims["sub"] = json!(""),
         Tweak::Fresh => claims["auth_time"] = json!(now),
     }
-    let signature = if grant.tweak == Tweak::BadSignature {
-        "bm90IGEgc2lnbmF0dXJl".to_string()
-    } else {
-        URL_SAFE_NO_PAD.encode(b"signature-the-client-does-not-check")
+    let header = json!({ "alg": "ES256", "kid": KEY_ID, "typ": "JWT" });
+    let id_token = match grant.tweak {
+        Tweak::BadSignature => {
+            // signed, then the subject changed to an administrator's
+            let signed = sign_jws(&p.key, &header, &claims);
+            let parts: Vec<&str> = signed.split('.').collect();
+            claims["sub"] = json!("admin");
+            format!("{}.{}.{}", parts[0], b64(&claims), parts[2])
+        }
+        Tweak::Unsigned => format!("{}.{}.", b64(&json!({ "alg": "none" })), b64(&claims)),
+        Tweak::ForeignKey => sign_jws(&es256_key_pair(), &header, &claims),
+        Tweak::ClientSecret => {
+            let message = format!("{}.{}", b64(&json!({ "alg": "HS256" })), b64(&claims));
+            let key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, b"secret");
+            let tag = ring::hmac::sign(&key, message.as_bytes());
+            format!("{message}.{}", URL_SAFE_NO_PAD.encode(tag.as_ref()))
+        }
+        _ => sign_jws(&p.key, &header, &claims),
     };
-    let id_token = format!(
-        "{}.{}.{signature}",
-        b64(&json!({ "alg": "RS256", "typ": "JWT" })),
-        b64(&claims)
-    );
     (
         StatusCode::OK,
         Json(json!({ "id_token": id_token, "access_token": "at-1", "token_type": "Bearer" })),
@@ -461,18 +486,30 @@ async fn a_misconfigured_client_stays_a_server_error() {
     app.teardown().await;
 }
 
+/// GHSA-864x-fmpf-4p73 (F6): the ID token's signature is checked against the
+/// provider's published keys – TLS to the token endpoint alone is not relied
+/// on. A forged, unsigned or foreign-signed token signs nobody in; HS256
+/// with the client secret is a valid signature (OpenID Connect Core 10.1).
 #[tokio::test]
-async fn id_token_signatures_are_not_checked_by_design() {
-    // OpenID Connect Core 1.0, 3.1.3.7 step 6: an ID token received directly
-    // from the token endpoint may be trusted without checking its
-    // signature; iss, aud, exp and nonce still are (see src/oidc.rs). This
-    // test pins that decision – a change of it has to change the test.
+async fn forged_id_tokens_never_sign_in() {
     let provider = Provider::start().await;
     let Some(app) = app_with(&provider).await else {
         return;
     };
+    for tweak in [Tweak::BadSignature, Tweak::Unsigned, Tweak::ForeignKey] {
+        let login = start_login(&app).await;
+        let code = provider.authorize(&login.nonce, &login.challenge, tweak);
+        let r = callback(&app, &code, &login.state).await;
+        refused(&app, &r, StatusCode::BAD_REQUEST, "ID token was refused").await;
+    }
+    let users: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE auth_source = 'oidc'")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(users, 0, "no account was provisioned");
+
     let login = start_login(&app).await;
-    let code = provider.authorize(&login.nonce, &login.challenge, Tweak::BadSignature);
+    let code = provider.authorize(&login.nonce, &login.challenge, Tweak::ClientSecret);
     let r = callback(&app, &code, &login.state).await;
     assert!(r.status.is_redirection(), "{} {}", r.status, r.text());
     assert!(session_cookie(&r).is_some());

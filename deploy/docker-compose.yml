@@ -1,7 +1,7 @@
 # TeamCraft server with PostgreSQL – production setup for one Linux host.
 #
 # Installed by deploy/install.sh into /opt/teamcraft (or ~/teamcraft), next to:
-#   .env              TEAMCRAFT_VERSION and TEAMCRAFT_BIND (written by install.sh)
+#   .env              TEAMCRAFT_VERSION, TEAMCRAFT_BIND and TEAMCRAFT_TRUSTED_PROXIES (written by install.sh)
 #   teamcraft.env     server configuration (from teamcraft.env.example)
 #   secrets/db_password   database password (generated, never printed)
 #
@@ -53,6 +53,9 @@ services:
       TEAMCRAFT_DB_PASSWORD_FILE: /run/secrets/db_password
       TEAMCRAFT_DB_SSLMODE: disable
       TEAMCRAFT_VAULT_DIR: /var/lib/teamcraft/vault
+      # From .env (install.sh): who may name the client in X-Forwarded-For –
+      # the Docker networks while the port is published on loopback only.
+      TEAMCRAFT_TRUSTED_PROXIES: ${TEAMCRAFT_TRUSTED_PROXIES:-127.0.0.0/8,::1}
     secrets: [db_password]
     ports:
       # Only this computer by default; TEAMCRAFT_BIND=0.0.0.0:8080 in .env

@@ -7,8 +7,10 @@
 //!   sign-on (a change at the identity provider applies at the next sign-in;
 //!   local accounts have no claims and never meet such a condition);
 //! * **networks** – the client address must be in one of the ranges (the
-//!   same client address as the sign-in throttle: the peer, or the entry the
-//!   reverse proxy added to `X-Forwarded-For`);
+//!   same client address as the sign-in throttle: the peer, or – when the peer
+//!   is a trusted proxy (`TEAMCRAFT_TRUSTED_PROXIES`) – the first
+//!   `X-Forwarded-For` entry from the right that is not one, see
+//!   `auth::client_address`);
 //! * a **maximum sign-in age** – the group is visible only for so many hours
 //!   after signing in (the web session's start; for tokens and
 //!   notifications the user's last sign-in), so a person removed at the

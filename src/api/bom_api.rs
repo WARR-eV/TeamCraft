@@ -109,7 +109,7 @@ pub(super) async fn bom_import(
                 .into(),
         )
     })?;
-    let table = imports::read_table(&filename, &content)?;
+    let table = imports::read_table(&filename, &content).await?;
     let dry_run = fields
         .get("dry_run")
         .is_some_and(|v| matches!(v.trim(), "true" | "1" | "on" | "yes"));

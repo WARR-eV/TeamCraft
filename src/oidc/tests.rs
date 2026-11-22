@@ -53,13 +53,32 @@ fn group_mapping() {
     );
 }
 
+/// GHSA-864x-fmpf-4p73 (F6): only https, or http on loopback.
 #[test]
-fn jwt_payload_decoding() {
-    let payload = URL_SAFE_NO_PAD.encode(br#"{"sub":"abc","iss":"x"}"#);
-    let jwt = format!("eyJhbGciOiJSUzI1NiJ9.{payload}.signature");
-    let claims = decode_jwt_claims(&jwt).unwrap();
-    assert_eq!(claims["sub"], "abc");
-    assert!(decode_jwt_claims("no-dots").is_err());
+fn provider_endpoints_need_tls_except_on_loopback() {
+    for ok in [
+        "https://auth.example.org",
+        "https://auth.example.org/application/o/teamcraft/",
+        "http://localhost:9000",
+        "http://LOCALHOST/realms/x",
+        "http://127.0.0.1:8080",
+        "http://127.8.9.10",
+        "http://[::1]:5556/dex",
+    ] {
+        assert!(secure_endpoint(ok), "{ok}");
+    }
+    for bad in [
+        "http://auth.example.org",
+        "http://192.168.2.10:9000",
+        "http://10.0.0.1",
+        "http://localhost.example.org",
+        "http://[fd00::1]",
+        "ftp://auth.example.org",
+        "auth.example.org",
+        "",
+    ] {
+        assert!(!secure_endpoint(bad), "{bad}");
+    }
 }
 
 #[test]
@@ -161,7 +180,7 @@ fn logout_claims(now: i64) -> Value {
     })
 }
 
-fn check(token: &str, keys: &[Jwk], now: i64) -> Result<String, LogoutTokenError> {
+fn check(token: &str, keys: &[Jwk], now: i64) -> Result<String, TokenError> {
     verify_logout_token(token, keys, ISS, "teamcraft", now)
 }
 
@@ -177,14 +196,11 @@ fn a_signed_logout_token_names_its_subject() {
     // another key with the same id, an unknown key id
     let (other, mut other_jwk) = es256_key("k1");
     let foreign = sign(&other, &header, &logout_claims(now));
-    assert_eq!(
-        check(&foreign, &keys, now),
-        Err(LogoutTokenError::BadSignature)
-    );
+    assert_eq!(check(&foreign, &keys, now), Err(TokenError::BadSignature));
     other_jwk.kid = Some("k2".into());
     assert_eq!(
         check(&token, &[other_jwk], now),
-        Err(LogoutTokenError::UnknownKey)
+        Err(TokenError::UnknownKey)
     );
     // a changed payload under the old signature, `alg: none`, garbage
     let parts: Vec<&str> = token.split('.').collect();
@@ -192,14 +208,11 @@ fn a_signed_logout_token_names_its_subject() {
     claims["sub"] = json!("admin");
     let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap());
     let forged = format!("{}.{payload}.{}", parts[0], parts[2]);
-    assert_eq!(
-        check(&forged, &keys, now),
-        Err(LogoutTokenError::BadSignature)
-    );
+    assert_eq!(check(&forged, &keys, now), Err(TokenError::BadSignature));
     let none = URL_SAFE_NO_PAD.encode(br#"{"alg":"none","kid":"k1"}"#);
     let unsigned = format!("{none}.{}.", parts[1]);
     assert!(check(&unsigned, &keys, now).is_err());
-    assert_eq!(check("a.b", &keys, now), Err(LogoutTokenError::Malformed));
+    assert_eq!(check("a.b", &keys, now), Err(TokenError::Malformed));
 }
 
 #[test]
@@ -212,7 +225,7 @@ fn logout_token_claims_are_checked() {
         let mut claims = logout_claims(now);
         change(&mut claims);
         let token = sign(&pair, &header, &claims);
-        matches!(check(&token, &keys, now), Err(LogoutTokenError::Claim(_)))
+        matches!(check(&token, &keys, now), Err(TokenError::Claim(_)))
     };
     assert!(refused(&|c| c["iss"] = json!("https://evil.example.org")));
     assert!(refused(&|c| c["aud"] = json!("another-app")));
@@ -227,4 +240,132 @@ fn logout_token_claims_are_checked() {
     claims["aud"] = json!(["other", "teamcraft"]);
     let token = sign(&pair, &header, &claims);
     assert!(check(&token, &keys, now).is_ok());
+}
+
+/// A compact JWS of `claims` with an HMAC of `secret`.
+fn sign_hmac(alg: &str, secret: &[u8], header: &Value, claims: &Value) -> String {
+    let enc = |v: &Value| URL_SAFE_NO_PAD.encode(serde_json::to_vec(v).unwrap());
+    let message = format!("{}.{}", enc(header), enc(claims));
+    let key = ring::hmac::Key::new(hmac_algorithm(alg).unwrap(), secret);
+    let tag = ring::hmac::sign(&key, message.as_bytes());
+    format!("{message}.{}", URL_SAFE_NO_PAD.encode(tag.as_ref()))
+}
+
+/// GHSA-864x-fmpf-4p73 (F6): the ID token's signature is checked.
+#[test]
+fn id_token_signatures_are_checked() {
+    let claims = json!({ "iss": ISS, "aud": "teamcraft", "sub": "u-4711" });
+    let (pair, jwk) = es256_key("k1");
+    let keys = [jwk.clone()];
+    let header = json!({ "alg": "ES256", "kid": "k1", "typ": "JWT" });
+    let token = sign(&pair, &header, &claims);
+    assert_eq!(
+        verified_payload(&token, &keys, None).unwrap()["sub"],
+        "u-4711"
+    );
+    // without a kid every key of the right type is tried
+    let token = sign(&pair, &json!({ "alg": "ES256" }), &claims);
+    assert!(verified_payload(&token, &keys, None).is_ok());
+
+    // a changed payload under the old signature, a foreign key, `none`
+    let parts: Vec<&str> = token.split('.').collect();
+    let admin = URL_SAFE_NO_PAD.encode(br#"{"iss":"x","aud":"teamcraft","sub":"admin"}"#);
+    let forged = format!("{}.{admin}.{}", parts[0], parts[2]);
+    assert_eq!(
+        verified_payload(&forged, &keys, None),
+        Err(TokenError::BadSignature)
+    );
+    let (other, _) = es256_key("k1");
+    let foreign = sign(&other, &header, &claims);
+    assert_eq!(
+        verified_payload(&foreign, &keys, None),
+        Err(TokenError::BadSignature)
+    );
+    let none = URL_SAFE_NO_PAD.encode(br#"{"alg":"none"}"#);
+    assert!(verified_payload(&format!("{none}.{}.", parts[1]), &keys, None).is_err());
+    assert_eq!(
+        verified_payload(&token, &[], None),
+        Err(TokenError::UnknownKey)
+    );
+
+    // an encryption key never signs; a key pinned to another algorithm neither
+    let mut enc = jwk.clone();
+    enc.use_ = Some("enc".into());
+    assert_eq!(
+        verified_payload(&token, &[enc], None),
+        Err(TokenError::BadSignature)
+    );
+    let mut pinned = jwk.clone();
+    pinned.alg = Some("RS256".into());
+    assert_eq!(
+        verified_payload(&token, &[pinned], None),
+        Err(TokenError::BadSignature)
+    );
+    // ES256 signed, but the header claims ES384: refused
+    let lie = sign(&pair, &json!({ "alg": "ES384", "kid": "k1" }), &claims);
+    let mut es = jwk;
+    es.alg = None;
+    assert_eq!(
+        verified_payload(&lie, &[es], None),
+        Err(TokenError::BadSignature)
+    );
+    // unknown critical header extensions
+    let crit = sign(
+        &pair,
+        &json!({ "alg": "ES256", "kid": "k1", "crit": ["exp"] }),
+        &claims,
+    );
+    assert_eq!(
+        verified_payload(&crit, &keys, None),
+        Err(TokenError::Malformed)
+    );
+}
+
+#[test]
+fn es384_and_hmac_id_tokens() {
+    use ring::signature::{EcdsaKeyPair, KeyPair, ECDSA_P384_SHA384_FIXED_SIGNING};
+    let claims = json!({ "iss": ISS, "aud": "teamcraft", "sub": "u-4711" });
+    let rng = ring::rand::SystemRandom::new();
+    let alg = &ECDSA_P384_SHA384_FIXED_SIGNING;
+    let pkcs8 = EcdsaKeyPair::generate_pkcs8(alg, &rng).unwrap();
+    let pair = EcdsaKeyPair::from_pkcs8(alg, pkcs8.as_ref(), &rng).unwrap();
+    let point = pair.public_key().as_ref().to_vec();
+    let jwk = Jwk {
+        kty: "EC".into(),
+        kid: Some("p384".into()),
+        crv: Some("P-384".into()),
+        x: Some(URL_SAFE_NO_PAD.encode(&point[1..49])),
+        y: Some(URL_SAFE_NO_PAD.encode(&point[49..97])),
+        ..Jwk::default()
+    };
+    let token = sign(&pair, &json!({ "alg": "ES384", "kid": "p384" }), &claims);
+    assert!(verified_payload(&token, &[jwk], None).is_ok());
+
+    // HS256 with the client secret (OIDC Core 10.1); no secret, a wrong one
+    let secret = b"a-long-client-secret-of-the-test";
+    for alg in ["HS256", "HS384", "HS512"] {
+        let token = sign_hmac(alg, secret, &json!({ "alg": alg }), &claims);
+        assert!(verified_payload(&token, &[], Some(secret)).is_ok(), "{alg}");
+        assert_eq!(
+            verified_payload(&token, &[], Some(b"another-secret")),
+            Err(TokenError::BadSignature)
+        );
+        assert_eq!(
+            verified_payload(&token, &[], None),
+            Err(TokenError::BadSignature)
+        );
+        assert_eq!(
+            verified_payload(&token, &[], Some(b"")),
+            Err(TokenError::BadSignature)
+        );
+        assert_eq!(token_alg(&token), alg);
+    }
+    // a logout token signed with the client secret stays refused
+    let logout = sign_hmac(
+        "HS256",
+        secret,
+        &json!({ "alg": "HS256" }),
+        &logout_claims(1_800_000_000),
+    );
+    assert!(check(&logout, &[], 1_800_000_000).is_err());
 }

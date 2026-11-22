@@ -112,10 +112,11 @@ fn check_size(input: &Path, limit: u64) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Limits the address space of this process (the preview child), so a file
-/// that needs more memory fails cleanly instead of taking the server host
-/// down. Linux and macOS; elsewhere (Windows) the limit is not enforced.
-/// Returns whether a limit is in force.
+/// Limits the memory of this process (the preview and `text-extract`
+/// child), so a file that needs more fails cleanly instead of taking the
+/// server host down: the address space on Linux and macOS, the committed
+/// memory of the process through a job object on Windows
+/// (GHSA-7q9q-g6rr-pc58, F11). Returns whether a limit is in force.
 pub fn limit_memory(bytes: u64) -> bool {
     if bytes == 0 {
         return false;
@@ -124,9 +125,57 @@ pub fn limit_memory(bytes: u64) -> bool {
     {
         rlimit::setrlimit(rlimit::Resource::AS, bytes, bytes).is_ok()
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    {
+        limit_memory_windows(bytes)
+    }
+    #[cfg(not(any(unix, windows)))]
     {
         false
+    }
+}
+
+/// Windows: the process puts itself into a new job object whose
+/// per-process memory limit is `bytes` (`JOB_OBJECT_LIMIT_PROCESS_MEMORY`;
+/// an allocation beyond it fails, and Rust's allocator aborts the child).
+/// `KILL_ON_JOB_CLOSE` takes anything the child might start down with it.
+/// Nested jobs work since Windows 8, so a server that itself runs in a job
+/// (a service manager, a container) is no obstacle. The job handle is never
+/// closed: it ends with the process.
+#[cfg(windows)]
+fn limit_memory_windows(bytes: u64) -> bool {
+    use windows_sys::Win32::System::{
+        JobObjects::{
+            AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+            SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+            JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOB_OBJECT_LIMIT_PROCESS_MEMORY,
+        },
+        Threading::GetCurrentProcess,
+    };
+    let Ok(limit) = usize::try_from(bytes) else {
+        return false;
+    };
+    let size = std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32;
+    // SAFETY: documented Win32 calls; `info` is a plain-data struct that
+    // lives across the call, `size` is its size, the pointers passed as null
+    // are optional (no security attributes, no name) and the handle of
+    // `GetCurrentProcess` is a pseudo handle that needs no closing.
+    unsafe {
+        let job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+        if job.is_null() {
+            return false;
+        }
+        let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+        info.BasicLimitInformation.LimitFlags =
+            JOB_OBJECT_LIMIT_PROCESS_MEMORY | JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        info.ProcessMemoryLimit = limit;
+        let set = SetInformationJobObject(
+            job,
+            JobObjectExtendedLimitInformation,
+            std::ptr::addr_of!(info).cast(),
+            size,
+        );
+        set != 0 && AssignProcessToJobObject(job, GetCurrentProcess()) != 0
     }
 }
 
@@ -1175,6 +1224,27 @@ pub fn cache_entry(name: &str) -> CacheEntry<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// GHSA-7q9q-g6rr-pc58 (F11): on Windows the job object refuses memory
+    /// beyond the limit. Only under nextest, which runs every test in its own
+    /// process – under `cargo test` the limit would hold for the whole test
+    /// binary.
+    #[cfg(windows)]
+    #[test]
+    fn windows_job_object_limits_memory() {
+        if std::env::var_os("NEXTEST").is_none() {
+            return;
+        }
+        assert!(!limit_memory(0), "0 = unlimited");
+        assert!(limit_memory(256 * 1024 * 1024));
+        let mut big: Vec<u8> = Vec::new();
+        assert!(
+            big.try_reserve_exact(1024 * 1024 * 1024).is_err(),
+            "1 GiB beyond a 256 MiB limit"
+        );
+        let mut small: Vec<u8> = Vec::new();
+        assert!(small.try_reserve_exact(16 * 1024 * 1024).is_ok());
+    }
 
     /// The binary isolates its conversions under both of its names – also
     /// as `teamcraft-server` in the desktop downloads with local server.

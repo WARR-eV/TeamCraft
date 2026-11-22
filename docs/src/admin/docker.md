@@ -117,6 +117,13 @@ note that a web form post without `Origin` and `Referer` is refused.
 Caddy sets `X-Forwarded-Host` itself; with nginx:
 `proxy_set_header X-Forwarded-Host $host;`.
 
+The client address (sign-in throttle, allowed networks, read log) comes from the proxy's `X-Forwarded-For` only when
+the request arrives from a trusted proxy. A port published on `127.0.0.1` reaches the container from the gateway of the
+Docker network, so `install.sh` writes `TEAMCRAFT_TRUSTED_PROXIES` into `.env`: the private ranges of Docker networks
+while the port is published on loopback (only this computer reaches it), loopback only when `--bind 0.0.0.0:8080` opens
+it to the network – there a client could otherwise claim any address. A value set by hand in `.env` is kept; see
+[Client address behind a reverse proxy](configuration.md#client-address-behind-a-reverse-proxy).
+
 ## Upgrade
 
 Run the installer again – it downloads the compose file of the new version,

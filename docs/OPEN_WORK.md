@@ -81,11 +81,9 @@ feature milestone – the features in *What works* are enough; what is missing i
 - Open findings of the [threat model](src/dev/threat-model.md) (F1–F20 there):
     - [x] First-start setup behind a reverse proxy on the same computer: `/setup` needs the one-time code of the setup
       link the server logs (`teamcraft local` excepted)
-    - [ ] Client address from `X-Forwarded-For` is believed from every peer on a private address (`auth::client_address`):
-      with Docker's published port (peer = the bridge gateway) or clients on a campus network without a proxy, any
-      client can claim an address – `allowed_networks` of restricted groups, the per-address sign-in throttle and
-      the read log can be fooled. Fix: an explicit list of trusted proxies (default loopback only), documented for
-      Docker
+    - [x] F20: client address from `X-Forwarded-For` only from `TEAMCRAFT_TRUSTED_PROXIES` (default loopback), read
+      from the right; `install.sh` trusts the Docker networks while the port is published on loopback
+      (GHSA-98v7-pm3r-5934)
     - [x] F1: failed password sign-ins throttled per username and client address (`TEAMCRAFT_SIGNIN_MAX_FAILURES`,
       429 with `Retry-After`)
     - [x] F1 (rest): wrong current passwords of the own password change (web form and `POST /api/v1/me/password`)
@@ -101,8 +99,8 @@ feature milestone – the features in *What works* are enough; what is missing i
     - [x] F4: web posts without `Origin` and `Referer` are refused; install guide says the proxy must overwrite
       `X-Forwarded-Host`
     - [x] F5: `Strict-Transport-Security` when the public URL is https
-    - [ ] F6: OIDC with a plain `http://` issuer: refuse it outside `localhost`, or verify ID token signatures (JWKS)
-      for it – a decision, since it can break installations with an internal IdP
+    - [x] F6: ID token signatures verified against `jwks_uri` (HS* with the client secret); `http://` issuers and
+      provider endpoints refused outside loopback (GHSA-864x-fmpf-4p73)
     - [x] F7: end TeamCraft sessions of users removed at the IdP – OpenID Connect back-channel logout
       (`/auth/oidc/backchannel-logout`, #173 step 9). Left: shorter SSO sessions for providers without back-channel
       logout (`TEAMCRAFT_OIDC_SESSION_HOURS`, unpublished `ga/oidc-hardening` work)
@@ -111,9 +109,13 @@ feature milestone – the features in *What works* are enough; what is missing i
       `teamcraft vault quota`, `tests/quotas.rs`)
     - [ ] F10: serve downloads with a Content-Type derived from the format (the download headers are pinned in
       `tests/web_security.rs`)
-    - [ ] F11: a memory limit for the preview and text children on Windows (job object); a smaller cap for 3MF entries
+    - [x] F11: a memory limit for the preview and text children on Windows (job object, GHSA-7q9q-g6rr-pc58). Left:
+      a smaller cap for 3MF entries
     - [x] F12: start the parser children with a cleared environment (no database URL, no keys)
-    - [ ] F13: a cap on the unpacked size of XLSX/ODS tables, or read them in the isolated child
+    - [x] F13: spreadsheets of BOM and result imports read in the isolated `text-extract` child after a 256 MiB
+      unpacked-size check (GHSA-54vc-vgp2-8whr)
+    - [x] Malware scan: files too large for clamd are refused unless `TEAMCRAFT_CLAMD_OVERSIZE=store`
+      (GHSA-qw27-m6gj-m6wm). Left: mark files stored unscanned in the UI, API and webhooks
     - [ ] F14: fuzz targets for `simmesh` and `pdftext` (`resultscan` and `cadformat` have theirs since #156; the
       no-panic lints and the 3DS and Kelvin fixes are in `main` since #106/#108)
     - [ ] F15: prompt injection: confirmation of assistant drafts per write, or taint for MCP sessions as well

@@ -129,7 +129,7 @@ enum Command {
     /// never parses them in its own process: time, size and memory limits).
     #[command(hide = true)]
     TextExtract {
-        /// pdf or html
+        /// pdf, html or sheet (a spreadsheet: its first worksheet as JSON)
         #[arg(long, default_value = "pdf")]
         format: String,
         /// Read at most this much of the file on standard input (a bigger PDF is
@@ -361,7 +361,7 @@ fn main() -> ExitCode {
         // the parser's panic messages are not meant for users
         std::panic::set_hook(Box::new(|_| {}));
         let Some(format) = teamcraft::pdftext::TextFormat::parse(format) else {
-            eprintln!("Error: unknown format {format:?} (pdf or html)");
+            eprintln!("Error: unknown format {format:?} (pdf, html or sheet)");
             return ExitCode::FAILURE;
         };
         return match teamcraft::pdftext::run_job_as(

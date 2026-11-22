@@ -239,7 +239,11 @@ pub async fn login_submit(
             "Password login is disabled on this instance; please use single sign-on.".into(),
         ));
     }
-    let client = auth::client_address(&headers, peer.map(|Extension(ConnectInfo(a))| a.ip()));
+    let client = auth::client_address(
+        &headers,
+        peer.map(|Extension(ConnectInfo(a))| a.ip()),
+        &st.config.trusted_proxies,
+    );
     let mut keys = auth::SignInThrottle::keys(&form.username, client);
     // The live demo's public account: a stranger's wrong passwords must not
     // lock every visitor out, so only the per-address limit counts for it.

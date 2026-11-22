@@ -116,8 +116,8 @@ Nothing is set by default.
   claims and never meet a claim condition.
 * **Allowed networks** (`"allowed_networks": ["10.20.0.0/16",
   "2001:db8::/32"]`): the client address must be in one of the ranges – the
-  same address as the sign-in throttle (the peer, or the entry the reverse
-  proxy added to `X-Forwarded-For`; see [Reverse proxy and TLS](docker.md#reverse-proxy-and-tls)). A
+  same address as the sign-in throttle (the peer, or – behind a trusted reverse proxy – the client entry of
+  `X-Forwarded-For`; see [Client address behind a reverse proxy](configuration.md#client-address-behind-a-reverse-proxy)). A
   request whose address is unknown is outside.
 * **Maximum sign-in age** (`"max_signin_age_hours": 12`, `0` removes it): the
   group is visible only for so many hours after signing in – the start of the
