@@ -15,6 +15,20 @@ see the notices in the README.
 
 ### Added
 
+- **Getting started in the desktop app** (#422): after the first sign-in
+  TeamCraft Desktop opens a short wizard – server (skipped when a policy fixes
+  it), sign-in, the working folder (*Change…*, *Open folder*), *Get project
+  groups…* for your groups (latest revision, also in work; skipped without
+  groups or when they are already fetched), the CAD setup for information
+  (the Inventor `.ipj`, NX load options and Solid Edge search paths a later
+  version will create – nothing is created now) and the daily loop *Check out
+  and open* → save in CAD → *Check in…*, ending in *Finish and open* with
+  one of your groups: its files open in Home, ready for *Check out and open*
+  on the assembly. Every step but the last can be skipped; *Finish*
+  or *Don't show again* is kept in the settings (`onboarding`), and *Help →
+  Getting Started…* opens it again. The wizard creates no file or folder by
+  itself. Step rules in `desktop/ui/js/onboarding-rules.js`, tested by
+  `scripts/desktop-onboarding-rules.test.mjs`.
 - **Check out several parts of an assembly at once** (#415): `POST /api/v1/checkouts`
   takes a list of revisions (by id, or item and code) and checks them out in one
   transaction with a result per revision – the ones that can be taken are checked

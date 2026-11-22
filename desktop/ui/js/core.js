@@ -49,7 +49,8 @@ export var state = {
   viewer: null,
   zoom: 1,
   update: null, // the newer release the status bar tells about: {version, current}
-  tokenFileWarned: false // the "no keychain" warning shows once per start
+  tokenFileWarned: false, // the "no keychain" warning shows once per start
+  signedInAtStart: null // the app started signed in (false: the user signs in now – the first-start wizard, onboarding.js)
 };
 
 // ======================================================================

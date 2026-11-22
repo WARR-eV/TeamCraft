@@ -686,7 +686,10 @@ real files and belong to section 3 once such files are at hand.
   instead of importing them again and again
 - [ ] Workspace setup wizard (first start or when getting a project group): optional CAD settings to tick – Inventor
   `.ipj`, NX load options, Solid Edge search paths; nothing ticked by default, preview of what would be created, never
-  created automatically, existing files never overwritten without asking; can be opened again from the settings
+  created automatically, existing files never overwritten without asking; can be opened again from the settings.
+  The wizard frame exists (#422: *Getting started* in the desktop app, also *Help → Getting Started…*); its *CAD
+  setup* step only lists what would be created. Left: creating the files themselves (needs the CAD programs to
+  verify the generated `.ipj`, load options and search paths); issue #422 stays open for this step 5 of its plan
 
 **Autodesk Inventor**
 
@@ -881,7 +884,8 @@ needs an issue with a reason first (see *Direction*).
 - [ ] Upgrades: proven upgrade chain per release, restore-based rollback guide, a plugin/extension layer (design: research page *A sandboxed extension layer*, #382)
 - [ ] CAD clone workflows: clone an assembly with selective reuse, Save As / revise per component over a whole
   structure, shown as an indented tree
-- [ ] Interactive onboarding and contextual help
+- [ ] Interactive onboarding and contextual help – the desktop first-start wizard *Getting started* is done (#422);
+  left: empty states that name the next step (#423) and contextual help
 - [ ] Migration tooling from commercial PLM/PDM systems
 - [ ] GA proofs: production readiness, migration and concurrency safety, scale validation, external security review,
   support and versioning policy

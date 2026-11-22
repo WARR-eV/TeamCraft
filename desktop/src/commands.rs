@@ -120,6 +120,8 @@ pub struct Session {
     /// Managed deployment policies (#378): the organisation and the settings
     /// fixed by a policy.
     pub policy: policy::PolicyView,
+    /// The first-start wizard: `done`, `dismissed` or none (#422).
+    pub onboarding: Option<String>,
 }
 
 #[tauri::command]
@@ -141,6 +143,7 @@ pub fn session(app: AppHandle, state: State<'_, AppState>) -> Session {
         local_server_available: localserver::sidecar().is_some(),
         local_server_in_use: local_server_in_use(&s),
         policy: policy::current().view(),
+        onboarding: s.onboarding.clone(),
     }
 }
 
@@ -1084,6 +1087,16 @@ pub fn dismiss_update(state: State<'_, AppState>, version: String) -> CmdResult<
     let version = update::tag_version(&version)
         .ok_or_else(|| ApiError::local(format!("'{version}' is not a version.")))?;
     update_settings(&state, |s| s.update_dismissed = Some(version))?;
+    Ok(())
+}
+
+/// *Getting started* (#422): the wizard was finished (`done`) or closed with
+/// *Don't show again* (`dismissed`); it then no longer opens by itself.
+#[tauri::command]
+pub fn set_onboarding(state: State<'_, AppState>, value: String) -> CmdResult<()> {
+    let value = crate::settings::onboarding_value(&value)
+        .ok_or_else(|| ApiError::local(format!("'{value}' is not a state of the wizard.")))?;
+    update_settings(&state, |s| s.onboarding = Some(value.to_string()))?;
     Ok(())
 }
 

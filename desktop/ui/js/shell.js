@@ -16,6 +16,7 @@ import { openRequest } from "./requests.js";
 import { openSettings } from "./settings.js";
 import { formatKinds } from "./folder-import.js";
 import { planNewFiles } from "./new-files.js";
+import { maybeStartOnboarding } from "./onboarding.js";
 
 // ======================================================================
 // Shell
@@ -133,6 +134,8 @@ export function enterShell() {
     checkWorkspaceLayout();
     checkTokenStorage();
     checkUpdate();
+    // the first start after the sign-in: *Getting started* (#422)
+    maybeStartOnboarding();
   }).catch(function (err) {
     if (!(err && err.status === 401)) showConnect("signin", errorText(err));
   });

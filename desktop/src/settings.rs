@@ -223,6 +223,12 @@ pub struct Settings {
     /// Id of the active connection in [`Settings::profiles`].
     #[serde(default)]
     pub active_profile: Option<String>,
+    /// The first-start wizard *Getting started* (#422, ui/js/onboarding.js):
+    /// `"done"` or `"dismissed"` – it then no longer opens by itself (*Help →
+    /// Getting started…* still does). `None` in settings files of older
+    /// versions.
+    #[serde(default)]
+    pub onboarding: Option<String>,
     /// Not stored in settings.json.
     #[serde(skip)]
     pub token: Option<String>,
@@ -280,6 +286,15 @@ pub(crate) fn write_private_file(dir: &Path, name: &str, content: &str) -> anyho
         fs::set_permissions(&path, fs::Permissions::from_mode(0o600))?;
     }
     Ok(())
+}
+
+/// The values of [`Settings::onboarding`]; anything else is refused.
+pub fn onboarding_value(value: &str) -> Option<&'static str> {
+    match value {
+        "done" => Some("done"),
+        "dismissed" => Some("dismissed"),
+        _ => None,
+    }
 }
 
 /// Most remembered Agent view backends (servers × users).
@@ -756,5 +771,44 @@ mod tests {
         s.save_token_with(dir.path(), &keychain, Some("tc_pat_secret".into()))
             .unwrap();
         assert!(s.save_token_with(dir.path(), &keychain, None).is_err());
+    }
+
+    /// A settings file of an older version has no `onboarding`: it still
+    /// loads, with the wizard not done (#422).
+    #[test]
+    fn settings_without_onboarding_still_load() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(
+            dir.path().join(SETTINGS_FILE),
+            r#"{"server_url":"https://plm.example.org","skin":"teamcraft"}"#,
+        )
+        .unwrap();
+        let loaded = Settings::load_with(dir.path(), &FakeKeychain::new(true));
+        assert_eq!(
+            loaded.server_url.as_deref(),
+            Some("https://plm.example.org")
+        );
+        assert_eq!(loaded.onboarding, None);
+    }
+
+    #[test]
+    fn onboarding_is_saved_and_loaded() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = Settings {
+            onboarding: Some("dismissed".into()),
+            ..Settings::default()
+        };
+        s.save(dir.path()).unwrap();
+        let loaded = Settings::load_with(dir.path(), &FakeKeychain::new(true));
+        assert_eq!(loaded.onboarding.as_deref(), Some("dismissed"));
+    }
+
+    #[test]
+    fn only_done_and_dismissed_are_onboarding_values() {
+        assert_eq!(onboarding_value("done"), Some("done"));
+        assert_eq!(onboarding_value("dismissed"), Some("dismissed"));
+        for bad in ["", "Done", "later", "done ", "dismissed\n"] {
+            assert_eq!(onboarding_value(bad), None, "{bad:?}");
+        }
     }
 }

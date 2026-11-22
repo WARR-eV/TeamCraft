@@ -106,6 +106,10 @@ jobs:
       # main CAD file (Check out and open after Cancel, #348)
       - name: Test the Get rules
         run: node scripts/desktop-get-rules.test.mjs
+      # the steps of the first-start wizard *Getting started* (#422): which
+      # are skipped, when it shows by itself, the texts
+      - name: Test the first-start wizard rules
+        run: node scripts/desktop-onboarding-rules.test.mjs
       # the empty states name the next step, by role (#423)
       - name: Test the empty state rules
         run: node scripts/desktop-empty-rules.test.mjs
