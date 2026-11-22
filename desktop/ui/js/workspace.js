@@ -512,12 +512,16 @@ export function checkinDialog(tab, park) {
       running = true; cancelled = false; opts.modal = true;
       var toExport = stepNote && withStep.checked ? files.filter(function (n) { return exportProgram(n, programs); }) : [];
       function show(text) { if (!cancelled) { progressLine.textContent = text; progressLine.classList.remove("hidden"); } }
-      // one export after the other: the CAD program handles one document at a time
+      // one export after the other: the CAD program handles one document at a
+      // time. A failed export never stops the check-in (#342, #368): the file
+      // goes without its STEP and the result says why.
+      var exportFailures = [];
       var exported = toExport.reduce(function (chain, name) {
         return chain.then(function () {
           if (cancelled) throw stopped();
           show("Exporting " + name + " to STEP with " + PROGRAM_LABEL[exportProgram(name, programs)] + " …");
-          return exportStep(rev, name).then(function (step) { if (files.indexOf(step) < 0) files.push(step); });
+          return exportStep(rev, name).then(function (step) { if (files.indexOf(step) < 0) files.push(step); },
+            function (e) { if (cancelled) throw stopped(); exportFailures.push(name + ": " + errorText(e)); });
         });
       }, Promise.resolve());
       exported.then(function () {
@@ -531,7 +535,9 @@ export function checkinDialog(tab, park) {
         d.close();
         toast((parking ? "Parked " + files.join(", ") + " on the server – " + rev.item_number + "/" + rev.code + " stays checked out to you"
           : "Checked in " + rev.item_number + "/" + rev.code + (files.length ? " with " + files.join(", ") : "")) +
-          (cancelled ? " – the server already had every file when you cancelled" : ""), cancelled ? "info" : null);
+          (cancelled ? " – the server already had every file when you cancelled" : "") +
+          (exportFailures.length ? ". No STEP export for " + exportFailures.join("; ") : ""),
+          cancelled || exportFailures.length ? "info" : null);
         reloadActive();
         refreshWorklistCount();
       }, function (err) {

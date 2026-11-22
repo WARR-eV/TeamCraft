@@ -184,6 +184,12 @@ check-outs and reviews, and a **local working folder**:
 * on Windows with Inventor or Solid Edge installed, *STEP* (workspace) and
   the check-in option (off by default) create STEP exports for the 3D preview with that
   program; the Files tab shows the preview image stored in native files.
+* on every system with SolidCraft installed, the same *STEP* button and
+  check-in option export SolidCraft designs (`.sc`) through SolidCraft's
+  command-line tool `solidcraft-cli` (set `SOLIDCRAFT_CLI` to its path if it
+  is not found); a design with a failing feature is not exported. An export
+  that fails or is not possible never stops the check-in – the file is
+  checked in without its STEP and the result names the reason.
 * with a *Preferred CAD program* set on your account page in the web UI, the
   Files tab of a revision collapses the native files of other CAD programs
   (see [Files](files.md#preferred-cad-program)); the app reads the setting at

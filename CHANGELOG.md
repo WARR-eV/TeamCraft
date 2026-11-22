@@ -31,6 +31,12 @@ see the notices in the README.
   SolidCraft design that SolidCraft has open (its `.~<file>.lock`, stale
   locks ignored) with the computer and user, and the check-in dialog warns
   that unsaved changes there are not checked in.
+- **Desktop: STEP export of SolidCraft designs** (#368). *STEP* in the
+  Workspace tab and *Create STEP exports … first* at check-in export `.sc`
+  designs through SolidCraft's `solidcraft-cli` on Windows, macOS and Linux
+  (`SOLIDCRAFT_CLI`, `PATH` or the default install folders). A failed export
+  – any program – no longer stops the check-in: the file is checked in
+  without its STEP and the result says why.
 
 ## [0.2.11] - 2026-11-21
 
