@@ -107,7 +107,8 @@ see the notices in the README.
 - **CI on `main` is green again.** The usage statistics page (#383) gives
   its table headers a `scope` (accessibility check), its background and
   reporting functions are named in the audit guard's `NOT_AUDITED` list with
-  their reasons, and the web module list is in rustfmt's order.
+  their reasons, the web module list is in rustfmt's order, and the error
+  page test expects the escaped `/` MiniJinja writes (#381).
 - **SolidCraft plugin: *status* and *check* run again, and each button has
   its own label.** SolidCraft refused both with *permission denied: edit
   command document.metadata from read entry*, because it classes the
