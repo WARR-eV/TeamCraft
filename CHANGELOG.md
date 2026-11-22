@@ -20,6 +20,7 @@ see the notices in the README.
 - BOM and result imports: spreadsheets are read in the isolated `text-extract` child (`--format sheet`) with memory and time limits, ZIP containers capped at 256 MiB unpacked; CSV, STEP and designs on a blocking thread (GHSA-54vc-vgp2-8whr, F13).
 - Windows: parser children get a memory limit through a job object (GHSA-7q9q-g6rr-pc58, F11).
 - Malware scan: files larger than `TEAMCRAFT_CLAMD_MAX_MB` are refused (413, chunked uploads at the start) unless `TEAMCRAFT_CLAMD_OVERSIZE=store` (GHSA-qw27-m6gj-m6wm).
+- Dependencies: `url` 2.5.9 in the server and the desktop app (RUSTSEC-2026-0592, stack overflow in `Url::origin()` on nested `blob:` URLs).
 
 ### Added
 

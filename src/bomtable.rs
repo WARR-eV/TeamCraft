@@ -1064,7 +1064,7 @@ mod tests {
         let small = zip_of_zeros("xl/worksheets/sheet1.xml", 1000, 1000);
         assert!(check_unpacked_within("small.xlsx", &small, CAP).is_ok());
         // the real cap in the reader
-        assert!(MAX_UNPACKED_BYTES >= 128 << 20);
+        const { assert!(MAX_UNPACKED_BYTES >= 128 << 20) };
         // not a ZIP at all (XLS is OLE): left to the reader
         assert!(check_unpacked("old.xls", b"\xD0\xCF\x11\xE0junk").is_ok());
         assert!(read_grid("junk.xlsx", b"PK\x03\x04junk").is_err());
@@ -1082,7 +1082,7 @@ mod tests {
         // a cell far to the right and a very long text are cut
         sheet.write_string(1, 900, "far right").unwrap();
         sheet
-            .write_string(2, 0, &"x".repeat(MAX_CELL_CHARS + 50))
+            .write_string(2, 0, "x".repeat(MAX_CELL_CHARS + 50))
             .unwrap();
         let bytes = book.save_to_buffer().unwrap();
         let mut out = Vec::new();
