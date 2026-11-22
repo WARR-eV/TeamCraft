@@ -20,17 +20,47 @@ export function projectItems(code) {
   return page(0);
 }
 
-/** For new team members or a fresh computer: copies the files of every item
- * of the chosen project groups into the workspace, one folder per group. */
-export function getProjectsDialog() { freshProjects().then(openGetProjectsDialog); }
+/** Key of the groups fetched with *Get project groups* into this working
+ *  folder (per folder: each connection has its own). */
+function gotGroupsKey() {
+  return "teamcraft.got-groups:" + String(state.session && state.session.workspace_dir || "");
+}
 
-export function openGetProjectsDialog() {
+/** Codes of the project groups a finished *Get project groups* copied into
+ *  the current working folder on this computer – the first-start wizard
+ *  (onboarding.js) skips its group step for them. Only a convenience: an
+ *  empty answer (private window, cleared storage) just shows the step. */
+export function gotGroups() {
+  try {
+    var list = JSON.parse(window.localStorage.getItem(gotGroupsKey()) || "[]");
+    return Array.isArray(list) ? list.filter(function (c) { return typeof c === "string"; }) : [];
+  } catch (e) { return []; }
+}
+
+/** Remembers the groups of a Get that ran to its end without a problem
+ *  (not stopped, no failed item or name clash, rule *Latest revision*). */
+export function rememberGotGroups(list) {
+  var all = gotGroups();
+  (list || []).forEach(function (c) { if (all.indexOf(c) === -1) all.push(c); });
+  try { window.localStorage.setItem(gotGroupsKey(), JSON.stringify(all.slice(-200))); } catch (e) { /* storage blocked: the step shows again */ }
+}
+
+/** For new team members or a fresh computer: copies the files of every item
+ * of the chosen project groups into the workspace, one folder per group.
+ * `opts.project` (a group code) ticks only that group – the *Get…* of an
+ * empty state starts with the active group (#423); without it, the groups
+ * the user is a member of are ticked. */
+export function getProjectsDialog(opts) { freshProjects().then(function () { openGetProjectsDialog(opts); }); }
+
+export function openGetProjectsDialog(opts) {
+  var preselect = opts && opts.project;
   function member(p) { return state.me.projects.indexOf(p.id) !== -1; }
+  function ticked(p) { return preselect ? p.code === preselect : member(p); }
   var groups = state.projects.filter(function (p) { return p.active; }).sort(function (a, b) {
     return (member(b) - member(a)) || a.code.localeCompare(b.code);
   });
   var boxes = groups.map(function (p) {
-    return { code: p.code, input: h("input", { type: "checkbox", checked: member(p) }), label: p.code + " – " + p.name + (member(p) ? " (member)" : "") };
+    return { code: p.code, input: h("input", { type: "checkbox", checked: ticked(p) }), label: p.code + " – " + p.name + (member(p) ? " (member)" : "") };
   });
   // Latest first (#355): in a team that releases only before manufacturing,
   // most items are still in work – "released" would leave the working folder
@@ -82,6 +112,8 @@ export function openGetProjectsDialog() {
           }, Promise.resolve());
         }).then(function () {
           running = false;
+          // only a complete copy: no problems, no clashes, the latest revision of every item
+          if (!stop && !done.errors.length && rule.value === "latest") rememberGotGroups(codes);
           var text = (stop ? "Stopped. " : "Done. ") + done.items + " items, " + done.files + " files copied" +
             (done.kept ? ", " + done.kept + " locally modified files kept" : "") +
             (done.skipped ? ", " + done.skipped + " items without a released revision skipped" : "") +

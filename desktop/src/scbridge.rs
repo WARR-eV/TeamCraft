@@ -343,6 +343,7 @@ mod tests {
             files: Vec::new(),
             inaccessible: false,
             released: None,
+            bom_structure: false,
         };
         let s = state(5, "PRT-000042", "A", &status);
         assert_eq!(s["checked_out"]["by_name"], "Kim Lee");

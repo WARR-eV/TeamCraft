@@ -20,8 +20,8 @@ use tokio::sync::Notify;
 use crate::{
     acp, addfiles,
     api::{self, Api, ApiError, Transfer},
-    bomimport, cadexport, cadlaunch, folderimport, layout, localserver, policy, profiles, scbridge,
-    scprops,
+    bomimport, cadexport, cadlaunch, folderimport, layout, localchanges, localserver, policy,
+    profiles, scbridge, scprops,
     settings::{self, Settings, TokenStorage},
     signin, update, workspace, AppState,
 };
@@ -120,6 +120,8 @@ pub struct Session {
     /// Managed deployment policies (#378): the organisation and the settings
     /// fixed by a policy.
     pub policy: policy::PolicyView,
+    /// The first-start wizard: `done`, `dismissed` or none (#422).
+    pub onboarding: Option<String>,
 }
 
 #[tauri::command]
@@ -141,6 +143,7 @@ pub fn session(app: AppHandle, state: State<'_, AppState>) -> Session {
         local_server_available: localserver::sidecar().is_some(),
         local_server_in_use: local_server_in_use(&s),
         policy: policy::current().view(),
+        onboarding: s.onboarding.clone(),
     }
 }
 
@@ -519,6 +522,10 @@ pub async fn assistant_send(state: State<'_, AppState>, body: Value) -> CmdResul
         .lock()
         .expect("assistant lock")
         .take();
+    if result.is_ok() {
+        // usage statistics (#383): one per answered question, never its text
+        usage(&state, |u| u.count("assistant"));
+    }
     result
 }
 
@@ -745,6 +752,22 @@ pub async fn workspace_checkout(
     .await
 }
 
+/// *Check out parts…* (issue #415): checks out the ticked revisions of an
+/// assembly in one server call and makes their files in the working folder
+/// writable; the result lists what the server refused and why.
+#[tauri::command]
+pub async fn workspace_checkout_many(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    revisions: Vec<workspace::CheckoutPick>,
+) -> CmdResult<workspace::CheckedOutMany> {
+    usage(&state, |u| u.count("checkout"));
+    let api = signed_in_api(&state)?;
+    let (cancel, mut progress) = progress_events(&app, &state);
+    let root = workspace_root(&app, &state);
+    workspace::checkout_many(&api, &root, &revisions, &cancel, &mut progress).await
+}
+
 /// Copies the current files of a revision into the working folder without
 /// taking the lock (read-only on disk).
 #[tauri::command]
@@ -824,7 +847,10 @@ pub async fn workspace_status(
 }
 
 /// Check in the chosen files (new versions) and release the lock.
+/// `bom_from_references` (`bomFromReferences` in JS, off when left out): also
+/// update the BOM from the CAD file on the server (#407).
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn workspace_checkin(
     app: AppHandle,
     state: State<'_, AppState>,
@@ -833,6 +859,7 @@ pub async fn workspace_checkin(
     code: String,
     files: Vec<String>,
     comment: String,
+    bom_from_references: Option<bool>,
 ) -> CmdResult<Value> {
     usage(&state, |u| u.count("checkin"));
     let api = signed_in_api(&state)?;
@@ -851,6 +878,7 @@ pub async fn workspace_checkin(
         &code,
         &files,
         &comment,
+        bom_from_references.unwrap_or(false),
         &transfer,
     )
     .await
@@ -912,6 +940,22 @@ pub async fn workspace_local_changes(
         results.push((r, files));
     }
     Ok(layout::local_changes(results))
+}
+
+/// *Local changes* (#416): the modified, outdated, conflicting, new and
+/// missing files of every revision in the working folder – a local pass over
+/// the state, then the Workspace status of at most
+/// [`localchanges::MAX_REVISIONS`] revisions (`src/localchanges.rs`). Unlike
+/// [`workspace_status`] it writes nothing: no SolidCraft bridge state, no
+/// read-only flags, no `state.json` (`workspace::status_with(.., false)`).
+#[tauri::command]
+pub async fn local_changes_scan(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> CmdResult<localchanges::LocalChangesScan> {
+    let api = signed_in_api(&state)?;
+    let root = workspace_root(&app, &state);
+    localchanges::scan(&api, &root).await
 }
 
 /// A fresh cancel switch for the upload that starts now (`cancel_upload`
@@ -1064,6 +1108,16 @@ pub fn dismiss_update(state: State<'_, AppState>, version: String) -> CmdResult<
     let version = update::tag_version(&version)
         .ok_or_else(|| ApiError::local(format!("'{version}' is not a version.")))?;
     update_settings(&state, |s| s.update_dismissed = Some(version))?;
+    Ok(())
+}
+
+/// *Getting started* (#422): the wizard was finished (`done`) or closed with
+/// *Don't show again* (`dismissed`); it then no longer opens by itself.
+#[tauri::command]
+pub fn set_onboarding(state: State<'_, AppState>, value: String) -> CmdResult<()> {
+    let value = crate::settings::onboarding_value(&value)
+        .ok_or_else(|| ApiError::local(format!("'{value}' is not a state of the wizard.")))?;
+    update_settings(&state, |s| s.onboarding = Some(value.to_string()))?;
     Ok(())
 }
 
@@ -1632,6 +1686,12 @@ pub async fn new_item_copy(
         let disk = src.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
             ApiError::local(format!("{} has no usable file name.", src.display()))
         })?;
+        // picked or dropped from the file manager (#418): regular files only
+        if !addfiles::is_regular_file(&src) {
+            return Err(ApiError::local(format!(
+                "{disk} is not a file – nothing was copied."
+            )));
+        }
         let rel = layout::local_rel(Some(group), &folder, &layout::nfc(disk));
         let dst = layout::join_rel(&root, &rel);
         if dst == src {
@@ -1747,7 +1807,12 @@ pub async fn import_bom(
     dry_run: bool,
 ) -> CmdResult<Value> {
     let api = signed_in_api(&state)?;
-    bomimport::send(&api, &path, &request, dry_run).await
+    let result = bomimport::send(&api, &path, &request, dry_run).await?;
+    if !dry_run {
+        // usage statistics (#383): the import itself, never the preview
+        usage(&state, |u| u.count("import_bom"));
+    }
+    Ok(result)
 }
 
 /// `(name on the server, local path)` for every path.
@@ -2481,6 +2546,26 @@ pub async fn pick_files(app: AppHandle) -> CmdResult<Vec<PathBuf>> {
     })
     .await
     .map_err(|e| ApiError::local(format!("The file dialog failed: {e}")))
+}
+
+/// Files dropped on the window from the file manager (#418): the regular
+/// files among the dropped paths and how many entries (folders, anything
+/// that is not a regular file) were left out. The paths then take the same
+/// way as picked ones – *New* or *Add files…* with all their checks.
+#[derive(Serialize)]
+pub struct DroppedFiles {
+    pub files: Vec<PathBuf>,
+    pub skipped: usize,
+}
+
+#[tauri::command]
+pub async fn dropped_files(paths: Vec<PathBuf>) -> CmdResult<DroppedFiles> {
+    tokio::task::spawn_blocking(move || {
+        let (files, skipped) = addfiles::split_dropped(&paths);
+        DroppedFiles { files, skipped }
+    })
+    .await
+    .map_err(|e| ApiError::local(format!("The dropped files could not be read: {e}")))
 }
 
 /// *Add files…*: what copying `paths` into the working folder would do

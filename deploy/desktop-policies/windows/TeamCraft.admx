@@ -2,8 +2,9 @@
 <!-- SPDX-License-Identifier: MPL-2.0
      Group Policy template of TeamCraft Desktop (#378). Copy TeamCraft.admx to
      %SystemRoot%\PolicyDefinitions (or the central store) and en-US\TeamCraft.adml
-     to its en-US folder; Intune: import both as custom ADMX. The app reads the
-     values under Software\Policies\TeamCraft (HKLM wins over HKCU). -->
+     to its en-US folder (for German editors also de-DE\TeamCraft.adml to its
+     de-DE folder); Intune: import TeamCraft.admx with the en-US ADML as custom
+     ADMX. The app reads the values under Software\Policies\TeamCraft (HKLM wins over HKCU). -->
 <policyDefinitions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
   <policyNamespaces>
     <target prefix="teamcraft" namespace="TeamCraft.Policies.Desktop" />

@@ -6,6 +6,7 @@
 // *Save report…*.
 
 import { call, dialog, errorText, field, h, reportHook, state, toast } from "./core.js";
+import { reportInputs } from "./report-inputs.js";
 
 /** Opens the report dialog for `failure` = { action, error, inputs }. */
 export function reportDialog(failure) {
@@ -18,7 +19,7 @@ export function reportDialog(failure) {
   var problem = {
     action: failure.action || "",
     error: failure.error || "",
-    inputs: (failure.inputs || []).map(function (kv) { return [String(kv[0]), String(kv[1])]; }),
+    inputs: reportInputs(failure.inputs),
     server_version: state.serverVersion || null
   };
   // the server's version, asked once per app run (null when it does not answer)

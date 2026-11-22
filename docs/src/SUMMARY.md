@@ -102,3 +102,4 @@
     - [3D preview of SolidCraft designs without an export](research/solidcraft-3d-preview.md)
     - [Talking to the desktop app from inside SolidCraft](research/solidcraft-bridge.md)
     - [3D preview of E57 point clouds](research/e57-preview.md)
+    - [CAD add-ins: Inventor and Siemens NX first](research/cad-addins.md)

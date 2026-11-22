@@ -784,7 +784,7 @@ form.inline input.item-no { width: 26ch; min-width: 18ch; max-width: 100%; }
 /* An inline form with short labels above its fields (Add component). */
 form.inline.fields { align-items: flex-end; gap: var(--space-2); }
 :is(.empty, .table-wrap) + form.inline.fields { margin-top: var(--space-3); }
-form.inline.fields > label { gap: 2px; font-size: 12px; line-height: 16px; }
+form.inline.fields > label, form.inline.fields > .picker > label { gap: 2px; font-size: 12px; line-height: 16px; }
 form.inline.fields > label.grow { flex: 1 1 12rem; }
 form.inline.fields > label.grow input { width: 100%; }
 
@@ -917,6 +917,8 @@ details.menu > summary.button::marker { content: ""; }
 .notice > :last-child { margin-bottom: 0; }
 .notice.state-review { box-shadow: inset 3px 0 0 var(--st-review-fg); }
 .notice.state-danger { box-shadow: inset 3px 0 0 var(--st-danger-fg); }
+/* why a viewer account sees no editing buttons (#423) */
+.viewer-note { margin-bottom: var(--space-4); box-shadow: inset 3px 0 0 var(--link); }
 @keyframes flash-in {
   from { opacity: 0; transform: translateY(-4px); }
 }
@@ -1055,6 +1057,7 @@ canvas.viewer-measuring { cursor: crosshair; }
 .explorer-tree a.active { background: var(--selected); font-weight: 600; box-shadow: inset 2px 0 0 var(--focus); }
 .explorer-tree .tree-head { margin: var(--space-3) 8px 4px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
 .explorer-tree .empty { padding: 0 8px; }
+.empty-actions { margin-top: var(--space-3); }
 .explorer-list .card-head { margin-bottom: var(--space-3); }
 .explorer-list .card-head input[type=search] { width: 16rem; }
 .explorer-detail { position: sticky; top: calc(var(--topbar-h) + 16px); }
@@ -1244,6 +1247,14 @@ ul.file-refs { margin-bottom: var(--space-3); }
   border: 1px solid var(--border); border-radius: 4px; background: #fff;
 }
 .similar-main { min-width: 0; overflow-wrap: anywhere; }
+/* main thumbnail of a revision in the item list, search and explorer (#420):
+   a fixed column, so a row without a picture (or a missing one) keeps its place */
+th.thumb-col, td.thumb-col { width: 2.5rem; padding-top: 0.15rem; padding-bottom: 0.15rem; }
+.list-thumb {
+  width: 2.5rem; height: 2.5rem; object-fit: contain; display: block;
+  border: 1px solid var(--border); border-radius: 4px; background: #fff;
+}
+td.thumb-col .thumb-link { margin: 0; display: block; }
 .similar-why { display: block; color: var(--text-dim); font-size: 0.8rem; margin-top: 0.15rem; }
 .similar-score { display: flex; align-items: center; gap: var(--space-2); font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; }
 .similar-score meter {
@@ -1524,3 +1535,20 @@ pre.json { max-height: 24rem; overflow: auto; white-space: pre-wrap; overflow-wr
 .section-nav .count { color: var(--text-dim); font-size: 12px; font-weight: 400; }
 /* anchors land below the top bar and the section nav */
 .section-nav ~ * section.card[id], .section-nav ~ section.card[id] { scroll-margin-top: calc(var(--topbar-h) + 52px); }
+
+/* Component picker of the BOM (#419, static/app.js): suggestions under the
+   item field of *Add component*. */
+.picker { position: relative; display: inline-flex; flex-direction: column; }
+.picker-list {
+  position: absolute; top: 100%; left: 0; z-index: 30;
+  min-width: 22rem; max-width: min(36rem, 90vw); max-height: 22rem; overflow-y: auto;
+  margin: 2px 0 0; padding: 4px 0; list-style: none;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 6px;
+  box-shadow: var(--shadow-pop);
+}
+.picker-option { display: flex; gap: var(--space-2, 8px); align-items: center; padding: 4px 8px; cursor: pointer; }
+.picker-option:hover, .picker-option[aria-selected="true"] { background: var(--selected); }
+.picker-thumb { flex: none; width: 40px; height: 40px; object-fit: contain; border-radius: 4px; background: var(--surface-sunken); }
+.picker-main { display: flex; flex-direction: column; min-width: 0; }
+.picker-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-empty { padding: 6px 10px; color: var(--text-muted); }

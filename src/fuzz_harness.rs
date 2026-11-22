@@ -115,11 +115,17 @@ pub fn thumbnail(data: &[u8]) {
 }
 
 /// SolidCraft designs: the document of a ZIP or JSON design, its linked
-/// designs, the embedded thumbnail and the bill of materials.
+/// designs, the design properties, the embedded thumbnail and the bill of
+/// materials.
 pub fn scdesign(data: &[u8]) {
     let _ = crate::scdesign::linked_designs(data);
+    let _ = crate::scdesign::properties(data);
     if let Some(document) = crate::scdesign::document(&mut Cursor::new(data)) {
         let _ = crate::scdesign::linked_designs(&document);
+        if let Some(props) = crate::scdesign::properties(&document) {
+            let _ = props.mismatches("P-1", "A", "name", "");
+            let _ = crate::scdesign::DesignProperties::from_json(&props.to_json());
+        }
     }
     if let Some(mut design) = crate::scdesign::Container::open(Cursor::new(data)) {
         let _ = design.thumbnail();

@@ -6,10 +6,11 @@
 //! optimistic base-version guard of uploads (`files::store_uploads`) live in
 //! their own services; this module combines them for the workspace views.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -18,7 +19,7 @@ use crate::{
     domain::{self, BaseVersion, FileSyncState, ServerFile},
     error::{AppError, AppResult},
     models::Revision,
-    services::{access, files, projects, revisions},
+    services::{access, audit, bom_references, files, projects, revisions},
 };
 
 /// A file of the client's workspace, as the client reports it.
@@ -103,6 +104,10 @@ pub struct RevisionStatus {
     /// The item's folder in its group (`items.folder`): where a revision
     /// without files has its place in the working folder.
     pub item_folder: String,
+    /// The revision has a structure file by what the reference scan stored
+    /// (`bom_references::has_structure`): the desktop app offers *Update the
+    /// BOM from the CAD file* in *Check in…* (#407).
+    pub bom_structure: bool,
     pub files: Vec<FileStatus>,
 }
 
@@ -184,9 +189,10 @@ pub async fn file_status(
     client: &[ClientFile],
 ) -> AppResult<RevisionStatus> {
     let rev = revisions::get(pool, actor, revision_id).await?;
-    let (list, versions) = tokio::try_join!(
+    let (list, versions, bom_structure) = tokio::try_join!(
         files::list(pool, actor, revision_id),
-        files::versions_of_revision(pool, revision_id)
+        files::versions_of_revision(pool, revision_id),
+        bom_references::has_structure(pool, revision_id)
     )?;
     let mut history: HashMap<Uuid, Vec<(i32, String)>> = HashMap::new();
     for v in versions {
@@ -285,6 +291,7 @@ pub async fn file_status(
         locked_by_me: rev.checked_out_by == Some(actor.id),
         locked_by_other: rev.checked_out_by.is_some_and(|id| id != actor.id),
         item_folder: rev.item_folder.clone(),
+        bom_structure,
         files: out,
     })
 }
@@ -364,6 +371,351 @@ pub async fn check_in_all(
         outcomes.push(CheckInOutcome::of(&rev, result));
     }
     Ok(outcomes)
+}
+
+/// Most revisions one [`checkout_many`] call takes (400 above it).
+pub const MAX_CHECKOUT_BATCH: usize = 500;
+
+/// One revision a client asks [`checkout_many`] to check out: by its id, or
+/// by item number and revision code (`latest` = the newest revision).
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct CheckoutTarget {
+    #[serde(default)]
+    pub id: Option<Uuid>,
+    #[serde(default)]
+    pub item: Option<String>,
+    #[serde(default)]
+    pub code: Option<String>,
+}
+
+/// Why [`checkout_many`] did not check out one revision.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CheckoutRefusal {
+    /// Missing, or hidden from the actor (answered alike, nothing leaks).
+    NotFound,
+    /// Released or obsolete: revise it first.
+    Released,
+    /// In review: the change has to come back to *in work* first.
+    InReview,
+    /// Checked out by somebody else (`checked_out_by_name`).
+    Locked,
+    /// Not a member of the item's project group.
+    Forbidden,
+}
+
+/// The result of [`checkout_many`] for one requested revision.
+#[derive(Clone, Debug, Serialize)]
+pub struct CheckoutOutcome {
+    /// The requested id, or the revision found by item and code (never for
+    /// a revision the actor may not read).
+    pub revision_id: Option<Uuid>,
+    /// Item number (as requested when the revision was not found).
+    pub item: String,
+    pub code: String,
+    pub name: Option<String>,
+    pub ok: bool,
+    /// The actor already held the check-out (no change, no audit record).
+    pub already: bool,
+    pub reason: Option<CheckoutRefusal>,
+    /// The sentence to show for a refusal.
+    pub message: Option<String>,
+    /// Who holds the check-out now: the actor when `ok`, the other user
+    /// when `reason` = `locked`.
+    pub checked_out_by_name: Option<String>,
+}
+
+impl CheckoutOutcome {
+    fn not_found(slot: &BatchSlot) -> CheckoutOutcome {
+        CheckoutOutcome {
+            revision_id: slot.requested_id,
+            item: slot.item.clone(),
+            code: slot.code.clone(),
+            name: None,
+            ok: false,
+            already: false,
+            reason: Some(CheckoutRefusal::NotFound),
+            message: Some(access::not_found_revision().to_string()),
+            checked_out_by_name: None,
+        }
+    }
+
+    fn of(rev: &Revision) -> CheckoutOutcome {
+        CheckoutOutcome {
+            revision_id: Some(rev.id),
+            item: rev.item_number.clone(),
+            code: rev.code.clone(),
+            name: Some(rev.name.clone()),
+            ok: false,
+            already: false,
+            reason: None,
+            message: None,
+            checked_out_by_name: rev.checked_out_by_name.clone(),
+        }
+    }
+}
+
+/// One entry of the request after resolving item and code.
+struct BatchSlot {
+    requested_id: Option<Uuid>,
+    item: String,
+    code: String,
+    id: Option<Uuid>,
+}
+
+/// Why `actor` may not check out `rev` – the rules of
+/// `revisions::ensure_checkout_possible`, sorted into a [`CheckoutRefusal`]
+/// instead of an error, so one refusal does not end the batch.
+fn refusal(rev: &Revision, actor: &Actor) -> Option<(CheckoutRefusal, String)> {
+    let err = revisions::ensure_checkout_possible(rev, actor).err()?;
+    let state = revisions::state_of(rev);
+    Some(match err {
+        AppError::NotFound(m) => (CheckoutRefusal::NotFound, m),
+        AppError::Conflict(_) if state == domain::LifecycleState::InReview => (
+            CheckoutRefusal::InReview,
+            format!(
+                "{} is in review; it can be checked out again once the change returns it to in work.",
+                revisions::label(rev)
+            ),
+        ),
+        AppError::Conflict(_) if !state.is_editable() => (
+            CheckoutRefusal::Released,
+            format!(
+                "{} is {}: revise it first.",
+                revisions::label(rev),
+                state.label()
+            ),
+        ),
+        AppError::Conflict(m) => (CheckoutRefusal::Locked, m),
+        other => (CheckoutRefusal::Forbidden, other.to_string()),
+    })
+}
+
+/// Looks up the id of a revision the actor may read, by item number and
+/// code (`latest` = the newest revision). Read-only; a hidden revision is
+/// `None`, exactly like a missing one, so the caller deduplicates and locks
+/// only visible rows (nothing about a hidden revision reaches the answer or
+/// its timing).
+async fn visible_revision_id_by_code(
+    pool: &PgPool,
+    actor: &Actor,
+    item: &str,
+    code: &str,
+) -> AppResult<Option<Uuid>> {
+    Ok(sqlx::query_scalar(&format!(
+        "SELECT r.id FROM revisions r JOIN items i ON i.id = r.item_id
+          WHERE i.number = $1 AND ($2 = 'LATEST' OR r.code = $2) AND {}
+          ORDER BY r.seq DESC
+          LIMIT 1",
+        access::item_visible("i", 3)
+    ))
+    .bind(item)
+    .bind(code)
+    .bind(&actor.hidden_projects)
+    .fetch_optional(pool)
+    .await?)
+}
+
+/// `id` if it names a revision the actor may read, else `None` (missing and
+/// hidden alike).
+async fn visible_revision_id(pool: &PgPool, actor: &Actor, id: Uuid) -> AppResult<Option<Uuid>> {
+    Ok(sqlx::query_scalar(&format!(
+        "SELECT r.id FROM revisions r JOIN items i ON i.id = r.item_id
+          WHERE r.id = $1 AND {}",
+        access::item_visible("i", 2)
+    ))
+    .bind(id)
+    .bind(&actor.hidden_projects)
+    .fetch_optional(pool)
+    .await?)
+}
+
+/// Checks out several revisions in one step – the parts of an assembly a
+/// CAD user wants to edit in its context (issue #415). The result has one
+/// entry per requested revision (duplicates once, in request order): the
+/// ones the actor may take are checked out, the rest are reported with a
+/// [`CheckoutRefusal`] instead of failing the whole request, so a released
+/// part or a part somebody else holds does not stop the others.
+///
+/// # Invariants
+///
+/// * **Permission:** CAD editor (403 for the whole request otherwise). Per
+///   revision the rules of `revisions::checkout`: visible ("not found"
+///   otherwise, the same answer as a missing revision, without its item or
+///   name), in a group the actor may edit (`forbidden`), in work
+///   (`released`, `in_review`) and not checked out by someone else
+///   (`locked`, with the holder's name).
+/// * **Bounds:** at most [`MAX_CHECKOUT_BATCH`] entries (400); every entry
+///   names an id or an item and a code (400).
+/// * **Locks:** the requested revisions the actor may read (resolved and
+///   deduplicated under the visibility guard, so a hidden row is neither
+///   locked nor collapsed with another entry) in one `SELECT … FOR UPDATE`
+///   ordered by id, so two batches over overlapping sets cannot deadlock:
+///   the second waits, then reports the revisions the first took as
+///   `locked` – each revision has one winner.
+/// * **Audit:** `revision.checkout` for every revision whose lock changed;
+///   nothing for one the actor already held.
+/// * **Notifications / webhooks:** none.
+/// * **Atomic:** one transaction for the whole batch.
+pub async fn checkout_many(
+    pool: &PgPool,
+    actor: &Actor,
+    targets: &[CheckoutTarget],
+) -> AppResult<Vec<CheckoutOutcome>> {
+    actor.require(domain::Role::Editor)?;
+    if targets.len() > MAX_CHECKOUT_BATCH {
+        return Err(AppError::BadRequest(format!(
+            "At most {MAX_CHECKOUT_BATCH} revisions can be checked out at once."
+        )));
+    }
+    let mut slots: Vec<BatchSlot> = Vec::with_capacity(targets.len());
+    let mut seen: HashSet<String> = HashSet::new();
+    for t in targets {
+        let slot = if let Some(id) = t.id {
+            BatchSlot {
+                requested_id: Some(id),
+                item: String::new(),
+                code: String::new(),
+                id: visible_revision_id(pool, actor, id).await?,
+            }
+        } else {
+            let item = t.item.as_deref().unwrap_or("").trim().to_ascii_uppercase();
+            let code = t.code.as_deref().unwrap_or("").trim().to_ascii_uppercase();
+            if item.is_empty() || code.is_empty() {
+                return Err(AppError::BadRequest(
+                    "Every revision needs an id or an item and a code.".into(),
+                ));
+            }
+            let id = visible_revision_id_by_code(pool, actor, &item, &code).await?;
+            BatchSlot {
+                requested_id: None,
+                item,
+                code,
+                id,
+            }
+        };
+        // Only visible revisions are deduplicated by their id; a missing or
+        // hidden one by what was sent, so both collapse (or not) alike.
+        let key = match (slot.id, slot.requested_id) {
+            (Some(id), _) | (None, Some(id)) => id.to_string(),
+            (None, None) => format!("{}/{}", slot.item, slot.code),
+        };
+        if seen.insert(key) {
+            slots.push(slot);
+        }
+    }
+    let mut ids: Vec<Uuid> = slots.iter().filter_map(|s| s.id).collect();
+    ids.sort();
+    if ids.is_empty() {
+        return Ok(slots.iter().map(CheckoutOutcome::not_found).collect());
+    }
+
+    let mut tx = pool.begin().await?;
+    // Lock first, in a fixed order, then read: the read is a new statement
+    // and sees what a batch we waited for committed, including the joined
+    // holder name (a locking read with joins could return a stale one).
+    sqlx::query("SELECT id FROM revisions WHERE id = ANY($1) ORDER BY id FOR UPDATE")
+        .bind(&ids)
+        .execute(&mut *tx)
+        .await?;
+    let rows: Vec<Revision> = sqlx::query_as::<_, Revision>(&format!(
+        "{} WHERE r.id = ANY($1)",
+        revisions::REVISION_SELECT
+    ))
+    .bind(&ids)
+    .fetch_all(&mut *tx)
+    .await?;
+    let by_id: HashMap<Uuid, &Revision> = rows.iter().map(|r| (r.id, r)).collect();
+
+    let mut outcomes = Vec::with_capacity(slots.len());
+    let mut take: Vec<&Revision> = Vec::new();
+    for slot in &slots {
+        let Some(rev) = slot.id.and_then(|id| by_id.get(&id).copied()) else {
+            outcomes.push(CheckoutOutcome::not_found(slot));
+            continue;
+        };
+        if !actor.can_see_project(rev.project_id) {
+            outcomes.push(CheckoutOutcome::not_found(slot));
+            continue;
+        }
+        let mut outcome = CheckoutOutcome::of(rev);
+        match refusal(rev, actor) {
+            Some((CheckoutRefusal::NotFound, _)) => {
+                outcomes.push(CheckoutOutcome::not_found(slot));
+                continue;
+            }
+            Some((reason, message)) => {
+                outcome.reason = Some(reason);
+                outcome.message = Some(message);
+                if reason != CheckoutRefusal::Locked {
+                    outcome.checked_out_by_name = None;
+                }
+            }
+            None => {
+                outcome.ok = true;
+                outcome.already = rev.checked_out_by == Some(actor.id);
+                outcome.checked_out_by_name = Some(actor.display_name.clone());
+                if !outcome.already {
+                    take.push(rev);
+                }
+            }
+        }
+        outcomes.push(outcome);
+    }
+
+    if !take.is_empty() {
+        let take_ids: Vec<Uuid> = take.iter().map(|r| r.id).collect();
+        sqlx::query(
+            "UPDATE revisions SET checked_out_by = $2, checked_out_at = now()
+              WHERE id = ANY($1)",
+        )
+        .bind(&take_ids)
+        .bind(actor.id)
+        .execute(&mut *tx)
+        .await?;
+        for rev in &take {
+            audit::record(
+                &mut tx,
+                Some(actor),
+                "revision.checkout",
+                "revision",
+                Some(rev.id),
+                format!("Checked out {}", revisions::label(rev)),
+                json!({ "item_id": rev.item_id, "batch": true }),
+            )
+            .await?;
+        }
+    }
+    tx.commit().await?;
+    Ok(outcomes)
+}
+
+/// One line about a [`checkout_many`] result: how many were checked out and
+/// which were refused, with the reason.
+pub fn checkout_summary(outcomes: &[CheckoutOutcome]) -> String {
+    let ok = outcomes.iter().filter(|o| o.ok).count();
+    let refused: Vec<String> = outcomes
+        .iter()
+        .filter(|o| !o.ok)
+        .map(|o| {
+            let what = if o.item.is_empty() {
+                o.revision_id.map(|id| id.to_string()).unwrap_or_default()
+            } else {
+                format!("{}/{}", o.item, o.code)
+            };
+            format!("{what} ({})", o.message.as_deref().unwrap_or("refused"))
+        })
+        .collect();
+    let head = match ok {
+        0 if refused.is_empty() => return "Nothing to check out.".into(),
+        1 => "Checked out 1 revision".to_string(),
+        n => format!("Checked out {n} revisions"),
+    };
+    if refused.is_empty() {
+        format!("{head}.")
+    } else {
+        format!("{head}; {} refused: {}", refused.len(), refused.join(", "))
+    }
 }
 
 /// Most check-outs one [`release_held`] run releases.
@@ -572,6 +924,59 @@ mod tests {
         assert_eq!(
             summary(&[outcome("PRT-3", Some("no access"))]),
             "Checked in 0 revisions; 1 failed: PRT-3/A (no access)"
+        );
+    }
+
+    fn taken(number: &str, refusal: Option<(CheckoutRefusal, &str)>) -> CheckoutOutcome {
+        CheckoutOutcome {
+            revision_id: None,
+            item: number.into(),
+            code: "A".into(),
+            name: None,
+            ok: refusal.is_none(),
+            already: false,
+            reason: refusal.map(|r| r.0),
+            message: refusal.map(|r| r.1.to_string()),
+            checked_out_by_name: None,
+        }
+    }
+
+    #[test]
+    fn checkout_summaries() {
+        assert_eq!(checkout_summary(&[]), "Nothing to check out.");
+        assert_eq!(
+            checkout_summary(&[taken("PRT-1", None)]),
+            "Checked out 1 revision."
+        );
+        assert_eq!(
+            checkout_summary(&[
+                taken("PRT-1", None),
+                taken("PRT-2", None),
+                taken(
+                    "PRT-3",
+                    Some((
+                        CheckoutRefusal::Released,
+                        "PRT-3/A is Released: revise it first."
+                    ))
+                ),
+            ]),
+            "Checked out 2 revisions; 1 refused: PRT-3/A (PRT-3/A is Released: revise it first.)"
+        );
+        let hidden = CheckoutOutcome {
+            revision_id: Some(Uuid::nil()),
+            item: String::new(),
+            ..taken("", Some((CheckoutRefusal::NotFound, "Revision not found.")))
+        };
+        assert_eq!(
+            checkout_summary(&[hidden]),
+            format!(
+                "Checked out 0 revisions; 1 refused: {} (Revision not found.)",
+                Uuid::nil()
+            )
+        );
+        assert_eq!(
+            serde_json::to_value(CheckoutRefusal::InReview).unwrap(),
+            "in_review"
         );
     }
 

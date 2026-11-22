@@ -15,7 +15,7 @@ const source = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../de
 const {
   checkedOutClass, compareNames, countText, entryIconType, entryName, entryRevision, entryTitle, folderKey,
   favouriteKey, favouritePath, favouriteSuggestions, groupTotal, mergeEntries, newItemFolder, normalizeFavourite,
-  parentFolder, remaining, sortEntries, sortFolders, suggestionKey
+  parentFolder, remaining, rowThumb, sortEntries, sortFolders, suggestionKey
 } = await import("data:text/javascript;base64," + Buffer.from(fs.readFileSync(source, "utf8")).toString("base64"));
 
 let passed = 0;
@@ -187,6 +187,21 @@ test("a checked-out row gets the one marker class, whoever holds the lock (#362)
   assert.equal(checkedOutClass(file("a.ipt", { checked_out_by_name: "You" })), ".checked-out");
   assert.equal(checkedOutClass(file("a.ipt")), "");
   assert.equal(checkedOutClass(null), "");
+});
+
+test("a row names its preview image when the server gave one (#420)", () => {
+  // Files rows: the file's own picture, when its format has one
+  assert.deepEqual(rowThumb(file("a.ipt", { thumbnail: true, sha256: "ab" })), { id: "f-a.ipt", sha: "ab" });
+  assert.equal(rowThumb(file("a.step", { thumbnail: false, sha256: "cd" })), null);
+  assert.equal(rowThumb(file("a.ipt", { thumbnail: true, sha256: null })), null);
+  assert.equal(rowThumb(loose("PRT-000002", "Bolt", { thumbnail: true })), null);
+  // All items, search, structure: the main thumbnail of the revision
+  assert.deepEqual(rowThumb({ number: "ASM-000001", thumbnail_file_id: "f1", thumbnail_sha256: "ef" }), { id: "f1", sha: "ef" });
+  assert.equal(rowThumb({ number: "ASM-000001", thumbnail_file_id: null, thumbnail_sha256: null }), null);
+  // an older server sends neither; a restricted structure line neither
+  assert.equal(rowThumb({ number: "PRT-000003" }), null);
+  assert.equal(rowThumb({ restricted: true }), null);
+  assert.equal(rowThumb(null), null);
 });
 
 console.log(passed + " tests passed");

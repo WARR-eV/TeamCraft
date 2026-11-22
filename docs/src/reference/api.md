@@ -11,6 +11,13 @@ curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/me
 curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8080/api/v1/items?q=bracket&system=solidworks"
 ```
 
+Every answer of the server (API, web pages, health checks) carries an
+**`x-request-id`** header (#381): a new UUID, or the request's own
+`x-request-id` when it is 1–64 characters of `A–Z`, `a–z`, `0–9` and `-`
+(set by a reverse proxy, for example). The same id is written to the
+request's log line (`request_id`) and shown on the web UI's error pages, so a
+bug report can be matched to the server log. JSON error bodies are unchanged.
+
 ## Token scopes
 
 A token has a scope that narrows what its user may do with it; it never
@@ -146,6 +153,75 @@ curl -s -X POST -H "$H" -H "Content-Type: application/json" \
      $API/items/PRT-000001/revisions/A/cancel-checkout
 ```
 
+### Updating the BOM from the CAD file at check-in
+
+The multipart field `bom_from_references=true` on `POST …/checkin` (and
+`"bom_from_references": true` next to `"check_in": true` in the body of
+`POST /uploads/{id}/finish`) also updates the BOM of the revision from the
+CAD references of the version being checked in, **in the check-in's
+transaction** (#407; the plan of `GET …/bom/from-references`, see the
+[structure guide](../guide/structure.md#at-check-in-update-the-bom-from-the-cad-file)):
+new children are added, quantities that differ are corrected where the CAD
+file counts them (never from an *assumed 1*), circular children are refused,
+no line is removed. It is off by default, so clients that do not send it
+behave as before; a refused upload (409) changes neither files nor BOM. The
+answer adds `bom`:
+
+```sh
+curl -s -X POST -H "$H" -F file=@pump.stp -F bom_from_references=true \
+     $API/items/ASM-000001/revisions/A/checkin
+# {"revision": {…}, "files": […],
+#  "bom": {"added": ["PRT-000007"], "updated": ["PRT-000004"],
+#          "kept_not_in_cad": ["PRT-000012"], "not_in_teamcraft": ["Lager.ipt"],
+#          "refused": [{"child": "ASM-000002", "reason": "Adding … would create a circular BOM structure."}]}}
+```
+
+`added`, `updated`, `kept_not_in_cad` (lines whose child the CAD files no
+longer reference – kept) and `refused[].child` are item numbers,
+`not_in_teamcraft` referenced file names. `bom` is `null` without the field
+and when the revision has no file whose references describe a structure
+(an assembly, an NX part or SolidCraft design with component instances, a
+STEP assembly with external part files).
+
+### Checking out several revisions at once
+
+`POST /checkouts` checks out several revisions in one step – the parts of
+an assembly a CAD user wants to change in the assembly's context (#415).
+Each entry names a revision by `id`, or by `item` and `code` (`latest` = the
+newest revision); at most 500 entries, duplicates are answered once.
+
+```sh
+curl -s -X POST -H "$H" -H "Content-Type: application/json" \
+     -d '{"revisions": [{"item": "PRT-000011", "code": "A"}, {"item": "PRT-000012", "code": "B"}]}' \
+     $API/checkouts
+```
+
+The answer has **a result per revision**, not all-or-nothing: the revisions
+that can be taken are checked out, the others are reported, so one released
+part or a part somebody else holds does not stop the rest. It is `200` with
+`checked_out`, `refused`, a `summary` sentence and `revisions`, each with
+`revision_id`, `item`, `code`, `name`, `ok`, `already` (you held it before:
+no change, no audit record), `reason`, `message` and `checked_out_by_name`
+(you when `ok`, the holder when `locked`). The reasons:
+
+| `reason`    | Meaning                                                                       |
+|-------------|-------------------------------------------------------------------------------|
+| `not_found` | Missing, or in a group you may not read – the same answer, without its name; only what you sent (`item` and `code`, or `revision_id` when you sent an id) comes back |
+| `released`  | Released or obsolete: revise it first                                         |
+| `in_review` | In review: it can be checked out again once the change returns it to in work |
+| `locked`    | Checked out by someone else (`checked_out_by_name`)                          |
+| `forbidden` | You are not a member of the item's project group                              |
+
+The whole batch is one transaction: the rows are locked in a fixed order
+(by id), so two batches over overlapping parts cannot deadlock – the second
+waits, then reports what the first took as `locked`; every revision has one
+winner. Each revision whose lock changed gets its own `revision.checkout`
+audit record. Viewers get `403` for the whole request, more than 500 entries
+or an entry without an id or an item and a code `400`. The choice of a server
+batch over one `checkout` call per revision: one round trip, one consistent
+moment for the whole set, and the per-revision rules stay those of
+`revisions::checkout` in one place.
+
 ### Concurrency: base versions and file status
 
 A check-in or upload can name the version each file is **based on** in the
@@ -166,7 +242,11 @@ curl -s -X POST -H "$H" -F file=@hub.step -F 'bases={"hub.step": 3}' \
 
 `GET …/revisions/{code}/file-status` returns every file with its current
 `version`, `sha256`, uploader and the lock (`locked_by`, `locked_by_name`,
-`locked_at`, `locked_by_me`, `locked_by_other`). When somebody else released *your* check-out of the revision and nobody
+`locked_at`, `locked_by_me`, `locked_by_other`). `bom_structure` is `true` when a
+current file of the revision describes its structure by what the reference
+scan stored (an assembly, or an NX part, STEP file or SolidCraft design whose
+references carry instance counts) – the desktop app then offers *Update the
+BOM from the CAD file* at check-in. When somebody else released *your* check-out of the revision and nobody
 has checked it out since,
 `released` says so (`by_name`, `at`, `reason` and the `message` *Released by
 X; your local changes are kept and need a new check-out.*); otherwise it is
@@ -211,7 +291,7 @@ curl -s -X POST -H "$H" -H 'Content-Type: application/json' \
 | `POST /uploads`             | `{item, revision, filename, size, sha256?, content_type?, base?, folder?, refuse_clash?, refuse_same_name?}` → **201** with the session (`folder` = place in the project group, see below; omitted = keep the file's folder; `refuse_clash`/`refuse_same_name` = the [duplicate guard](#duplicates-of-new-files-check-and-guard), kept with the session and applied when the file is stored); 413 above `TEAMCRAFT_MAX_UPLOAD_MB`, 409 if the revision is not checked out by you, `base` is outdated or the guard refuses the new file already |
 | `PATCH /uploads/{id}`       | header `Upload-Offset`, body = the next chunk (≤ `chunk_bytes`) → the session with the new `offset`; **409** with the server's `Upload-Offset` header at any other offset, 400 beyond `size`                                                                                                         |
 | `HEAD`/`GET /uploads/{id}`  | headers `Upload-Offset`, `Upload-Length`; `GET` also as JSON (`offset`, `size`, `complete`, `expires_at`)                                                                                                                                                                                            |
-| `POST /uploads/{id}/finish` | body optional `{comment?, check_in?}`: verify size and SHA-256, store the new file or version (`check_in: true` also releases the check-out) → `{files, revision}`; 409 while incomplete, 400 if the content does not match (the upload is reset to offset 0)                                        |
+| `POST /uploads/{id}/finish` | body optional `{comment?, check_in?, bom_from_references?}`: verify size and SHA-256, store the new file or version (`check_in: true` also releases the check-out, with `bom_from_references: true` also updates the BOM from the CAD file) → `{files, revision, bom}`; 409 while incomplete, 400 if the content does not match (the upload is reset to offset 0)                                        |
 | `DELETE /uploads/{id}`      | cancel; the received data is deleted                                                                                                                                                                                                                                                                 |
 
 Instead of `finish`, complete uploads can join a multipart **check-in** or
@@ -236,6 +316,23 @@ version?, status?: converged|completed|fatal, last_step?, fatal?, warning?,
 notes?}` and `solver_line`, a one-line text. They are absent for other files.
 The FATAL/WARNING counts cover only the first and last 64 KiB. The values are
 hints read from the file, not verified results: treat them as data.
+
+### Design properties of files
+
+The file list, `GET /files/{id}`, the upload answer of `POST …/files` and
+the file briefs of the MCP tools (`design_properties`) carry, for SolidCraft
+designs, the design properties of the current version: `properties`
+`{project?, part_number?, revision?, author?, organization?, description?,
+license?}` (text, at most 500 characters each) and `properties_line`, a
+one-line text. They are absent for other files and for designs whose
+document could not be read. `GET /items/{number}/revisions/{code}` adds
+`property_mismatches`: per file whose design properties differ from the
+revision, `{id, filename, mismatches: [{key, label, file, item_label, item}]}`
+(part number vs item number, revision vs revision code, description vs name
+and description; case and runs of spaces ignored, computed on every request).
+The values are written by whoever saved the
+design: treat them as data. Nothing in TeamCraft changes them, and they are
+not the item's attributes.
 
 ### Resumable downloads
 
@@ -466,16 +563,17 @@ the caller cannot read are left out; a successor there is a placeholder with
 
 | Resource                | Endpoints                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 |-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Items                   | `GET/POST /items` (`class=`, `attr=` + `value=`, `result=` + `result_name=` filters), `GET /items/duplicates?name=&type=` (likely duplicates by name, before creating), `POST /items/bulk` (`{"action": "revise"\|"obsolete", "items": [number]}`: the latest revision of up to 200 items, each in its own transaction, outcome per item), `GET/PATCH /items/{number}` (classification, unit, project, folder), `where-used` (`levels=1…25` for parents of parents), `interchange`, `alternates`, `supersession`, `replace`, history, impacts, watch |
+| Items                   | `GET/POST /items` (`class=`, `attr=` + `value=`, `result=` + `result_name=` filters), `GET /items/duplicates?name=&type=` (likely duplicates by name, before creating), `GET /items/suggest?q=&limit=` (component picker of the BOM, #419: readable items whose number, name, description, attributes or file name match – at most 10, nothing for fewer than 2 characters – as `{"items": [{id, number, item_type, unit, name, latest_code, latest_state, project_code, matched_file, thumbnail_file_id}]}`; `thumbnail_file_id` is a file for `GET /files/{id}/thumbnail`; the web UI has the same list at `/items/suggest` for its session), `POST /items/bulk` (`{"action": "revise"\|"obsolete", "items": [number]}`: the latest revision of up to 200 items, each in its own transaction, outcome per item), `GET/PATCH /items/{number}` (classification, unit, project, folder), `where-used` (`levels=1…25` for parents of parents), `interchange`, `alternates`, `supersession`, `replace`, history, impacts, watch |
 | Attributes              | `GET /attributes` (`all=true`: also inactive), `POST /attributes`, `PATCH /attributes/{key}` (admins); values in `attributes` of a revision                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Revisions               | `GET/PATCH /items/{number}/revisions/{code\|latest}`, `checkout`, `checkin`, `cancel-checkout`, `file-status`, `revise`, `obsolete`                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Revisions               | `GET/PATCH /items/{number}/revisions/{code\|latest}`, `checkout`, `checkin`, `cancel-checkout`, `file-status`, `revise`, `obsolete`; `POST /checkouts` (several at once, a result per revision)                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Revisions               | `GET/PATCH /items/{number}/revisions/{code\|latest}`, `checkout`, `checkin`, `cancel-checkout`, `file-status`, `revise`, `obsolete`; `GET /revisions/{id}/thumbnail` – the picture of the main model (see below)                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Worklist                | `GET /worklist` (check-outs, reviews, impacts and `impact_groups`, statistics), `POST /worklist/checkin-all`                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Users                   | `GET /users/{id}/holdings` – what a user still holds (check-outs, open change orders, pending reviews, change requests, owned items, memberships, tokens), as the caller may see it: administrators, and group managers for the groups they manage; `POST /users/{id}/offboard` `{hand_over_to?: username, release_checkouts?, revoke_tokens?, confirm_no_manager?}` – administrators deactivate a leaver in one step (see [When someone leaves](../admin/users.md#when-someone-leaves))                                                     |
 | Files                   | `POST …/files` (multipart, `folder`/`folders`, duplicate guard `refuse_clash`/`refuse_same_name`), `GET/PATCH /files/{id}` (metadata, folder), `/content`, `/versions`, `/restore`, `/mesh`, `/thumbnail`, `…/workset`, `GET/POST /file-versions/{id}/annotations` + `DELETE /annotations/{id}` (3D notes)                                                                                                                                                                                                                                                                                      |
 | Uploads                 | `POST /uploads`, `PATCH/HEAD/GET/DELETE /uploads/{id}`, `POST /uploads/{id}/finish` – chunked, resumable uploads of large files                                                                                                                                                                                                                                                                                                                                                                                                              |
 | BOM                     | `GET/POST …/bom` (`rule=latest\|released\|as_released`, `expand=true`), `PATCH/DELETE /bom-lines/{id}`, `…/package` (Pack and Go ZIP); the expanded tree has `project_id` per line (`null` for restricted placeholders)                                                                                                                                                                                                                                                                                                                      |
 | BOM import              | `POST /bom-imports` (new assembly), `POST …/bom/import` (into a checked-out revision); multipart `file` = CSV/Excel table or STEP assembly, `dry_run=true` returns the plan (with `attribute_columns`, `unused_columns`, per item `classification` and `attributes`)                                                                                                                                                                                                                                                                         |
-| BOM from CAD references | `GET …/bom/from-references` (plan: children with instance-count quantities, status `new`/`already_in_bom`/`differs`/`circular`, `not_in_teamcraft`, `hidden`), `POST …/bom/from-references` `{children, update_quantities?}` (revision checked out by the caller; one transaction; `added`/`updated`/`skipped`/`refused`)                                                                                                                                                                                                                    |
+| BOM from CAD references | `GET …/bom/from-references` (plan: children with instance-count quantities, status `new`/`already_in_bom`/`differs`/`circular`, `not_in_teamcraft`, `hidden`), `POST …/bom/from-references` `{children, update_quantities?}` (revision checked out by the caller; one transaction; `added`/`updated`/`skipped`/`refused`); at check-in: `bom_from_references` (see above)                                                                                                                                                                                                                    |
 | References              | `GET/POST …/references`, `DELETE /references/{id}`, `GET /impacts`, `POST /impacts/{id}/acknowledge`, `POST …/impacts/acknowledge`                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Change requests         | `GET/POST /change-requests`, `GET/PATCH /change-requests/{number}`, `comments`, `items`, `triage`, `assign`, `decide`, `reopen`, `withdraw`, `create-change`, `link-change`, `attachments`, `watch`                                                                                                                                                                                                                                                                                                                                          |
 | Simulations             | `GET/POST /projects/{code}/result-templates`, `PUT/DELETE /result-templates/{id}`, `GET …/simulation`, `GET/POST …/simulation/bases`, `DELETE /simulation-bases/{id}`, `GET/POST/PUT …/simulation/results`, `…/results/import`, `PATCH/DELETE /simulation-results/{id}`, `…/simulation/compare`, `GET /items/{number}/simulations`                                                                                                                                                                                                           |
@@ -503,6 +601,32 @@ children resolved by `rule=latest|released|as_released` (default
 line then has
 its `level` and the resolved `revision` on both sides). The expanded BOM
 itself downloads as Excel workbook: `GET …/revisions/{code}/bom.xlsx?rule=`.
+
+### Thumbnails in lists
+
+`GET /revisions/{id}/thumbnail` (#420) answers the picture that stands for a
+revision: the preview image of its main CAD file – the assembly before the
+part before a model file before the drawing before a JT file, the first by
+name on a tie (the picture at the top of the revision page). It is the
+image of `GET /files/{id}/thumbnail` of that file (PNG, BMP or JPEG) with
+`ETag: "<sha256>-thumb"`; a request with that `If-None-Match` answers
+`304 Not Modified` (also on `/files/{id}/thumbnail`) – except for assemblies
+whose picture may be put together from their parts' previews (it changes
+with a component while the assembly file stays the same). 404 when no file has a
+picture, and when the revision is unknown or in a project group the caller
+may not read.
+
+The lists name the picture of each row, so a client needs no request per
+row (the server fills them for the whole page in one query):
+
+| List                                                              | Fields                                                                                  |
+|-------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
+| `GET /items` (also the search), `GET /favorites`                  | `thumbnail_file_id`, `thumbnail_sha256` of the latest revision (`null`: no picture)     |
+| `GET /projects/{code}/structure`, `GET …/revisions/{code}/structure` | `thumbnail_file_id`, `thumbnail_sha256` of the resolved revision (`null` for restricted lines) |
+| `GET /projects/{code}/files`                                      | per file `thumbnail` (its format has a picture) and `sha256` (current version)          |
+
+The image is `GET /files/{thumbnail_file_id}/thumbnail`; `thumbnail_sha256`
+is the cache key (the web pages add it as `?v=`).
 
 ### Similar parts
 

@@ -135,6 +135,21 @@ before the drawing, the first by name when there are several. A click opens
 its 3D view (or the picture itself when the file has no 3D preview).
 Revisions with only neutral files (STEP, PDF) show no picture there.
 
+**In the lists** (#420) the same picture heads each row: the item list and
+its search results, the vault explorer and, in the desktop app, Home
+(*Files*, *All items*, *Structure*) and the search. A stand-alone JT file
+comes after the native files. A revision with only neutral files (STEP, STL,
+glTF …) has no list picture yet, even when it has a 3D view: rendering one
+from the 3D preview is left as a follow-up. The list answer names the picture of every row
+(one query for the whole page, never one per row); the images load lazily,
+only for the rows in view, and are cached by the file's content hash (ETag,
+a repeated request answers *304 Not Modified*; not for an assembly whose
+picture is put together from its parts, which changes with them). A row without a picture
+keeps its place and shows nothing (web) or the type icon (desktop). The
+picture of a revision on its own is `GET /revisions/{id}/thumbnail` (web)
+and `GET /api/v1/revisions/{id}/thumbnail` (REST API) – 404 when it has
+none or when the revision is in a project group the caller may not read.
+
 Native CAD files (Inventor, Solid Edge, SolidWorks, NX, Creo, CATIA, …) are
 proprietary; TeamCraft does not read their exact geometry (see
 [Research: previews of native CAD files](../research/cad-previews.md)).
@@ -236,7 +251,41 @@ For the rest TeamCraft shows what other PLM systems show:
 The item search ranks matches in numbers, names, materials, descriptions and
 file names, and in the text inside STEP and IGES files (product names,
 authors, organisations), plain-text files (with their decimal numbers), the
-text layer of PDF reports and the text of HTML reports (table rows as lines;
-scripts, styles and hidden elements skipped). PDFs and HTML files are read in an
+text layer of PDF reports, the text of HTML reports (table rows as lines;
+scripts, styles and hidden elements skipped) and the design properties of
+SolidCraft designs (see below). PDFs and HTML files are read in an
 isolated child process with size, time and memory limits; scanned PDFs have no
 text layer (there is no OCR).
+
+## Design properties of SolidCraft designs
+
+SolidCraft keeps *design properties* in every design: project, part number,
+revision, author, organisation, description and licence. TeamCraft reads them
+when a `.sc` design is uploaded or checked in (ZIP and JSON designs; only
+these text values, each cut at 500 characters – other tools' data and values
+that are not text are left out) and stores them with the file version:
+
+* They are listed under the file name on the revision page and in the desktop
+  app (*Part number BR-7731 · Revision B · Description Mounting bracket …*),
+  and returned as `properties` with the file in the REST API.
+* They are found by the full-text search, like the text inside other files.
+  Only the current version counts.
+* When the part number differs from the item number, the revision from the
+  revision code, or the description from the revision's name (and its
+  description), the revision page (web and desktop app) shows a notice *Design properties differ
+  from this revision*. Case and runs of spaces do not count. The notice is
+  worked out on every view, so it disappears as soon as the revision or the
+  design is changed. Nothing is changed automatically – edit the revision, or
+  the design (the desktop app can write the item number and revision into
+  it).
+* A new item created with a design and no name takes the design's
+  description as its name; with a name but no description, the description
+  is filled in. In the desktop app, *New item* from local files (also
+  *Create items…* of the worklist) and *Import a CAD folder* fill an empty
+  description the same way (the name stays the file name).
+
+A design whose document cannot be read (an unknown container, a damaged
+archive, a document above 16 MiB) is stored like any other file, without
+properties. Designs stored before TeamCraft read the properties get them with
+their next version. The properties come from the file and are data – they
+are not the item's attributes.

@@ -240,6 +240,10 @@ Edge's OLE container); `.sc` must be a SolidCraft ZIP or JSON design.
 A SolidCraft ZIP design shows the picture it embeds (`cache/thumbnail.png`)
 when its key (`cache/thumbnail.json`, `solidcraft-thumbnail/1`) names the
 SHA-256 of this `document.json` and of the PNG; otherwise none.
+Its design properties (the text keys of the document's `metadata`: part
+number, revision, description, …) are stored with the file version, listed,
+searchable and compared with the item – see
+[Files](../guide/files.md#design-properties-of-solidcraft-designs).
 
 ## BIM / architecture
 

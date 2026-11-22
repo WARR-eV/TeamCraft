@@ -117,7 +117,8 @@ export function attachmentImage(a) {
 export function attachToRequest(r) {
   chooseAttachment().then(function (path) {
     if (!path) return;
-    run("Attaching " + baseName(path), function () { return call("upload_request_attachment", { number: r.number, path: path }); })
+    run("Attaching " + baseName(path), function () { return call("upload_request_attachment", { number: r.number, path: path }); },
+      [["request", r.number], ["file", baseName(path)]])
       .then(function (a) { toast("Attached " + a.filename + " to " + r.number); reloadActive(); }, function () {});
   }, function (e) { toast(errorText(e), "error"); });
 }
