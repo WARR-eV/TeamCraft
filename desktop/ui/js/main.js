@@ -9,7 +9,7 @@
 // Every server call goes through the Rust commands (src/commands.rs); data
 // from the server is only ever inserted as text, never as HTML.
 //
-// Modules: core.js, skins.js, connect.js, shell.js, navigator.js, tabs.js, assistant.js, agent.js, revision.js, references.js, workspace.js, change.js, requests.js, dialogs.js, bom-import.js, bom-lines.js, group-sync.js, folder-import.js, settings.js, onboarding-rules.js, onboarding.js, crash.js, main.js.
+// Modules: core.js, skins.js, connect.js, shell.js, navigator.js, tabs.js, assistant.js, agent.js, revision.js, references.js, workspace.js, change.js, requests.js, dialogs.js, bom-import.js, bom-lines.js, group-sync.js, folder-import.js, settings.js, onboarding-rules.js, onboarding.js, crash.js, drop.js, main.js.
 
 import { $, TAURI, call, errorText, h, invoke, setStatus, state, toast } from "./core.js";
 import { applySkin } from "./skins.js";
@@ -29,6 +29,7 @@ import { reportDialog } from "./report.js";
 import { checkCrashReports, initCrashWatch } from "./crash.js";
 import { onSolidcraftRequest } from "./solidcraft-bridge.js";
 import { initItemMenu } from "./item-menu.js";
+import { initDrop } from "./drop.js";
 import { openOnboarding } from "./onboarding.js";
 
 // ======================================================================
@@ -133,6 +134,7 @@ export function boot() {
   initConnect();
   initShell();
   initItemMenu();
+  initDrop();
   initZoom();
   TAURI.event.listen("menu", function (e) { handleMenu(e.payload); });
   // large files are sent in resumable chunks: show how far they are
