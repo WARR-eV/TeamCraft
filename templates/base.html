@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-skin="{{ skin }}">
+<html lang="{{ lang or 'en' }}" data-skin="{{ skin }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -41,12 +41,12 @@
       {%- endif %}
     </a>
     <nav class="nav" aria-label="Main">
-      <a href="/" class="{% block nav_home %}{% endblock %}">Dashboard</a>
-      <a href="/vault" class="{% block nav_vault %}{% endblock %}" title="Browse project groups and check files out and in">Vault</a>
-      <a href="/items" class="{% block nav_items %}{% endblock %}">Items</a>
-      <a href="/requests" class="{% block nav_requests %}{% endblock %}" title="Change requests (ECR): report a problem, propose a change">Requests</a>
-      <a href="/changes" class="{% block nav_changes %}{% endblock %}">Changes</a>
-      <a href="/projects" class="{% block nav_projects %}{% endblock %}">Projects</a>
+      <a href="/" class="{% block nav_home %}{% endblock %}">{{ t("nav.dashboard") }}</a>
+      <a href="/vault" class="{% block nav_vault %}{% endblock %}" title="{{ t("nav.vault.title") }}">{{ t("nav.vault") }}</a>
+      <a href="/items" class="{% block nav_items %}{% endblock %}">{{ t("nav.items") }}</a>
+      <a href="/requests" class="{% block nav_requests %}{% endblock %}" title="{{ t("nav.requests.title") }}">{{ t("nav.requests") }}</a>
+      <a href="/changes" class="{% block nav_changes %}{% endblock %}">{{ t("nav.changes") }}</a>
+      <a href="/projects" class="{% block nav_projects %}{% endblock %}">{{ t("nav.projects") }}</a>
     </nav>
     {% if me.is_admin %}
     <details class="menu nav-admin">
@@ -63,7 +63,7 @@
     </details>
     {% endif %}
     <form class="quicksearch" action="/items" method="get" role="search">
-      <input type="search" name="q" placeholder="Search items" aria-label="Search items" aria-keyshortcuts="/">
+      <input type="search" name="q" placeholder="{{ t("nav.search") }}" aria-label="{{ t("nav.search") }}" aria-keyshortcuts="/">
       <kbd aria-hidden="true">/</kbd>
     </form>
     {% if assistant_enabled %}
@@ -72,7 +72,7 @@
     </button>
     {% endif %}
     <a class="bell{% if unread_notifications %} has-unread{% endif %}" href="/notifications"
-       title="Notifications{% if unread_notifications %} – {{ unread_notifications }} unread{% endif %}" aria-label="Notifications{% if unread_notifications %}, {{ unread_notifications }} unread{% endif %}">
+       title="{{ t("nav.notifications") }}{% if unread_notifications %} – {{ t("nav.notifications.unread", count=unread_notifications) }}{% endif %}" aria-label="{{ t("nav.notifications") }}{% if unread_notifications %}, {{ t("nav.notifications.unread", count=unread_notifications) }}{% endif %}">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
       {% if unread_notifications %}<span class="bell-count">{{ unread_notifications }}</span>{% endif %}
     </a>

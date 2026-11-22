@@ -588,6 +588,8 @@ pub struct WebCtx {
     /// Path and query of this request: the `back` target of the forms in the
     /// header (appearance), so they return here without JavaScript too.
     pub here: String,
+    /// The page language (#379): from `Accept-Language`, English by default.
+    pub lang: &'static str,
 }
 
 impl FromRequestParts<AppState> for WebCtx {
@@ -610,6 +612,11 @@ impl FromRequestParts<AppState> for WebCtx {
                 .path_and_query()
                 .map(|p| p.as_str().to_string())
                 .unwrap_or_else(|| "/".to_string()),
+            lang: parts
+                .headers
+                .get(axum::http::header::ACCEPT_LANGUAGE)
+                .and_then(|v| v.to_str().ok())
+                .map_or("en", crate::i18n::negotiate),
         })
     }
 }
@@ -700,6 +707,7 @@ pub(crate) fn render(
         map.insert("unread_notifications".into(), json!(ctx.unread));
         map.insert("here".into(), json!(ctx.here));
         map.insert("branding".into(), json!(ctx.branding));
+        map.insert("lang".into(), json!(ctx.lang));
         map.insert(
             "assistant_enabled".into(),
             json!(crate::services::assistant::enabled(st)),

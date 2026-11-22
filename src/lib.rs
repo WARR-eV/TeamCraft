@@ -33,6 +33,7 @@ pub mod fusion;
 pub mod fuzz_harness;
 pub mod htmltext;
 pub mod httprange;
+pub mod i18n;
 pub mod invasm;
 pub mod invpart;
 pub mod invplace;

@@ -23,7 +23,8 @@ import { newItemDialog } from "./dialogs.js";
 import { importBomDialog } from "./bom-import.js";
 import { getProjectsDialog } from "./group-sync.js";
 import { importFolderDialog, importTutorial } from "./folder-import.js";
-import { openAbout, openSettings, signOut } from "./settings.js";
+import { openAbout, openSettings, preferredLanguage, signOut } from "./settings.js";
+import { loadLanguage } from "/static/shared/js/i18n.js";
 import { checkCrashReports, initCrashWatch } from "./crash.js";
 
 // ======================================================================
@@ -142,6 +143,8 @@ export function boot() {
     $("status-get-text").textContent = "Stopping …";
     call("workspace_cancel").catch(function () {});
   });
+  // translated UI (#379): the saved choice, else the system's language
+  loadLanguage(preferredLanguage()).catch(function () {});
   call("session").then(function (s) {
     state.session = s;
     showAppVersion(s.version);

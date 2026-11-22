@@ -57,6 +57,14 @@ see the notices in the README.
   the lines – part properties, placement counts, purchased/standard parts not
   expanded, phantoms passed through, reference components left out
   (`src/scbom.rs`, fuzzed by the `scdesign` target).
+- **Translated UI, first part: English and German** (#379). Message
+  catalogs in `shared/i18n/` (stable IDs, whole sentences with named
+  placeholders, plural forms), read by the server (`src/i18n.rs`, `t()` in
+  templates) and the desktop app (`shared/js/i18n.js`). The web header
+  follows the browser's `Accept-Language` (exactly, then by base language,
+  then English); the desktop app has *Settings → Language*. Guard tests check
+  IDs, placeholders and plural forms. Translated so far: the web header and
+  the desktop *Settings* dialog.
 
 ## [0.2.11] - 2026-11-21
 

@@ -15,6 +15,8 @@ js/format.js       label, fmtNum, fmtFixed, fmtSize, fmtAge, fmtDate – the Rus
 js/states.js       glyph(state): the state glyph table (domain::state_glyph on the server)
 js/markdown.js     markdown(text, link): the assistant's markdown-lite as DOM nodes
 js/dom.js          el(tag, attrs, children): text-only DOM builder of the shared modules
+js/i18n.js         t(id, params), negotiate, loadLanguage: the message catalogs (src/i18n.rs is the Rust twin, #379)
+i18n/              en.json (the source) and de.json: message ID → sentence with {named} placeholders or plural forms
 test-vectors/      JSON input → expected output, run against Rust and JS (not served, not copied)
 ```
 

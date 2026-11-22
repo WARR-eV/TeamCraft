@@ -299,7 +299,9 @@ end-to-end tests against a real PostgreSQL.
 **Clients and integrations**
 
 - **Web UI** – light and dark design that follows the operating system, plus
-  distribution skins; responsive down to phone width.
+  distribution skins; responsive down to phone width. English and German (first
+  part, #379): the header follows the browser's language, the desktop app has
+  *Settings → Language*.
 - **Desktop app** – Linux, macOS and Windows client with a local working
   folder, *Get* of whole assemblies, an import wizard, a *Files* view of each
   project group (with *New item here* on every folder, starting in a favourite folder, e.g. the one with the

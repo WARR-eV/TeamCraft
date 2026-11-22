@@ -109,6 +109,9 @@ jobs:
       # src/ui_vectors.rs pins the server's Rust side to
       - name: Test the shared UI rules against the test vectors
         run: node scripts/shared-vectors.test.mjs
+      # the message catalogs of the translated UI (#379)
+      - name: Test the translated UI catalogs
+        run: node scripts/shared-i18n.test.mjs
 
   test:
     name: desktop (${{ matrix.os }})
