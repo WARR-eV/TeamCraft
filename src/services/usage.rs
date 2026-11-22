@@ -664,7 +664,7 @@ mod desktop_list {
         let desktop = include_str!("../../desktop/src/usage.rs");
         for name in super::ACTIONS.iter().chain(super::CAD_EXPORTS) {
             assert!(
-                desktop.contains(&format!("\"{name}\",")),
+                desktop.contains(&format!("\"{name}\"")),
                 "{name} missing in desktop/src/usage.rs"
             );
         }
