@@ -433,6 +433,7 @@ export function doCancelCheckout(tab) {
       return api("POST", "/items/" + enc(rev.item_number) + "/revisions/" + enc(rev.code) + "/cancel-checkout");
     }).then(function () {
       toast("Released the check-out of " + rev.item_number + "/" + rev.code);
+      call("usage_count", { action: "cancel_checkout" }).catch(function () {});
       // the unchanged local files become read-only again
       call("workspace_status", { project: rev.project_code, item: rev.item_number, code: rev.code }).catch(function () {}).then(function () {
         reloadActive(); refreshWorklistCount();
@@ -744,6 +745,7 @@ export function releaseDialog(tab) {
         }).then(function () {
           setStatus("");
           d.close();
+          call("usage_count", { action: "release" }).catch(function () {});
           toast(number + (submitNow.checked ? " submitted for review – " + rev.item_number + "/" + rev.code + " is now In Review" : " created as draft"));
           tab.data = null;
           refreshWorklistCount();
