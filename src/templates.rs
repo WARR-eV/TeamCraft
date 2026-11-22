@@ -1710,8 +1710,10 @@ mod tests {
             })),
         );
         assert!(html.contains("class=\"lock-graph\"") && html.contains("lg-holder lg-inactive"));
+        // (MiniJinja escapes `/` in text as `&#x2f;`)
         assert!(
-            html.contains("Erika &lt;x&gt;") && html.contains("PRT-000001/A Bracket &lt;b&gt;")
+            html.contains("Erika &lt;x&gt;")
+                && html.contains("PRT-000001&#x2f;A Bracket &lt;b&gt;")
         );
         assert!(html.contains("href=\"/revisions/44444444-4444-4444-8444-444444444444\""));
         assert!(
