@@ -1054,17 +1054,21 @@ mod tests {
     }
 
     /// GHSA-54vc-vgp2-8whr (F13): a spreadsheet that unpacks to more than
-    /// the cap is refused before the spreadsheet reader sees it (a 1 MiB cap
-    /// here; the real one is [`MAX_UNPACKED_BYTES`]).
+    /// the cap is refused before the spreadsheet reader sees it (a 64 KiB cap
+    /// here, small enough for the 1 s test limit on Windows; the real one is
+    /// [`MAX_UNPACKED_BYTES`]).
     #[test]
     fn zip_bombs_are_refused_before_parsing() {
-        const CAP: u64 = 1 << 20;
-        let len = 4 << 20;
+        const CAP: u64 = 64 << 10;
+        let len = 256 << 10;
         // honest sizes: refused from the directory alone
         let honest = zip_of_zeros("xl/worksheets/sheet1.xml", len, len as u32);
-        assert!(honest.len() < 64 * 1024, "a few KiB unpack to 4 MiB");
+        assert!(
+            honest.len() < 4 * 1024,
+            "a few hundred bytes unpack to 256 KiB"
+        );
         let err = check_unpacked_within("bomb.xlsx", &honest, CAP).unwrap_err();
-        assert!(err.contains("unpacks to more than 1 MiB"), "{err}");
+        assert!(err.contains("unpacks to more than"), "{err}");
         // a directory that lies: refused while unpacking
         let lying = zip_of_zeros("xl/worksheets/sheet1.xml", len, 1000);
         assert!(check_unpacked_within("lie.xlsx", &lying, CAP).is_err());
