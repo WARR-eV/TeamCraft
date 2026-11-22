@@ -257,6 +257,18 @@ const NOT_AUDITED: &[(&str, &str)] = &[
         "request_digests::spawn",
         "starts the background task of request_digests::run_once",
     ),
+    (
+        "usage::record",
+        "an anonymous desktop usage report (#383): no actor, nothing names the user",
+    ),
+    (
+        "usage::overview",
+        "a read for the admin page; its only write creates the one usage_sharing row (default off)",
+    ),
+    (
+        "usage::spawn",
+        "housekeeping of old usage reports and the stamp of what was shared last; no actor",
+    ),
 ];
 
 #[derive(Debug, Default, Clone)]

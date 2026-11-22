@@ -17,7 +17,6 @@ mod attributes;
 mod auth_pages;
 mod bom;
 mod branding;
-mod usage;
 mod changes;
 mod dashboard;
 mod desktop;
@@ -35,6 +34,7 @@ mod revisions;
 mod season;
 mod simulations;
 mod uploads;
+mod usage;
 mod webhooks;
 
 // posted by the identity provider: mounted outside the cross-site guard

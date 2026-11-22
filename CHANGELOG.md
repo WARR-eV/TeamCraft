@@ -104,6 +104,10 @@ see the notices in the README.
 
 ### Fixed
 
+- **CI on `main` is green again.** The usage statistics page (#383) gives
+  its table headers a `scope` (accessibility check), its background and
+  reporting functions are named in the audit guard's `NOT_AUDITED` list with
+  their reasons, and the web module list is in rustfmt's order.
 - **Desktop: a slow STEP export no longer holds the check-in hostage**
   (#342). With *Create STEP exports* ticked, the files are uploaded first
   (parked), then exported, then checked in with the STEP files. *Cancel*
