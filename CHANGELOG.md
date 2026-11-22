@@ -240,6 +240,19 @@ see the notices in the README.
   colour – a bar at its left edge and a light tint of the row – whoever holds
   the lock; the text colour is unchanged.
 
+### Documentation
+
+- **Research page *CAD add-ins: Inventor and Siemens NX first*** (#425):
+  extension mechanism and runtime (Inventor 2025–2026 on .NET 8, 2027 on
+  .NET 10 templates; NX Open journals vs signed startup applications and the
+  author licence), events, UI, licences (vendor assemblies referenced, never
+  redistributed), build and tests (a CAD-independent core with a fake host,
+  FreeCAD as the reference add-in for CI), install and update (*Settings →
+  CAD add-ins*, a `CadAddins` policy). Decision: an Inventor MVP, an NX MVP
+  after the licence check, both talking to the desktop app over per-user
+  local IPC (protocol `teamcraft.cad` v1, no token in the add-in, requests are
+  untrusted intents). Nothing of it is built yet.
+
 ## [0.2.11] - 2026-11-21
 
 ### Added

@@ -665,9 +665,13 @@ real files and belong to section 3 once such files are at hand.
 
 **All CAD programs**
 
-- [ ] (research first) CAD add-ins through the official APIs (Inventor API, Solid Edge API, SolidWorks API, NX Open):
+- [x] (research first) CAD add-ins through the official APIs (Inventor API, Solid Edge API, SolidWorks API, NX Open):
   check out, "save and check in", "get latest" inside the CAD program – also to report conflicts when a file is opened
-  inside the CAD program (the desktop app already asks before opening)
+  inside the CAD program (the desktop app already asks before opening). Research page *CAD add-ins: Inventor and
+  Siemens NX first* (#425): Inventor MVP (.NET 8, registry-free `.addin`), NX MVP after the author-licence check, both
+  over per-user local IPC to the desktop app (protocol `teamcraft.cad` v1); SOLIDWORKS/Solid Edge after Inventor,
+  FreeCAD as the reference add-in for CI. Left: the follow-up issues *Inventor add-in MVP* and *NX add-in MVP* (desktop
+  listener, shared core with a fake host, *Settings → CAD add-ins*, `CadAddins` policy, threat-model entry)
 - [ ] Check-in takes dependent files along automatically (from the reference scan)
 - [ ] Create viewables (STEP) in the background without blocking the check-in
 - [ ] Sync file properties with item attributes: part number, name, material, mass
@@ -716,7 +720,10 @@ real files and belong to section 3 once such files are at hand.
 **Siemens NX**
 
 - [ ] (research first) How other PLMs connect NX (native vs. through a PLM integration), licences (student/academic) and
-  what is feasible for an open-source project
+  what is feasible for an open-source project – the add-in part is answered in the research page *CAD add-ins: Inventor
+  and Siemens NX first* (#425: NX Open journals vs signed startup applications, author licence, vendor assemblies never
+  redistributed). Left: whether the team's academic NX licence includes an NX Open author licence (checked on a licensed
+  machine, recorded on that page)
 - [ ] Folder import for the master model concept: the drawing `*_dwg*.prt` belongs into the item of the model
 - [ ] Test the BOM import with real NX BOM exports
 - [ ] STEP export through the local NX (NX Open / journal), on Windows and Linux
@@ -763,7 +770,8 @@ needs an issue with a reason first (see *Direction*).
 - [ ] Central conversion queue for previews and derivatives with retries and a failure view
 - [ ] 3D preview of more native formats; IFC geometry in the viewer
 - [ ] PMI in the 3D preview, also PMI authored on assemblies
-- [ ] Native CAD add-ins (see the research entry in section 4): check in/out, search, revise, BOM and references inside
+- [ ] Native CAD add-ins (research page *CAD add-ins: Inventor and Siemens NX first*, #425; Inventor and NX MVPs are
+  follow-up issues): check in/out, search, revise, BOM and references inside
   SolidWorks, Inventor, Solid Edge (occurrence semantics), Creo, CATIA, AutoCAD (xrefs) and Revit/BIM; NX comparable
   to a managed mode (Save As, revise, structure, numbering)
 - [ ] ECAD/EPLAN integration: electrical design files and their BOM connectivity as first-class data, not
