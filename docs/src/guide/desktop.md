@@ -527,6 +527,20 @@ locks not refreshed for three minutes are ignored). The check-in dialog warns
 about such files: changes not saved in SolidCraft are not checked in. You can
 check in anyway.
 
+**TeamCraft inside SolidCraft.** The TeamCraft plugin for SolidCraft
+(`plugins/solidcraft`) shows a design's TeamCraft item, checks it before
+check-in and links it to an item – offline, from the design itself. With the
+desktop app running it also shows the live state (*TeamCraft live status*:
+checked out by whom, local changes, whether the app reaches the server) and
+sends requests to the app: *Check out in TeamCraft*, *Check in with
+TeamCraft*, *Open in TeamCraft*. SolidCraft plugins have no network, so the
+two share the folder `.teamcraft/solidcraft` in your working folder; grant it
+to the plugin as `teamcraft` (reading and writing) when you install it. The
+app asks before a check-out the plugin requests and opens its usual check-in
+dialog for a check-in – a request never acts on its own. When the app is not
+running, the plugin says so and shows what the app knew when it last ran; a
+request waits 10 minutes for the app to start.
+
 **Read-only rule.** Files you have **not** checked out are read-only on disk (the read-only attribute on Windows, no
 write permission on Linux and macOS).
 CAD programs then open them read-only, and nobody edits a file that cannot be

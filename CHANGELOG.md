@@ -15,6 +15,19 @@ see the notices in the README.
 
 ### Added
 
+- **SolidCraft plugin ↔ desktop app** (research page *Talking to the desktop
+  app from inside SolidCraft*). SolidCraft plugins have no network, so the
+  plugin and the desktop app share `<working folder>/.teamcraft/solidcraft`:
+  the app writes a heartbeat and the state of each revision it shows, the
+  plugin's new entries read it and leave requests – *TeamCraft live status*,
+  *Check out in TeamCraft*, *Check in with TeamCraft*, *Open in TeamCraft*.
+  The app checks each request (a revision of its working folder, a known
+  action, fresh, small, a regular file), asks before a check-out and opens its
+  check-in dialog for a check-in. The app not running is never an error: the
+  plugin says so and shows what the app last knew; a request waits 10 minutes.
+  The old entries need no folder. 14 cases in `plugins/solidcraft/tests/` run
+  on the real SolidCraft (`solidcraft-cli plugin test --require-cases`), and
+  `build.sh` also makes the `.zip` SolidCraft installs.
 - **SolidCraft designs show their picture** (#364). The preview image of a
   `.sc` design is the PNG SolidCraft embeds when saving with its model, read
   from the ZIP container with size and CRC checks and shown only when its key

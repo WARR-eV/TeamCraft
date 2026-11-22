@@ -27,6 +27,7 @@ import { openAbout, openSettings, preferredLanguage, signOut } from "./settings.
 import { loadLanguage } from "/static/shared/js/i18n.js";
 import { reportDialog } from "./report.js";
 import { checkCrashReports, initCrashWatch } from "./crash.js";
+import { onSolidcraftRequest } from "./solidcraft-bridge.js";
 
 // ======================================================================
 // Zoom: Ctrl + mouse wheel (trackpads: pinch), Ctrl/Cmd + + / - / 0
@@ -142,6 +143,8 @@ export function boot() {
   TAURI.event.listen("workspace-progress", function (e) { onGetProgress(e.payload); });
   // a parallel instance found dead after the start (src/crash.rs)
   TAURI.event.listen("crash-reports", function () { checkCrashReports(); });
+  // the SolidCraft plugin asks to open, check out or check in a revision (src/scbridge.rs)
+  TAURI.event.listen("solidcraft-request", function (e) { onSolidcraftRequest(e.payload); });
   $("status-get-cancel").addEventListener("click", function () {
     $("status-get-text").textContent = "Stopping …";
     call("workspace_cancel").catch(function () {});

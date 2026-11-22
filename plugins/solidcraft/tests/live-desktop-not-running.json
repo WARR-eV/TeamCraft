@@ -1,0 +1,1 @@
+{"entry": "live", "design": "linked.sc", "expect": {"reply": {"result": {"live": false, "desktop_running": false}}}}

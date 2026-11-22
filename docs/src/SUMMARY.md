@@ -99,3 +99,4 @@
     - [A sandboxed extension layer](research/extension-layer.md)
     - [SolidCraft designs](research/solidcraft-design.md)
     - [3D preview of SolidCraft designs without an export](research/solidcraft-3d-preview.md)
+    - [Talking to the desktop app from inside SolidCraft](research/solidcraft-bridge.md)

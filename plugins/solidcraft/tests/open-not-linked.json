@@ -1,0 +1,1 @@
+{"entry": "open", "expect": {"error": "unsupported", "message": "not linked"}}

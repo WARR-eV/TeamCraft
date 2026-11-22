@@ -731,8 +731,12 @@ real files and belong to section 3 once such files are at hand.
 - [x] Desktop: item number and revision written into the design properties (#369); left: automatically at check-out (a setting), link paths after a rename
 - [x] Desktop: designs open in SolidCraft (lock file) shown, warning at check-in (#370)
 - [x] (research first) 3D preview from the `.sc` file alone (#371): research page *3D preview of SolidCraft designs without an export*; left: read `cache/preview.bin` when present, an SCBREP05 reader later
-- [x] TeamCraft plugin for SolidCraft (`plugins/solidcraft`): status, check before check-in, link/unlink; left: tested
-  in a real SolidCraft, a release package, a *Check in* hand-over to the desktop app
+- [x] TeamCraft plugin for SolidCraft (`plugins/solidcraft`): status, check before check-in, link/unlink; tested
+  in SolidCraft 0.45 (`tests/*.json`, `solidcraft-cli plugin test`); left: a release package
+- [x] (research first) Plugin ↔ desktop app through a shared folder (research page *Talking to the desktop app from
+  inside SolidCraft*): live status, check-out, check-in, open; left: the desktop side tried on a real machine, a live
+  badge once SolidCraft has panels, the control channel (open and unsaved designs), installing the plugin with its
+  folder from the desktop app
 
 ### 5. Feature demand (backlog)
 

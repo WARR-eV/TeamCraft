@@ -1,0 +1,1 @@
+{"entry": "status", "design": "linked.sc", "expect": {"reply": {"result": {"managed": true, "item_number": "PRT-000042", "revision": "A", "part_number_matches": true}}}}

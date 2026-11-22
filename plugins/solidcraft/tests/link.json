@@ -1,0 +1,1 @@
+{"entry": "link", "params": {"item_number": "PRT-000043", "revision": "B"}, "expect": {"reply": {"result": {"linked": true, "item_number": "PRT-000043"}}}}

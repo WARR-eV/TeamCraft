@@ -20,7 +20,8 @@ use tokio::sync::Notify;
 use crate::{
     acp, addfiles,
     api::{self, Api, ApiError, Transfer},
-    bomimport, cadexport, cadlaunch, folderimport, layout, localserver, policy, profiles, scprops,
+    bomimport, cadexport, cadlaunch, folderimport, layout, localserver, policy, profiles, scbridge,
+    scprops,
     settings::{self, Settings, TokenStorage},
     signin, update, workspace, AppState,
 };
@@ -793,14 +794,15 @@ pub async fn workspace_status(
     code: String,
 ) -> CmdResult<workspace::Status> {
     let api = signed_in_api(&state)?;
-    workspace::status(
-        &api,
-        &workspace_root(&app, &state),
-        project.as_deref(),
-        &item,
-        &code,
-    )
-    .await
+    let root = workspace_root(&app, &state);
+    let status = workspace::status(&api, &root, project.as_deref(), &item, &code).await?;
+    // the SolidCraft plugin shows it (bridge folder, src/scbridge.rs); a
+    // failed write only means the plugin shows older state
+    if root.is_dir() {
+        let value = scbridge::state(scbridge::now_secs(), &item, &code, &status);
+        let _ = scbridge::write(&root, &scbridge::state_file(&item, &code), &value);
+    }
+    Ok(status)
 }
 
 /// Check in the chosen files (new versions) and release the lock.
@@ -2665,4 +2667,43 @@ pub fn set_report_url(state: State<'_, AppState>, url: String) -> CmdResult<()> 
     };
     update_settings(&state, |s| s.report_url = value)?;
     Ok(())
+}
+
+/// The bridge to the SolidCraft plugin (src/scbridge.rs), for as long as the
+/// app runs: every 5 s the plugin's requests are picked up and handed to the
+/// user interface (event `solidcraft-request`); every 30 s the heartbeat says
+/// that the app runs and whether it reaches the server. Only for a working
+/// folder that exists – the bridge never creates one.
+pub(crate) async fn solidcraft_bridge(app: AppHandle) {
+    let mut tick: u64 = 0;
+    loop {
+        let (root, api) = {
+            let state = app.state::<AppState>();
+            (workspace_root(&app, &state), signed_in_api(&state).ok())
+        };
+        if root.is_dir() {
+            let beat = if tick % 6 == 0 {
+                let reachable = match &api {
+                    Some(api) => api.json(Method::GET, "/me", None).await.is_ok(),
+                    None => false,
+                };
+                Some(scbridge::heartbeat(scbridge::now_secs(), reachable))
+            } else {
+                None
+            };
+            let requests = tokio::task::spawn_blocking(move || {
+                if let Some(beat) = beat {
+                    let _ = scbridge::write(&root, "desktop.json", &beat);
+                }
+                scbridge::take_requests(&root, scbridge::now_secs())
+            })
+            .await
+            .unwrap_or_default();
+            for request in requests {
+                let _ = app.emit("solidcraft-request", &request);
+            }
+        }
+        tick = tick.wrapping_add(1);
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    }
 }
