@@ -1,3 +1,6 @@
+      requests: r[0].open_requests || [],
+      // design properties that differ from the revision (#367; older servers: none)
+      propertyMismatches: r[0].property_mismatches || [],
 // SPDX-License-Identifier: MPL-2.0
 // TeamCraft Desktop – Revision tab: overview, files, structure, where used.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
@@ -38,6 +41,8 @@ export function fetchRevision(number, code, onData) {
     var data = {
       rev: r[0].revision, files: r[0].files, bom: r[0].bom, changes: r[0].changes, item: r[1].item, revisions: r[1].revisions,
       requests: r[0].open_requests || [],
+      // design properties that differ from the revision (#367; older servers: none)
+      propertyMismatches: r[0].property_mismatches || [],
       watching: !!r[1].watching,
       refs: r[2] || { outgoing: [], incoming: [], files: [], file_referrers: [], impacts: [] },
       // my check-out: are there local changes? (decides the primary action)
@@ -493,11 +498,15 @@ export function revFiles(tab, el) {
   var groups = groupByFamily(d.files, state.me && state.me.preferred_cad);
   var rowOf = function (f) {
     var fmt = previewFormat(f);
+    // design properties read from a SolidCraft design (#367): data from the file
+    var props = f.properties_line
+      ? h("div.small.muted", { text: f.properties_line, title: "Design properties read from the file – not the item's attributes" })
+      : null;
     return {
       cells: [
         f.format_info && f.format_info.thumbnail
-          ? h("span.file-cell", null, [thumbImage(f), h("span", null, [f.filename, " ", formatChip(f)])])
-          : h("span", null, [f.filename, " ", formatChip(f)]),
+          ? h("span.file-cell", null, [thumbImage(f), h("span", null, [f.filename, " ", formatChip(f), props])])
+          : h("span", null, [f.filename, " ", formatChip(f), props]),
         h("span.badge", { text: "v" + f.version, title: "Version " + f.version + " – " + VERSION_HELP + " SHA-256 " + f.sha256 }),
         fmtSize(f.size_bytes),
         fmtDate(f.uploaded_at) + " · " + f.uploaded_by_name,
@@ -522,8 +531,30 @@ export function revFiles(tab, el) {
     n ? h("details.other-formats", null, [
       h("summary", { text: n + " file" + (n === 1 ? "" : "s") + " in other CAD formats (" + groups.families.join(", ") + ")" }),
       table(columns(), groups.other.map(rowOf), { numeric: [2] })
-    ]) : null
+    ]) : null,
+    propertyMismatchNotice(d.propertyMismatches)
   ]));
+}
+
+/** The notice that a SolidCraft design's properties differ from the
+ *  revision (`property_mismatches` of GET …/revisions/{code}, #367) – the
+ *  same hint as the web revision page; nothing is changed automatically.
+ *  Values come from the file: shown as text only. */
+export function propertyMismatchNotice(list) {
+  if (!Array.isArray(list) || !list.length) return null;
+  var items = [];
+  list.forEach(function (f) {
+    (f.mismatches || []).forEach(function (x) {
+      items.push(h("li", null, [h("span.mono", { text: f.filename }), ": " + x.label + " ",
+        h("span.mono", { text: x.file }), " ≠ " + x.item_label + " ", h("span.mono", { text: x.item })]));
+    });
+  });
+  if (!items.length) return null;
+  return h("div.notice", { role: "note" }, [
+    h("strong", { text: "Design properties differ from this revision" }),
+    " – read from the files, nothing is changed automatically. Edit the revision or the design if they should agree.",
+    h("ul.small", null, items)
+  ]);
 }
 
 /**

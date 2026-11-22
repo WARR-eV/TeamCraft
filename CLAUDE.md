@@ -72,10 +72,6 @@
 
 ## Git rules
 
-**Pull requests that still need work are opened as drafts** – work in progress, CI not yet
-green, or open questions. Mark a PR *ready for review* only when the work is done, the
-documentation is in it and its CI is green; a draft cannot be merged by accident.
-
 Always add, commit, and **push** after each successful and test-passing
 functionality implementation. If a push is rejected because the remote moved,
 tell the user immediately and ask them to run `! git pull --no-rebase && git push`
@@ -112,6 +108,8 @@ src/services/      business logic – the only code that writes to the database
                     notifications.rs: in-app notifications, watch lists, settings – created in the event's transaction;
                     imports.rs: BOM import – one plan for preview and import, one transaction; staged_imports for the web flow;
                     insights.rs: read-only BOM health check and duplicate files;
+                    thumbnails.rs: the main thumbnail of a revision – one rule (revision page, lists) and one
+                    batched query per list page (#420);
                     file_check.rs: duplicates of new files – read-only check per group and the upload guard (#359);
                     attributes.rs: custom attribute definitions (admins), values per revision in revisions.attributes;
                     mass_properties.rs: material library, mass settings of revisions/files, mass/CG/inertia roll-up;
@@ -172,7 +170,8 @@ src/nxasm.rs       NX assemblies: components + placements from /Root/FastLoad/St
                    services/assemblies.rs composes the assembly preview from the parts' previews (found by file name)
 src/fusion.rs      Fusion design archives (.f3d): ZIP with Zstandard entries (ruzstd), size/CRC-checked; sample archives for tests
 src/scdesign.rs    SolidCraft designs (.sc): ZIP design container (bounded, size/CRC-checked, unknown versions = nothing found), embedded thumbnail,
-                   document of ZIP or JSON designs, linked designs with placement counts (cadrefs)
+                   document of ZIP or JSON designs, linked designs with placement counts (cadrefs),
+                   design properties (metadata text keys → file_versions.properties, mismatches with the item, #367)
 src/scbom.rs       BOM of a SolidCraft assembly from its design (components, placements, BOM types) → BomTable for the BOM import
 src/swpart.rs      SOLIDWORKS 2015+ section container: Deflate sections (bounded, CRC-checked), PreviewPNG, component tree (COMPINSTANCETREE):
                    referenced files and placements (assembly previews, also via services/assemblies.rs)
@@ -219,6 +218,7 @@ deploy/            production Docker install: docker-compose.yml (teamcraft + po
 desktop/           TeamCraft Desktop (Tauri 2, own Cargo project – never part of the server build); UI in desktop/ui/js
                    (plain ES modules, no build step): graph.js = the *Graph* tab (navigable BOM/reference graph, SVG +
                    HTML card layer, checked by scripts/desktop-graph-check.mjs), files-view.js = Home *Files* view,
+                   list-thumbs.js = row pictures of Home and the search (lazy, IntersectionObserver, #420),
                    crash.js = crash reports; desktop/src/workspace.rs + layout.rs = working folder, park, local changes;
                    new-files.js + desktop/src/newfiles.rs = new items from local files, worklist *New on this computer* (#359);
                    desktop/src/localserver.rs = *Try TeamCraft on this computer* (starts the bundled teamcraft-server local);

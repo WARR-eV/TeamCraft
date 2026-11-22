@@ -420,9 +420,21 @@ pub async fn create(State(st): State<AppState>, ctx: WebCtx, req: Request) -> Ap
         Err(e) => return Err(e),
     };
     let mut form: NewItemForm = serde_json::from_value(json!(received.fields)).unwrap_or_default();
+    // Empty fields are filled from the files: the description of a
+    // SolidCraft design (its design properties, #367), else the file name.
+    let design_description = received
+        .uploads
+        .iter()
+        .find_map(|u| u.properties.as_ref().and_then(|p| p.description.clone()));
     if form.name.trim().is_empty() {
         if let Some(first) = received.uploads.first() {
-            form.name = file_stem(&first.filename).to_string();
+            form.name = design_description
+                .clone()
+                .unwrap_or_else(|| file_stem(&first.filename).to_string());
+        }
+    } else if form.description.trim().is_empty() {
+        if let Some(description) = design_description {
+            form.description = description;
         }
     }
     // A basis the user may not read is a plain 404 (nothing is echoed).

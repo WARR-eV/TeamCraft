@@ -469,25 +469,14 @@ pub async fn find(
         .collect())
 }
 
-/// Per revision the first file with an embedded preview image.
+/// Per revision the file of its main thumbnail (the rule of
+/// `services::thumbnails`, the same picture as in the lists).
 async fn thumbnails(pool: &PgPool, revision_ids: &[Uuid]) -> AppResult<HashMap<Uuid, Uuid>> {
-    if revision_ids.is_empty() {
-        return Ok(HashMap::new());
-    }
-    let rows = sqlx::query_as::<_, (Uuid, Uuid, Option<String>)>(
-        "SELECT revision_id, id, format FROM files
-         WHERE revision_id = ANY($1) ORDER BY lower(filename)",
-    )
-    .bind(revision_ids)
-    .fetch_all(pool)
-    .await?;
-    let mut out = HashMap::new();
-    for (revision_id, file_id, format) in rows {
-        if format.as_deref().is_some_and(crate::thumbnail::supports) {
-            out.entry(revision_id).or_insert(file_id);
-        }
-    }
-    Ok(out)
+    Ok(super::thumbnails::main_for_revisions(pool, revision_ids)
+        .await?
+        .into_iter()
+        .map(|(revision_id, thumb)| (revision_id, thumb.file_id))
+        .collect())
 }
 
 /// Similar parts of a revision: picks its 3D file (or `filename`), gets
