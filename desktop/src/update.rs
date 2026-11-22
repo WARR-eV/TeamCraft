@@ -104,6 +104,324 @@ pub async fn latest_release() -> Result<Option<String>, String> {
     Ok(release["tag_name"].as_str().and_then(tag_version))
 }
 
+// ------------------------------------------------- update window (#377)
+
+/// *Remind me later* hides the notice for three days.
+pub const REMIND_LATER_SECS: u64 = 3 * 24 * 60 * 60;
+/// Longest release notes shown (characters).
+const MAX_NOTES: usize = 20_000;
+/// Largest download accepted.
+pub const MAX_DOWNLOAD: u64 = 1024 * 1024 * 1024;
+/// Every asset is downloaded from this repository's releases only.
+const DOWNLOAD_PREFIX: &str = "https://github.com/WARR-eV/TeamCraft/releases/download/";
+/// The release API of one version.
+const RELEASE_BY_TAG_API: &str = "https://api.github.com/repos/WARR-eV/TeamCraft/releases/tags/v";
+/// The checksum list every release publishes.
+pub const SUMS_FILE: &str = "SHA256SUMS.txt";
+
+/// Should the notice of `latest` show now? Only for a newer version that
+/// was not skipped (*Skip this version*) and not while *Remind me later*
+/// runs (`remind_until`, seconds since the epoch).
+pub fn notice_due(
+    latest: &str,
+    current: &str,
+    skipped: Option<&str>,
+    remind_until: Option<u64>,
+    now: u64,
+) -> bool {
+    is_newer(latest, current) && skipped != Some(latest) && remind_until.is_none_or(|t| now >= t)
+}
+
+/// How this copy of the app was installed – what *Update now* can do.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum InstallKind {
+    /// Windows MSI (Program Files): download, verify, start the installer.
+    WindowsMsi,
+    /// Windows setup.exe (per user, AppData): download, verify, start it.
+    WindowsSetup,
+    /// Windows portable zip: download and verify; unpack it yourself.
+    WindowsPortable,
+    /// macOS app: download and verify the `.dmg` and open it.
+    MacDmg,
+    /// Linux AppImage: download and verify next to the old one.
+    AppImage,
+    /// Flatpak, `.deb`, `.rpm`: the package manager updates the app.
+    Package,
+    /// Built from source or unknown: the release page only.
+    Other,
+}
+
+/// The install kind from the operating system, the app's own path and the
+/// environment (`APPIMAGE`, `FLATPAK_ID`).
+pub fn install_kind(os: &str, exe: &str, appimage: bool, flatpak: bool) -> InstallKind {
+    let exe_lower = exe.replace('\\', "/").to_ascii_lowercase();
+    match os {
+        "windows" if exe_lower.contains("/program files") => InstallKind::WindowsMsi,
+        "windows" if exe_lower.contains("/appdata/local/") => InstallKind::WindowsSetup,
+        "windows" if exe_lower.contains("/target/") => InstallKind::Other,
+        "windows" => InstallKind::WindowsPortable,
+        "macos" if exe.contains(".app/Contents/MacOS/") => InstallKind::MacDmg,
+        "linux" if flatpak => InstallKind::Package,
+        "linux" if appimage => InstallKind::AppImage,
+        "linux" if exe.starts_with("/usr/") || exe.starts_with("/opt/") => InstallKind::Package,
+        _ => InstallKind::Other,
+    }
+}
+
+/// The install kind of this running app.
+pub fn this_install() -> InstallKind {
+    let exe = std::env::current_exe()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    install_kind(
+        std::env::consts::OS,
+        &exe,
+        std::env::var_os("APPIMAGE").is_some(),
+        std::env::var_os("FLATPAK_ID").is_some(),
+    )
+}
+
+/// The release file for this install: the name the release workflow gives
+/// it (`TeamCraft_0.3.0_x64_en-US.msi`, `TeamCraft_0.3.0_x64-setup.exe`,
+/// `TeamCraft_0.3.0_x64_portable.zip`, `TeamCraft_0.3.0_aarch64.dmg`,
+/// `TeamCraft_0.3.0_amd64.AppImage`; the *with local server* downloads as
+/// `TeamCraft-with-local-server_…`).
+pub fn pick_asset<'a>(
+    kind: InstallKind,
+    arch: &str,
+    version: &str,
+    local_server: bool,
+    names: &'a [String],
+) -> Option<&'a str> {
+    let prefix = if local_server {
+        format!("TeamCraft-with-local-server_{version}_")
+    } else {
+        format!("TeamCraft_{version}_")
+    };
+    let win = match arch {
+        "x86_64" => "x64",
+        "aarch64" => "arm64",
+        _ => return None,
+    };
+    names
+        .iter()
+        .map(String::as_str)
+        .filter(|n| n.starts_with(&prefix))
+        .find(|n| {
+            let rest = &n[prefix.len()..];
+            match kind {
+                InstallKind::WindowsMsi => {
+                    rest.starts_with(&format!("{win}_")) && rest.ends_with(".msi")
+                }
+                InstallKind::WindowsSetup => rest == format!("{win}-setup.exe"),
+                InstallKind::WindowsPortable => rest == format!("{win}_portable.zip"),
+                InstallKind::MacDmg => arch == "aarch64" && rest == "aarch64.dmg",
+                InstallKind::AppImage => arch == "x86_64" && rest == "amd64.AppImage",
+                InstallKind::Package | InstallKind::Other => false,
+            }
+        })
+}
+
+/// The command that updates a package installation, for the update window.
+pub fn package_hint(flatpak: bool) -> &'static str {
+    if flatpak {
+        "flatpak update io.github.rudalabs.teamcraft"
+    } else {
+        "Update TeamCraft with your package manager (apt, dnf, zypper …) or install the new .deb/.rpm from the release page."
+    }
+}
+
+/// The SHA-256 of `name` in a `sha256sum` list (`<hex>  <name>` or
+/// `<hex> *<name>`); `None` without exactly one well-formed line for it.
+pub fn checksum_of(sums: &str, name: &str) -> Option<String> {
+    let mut found = None;
+    for line in sums.lines() {
+        let line = line.trim_end_matches('\r');
+        let Some((hex, file)) = line.split_once(' ') else {
+            continue;
+        };
+        let file = file.trim_start_matches(' ').trim_start_matches('*');
+        if file != name {
+            continue;
+        }
+        if hex.len() != 64 || !hex.bytes().all(|b| b.is_ascii_hexdigit()) || found.is_some() {
+            return None;
+        }
+        found = Some(hex.to_ascii_lowercase());
+    }
+    found
+}
+
+/// A release as the update window shows it.
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct Release {
+    pub version: String,
+    /// The release notes (plain text, cut at [`MAX_NOTES`] characters).
+    pub notes: String,
+    /// Asset name → download address (this repository's releases only).
+    #[serde(skip)]
+    pub assets: Vec<(String, String)>,
+}
+
+/// The release of one version from the GitHub release JSON; assets with an
+/// address outside this repository's downloads are left out.
+pub fn release_of(json: &serde_json::Value) -> Option<Release> {
+    let version = tag_version(json["tag_name"].as_str()?)?;
+    let notes: String = json["body"]
+        .as_str()
+        .unwrap_or("")
+        .chars()
+        .take(MAX_NOTES)
+        .collect();
+    let assets = json["assets"]
+        .as_array()
+        .map(|list| {
+            list.iter()
+                .filter_map(|a| {
+                    let name = a["name"].as_str()?;
+                    let url = a["browser_download_url"].as_str()?;
+                    let expected = format!("{DOWNLOAD_PREFIX}v{version}/{name}");
+                    (url == expected).then(|| (name.to_string(), url.to_string()))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    Some(Release {
+        version,
+        notes,
+        assets,
+    })
+}
+
+fn client(redirects: bool) -> Result<reqwest::Client, String> {
+    let policy = if redirects {
+        // GitHub's downloads answer with a redirect to its storage host:
+        // followed over https only; the checksum proves the content
+        reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.url().scheme() == "https" && attempt.previous().len() < 5 {
+                attempt.follow()
+            } else {
+                attempt.stop()
+            }
+        })
+    } else {
+        reqwest::redirect::Policy::none()
+    };
+    reqwest::Client::builder()
+        .user_agent(concat!("TeamCraft-Desktop/", env!("CARGO_PKG_VERSION")))
+        .connect_timeout(TIMEOUT)
+        .redirect(policy)
+        .build()
+        .map_err(|e| e.to_string())
+}
+
+/// The release of `version` from GitHub (notes and assets).
+pub async fn release(version: &str) -> Result<Release, String> {
+    let version = tag_version(version).ok_or("not a version")?;
+    let response = client(false)?
+        .get(format!("{RELEASE_BY_TAG_API}{version}"))
+        .header("Accept", "application/vnd.github+json")
+        .timeout(TIMEOUT)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !response.status().is_success() {
+        return Err(format!("GitHub answered {}", response.status()));
+    }
+    let json: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
+    release_of(&json).ok_or_else(|| "GitHub sent an unreadable release.".to_string())
+}
+
+/// Downloads `name` of `release` into `dir` and checks it against the
+/// release's [`SUMS_FILE`]: a file that does not match, or has no line
+/// there, is deleted and nothing changes. Returns the verified file.
+pub async fn download_verified(
+    release: &Release,
+    name: &str,
+    dir: &std::path::Path,
+) -> Result<std::path::PathBuf, String> {
+    use sha2::{Digest, Sha256};
+    use tokio::io::AsyncWriteExt;
+    let url_of = |n: &str| {
+        release
+            .assets
+            .iter()
+            .find(|(a, _)| a == n)
+            .map(|(_, u)| u.clone())
+    };
+    let sums_url =
+        url_of(SUMS_FILE).ok_or("The release has no SHA256SUMS.txt – nothing was downloaded.")?;
+    let url = url_of(name).ok_or_else(|| format!("The release has no {name}."))?;
+    let http = client(true)?;
+    let sums = http
+        .get(&sums_url)
+        .timeout(TIMEOUT)
+        .send()
+        .await
+        .and_then(|r| r.error_for_status())
+        .map_err(|e| format!("SHA256SUMS.txt could not be loaded: {e}"))?
+        .text()
+        .await
+        .map_err(|e| e.to_string())?;
+    let expected = checksum_of(&sums, name).ok_or_else(|| {
+        format!("SHA256SUMS.txt has no checksum for {name} – nothing was downloaded.")
+    })?;
+    tokio::fs::create_dir_all(dir)
+        .await
+        .map_err(|e| e.to_string())?;
+    let target = dir.join(name);
+    let part = dir.join(format!("{name}.part"));
+    let result = async {
+        let mut response = http
+            .get(&url)
+            .send()
+            .await
+            .and_then(|r| r.error_for_status())
+            .map_err(|e| format!("The download failed: {e}"))?;
+        let mut file = tokio::fs::File::create(&part)
+            .await
+            .map_err(|e| e.to_string())?;
+        let mut hash = Sha256::new();
+        let mut size = 0u64;
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|e| format!("The download failed: {e}"))?
+        {
+            size += chunk.len() as u64;
+            if size > MAX_DOWNLOAD {
+                return Err("The download is larger than 1 GiB – stopped.".to_string());
+            }
+            hash.update(&chunk);
+            file.write_all(&chunk).await.map_err(|e| e.to_string())?;
+        }
+        file.flush().await.map_err(|e| e.to_string())?;
+        drop(file);
+        verify_digest(&hex::encode(hash.finalize()), &expected, name)
+    }
+    .await;
+    if let Err(e) = result {
+        let _ = tokio::fs::remove_file(&part).await;
+        return Err(e);
+    }
+    tokio::fs::rename(&part, &target)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(target)
+}
+
+/// The downloaded file's SHA-256 must be the listed one.
+fn verify_digest(actual: &str, expected: &str, name: &str) -> Result<(), String> {
+    if actual.eq_ignore_ascii_case(expected) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{name} does not match its checksum in SHA256SUMS.txt – it was deleted and nothing was installed."
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -140,5 +458,203 @@ mod tests {
         assert!(!due(Some(1_000), 1_000 + day - 1));
         assert!(due(Some(1_000), 1_000 + day));
         assert!(due(Some(1_000 + day), 1_000), "the clock went back");
+    }
+
+    #[test]
+    fn skipped_and_remind_later() {
+        let now = 1_000_000;
+        assert!(notice_due("0.3.0", "0.2.0", None, None, now));
+        assert!(
+            !notice_due("0.3.0", "0.2.0", Some("0.3.0"), None, now),
+            "skipped"
+        );
+        assert!(
+            notice_due("0.3.1", "0.2.0", Some("0.3.0"), None, now),
+            "a newer one shows again"
+        );
+        let later = now + REMIND_LATER_SECS;
+        assert!(
+            !notice_due("0.3.0", "0.2.0", None, Some(later), now + 10),
+            "remind me later"
+        );
+        assert!(
+            notice_due("0.3.0", "0.2.0", None, Some(later), later),
+            "three days on"
+        );
+        assert!(!notice_due("0.2.0", "0.2.0", None, None, now));
+    }
+
+    #[test]
+    fn install_kinds() {
+        use InstallKind::*;
+        assert_eq!(
+            install_kind(
+                "windows",
+                r"C:\Program Files\TeamCraft\TeamCraft.exe",
+                false,
+                false
+            ),
+            WindowsMsi
+        );
+        assert_eq!(
+            install_kind(
+                "windows",
+                r"C:\Users\kim\AppData\Local\TeamCraft\teamcraft-desktop.exe",
+                false,
+                false
+            ),
+            WindowsSetup
+        );
+        assert_eq!(
+            install_kind(
+                "windows",
+                r"D:\Tools\TeamCraft_0.2.9_x64_portable\TeamCraft.exe",
+                false,
+                false
+            ),
+            WindowsPortable
+        );
+        assert_eq!(
+            install_kind(
+                "macos",
+                "/Applications/TeamCraft.app/Contents/MacOS/teamcraft-desktop",
+                false,
+                false
+            ),
+            MacDmg
+        );
+        assert_eq!(
+            install_kind(
+                "linux",
+                "/tmp/.mount_TeamCr/usr/bin/teamcraft-desktop",
+                true,
+                false
+            ),
+            AppImage
+        );
+        assert_eq!(
+            install_kind("linux", "/usr/bin/teamcraft-desktop", false, false),
+            Package
+        );
+        assert_eq!(
+            install_kind("linux", "/app/bin/teamcraft-desktop", false, true),
+            Package
+        );
+        assert_eq!(
+            install_kind(
+                "linux",
+                "/home/kim/src/desktop/target/debug/teamcraft-desktop",
+                false,
+                false
+            ),
+            Other
+        );
+    }
+
+    #[test]
+    fn the_asset_fits_the_install() {
+        use InstallKind::*;
+        let names: Vec<String> = [
+            "TeamCraft_0.3.0_x64_en-US.msi",
+            "TeamCraft_0.3.0_arm64_en-US.msi",
+            "TeamCraft_0.3.0_x64-setup.exe",
+            "TeamCraft_0.3.0_x64_portable.zip",
+            "TeamCraft_0.3.0_aarch64.dmg",
+            "TeamCraft_0.3.0_amd64.AppImage",
+            "TeamCraft-with-local-server_0.3.0_x64-setup.exe",
+            "SHA256SUMS.txt",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        let pick = |k, arch, local| pick_asset(k, arch, "0.3.0", local, &names);
+        assert_eq!(
+            pick(WindowsMsi, "x86_64", false),
+            Some("TeamCraft_0.3.0_x64_en-US.msi")
+        );
+        assert_eq!(
+            pick(WindowsMsi, "aarch64", false),
+            Some("TeamCraft_0.3.0_arm64_en-US.msi")
+        );
+        assert_eq!(
+            pick(WindowsSetup, "x86_64", false),
+            Some("TeamCraft_0.3.0_x64-setup.exe")
+        );
+        assert_eq!(
+            pick(WindowsSetup, "x86_64", true),
+            Some("TeamCraft-with-local-server_0.3.0_x64-setup.exe")
+        );
+        assert_eq!(pick(WindowsSetup, "aarch64", false), None);
+        assert_eq!(
+            pick(WindowsPortable, "x86_64", false),
+            Some("TeamCraft_0.3.0_x64_portable.zip")
+        );
+        assert_eq!(
+            pick(MacDmg, "aarch64", false),
+            Some("TeamCraft_0.3.0_aarch64.dmg")
+        );
+        assert_eq!(
+            pick(AppImage, "x86_64", false),
+            Some("TeamCraft_0.3.0_amd64.AppImage")
+        );
+        assert_eq!(pick(AppImage, "aarch64", false), None);
+        assert_eq!(pick(Package, "x86_64", false), None);
+        assert_eq!(
+            pick_asset(WindowsMsi, "x86_64", "0.3.1", false, &names),
+            None,
+            "another version"
+        );
+    }
+
+    #[test]
+    fn checksums() {
+        let a = "a".repeat(64);
+        let b = "B".repeat(64);
+        let sums = format!(
+            "{a}  TeamCraft_0.3.0_x64-setup.exe\r\n{b} *TeamCraft_0.3.0_aarch64.dmg\nnot a line\n"
+        );
+        assert_eq!(
+            checksum_of(&sums, "TeamCraft_0.3.0_x64-setup.exe"),
+            Some(a.clone())
+        );
+        assert_eq!(
+            checksum_of(&sums, "TeamCraft_0.3.0_aarch64.dmg"),
+            Some("b".repeat(64))
+        );
+        assert_eq!(
+            checksum_of(&sums, "TeamCraft_0.3.0_x64_en-US.msi"),
+            None,
+            "missing line"
+        );
+        assert_eq!(checksum_of("abc  x.msi\n", "x.msi"), None, "not a SHA-256");
+        assert_eq!(
+            checksum_of(&format!("{a}  x.msi\n{b}  x.msi\n"), "x.msi"),
+            None,
+            "two lines"
+        );
+        assert!(verify_digest(&a, &a.to_uppercase(), "x").is_ok());
+        let err = verify_digest(&a, &b, "x.msi").unwrap_err();
+        assert!(
+            err.contains("does not match") && err.contains("deleted"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn release_assets_come_from_this_repository_only() {
+        let json = serde_json::json!({
+            "tag_name": "v0.3.0", "body": "Notes",
+            "assets": [
+                { "name": "SHA256SUMS.txt", "browser_download_url": "https://github.com/WARR-eV/TeamCraft/releases/download/v0.3.0/SHA256SUMS.txt" },
+                { "name": "evil.msi", "browser_download_url": "https://example.org/evil.msi" },
+                { "name": "TeamCraft_0.3.0_x64-setup.exe", "browser_download_url": "https://github.com/WARR-eV/TeamCraft/releases/download/v0.2.0/TeamCraft_0.3.0_x64-setup.exe" }
+            ]
+        });
+        let r = release_of(&json).unwrap();
+        assert_eq!(r.version, "0.3.0");
+        assert_eq!(r.notes, "Notes");
+        assert_eq!(r.assets.len(), 1);
+        assert_eq!(r.assets[0].0, "SHA256SUMS.txt");
+        assert!(release_of(&serde_json::json!({ "tag_name": "nightly" })).is_none());
     }
 }

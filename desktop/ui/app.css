@@ -480,6 +480,14 @@ tr.row-conflict td:first-child, tr.row-clash td:first-child { box-shadow: inset 
 }
 .node:focus-visible { outline-offset: -2px; }
 .node.selected { background: var(--selected); }
+/* A checked-out row (issue #362): a bar in the lock colour at the left edge
+   and a light tint of it – the same marker in the Files view and
+   the structure tree, whoever holds the lock; the text colour is unchanged. */
+.node.checked-out {
+  box-shadow: inset 3px 0 0 var(--st-lock-other);
+  background: color-mix(in srgb, var(--st-lock-other) 12%, transparent);
+}
+.node.checked-out.selected { background: color-mix(in srgb, var(--st-lock-other) 12%, var(--selected)); }
 .node.selected .label { color: var(--text-muted); }
 .node .twisty { width: 16px; flex: none; color: var(--text-dim); text-align: center; font-size: 10px; }
 .node .ico { width: 16px; flex: none; color: var(--text-dim); text-align: center; font-size: 11px; }
@@ -1308,3 +1316,9 @@ pre.report-log {
 }
 .toast .link { margin-left: 8px; }
 .error-text .link { margin-left: 4px; }
+/* The update window (#377): the release notes as plain text, scrolled. */
+pre.release-notes {
+  max-height: 16rem; overflow: auto; margin: 0; padding: 8px 10px;
+  white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 13px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}

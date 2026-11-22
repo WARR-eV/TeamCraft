@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 
 const source = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../desktop/ui/js/files-view.js");
 const {
-  compareNames, countText, entryIconType, entryName, entryRevision, entryTitle, folderKey,
+  checkedOutClass, compareNames, countText, entryIconType, entryName, entryRevision, entryTitle, folderKey,
   favouriteKey, favouritePath, favouriteSuggestions, groupTotal, mergeEntries, newItemFolder, normalizeFavourite,
   parentFolder, remaining, sortEntries, sortFolders, suggestionKey
 } = await import("data:text/javascript;base64," + Buffer.from(fs.readFileSync(source, "utf8")).toString("base64"));
@@ -180,6 +180,13 @@ test("the folders with an Inventor project file are suggested – at most 3, nev
   assert.deepEqual(favouriteSuggestions({ folders: [] }, "", false), []);
   assert.deepEqual(favouriteSuggestions({ project_folders: "Design" }, "", false), []);
   assert.deepEqual(favouriteSuggestions(null, "", false), []);
+});
+
+test("a checked-out row gets the one marker class, whoever holds the lock (#362)", () => {
+  assert.equal(checkedOutClass(file("a.ipt", { checked_out_by_name: "Ada" })), ".checked-out");
+  assert.equal(checkedOutClass(file("a.ipt", { checked_out_by_name: "You" })), ".checked-out");
+  assert.equal(checkedOutClass(file("a.ipt")), "");
+  assert.equal(checkedOutClass(null), "");
 });
 
 console.log(passed + " tests passed");

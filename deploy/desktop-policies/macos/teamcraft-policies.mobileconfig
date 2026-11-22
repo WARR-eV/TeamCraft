@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: MPL-2.0
+     Example configuration profile for TeamCraft Desktop (#378). Change the
+     values, give both PayloadUUIDs new random UUIDs (uuidgen) and deploy it
+     with your MDM; leave out a key to let users choose. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>PayloadContent</key>
+  <array>
+    <dict>
+      <key>PayloadType</key>
+      <string>io.github.rudalabs.teamcraft</string>
+      <key>PayloadIdentifier</key>
+      <string>org.example.teamcraft.policies.settings</string>
+      <key>PayloadUUID</key>
+      <string>00000000-0000-4000-8000-000000000001</string>
+      <key>PayloadVersion</key>
+      <integer>1</integer>
+      <key>PayloadDisplayName</key>
+      <string>TeamCraft Desktop policies</string>
+      <key>ServerUrl</key>
+      <string>https://plm.example.org</string>
+      <key>AllowOtherServers</key>
+      <integer>0</integer>
+      <key>CheckForUpdates</key>
+      <integer>1</integer>
+      <key>CrashReportPrompt</key>
+      <integer>0</integer>
+      <key>WorkspaceRoot</key>
+      <string>/Users/Shared/CAD</string>
+      <key>OrganizationName</key>
+      <string>Example Lab</string>
+      <key>UsageStatistics</key>
+      <integer>0</integer>
+    </dict>
+  </array>
+  <key>PayloadType</key>
+  <string>Configuration</string>
+  <key>PayloadIdentifier</key>
+  <string>org.example.teamcraft.policies</string>
+  <key>PayloadUUID</key>
+  <string>00000000-0000-4000-8000-000000000002</string>
+  <key>PayloadVersion</key>
+  <integer>1</integer>
+  <key>PayloadDisplayName</key>
+  <string>TeamCraft Desktop</string>
+  <key>PayloadScope</key>
+  <string>System</string>
+</dict>
+</plist>

@@ -16,13 +16,19 @@ export function showConnect(step, error) {
   $("signin-step").classList.toggle("hidden", step !== "signin");
   // "Try TeamCraft on this computer" (downloads with local server only);
   // "starting": the app starts its local server before signing in
-  $("local-server").classList.toggle("hidden", step !== "server" || !state.session.local_server_available);
+  // a server fixed by a policy (#378): prefilled and read-only, no local server
+  var policy = state.session.policy || {};
+  var locked = (policy.fixed || []).indexOf("server") !== -1;
+  $("local-server").classList.toggle("hidden", step !== "server" || !state.session.local_server_available || locked);
   $("local-server-wait").classList.add("hidden");
   $("local-server-start").disabled = false;
   $("local-server-boot").classList.toggle("hidden", step !== "starting");
   $("signin-wait").classList.add("hidden");
   $("signin-browser").disabled = false;
-  if (!$("server-url").value) $("server-url").value = state.session.server_url || "";
+  if (locked) $("server-url").value = policy.server_url;
+  else if (!$("server-url").value) $("server-url").value = state.session.server_url || policy.server_url || "";
+  $("server-url").readOnly = locked;
+  $("server-url").title = locked ? "Set by your organization" : "";
   $("signin-server").textContent = state.session.server_url || "";
   var err = $("connect-error");
   err.textContent = error || "";
