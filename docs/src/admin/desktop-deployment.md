@@ -14,6 +14,7 @@ these *policies*, once at start; nothing about them is sent anywhere
 | `CheckForUpdates`   | switch | `1`: the daily release check is on and cannot be turned off; `0`: no checks at all                      |
 | `CrashReportPrompt` | switch | `0`: crash reports stay on the computer and are never offered for sharing; `1`: always offered          |
 | `WorkspaceRoot`     | text   | The folder new working folders are created in (an absolute path); users can still choose another one   |
+| `ReportUrl`         | text   | Where *Report a problem* sends reports: your help desk's issue form (`https://…`), opened with the reviewed report as `title` and `body`; replaces *Settings → Report problems to*, which shows *Set by your organization* |
 | `OrganizationName`  | text   | Shown as *Managed by …* in *Settings* and *About* (one line, at most 64 characters)                     |
 | `UsageStatistics`   | switch | `0`: the app counts, keeps and sends no usage report to its server (#383); `1` or not set: it reports to its own server – whether the server shares a summary with the developers is its administrator's choice ([Privacy](privacy.md)) |
 

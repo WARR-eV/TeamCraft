@@ -159,8 +159,8 @@ feature milestone – the features in *What works* are enough; what is missing i
 - [ ] Desktop: report a problem from any error (#381). Done: *Report…* on every toast and dialog error, *Help → Report a
   Problem…*, redacted prefilled report (`desktop/src/report.rs`), *Open issue form* / *Copy* / *Save*, own tracker
   setting, *Copy details* on web error pages. Left: screenshot and affected-file attachments, the key inputs of
-  each action (most messages name only the action), the server version in the report, a request id on web errors,
-  the tracker as a desktop policy (#378)
+  each action (most messages name only the action), the server version in the report, a request id on web errors
+  (the tracker as a desktop policy: done, `ReportUrl`)
 - [ ] Desktop: one-click update (#377). Done: update window (release notes, *Skip this version*, *Remind me later*),
   *Help → Check for Updates…*, download of this installation's file verified against `SHA256SUMS.txt`, Windows
   installers started, `.dmg` opened. Left: swapping a portable zip or AppImage in place with *Restart now*, a
@@ -168,7 +168,7 @@ feature milestone – the features in *What works* are enough; what is missing i
   test script per install type for each RC
 - [x] Desktop: managed deployment policies (#378) – Windows registry with ADMX/ADML templates, macOS configuration
   profile, `/etc/teamcraft/policies.json`; fixed server, updates, crash prompts, working folder, organisation name,
-  `UsageStatistics` (read for #383). Left: a manual test per OS (Group Policy, Intune, an MDM profile), a German ADML,
+  `UsageStatistics` (read for #383), `ReportUrl` (the problem-report tracker, #381). Left: a manual test per OS (Group Policy, Intune, an MDM profile), a German ADML,
   a per-machine MSI checked for silent installs
 - [ ] Desktop app run and tested on Windows x64/ARM64, macOS and Linux for each RC (a short manual test script in
   `docs/src/dev/release-checklist.md`)

@@ -15,6 +15,11 @@ see the notices in the README.
 
 ### Added
 
+- **Desktop: the problem-report tracker as a policy** (#378, #381). The
+  managed-deployment policy `ReportUrl` (registry, macOS profile,
+  `/etc/teamcraft/policies.json`; ADMX/ADML and examples updated) names the
+  help desk's issue form *Report a problem* opens; *Settings → Report problems
+  to* then shows *Set by your organization*. Only http(s) addresses count.
 - **SolidCraft plugin ↔ desktop app** (research page *Talking to the desktop
   app from inside SolidCraft*). SolidCraft plugins have no network, so the
   plugin and the desktop app share `<working folder>/.teamcraft/solidcraft`:
