@@ -33,6 +33,7 @@ pub mod imports;
 pub mod insights;
 pub mod interchange;
 pub mod items;
+pub mod lock_overview;
 pub mod manager_gaps;
 pub mod mass_geometry;
 pub mod mass_properties;

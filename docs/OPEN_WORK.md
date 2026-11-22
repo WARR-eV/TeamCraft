@@ -836,6 +836,9 @@ needs an issue with a reason first (see *Direction*).
 
 #### Administration, security, platform
 
+- [x] Check-out overview per project group for administrators and managers (#428): graph of holders and
+  revisions coloured by age, list per person, web (`/projects/{id}/checkouts`), REST and desktop (*Check-outs*
+  tab); left: releasing several locks from the overview, a filter by age, notifications for old locks
 - [ ] Managed/SaaS and hybrid deployment (on-premises vault, cloud collaboration)
 - [ ] Permissions per object, per attribute and per lifecycle state; external (supplier) users
 - [ ] SAML, SCIM provisioning (research: *Deprovisioning through the identity provider*, not now), built-in MFA

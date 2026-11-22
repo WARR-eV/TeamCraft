@@ -384,6 +384,12 @@ matching sub-tab.
 
 **Projects** (the rail button below *Agent*, `Ctrl/Cmd+5`) is where you
 choose the **active project group**: your groups first, then the others.
+Administrators and the managers of a group see a lock button next to it:
+*Check-outs* opens a tab with the graph of who has what checked out in that
+group – the people on the left, their revisions on the right, the line
+coloured by how long the lock is held – and a list per person; a click on a
+revision opens it (#428, the same overview as on the group page in the web
+UI, *Open in browser*).
 CAD editors create a new group there (*New* – you become its manager; tick *Restricted* to keep it to its members), and
 the page offers *Get…* (copy
 groups into your workspace) and *Import CAD folder…*. The choice is kept on

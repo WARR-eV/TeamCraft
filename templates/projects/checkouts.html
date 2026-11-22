@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Check-outs {{ overview.project_code }}{% endblock %}
+{% block nav_projects %}active{% endblock %}
+{% block tc_context %}data-tc-kind="project" data-tc-id="{{ overview.project_id }}"{% endblock %}
+{% block content %}
+{% import "macros.html" as m %}
+{#- Who holds which lock in the group (#428): the graph of holders and
+    checked-out revisions (services/lock_overview.rs lays it out), then the
+    list per holder. Read-only – locks are released on the revision page. -#}
+<div class="page-head">
+  <div>
+    <h1>Check-outs: {{ overview.project_code }}</h1>
+    <p class="subtitle">Who has what checked out in {{ overview.project_name }} right now –
+      {{ overview.total }} revision{% if overview.total != 1 %}s{% endif %} held by {{ overview.holders|length }} {% if overview.holders|length == 1 %}person{% else %}people{% endif %}.
+      A lock is released on the revision page (<em>Cancel check-out</em>, or <em>Release with reason</em> as a manager).</p>
+  </div>
+  <div class="actions">
+    <a class="button" href="/projects/{{ overview.project_id }}">Back to the group</a>
+  </div>
+</div>
+
+{% if overview.total == 0 %}
+<section class="card">
+  <p class="empty">Nothing is checked out in {{ overview.project_code }}.</p>
+</section>
+{% else %}
+<section class="card" id="graph">
+  <h2>Graph</h2>
+  <svg class="lock-graph" viewBox="0 0 {{ graph.width }} {{ graph.height }}" role="group" aria-label="Check-outs of {{ overview.project_code }}: people and the revisions they hold">
+    {%- for l in graph.locks %}
+    <path class="lg-edge lg-{{ l.age }}" d="{{ l.edge }}"/>
+    {%- endfor %}
+    {%- for h in graph.holders %}
+    <g class="lg-node lg-holder{% if not h.active %} lg-inactive{% endif %}">
+      <rect x="{{ graph.holder_x }}" y="{{ h.y }}" width="{{ graph.holder_w }}" height="{{ graph.node_h }}" rx="6"/>
+      <text x="{{ graph.holder_x + 10 }}" y="{{ h.y + graph.node_h // 2 }}">{{ h.label }}</text>
+      <text class="lg-count" x="{{ graph.holder_x + graph.holder_w - 10 }}" y="{{ h.y + graph.node_h // 2 }}" text-anchor="end">{{ h.count }}</text>
+    </g>
+    {%- endfor %}
+    {%- for l in graph.locks %}
+    <a href="/revisions/{{ l.revision_id }}" aria-label="{{ l.label }} – {{ l.sub|label }}">
+      <g class="lg-node lg-lock lg-{{ l.age }}">
+        <rect x="{{ graph.lock_x }}" y="{{ l.y }}" width="{{ graph.lock_w }}" height="{{ graph.node_h }}" rx="6"/>
+        <text x="{{ graph.lock_x + 10 }}" y="{{ l.y + graph.node_h // 2 }}">{{ l.label }}</text>
+      </g>
+    </a>
+    {%- endfor %}
+  </svg>
+  <ul class="lock-legend">
+    <li class="lg-today">checked out today</li>
+    <li class="lg-week">for 1–7 days</li>
+    <li class="lg-old">longer than a week</li>
+    <li class="lg-inactive">holder deactivated</li>
+  </ul>
+</section>
+
+<section class="card" id="holders">
+  <h2>Per person</h2>
+  {% for h in overview.holders %}
+  <h3>{{ h.name }}{% if not h.active %} <span class="badge badge-obsolete">deactivated</span>{% endif %} <span class="muted small">{{ h.locks|length }} checked out</span></h3>
+  <div class="table-wrap">
+  <table class="dense">
+    <thead><tr><th scope="col">Revision</th><th scope="col">Name</th><th scope="col">Type</th><th scope="col">Checked out</th></tr></thead>
+    <tbody>
+    {% for l in h.locks %}
+      <tr>
+        <td><a class="mono" href="/revisions/{{ l.revision_id }}">{{ l.item_number }}/{{ l.code }}</a></td>
+        <td>{{ l.name }}</td>
+        <td>{{ l.item_type|label }}</td>
+        <td class="nowrap">{{ m.time(l.checked_out_at) }} <span class="muted small">({{ l.checked_out_at|age }}){% if ages[l.revision_id] == "old" %} · longer than a week{% endif %}</span></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+{% endblock %}

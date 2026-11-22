@@ -41,6 +41,7 @@ pub const TEMPLATES: &[(&str, &str)] = embed![
     "projects/show.html",
     "projects/access_review.html",
     "projects/access_log.html",
+    "projects/checkouts.html",
     "projects/season.html",
     "files/preview.html",
     "admin/users.html",
@@ -1685,6 +1686,48 @@ mod tests {
         assert!(
             html.contains("the log of this group is off") && html.contains("since must be a date")
         );
+        // the check-out overview (#428): graph and list, and an empty group
+        let lock = |id: &str, number: &str, at: &str| {
+            json!({ "revision_id": id, "item_number": number, "code": "A", "name": "Bracket <b>",
+                    "item_type": "part", "holder_id": OTHER, "holder_name": "Erika", "holder_active": false,
+                    "checked_out_at": at })
+        };
+        let locks = vec![
+            lock("44444444-4444-4444-8444-444444444444", "PRT-000001", TS),
+            lock("55555555-5555-4555-8555-555555555555", "PRT-000002", TS),
+        ];
+        let overview = json!({ "project_id": ME, "project_code": "ROVER", "project_name": "Rover",
+                               "total": 2, "holders": [{ "id": OTHER, "name": "Erika <x>", "active": false, "locks": locks }] });
+        let parsed: crate::services::lock_overview::Overview =
+            serde_json::from_value(overview.clone()).expect("overview from JSON");
+        let graph = crate::services::lock_overview::graph(&parsed, chrono::Utc::now());
+        let html = render(
+            &env,
+            "projects/checkouts.html",
+            with_common(json!({
+                "overview": overview, "graph": graph,
+                "ages": { "44444444-4444-4444-8444-444444444444": "old", "55555555-5555-4555-8555-555555555555": "today" },
+            })),
+        );
+        assert!(html.contains("class=\"lock-graph\"") && html.contains("lg-holder lg-inactive"));
+        // (MiniJinja escapes `/` in text as `&#x2f;`)
+        assert!(
+            html.contains("Erika &lt;x&gt;")
+                && html.contains("PRT-000001&#x2f;A Bracket &lt;b&gt;")
+        );
+        assert!(html.contains("href=\"/revisions/44444444-4444-4444-8444-444444444444\""));
+        assert!(
+            html.contains("longer than a week") && html.contains("2 revisions held by 1 person")
+        );
+        let html = render(
+            &env,
+            "projects/checkouts.html",
+            with_common(json!({
+                "overview": { "project_id": ME, "project_code": "ROVER", "project_name": "Rover", "total": 0, "holders": [] },
+                "graph": { "width": 0, "height": 0, "holders": [], "locks": [] }, "ages": {},
+            })),
+        );
+        assert!(html.contains("Nothing is checked out in ROVER") && !html.contains("lock-graph\""));
         let html = render(
             &env,
             "projects/show.html",

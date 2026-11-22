@@ -1169,6 +1169,38 @@ pub async fn access_review(
     )
 }
 
+/// `GET /projects/{id}/checkouts` – who holds which lock in the group, as a
+/// graph and a list per holder (#428): administrators and the group's
+/// managers.
+pub async fn checkouts_page(
+    State(st): State<AppState>,
+    ctx: WebCtx,
+    Path(id): Path<Uuid>,
+) -> AppResult<Response> {
+    use crate::services::lock_overview;
+    let overview = lock_overview::for_project(&st.db, &ctx.me, id).await?;
+    let now = chrono::Utc::now();
+    let graph = lock_overview::graph(&overview, now);
+    // the age class of every lock, for the list below the graph
+    let ages: serde_json::Map<String, Value> = overview
+        .holders
+        .iter()
+        .flat_map(|h| h.locks.iter())
+        .map(|l| {
+            (
+                l.revision_id.to_string(),
+                json!(lock_overview::age_class(l.checked_out_at, now)),
+            )
+        })
+        .collect();
+    render(
+        &st,
+        &ctx,
+        "projects/checkouts.html",
+        json!({ "overview": overview, "graph": graph, "ages": ages }),
+    )
+}
+
 /// `GET /projects/{id}/access-log` – the read and download log of a group
 /// with filters and paging (managers and administrators who read it).
 pub async fn access_log_page(

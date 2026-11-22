@@ -61,6 +61,9 @@ DESKTOP_RUST_ALSO='^desktop/ui/index\.html$'
 # desktop_ui – desktop.yml: syntax of every script of the desktop and web UI,
 # the imports of the desktop modules and the Node tests in scripts/.
 DESKTOP_UI='^(desktop/ui|static|shared)/|^scripts/[^/]*\.mjs$|^\.github/workflows/desktop\.yml$'
+# scripts/desktop-lock-layout.test.mjs compares the desktop layout with the
+# server's sizes in this file (#428)
+DESKTOP_UI+='|^src/services/lock_overview\.rs$'
 
 # codeql – codeql.yml, one analysis per language.
 CODEQL_ACTIONS='^\.github/(workflows|actions|codeql)/'
@@ -194,6 +197,7 @@ self_test() {
     check tests/fixtures/cad/nist/ctc-01/inventor/ctc_01.ipt server=true desktop_rust=true
     check clippy.toml server=true desktop_rust=true
     check scripts/desktop-tab-order.test.mjs server=false desktop_ui=true 'codeql=["javascript-typescript"]'
+    check src/services/lock_overview.rs server=true desktop_ui=true desktop_rust=false
     # documentation and examples read by the guard tests
     check docs/src/admin/configuration.md server=false guards=true docs_site=true 'codeql=[]'
     check deploy/teamcraft.env.example server=false guards=true

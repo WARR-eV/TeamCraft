@@ -264,6 +264,18 @@ pub(super) async fn project_access_log(
     Ok(Json(json!({ "entries": page.entries, "next": page.next })))
 }
 
+/// `GET /api/v1/projects/{code}/checkouts` – who holds which lock in the
+/// group, grouped per holder (#428): administrators and the group's managers.
+pub(super) async fn project_checkouts(
+    State(st): State<AppState>,
+    ApiUser(me): ApiUser,
+    Path(code): Path<String>,
+) -> AppResult<Json<Value>> {
+    let project = projects::get_by_code_for_management(&st.db, &me, &code).await?;
+    let overview = crate::services::lock_overview::for_project(&st.db, &me, project.id).await?;
+    Ok(Json(json!(overview)))
+}
+
 /// `GET /api/v1/projects/{code}/review-policy` – anybody who sees the group.
 pub(super) async fn review_policy_get(
     State(st): State<AppState>,

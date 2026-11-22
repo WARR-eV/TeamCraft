@@ -81,6 +81,18 @@ pub async fn restricted_memberships(pool: &PgPool, actor: &Actor) -> AppResult<V
     .await?)
 }
 
+/// The groups the actor manages (member marked as manager) – for clients
+/// that offer the managers' views, such as the check-out overview (#428).
+/// Administrators manage every group without being listed here.
+pub async fn managed_memberships(pool: &PgPool, actor: &Actor) -> AppResult<Vec<Uuid>> {
+    Ok(sqlx::query_scalar::<_, Uuid>(
+        "SELECT project_id FROM project_members WHERE user_id = $1 AND manager ORDER BY project_id",
+    )
+    .bind(actor.id)
+    .fetch_all(pool)
+    .await?)
+}
+
 /// Active projects in which the actor may create and modify items.
 pub async fn editable_by(pool: &PgPool, actor: &Actor) -> AppResult<Vec<Project>> {
     Ok(list(pool, actor, true)
