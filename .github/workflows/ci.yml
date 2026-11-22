@@ -309,7 +309,7 @@ jobs:
           save-if: false
       - name: configuration tests (docs/src/admin/configuration.md, deploy/, packaging/)
         run: cargo test --locked --lib -- config::tests
-      - name: architecture guards (every configuration variable documented in the book)
+      - name: architecture guards (every configuration variable documented in the book, policy template languages)
         run: cargo test --locked --test architecture_guards
 
   dependencies:
