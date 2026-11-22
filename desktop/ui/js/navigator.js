@@ -5,7 +5,7 @@
 import { $, ICONS, api, append, badge, call, clear, dialog, enc, errorText, field, h, lockIcon, setStatus, state, svgIcon, toast } from "./core.js";
 import { fmtDate, label } from "/static/shared/js/format.js";
 import { canSeeLocks, openLockOverview } from "./lock-overview.js";
-import { canEdit, checkInAll, fetchWorklist, refreshWorklistCount, reloadProjects, renderNotifications, rescanNewFiles, scanNewFiles, showWorklistCount } from "./shell.js";
+import { canEdit, canEditProject, checkInAll, fetchWorklist, refreshWorklistCount, reloadProjects, renderNotifications, rescanNewFiles, scanNewFiles, showWorklistCount } from "./shell.js";
 import { assistantContextChanged } from "./assistant.js";
 import { agent, renderAgentView } from "./agent.js";
 import { openRevision } from "./revision.js";
@@ -20,6 +20,8 @@ import { renderFiles } from "./browser.js";
 import { ageText, batchSummary, newItemFindings, newItemPlacement } from "./new-files.js";
 import { checkedOutClass, favouriteKey, normalizeFavourite, suggestionKey } from "./files-view.js";
 import { cutLevel, describeNode, normalizeMode, pathKey, quantityText, rootNodes, usageBadge } from "./structure.js";
+import { emptyActionLabel, emptyGroupHint, noGroupsHint, noNewFilesHint, worklistHint } from "./empty-rules.js";
+import { t } from "/static/shared/js/i18n.js";
 
 // ======================================================================
 // Navigator views
@@ -43,6 +45,28 @@ export function selectView(view) {
 
 export function navHead(title, actions) {
   return h("div.nav-head", null, [h("h2", { text: title }), h("div.row", null, actions || [])]);
+}
+
+/** An empty state with its next step (#423): the line of the `hint` of
+ *  empty-rules.js, its actions as buttons and, for viewers, why there are
+ *  none. `ctx.project` is the group code New item starts in; `ctx.tag`
+ *  is "li" inside a tree (default "div"). */
+export function emptyHint(hint, ctx) {
+  ctx = ctx || {};
+  var run = {
+    create_group: function () { newProjectDialog(); },
+    import_folder: function () { importFolderDialog(); },
+    new_item: function () { newItemDialog(ctx.project ? { project: ctx.project } : undefined); },
+    get: function () { getProjectsDialog(ctx.project ? { project: ctx.project } : undefined); }
+  };
+  var buttons = hint.actions.filter(function (a) { return run[a] && emptyActionLabel(a); }).map(function (a) {
+    return h("button.small", { type: "button", on: { click: function (ev) { ev.stopPropagation(); run[a](); } } }, t(emptyActionLabel(a)));
+  });
+  return h((ctx.tag || "div") + ".empty-hint", null, [
+    h("p.empty", { text: (hint.lead ? t(hint.lead) + " " : "") + t(hint.text) }),
+    buttons.length ? h("div.row", null, buttons) : null,
+    hint.note ? h("p.small.dim", { text: t(hint.note) }) : null
+  ]);
 }
 
 export function itemNode(it, opts) {
@@ -175,6 +199,11 @@ export function drawHome() {
   if (!p) {
     nav.appendChild(navHead("Files", []));
     var mine = myGroups();
+    // no group at all: the next step by role (#423)
+    if (!mine.length && !otherGroups().length) {
+      nav.appendChild(emptyHint(noGroupsHint(canEdit())));
+      return;
+    }
     nav.appendChild(h("p.empty", { text: "Choose the project group to work in." }));
     nav.appendChild(h("div.row", null, [h("button.primary", { type: "button", on: { click: function () { selectView("projects"); } } }, "Choose a project…")]));
     if (mine.length) {
@@ -269,7 +298,7 @@ export function drawProjects() {
   }
   append(nav, group("My project groups", mine));
   append(nav, group(mine.length ? "Other project groups" : "All project groups", others));
-  if (!mine.length && !others.length) nav.appendChild(h("p.empty", { text: "No project groups yet." }));
+  if (!mine.length && !others.length) nav.appendChild(emptyHint(noGroupsHint(canEdit())));
 }
 
 /** Creates a project group (CAD editors; the creator becomes member and
@@ -331,7 +360,7 @@ export function loadProjectItems(p, ul, count, opts) {
     clear(ul);
     count.textContent = r.total > r.items.length ? r.items.length + " of " + r.total : String(r.total);
     if (!r.items.length) {
-      ul.appendChild(h("li.empty", { text: "No items yet." }));
+      ul.appendChild(emptyHint(emptyGroupHint(canEditProject(p.id), canEdit()), { project: p.code, tag: "li" }));
       return;
     }
     var items = opts.sort ? sortItems(r.items, opts.sort) : r.items;
@@ -369,6 +398,8 @@ export function drawWorklist(w) {
       on: { click: function () { checkInAll(); } } }, [svgIcon(ICONS.checkin), " Check in all"]) : null,
     h("button.icon", { type: "button", title: "Refresh", "aria-label": "Refresh", on: { click: function () { selectView("worklist"); } } }, svgIcon(ICONS.refresh))
   ]));
+  // why a viewer account has no editing buttons (#423)
+  if (!canEdit()) nav.appendChild(h("p.small.dim.viewer-note", { text: t("empty.viewer_note") }));
   nav.appendChild(sectionTitle("Checked out by me", w.checkouts.length));
   nav.appendChild(w.checkouts.length ? h("ul.tree", null, w.checkouts.map(function (r) {
     return h("li", null, h("div.node", { title: "Checked out " + fmtDate(r.checked_out_at), "data-item": r.item_number, "data-rev": r.code, on: { click: function () { openRevision(r.item_number, r.code); } } }, [
@@ -376,15 +407,15 @@ export function drawWorklist(w) {
       h("span.label", null, [h("span.mono", { text: r.item_number + "/" + r.code }), " ", r.name]),
       h("span.meta.small.dim", { text: lockAge(r.checked_out_at) })
     ]));
-  })) : h("p.empty", { text: "Nothing checked out." }));
+  })) : emptyHint(worklistHint("checkouts", canEdit())));
   if (canEdit()) newFilesSection(nav);
   nav.appendChild(sectionTitle("Waiting for my review", w.reviews.length));
-  nav.appendChild(w.reviews.length ? h("ul.tree", null, w.reviews.map(changeNode)) : h("p.empty", { text: "Nothing to review." }));
+  nav.appendChild(w.reviews.length ? h("ul.tree", null, w.reviews.map(changeNode)) : emptyHint(worklistHint("reviews", canEdit())));
   var groups = impactGroups(w);
   nav.appendChild(sectionTitle("Dependents to check", groups.length));
   nav.appendChild(groups.length ? h("ul.tree", null, groups.map(dependentNode)) : h("p.empty", { text: "Nothing to check." }));
   nav.appendChild(sectionTitle("My open changes", w.my_changes.length));
-  nav.appendChild(w.my_changes.length ? h("ul.tree", null, w.my_changes.map(changeNode)) : h("p.empty", { text: "No open changes." }));
+  nav.appendChild(w.my_changes.length ? h("ul.tree", null, w.my_changes.map(changeNode)) : emptyHint(worklistHint("changes", canEdit())));
   // change requests (older servers: none)
   var assigned = w.requests_assigned || [], mine = w.my_requests || [];
   nav.appendChild(sectionTitle("Requests assigned to me", assigned.length));
@@ -415,7 +446,9 @@ function newFilesSection(nav) {
   var head = h("div.row", null, [sectionTitle("New on this computer", list.length), list.length ? createBtn : null]);
   nav.appendChild(head);
   if (!list.length) {
-    nav.appendChild(h("p.empty", { text: "No new parts or assemblies in your working folder." }));
+    // Get… starts with the active group (#423)
+    var active = activeProject();
+    nav.appendChild(emptyHint(noNewFilesHint(), { project: active ? active.code : null }));
   } else {
     nav.appendChild(h("ul.tree", null, list.map(function (s) {
       var box = h("input", { type: "checkbox", "aria-label": "Tick " + s.name, checked: !!ticked[s.key],
@@ -727,7 +760,7 @@ function loadStructureRoots(p, ul, count) {
     var top = rootNodes(r);
     count.textContent = String(top.total);
     if (!top.nodes.length) {
-      ul.appendChild(h("li.empty", { text: "No items yet." }));
+      ul.appendChild(emptyHint(emptyGroupHint(canEditProject(p.id), canEdit()), { project: p.code, tag: "li" }));
       return;
     }
     top.nodes.forEach(function (n) { ul.appendChild(structureNode(n, "grp:" + p.code)); });

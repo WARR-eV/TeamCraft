@@ -124,7 +124,7 @@
   </div>
   {{ m.pager(pagination, base_query) }}
   {% else %}
-  <p class="empty">No items match the filter.{% if me.can_edit %} <a href="/items/new">Create the first one.</a>{% endif %}</p>
+  <p class="empty">No items match the filter.{% if me.can_edit %} <a href="/items/new">Create the first one.</a>{% else %} {{ t("empty.items.viewer") }}{% endif %}</p>
   {% endif %}
 </div>
 {% endblock %}

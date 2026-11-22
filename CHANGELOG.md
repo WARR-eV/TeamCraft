@@ -24,6 +24,12 @@ see the notices in the README.
   search terms. A test checks that every name of the fixed list has a place
   in the app that counts it.
 
+### Fixed
+
+- CI on `main` is green again: the comment of the shared text-selection rule
+  (#436) quoted two hex colours, which the no-literal-colours guard of
+  `shared/css/` counts as colours in the stylesheet.
+
 ## [0.2.12] - 2026-11-22
 
 ### Security
@@ -37,6 +43,24 @@ see the notices in the README.
 
 ### Added
 
+- **Empty states that name the next step** (#423, part of #408): no project
+  group → *Create a project group* for CAD editors, "ask a manager of a group
+  to add you" for viewers (vault, *Projects*, desktop *Home* and *Projects*);
+  an empty project group → *New item* / *Import BOM* in the vault and
+  *Import CAD folder…* / *New item* on desktop *Home* for those who may create
+  items in it (CAD editors outside the group are asked to have a manager add
+  them); *New on this computer* without suggestions → *Get…* with the active
+  group ticked; the empty review, check-out and change lists of the dashboard,
+  the desktop *Home* tab and the desktop worklist say how work arrives there;
+  an empty working folder of a revision names the next step by check-out.
+  Viewer accounts see a note on the dashboard, the desktop *Home* tab and atop
+  the desktop worklist
+  that editing needs the CAD editor role and that a server administrator
+  grants it. The texts are in the i18n catalogs (`empty.*`, English and
+  German); the desktop app loads its catalog before the first view draws.
+  Tests: `every_template_renders` renders the dashboard and the vault as
+  editor and viewer, `scripts/desktop-empty-rules.test.mjs` checks the
+  desktop rules (`ui/js/empty-rules.js`).
 - **Check-outs of a project group as a graph** (#428): administrators and
   the group's managers see who has what checked out right now – *Check-outs*
   on the group page (`/projects/{id}/checkouts`) and a lock button next to
@@ -192,6 +216,10 @@ see the notices in the README.
   organization*, and *Managed by …* appears in Settings and About. The
   templates ship with each release as
   `teamcraft-desktop-policies-<version>.zip`.
+- **German Group Policy texts** (#378): `deploy/desktop-policies/windows/de-DE/TeamCraft.adml`
+  shows the TeamCraft Desktop policies in German in the Group Policy editor
+  (same string and presentation IDs as `en-US`, checked by
+  `tests/architecture_guards.rs`); it ships in the policy zip.
 
 ### Fixed
 
@@ -271,6 +299,19 @@ see the notices in the README.
   in the *Files* view and the *Structure* tree gets one marker in the lock
   colour – a bar at its left edge and a light tint of the row – whoever holds
   the lock; the text colour is unchanged.
+
+### Documentation
+
+- **Research page *CAD add-ins: Inventor and Siemens NX first*** (#425):
+  extension mechanism and runtime (Inventor 2025–2026 on .NET 8, 2027 on
+  .NET 10 templates; NX Open journals vs signed startup applications and the
+  author licence), events, UI, licences (vendor assemblies referenced, never
+  redistributed), build and tests (a CAD-independent core with a fake host,
+  FreeCAD as the reference add-in for CI), install and update (*Settings →
+  CAD add-ins*, a `CadAddins` policy). Decision: an Inventor MVP, an NX MVP
+  after the licence check, both talking to the desktop app over per-user
+  local IPC (protocol `teamcraft.cad` v1, no token in the add-in, requests are
+  untrusted intents). Nothing of it is built yet.
 
 ## [0.2.11] - 2026-11-21
 

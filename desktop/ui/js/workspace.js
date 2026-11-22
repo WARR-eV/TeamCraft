@@ -16,6 +16,7 @@ import { incompleteGet, notOpenedText } from "./get-rules.js";
 import { formatKinds } from "./folder-import.js";
 import { isNewModelOfItsOwn, workspacePath } from "./new-files.js";
 import { newItemDialog } from "./dialogs.js";
+import { t } from "/static/shared/js/i18n.js";
 
 // ---------------------------------------------------------------- 3D viewer
 
@@ -178,7 +179,7 @@ export function revWorkspace(tab, el) {
                 h("button.small", { type: "button", title: "Request a change to " + f.name + " (change request)", on: { click: function () { requestChangeDialog(rev, f.name); } } }, "Request…")
               ])]
           };
-        }), { numeric: [3] }) : h("p.empty", { text: "The folder is empty." }),
+        }), { numeric: [3] }) : h("p.empty", { text: t(workspaceEmptyText(can)) }),
       clashes.length ? h("p.notice.error", { text: clashes.length + " file(s) cannot be placed because another item's file with the same folder and name is there: " +
         clashes.map(function (f) { return f.path + " (" + f.clash_with + ")"; }).join(", ") + ". Nothing was overwritten – give one of them another folder on the revision page." }) : null,
       conflicts.length ? h("p.notice.error", { text: conflicts.length + " file(s) changed here and on the server since you got them: " +
@@ -189,6 +190,13 @@ export function revWorkspace(tab, el) {
         (lockedByOther ? rev.checked_out_by_name + " holds the lock; check in after they released it." : "check out first, then check in.") }) : null
     ]));
   });
+}
+
+/** The line of an empty working folder of a revision, by what the user may
+ *  do (#423): the holder of the check-out saves and checks in, who may check
+ *  out is told to, everyone else only that it has no files yet. */
+function workspaceEmptyText(can) {
+  return can.checkin ? "empty.workspace_folder.mine" : can.checkout ? "empty.workspace_folder" : "empty.workspace_folder.none";
 }
 
 /** After somebody else released my check-out (issue #173, step 10): who,

@@ -39,9 +39,10 @@ SERVER+='|^desktop/ui/(app\.css|index\.html)$|^desktop/ui/js/(core|settings|shel
 
 # guards – ci.yml, without a database: config::tests and
 # tests/architecture_guards.rs, for the files outside the server area they
-# read: every page of the book (each configuration variable is documented)
-# and the shipped configuration examples. Runs only when `server` does not.
-GUARDS='^docs/src/|^deploy/(teamcraft\.env\.example|docker-compose\.yml)$|^packaging/linux/teamcraft\.env$'
+# read: every page of the book (each configuration variable is documented),
+# the shipped configuration examples and the desktop Group Policy template
+# (its language files must match the ADMX). Runs only when `server` does not.
+GUARDS='^docs/src/|^deploy/(teamcraft\.env\.example|docker-compose\.yml)$|^deploy/desktop-policies/windows/|^packaging/linux/teamcraft\.env$'
 
 # cargo deny – ci.yml, one leg per lock file.
 DENY_SERVER='^(Cargo\.toml|Cargo\.lock|deny\.toml)$|^vendor/|^\.github/workflows/ci\.yml$'
@@ -204,6 +205,7 @@ self_test() {
     check docs/src/admin/configuration.md server=false guards=true docs_site=true 'codeql=[]'
     check deploy/teamcraft.env.example server=false guards=true
     check packaging/linux/teamcraft.env server=false guards=true
+    check deploy/desktop-policies/windows/de-DE/TeamCraft.adml server=false guards=true 'codeql=[]'
     # nothing in these workflows
     check README.md all=false server=false guards=false desktop_rust=false desktop_ui=false \
         'codeql=[]' 'deny=[]' docs_site=false
