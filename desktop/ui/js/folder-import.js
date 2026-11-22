@@ -465,6 +465,8 @@ export function openImportFolderDialog() {
       status.textContent = "";
       if (created.length) { delete state.expanded[group]; if (state.view === "home") selectView("home"); refreshWorklistCount(); }
       d.close();
+      // usage statistics (#383): one per folder import that created something
+      if (created.length) call("usage_count", { action: "import_folder" }).catch(function () {});
       importFinishedDialog({
         stopped: stop, created: created, files: files, skipped: plan.items.length - todo.length,
         bom: bom.checked, lines: lines.lines, assumed: lines.assumed, checkedIn: checkedIn, failed: failed,
