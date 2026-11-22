@@ -174,7 +174,9 @@ feature milestone – the features in *What works* are enough; what is missing i
   a per-machine MSI checked for silent installs
 - [ ] Desktop app run and tested on Windows x64/ARM64, macOS and Linux for each RC (a short manual test script in
   `docs/src/dev/release-checklist.md`)
-- [x] One download to try TeamCraft on a laptop: desktop installers *with local server* (Windows x64, macOS Apple
+- [x] (**paused for the next releases since 2026-11-22**, to make releases faster: the installers below and the
+  Windows/macOS server builds are switched off in `release.yml`; bring back before 1.0 or when testers ask)
+  One download to try TeamCraft on a laptop: desktop installers *with local server* (Windows x64, macOS Apple
   silicon, Linux x86_64 AppImage) with the server and PostgreSQL, *Try TeamCraft on this computer*, and
   `teamcraft local` for an installed PostgreSQL ([research](src/research/local-test-server.md),
   [guide](src/guide/local-server.md)). Left: the manual check in section 3; Windows ARM64 and Linux ARM64 variants if

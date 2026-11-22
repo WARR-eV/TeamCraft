@@ -235,6 +235,19 @@ see the notices in the README.
 
 ### Changed
 
+- **Releases without the installers *with local server*** (paused, to make
+  releases faster): `release.yml` no longer builds the desktop installers
+  *with local server* (`TeamCraft-with-local-server_…`, job `local-server`
+  switched off) nor the server builds only they needed – the Windows x64
+  server archive (no longer a release download) and the macOS sidecar. The
+  next releases have the Linux server archives and the regular desktop
+  installers. To try TeamCraft, use `teamcraft local` or the live demo; how to
+  switch the job on again is in CONTRIBUTING.md ("Releases"). An installed
+  *TeamCraft Local* finds no matching file in these releases – its update
+  window offers the release page instead.
+- **Pull requests that still need work are opened as drafts** (CLAUDE.md,
+  *Git rules*).
+
 - **Desktop: checked-out files stand out in Home** (#362). A checked-out row
   in the *Files* view and the *Structure* tree gets one marker in the lock
   colour – a bar at its left edge and a light tint of the row – whoever holds

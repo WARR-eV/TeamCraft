@@ -72,6 +72,10 @@
 
 ## Git rules
 
+**Pull requests that still need work are opened as drafts** – work in progress, CI not yet
+green, or open questions. Mark a PR *ready for review* only when the work is done, the
+documentation is in it and its CI is green; a draft cannot be merged by accident.
+
 Always add, commit, and **push** after each successful and test-passing
 functionality implementation. If a push is rejected because the remote moved,
 tell the user immediately and ask them to run `! git pull --no-rebase && git push`
@@ -207,7 +211,8 @@ deploy/            production Docker install: docker-compose.yml (teamcraft + po
                    public account, auth::refuse_demo_write; data from scripts/seed-demo.sh over screenshots.sh seed_*)
 .github/workflows/ ci.yml (fmt, clippy, tests on PostgreSQL 16/18, macOS/Windows builds), docs.yml, desktop.yml, scale.yml (manual/weekly scale check, tests/scale.rs),
                    mutants.yml (cargo-mutants: PR diff report-only, weekly sharded full run; .cargo/mutants.toml),
-                   release.yml (binaries, installers, *with local server* installers with PostgreSQL, image + Docker install smoke test);
+                   release.yml (binaries, installers, image + Docker install smoke test; the *with local server* installers and the
+                   Windows/macOS server builds are paused for the next releases (since 2026-11-22, to make releases faster) – job local-server off);
                    scripts/ci-changes.sh = the one table from changed files to the jobs of ci/desktop/codeql/docs.yml
                    (self-test in every `changes` job) – a test that reads a new file outside its area adds it there
 desktop/           TeamCraft Desktop (Tauri 2, own Cargo project – never part of the server build); UI in desktop/ui/js

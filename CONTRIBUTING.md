@@ -554,6 +554,13 @@ like the rest of the project.
 [Semantic Versioning](https://semver.org); while the version is `0.x`, any
 release may contain breaking changes.
 
+**Paused for the next releases** (since 2026-11-22, to make releases faster): the job
+`local-server` is switched off (`if: false && …`) and the `server` job builds only Linux – the
+Windows x64 server and the macOS sidecar were needed only by the installers *with local
+server*. To bring them back: drop `false &&`, uncomment the two server matrix rows and add
+`local-server` to the `needs` of `publish` (the top of `release.yml` says the same). The
+description below is the full build.
+
 **Build artifacts.** `.github/workflows/release.yml` builds the server
 binaries (Linux x86_64/ARM64, Windows x64) and the desktop installers (AppImage, `.deb`, `.rpm` and Flatpak bundles for
 x86_64/aarch64, `.dmg`,
