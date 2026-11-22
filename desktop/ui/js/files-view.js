@@ -70,6 +70,17 @@ export function checkedOutClass(e) {
   return e && e.checked_out_by_name ? ".checked-out" : "";
 }
 
+/** The preview image of a row (#420), `{ id, sha }` for GET /files/{id}/thumbnail
+ *  and the cache, or null: a Files row (folders.rs Entry: `thumbnail`, `file_id`,
+ *  `sha256`) or a row of All items, the search and the structure (the main
+ *  thumbnail of the revision: `thumbnail_file_id`, `thumbnail_sha256`). */
+export function rowThumb(e) {
+  if (!e) return null;
+  if (e.thumbnail_file_id && e.thumbnail_sha256) return { id: e.thumbnail_file_id, sha: e.thumbnail_sha256 };
+  if (e.thumbnail === true && e.file_id && e.sha256) return { id: e.file_id, sha: e.sha256 };
+  return null;
+}
+
 /** The tooltip of a row: everything the dense row leaves out. */
 export function entryTitle(e, labelOf) {
   var parts = [entryRevision(e) + " – " + (e.name || "")];

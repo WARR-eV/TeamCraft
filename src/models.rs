@@ -110,6 +110,12 @@ pub struct ItemSummary {
     pub classification: String,
     /// Custom attribute values of the latest revision.
     pub attributes: serde_json::Value,
+    /// Main thumbnail of the latest revision (`services::thumbnails`, #420):
+    /// its file and the content hash (image URL `?v=`); filled by `items::search`.
+    #[sqlx(skip)]
+    pub thumbnail_file_id: Option<Uuid>,
+    #[sqlx(skip)]
+    pub thumbnail_sha256: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, sqlx::FromRow)]

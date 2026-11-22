@@ -216,7 +216,10 @@ end-to-end tests against a real PostgreSQL.
   and more.
 - **CAD thumbnails** – the preview images stored in Inventor drawings and Solid
   Edge files; NX, SOLIDWORKS, Inventor, CATIA, Creo, Rhino, SketchUp, JT and
-  Fusion files get a sharper thumbnail rendered from their 3D preview.
+  Fusion files get a sharper thumbnail rendered from their 3D preview. The
+  picture of the main model heads the revision page and every row of the item
+  list, the search results, the vault explorer and the desktop app's Home views
+  (lazy-loaded, cached by content hash).
 - **FEA/CFD results** – VTK, VTU/VTP and CalculiX results coloured by a result
   field, with legend.
 - **Search** – ranked full-text search over numbers, names, materials, file

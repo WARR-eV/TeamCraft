@@ -418,6 +418,15 @@ this computer.
   number);
 * *Structure*: the assemblies with their parts.
 
+**Pictures in the rows** (#420). In all three views and in the search, a
+row shows a small picture of its model in place of the type icon: in
+*Files* the preview image of the file itself, in *All items*, *Structure*
+and the search the picture of the item's main model (the assembly before the
+part before the drawing, as at the top of the revision page). The server
+names the picture in the list, and the app fetches it only when the row
+scrolls into view, once per file content; rows without a picture keep the
+type icon.
+
 **Favourite folder.** When your work is several folders down, make that
 folder the group's favourite: point at the folder in *Files* and click its
 ☆. Home then starts in that folder instead of at the top of the group. A

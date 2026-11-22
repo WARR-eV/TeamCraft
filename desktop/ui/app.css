@@ -492,6 +492,15 @@ tr.row-conflict td:first-child, tr.row-clash td:first-child { box-shadow: inset 
 .node .ico { width: 16px; flex: none; color: var(--text-dim); text-align: center; font-size: 11px; }
 .node .ico.warn { color: var(--st-impact-fg); }
 .node .ico.dim { color: var(--text-dim); }
+/* the preview image of a row (list-thumbs.js, #420): over the type icon once loaded,
+   positioned so the row keeps its height */
+.node .ico { position: relative; }
+.node .ico.has-thumb { width: 22px; }
+.node .ico.has-thumb .ico-glyph { visibility: hidden; }
+.node .ico .row-thumb {
+  position: absolute; left: 0; top: 50%; width: 22px; height: 22px; margin-top: -11px;
+  object-fit: contain; background: #fff; border: 1px solid var(--border); border-radius: 3px;
+}
 .node .label { overflow: hidden; text-overflow: ellipsis; min-width: 0; color: var(--text-muted); }
 .node .label .mono, .node .label strong { color: var(--text); font-weight: 600; }
 .node .label .dim { color: var(--text-dim); }

@@ -468,7 +468,7 @@ the caller cannot read are left out; a successor there is a placeholder with
 |-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Items                   | `GET/POST /items` (`class=`, `attr=` + `value=`, `result=` + `result_name=` filters), `GET /items/duplicates?name=&type=` (likely duplicates by name, before creating), `POST /items/bulk` (`{"action": "revise"\|"obsolete", "items": [number]}`: the latest revision of up to 200 items, each in its own transaction, outcome per item), `GET/PATCH /items/{number}` (classification, unit, project, folder), `where-used` (`levels=1…25` for parents of parents), `interchange`, `alternates`, `supersession`, `replace`, history, impacts, watch |
 | Attributes              | `GET /attributes` (`all=true`: also inactive), `POST /attributes`, `PATCH /attributes/{key}` (admins); values in `attributes` of a revision                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Revisions               | `GET/PATCH /items/{number}/revisions/{code\|latest}`, `checkout`, `checkin`, `cancel-checkout`, `file-status`, `revise`, `obsolete`                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Revisions               | `GET/PATCH /items/{number}/revisions/{code\|latest}`, `checkout`, `checkin`, `cancel-checkout`, `file-status`, `revise`, `obsolete`; `GET /revisions/{id}/thumbnail` – the picture of the main model (see below)                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Worklist                | `GET /worklist` (check-outs, reviews, impacts and `impact_groups`, statistics), `POST /worklist/checkin-all`                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Users                   | `GET /users/{id}/holdings` – what a user still holds (check-outs, open change orders, pending reviews, change requests, owned items, memberships, tokens), as the caller may see it: administrators, and group managers for the groups they manage; `POST /users/{id}/offboard` `{hand_over_to?: username, release_checkouts?, revoke_tokens?, confirm_no_manager?}` – administrators deactivate a leaver in one step (see [When someone leaves](../admin/users.md#when-someone-leaves))                                                     |
 | Files                   | `POST …/files` (multipart, `folder`/`folders`, duplicate guard `refuse_clash`/`refuse_same_name`), `GET/PATCH /files/{id}` (metadata, folder), `/content`, `/versions`, `/restore`, `/mesh`, `/thumbnail`, `…/workset`, `GET/POST /file-versions/{id}/annotations` + `DELETE /annotations/{id}` (3D notes)                                                                                                                                                                                                                                                                                      |
@@ -503,6 +503,30 @@ children resolved by `rule=latest|released|as_released` (default
 line then has
 its `level` and the resolved `revision` on both sides). The expanded BOM
 itself downloads as Excel workbook: `GET …/revisions/{code}/bom.xlsx?rule=`.
+
+### Thumbnails in lists
+
+`GET /revisions/{id}/thumbnail` (#420) answers the picture that stands for a
+revision: the preview image of its main CAD file – the assembly before the
+part before a model file before the drawing before a JT file, the first by
+name on a tie (the picture at the top of the revision page). It is the
+image of `GET /files/{id}/thumbnail` of that file (PNG, BMP or JPEG) with
+`ETag: "<sha256>-thumb"`; a request with that `If-None-Match` answers
+`304 Not Modified` (also on `/files/{id}/thumbnail`). 404 when no file has a
+picture, and when the revision is unknown or in a project group the caller
+may not read.
+
+The lists name the picture of each row, so a client needs no request per
+row (the server fills them for the whole page in one query):
+
+| List                                                              | Fields                                                                                  |
+|-------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
+| `GET /items` (also the search), `GET /favorites`                  | `thumbnail_file_id`, `thumbnail_sha256` of the latest revision (`null`: no picture)     |
+| `GET /projects/{code}/structure`, `GET …/revisions/{code}/structure` | `thumbnail_file_id`, `thumbnail_sha256` of the resolved revision (`null` for restricted lines) |
+| `GET /projects/{code}/files`                                      | per file `thumbnail` (its format has a picture) and `sha256` (current version)          |
+
+The image is `GET /files/{thumbnail_file_id}/thumbnail`; `thumbnail_sha256`
+is the cache key (the web pages add it as `?v=`).
 
 ### Similar parts
 
