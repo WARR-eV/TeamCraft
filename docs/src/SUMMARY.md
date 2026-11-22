@@ -93,3 +93,4 @@
     - [Read permissions for project groups](research/read-permissions.md)
     - [As-built records](research/as-built.md)
     - [Fluent, STAR-CCM+ and Simcenter 3D files](research/solver-files.md)
+    - [SolidCraft designs](research/solidcraft-design.md)

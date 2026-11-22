@@ -22,3 +22,6 @@ references it.
 The three projects share their approach – one Rust build, a desktop app and
 a command line, open formats – but not code: TeamCraft is licensed under the
 MPL-2.0 and does not include SolidCraft or FieldCraft code.
+
+What TeamCraft reads from a `.sc` design, and the sources of those findings, are
+recorded in the research page [SolidCraft designs](../research/solidcraft-design.md).
