@@ -114,6 +114,7 @@ pub const KNOWN_VARIABLES: &[&str] = &[
     "TEAMCRAFT_MATTERMOST_WEBHOOK",
     "TEAMCRAFT_MAX_UPLOAD_MB",
     "TEAMCRAFT_METRICS_TOKEN",
+    "TEAMCRAFT_NO_TELEMETRY",
     "TEAMCRAFT_OIDC_ADMIN_GROUP",
     "TEAMCRAFT_OIDC_CLIENT_ID",
     "TEAMCRAFT_OIDC_CLIENT_SECRET",
@@ -140,6 +141,8 @@ pub const KNOWN_VARIABLES: &[&str] = &[
     "TEAMCRAFT_TOKEN",
     "TEAMCRAFT_TOKEN_MAX_DAYS",
     "TEAMCRAFT_UPLOAD_CHUNK_MB",
+    "TEAMCRAFT_USAGE_STATISTICS",
+    "TEAMCRAFT_USAGE_STATISTICS_URL",
     "TEAMCRAFT_VAULT_DIR",
     "TEAMCRAFT_WEBHOOK_ALLOWED_HOSTS",
     "TEAMCRAFT_WEBHOOK_ALLOW_PRIVATE",
@@ -346,6 +349,25 @@ pub struct Config {
     pub local_agents: LocalAgents,
     /// Which targets outgoing event webhooks may reach.
     pub webhooks: WebhookConfig,
+    /// Usage statistics shared with the developers (#383).
+    pub usage: UsageConfig,
+}
+
+/// Sharing of aggregated usage statistics with the TeamCraft developers
+/// (#383, `services::usage`). The desktop apps always report to their own
+/// server; this only decides what leaves the server.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct UsageConfig {
+    /// `TEAMCRAFT_USAGE_STATISTICS`: `Some` fixes the switch (it wins over
+    /// the administrator's setting), `None` = the setting decides (off until
+    /// an administrator turns it on).
+    pub forced: Option<bool>,
+    /// `DO_NOT_TRACK=1` or `TEAMCRAFT_NO_TELEMETRY=1` (set by `teamcraft
+    /// local`): never send, whatever else is set.
+    pub never: bool,
+    /// `TEAMCRAFT_USAGE_STATISTICS_URL`: where the aggregate goes (https);
+    /// `None` = nowhere yet – nothing is sent even when sharing is on.
+    pub url: Option<String>,
 }
 
 /// Shortest audit log retention (`TEAMCRAFT_AUDIT_RETENTION_DAYS`): a typo
@@ -1238,6 +1260,33 @@ impl Config {
             bail!("TEAMCRAFT_WEBHOOK_RETENTION_DAYS must be between 1 and 3650");
         }
 
+        // DO_NOT_TRACK / TEAMCRAFT_NO_TELEMETRY: any value but a "no" counts
+        let set = |key: &str| -> Result<bool> {
+            Ok(env
+                .get(key)?
+                .is_some_and(|v| parse_bool(&v).unwrap_or(true)))
+        };
+        let usage = UsageConfig {
+            forced: match env.get("TEAMCRAFT_USAGE_STATISTICS")? {
+                Some(v) => {
+                    Some(parse_bool(&v).context("TEAMCRAFT_USAGE_STATISTICS must be 0 or 1")?)
+                }
+                None => None,
+            },
+            never: set("DO_NOT_TRACK")? || set("TEAMCRAFT_NO_TELEMETRY")?,
+            url: match env.get("TEAMCRAFT_USAGE_STATISTICS_URL")? {
+                Some(raw) => {
+                    let url = reqwest::Url::parse(raw.trim())
+                        .context("TEAMCRAFT_USAGE_STATISTICS_URL is not a URL")?;
+                    if url.scheme() != "https" {
+                        bail!("TEAMCRAFT_USAGE_STATISTICS_URL must be an https:// address");
+                    }
+                    Some(url.to_string())
+                }
+                None => None,
+            },
+        };
+
         Ok(Config {
             bind_addr,
             public_url,
@@ -1276,6 +1325,7 @@ impl Config {
             assistant_quota,
             local_agents,
             webhooks,
+            usage,
         })
     }
 

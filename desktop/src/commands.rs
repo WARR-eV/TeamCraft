@@ -687,6 +687,7 @@ pub async fn workspace_checkout(
     item: String,
     code: String,
 ) -> CmdResult<workspace::Downloaded> {
+    usage(&state, |u| u.count("checkout"));
     let api = signed_in_api(&state)?;
     api.json(
         Method::POST,
@@ -760,6 +761,7 @@ pub async fn workspace_get(
     code: String,
     rule: Option<String>,
 ) -> CmdResult<workspace::Downloaded> {
+    usage(&state, |u| u.count("get_files"));
     let api = signed_in_api(&state)?;
     let (cancel, mut progress) = progress_events(&app, &state);
     workspace::get_structure(
@@ -812,6 +814,7 @@ pub async fn workspace_checkin(
     files: Vec<String>,
     comment: String,
 ) -> CmdResult<Value> {
+    usage(&state, |u| u.count("checkin"));
     let api = signed_in_api(&state)?;
     let root = workspace_root(&app, &state);
     let cancel = new_upload(&state);
@@ -845,6 +848,7 @@ pub async fn workspace_park(
     files: Vec<String>,
     comment: String,
 ) -> CmdResult<Value> {
+    usage(&state, |u| u.count("park"));
     let api = signed_in_api(&state)?;
     let root = workspace_root(&app, &state);
     let cancel = new_upload(&state);
@@ -1795,10 +1799,19 @@ pub async fn cad_export_step(
             "{file} is not in the working folder – check out or use “Get files” first."
         )));
     };
+    let program = cadexport::program_for(&input);
     let output = tokio::task::spawn_blocking(move || cadexport::export_step(&input))
         .await
         .map_err(|e| ApiError::local(format!("The export stopped: {e}")))?
         .map_err(ApiError::local)?;
+    // usage statistics (#383): which program exported, never the file
+    let name = match program {
+        Some(cadexport::CadProgram::Inventor) => "inventor",
+        Some(cadexport::CadProgram::SolidEdge) => "solid-edge",
+        Some(cadexport::CadProgram::SolidCraft) => "solidcraft",
+        None => "",
+    };
+    usage(&state, |u| u.count_export(name));
     Ok(output
         .file_name()
         .and_then(|n| n.to_str())
@@ -1883,6 +1896,7 @@ pub async fn workspace_open_cad(
     file: String,
     wish: cadlaunch::Wish,
 ) -> CmdResult<cadlaunch::OpenPlan> {
+    usage(&state, |u| u.count("open_cad"));
     let api = signed_in_api(&state)?;
     let root = workspace_root(&app, &state);
     let (_, found) =
@@ -2515,6 +2529,78 @@ pub async fn workspace_add_files(
     Ok(json!({ "copied": copied, "skipped": skipped }))
 }
 
+// ------------------------------------------------------- usage counts (#383)
+
+/// Counts for the own server's usage statistics (src/usage.rs): rolls the
+/// day, applies `change` and saves; a failure to save is ignored – counting
+/// never gets in the way.
+pub(crate) fn usage(state: &State<'_, AppState>, change: impl FnOnce(&mut crate::usage::Usage)) {
+    let mut s = state.settings.lock().expect("settings lock");
+    // desktop policy UsageStatistics = 0 (#378): nothing is counted, kept or sent
+    if policy::current().usage_statistics == Some(false) {
+        if s.usage != crate::usage::Usage::default() {
+            s.usage = crate::usage::Usage::default();
+            let _ = s.save(&state.config_dir);
+        }
+        return;
+    }
+    let today = crate::usage::today_utc();
+    s.usage.roll(&today, crate::usage::package(), None);
+    change(&mut s.usage);
+    let _ = s.save(&state.config_dir);
+}
+
+/// Counts one of the fixed actions the UI performs (unknown names are
+/// ignored).
+#[tauri::command]
+pub fn usage_count(state: State<'_, AppState>, action: String) {
+    usage(&state, |u| u.count(&action));
+}
+
+/// One more minute with the window in front (the UI asks once a minute).
+#[tauri::command]
+pub fn usage_tick(state: State<'_, AppState>) {
+    usage(&state, |u| u.tick());
+}
+
+/// Sends a finished day's report to the server the app is signed in to
+/// (`POST /api/v1/usage`); kept for *Show what is sent*. A failure is
+/// silent – the report is replaced by the next day's.
+#[tauri::command]
+pub async fn usage_flush(state: State<'_, AppState>) -> CmdResult<()> {
+    usage(&state, |_| {});
+    if policy::current().usage_statistics == Some(false) {
+        return Ok(());
+    }
+    let Some(pending) = snapshot(&state).usage.pending.clone() else {
+        return Ok(());
+    };
+    let api = signed_in_api(&state)?;
+    if api
+        .json(Method::POST, "/usage", Some(&pending))
+        .await
+        .is_ok()
+    {
+        let mut s = state.settings.lock().expect("settings lock");
+        s.usage.pending = None;
+        s.usage.last_sent = Some(pending);
+        let _ = s.save(&state.config_dir);
+    }
+    Ok(())
+}
+
+/// *Settings → Privacy → Show what is sent*: the report being counted
+/// today, a finished one waiting to be sent, and the one sent last.
+#[tauri::command]
+pub fn usage_show(state: State<'_, AppState>) -> Value {
+    usage(&state, |_| {});
+    let s = snapshot(&state);
+    json!({
+        "today": crate::usage::report(&s.usage, crate::usage::package(), None),
+        "pending": s.usage.pending,
+        "last_sent": s.usage.last_sent,
+    })
+}
 // ------------------------------------------------------ report a problem (#381)
 
 /// The prefilled, redacted report of a failure for the review dialog.

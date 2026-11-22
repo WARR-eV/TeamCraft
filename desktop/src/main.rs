@@ -30,6 +30,7 @@ mod scprops;
 mod settings;
 mod signin;
 mod update;
+mod usage;
 mod workspace;
 
 use std::{
@@ -274,6 +275,10 @@ fn main() {
             commands::workspace_open,
             commands::open_web,
             commands::set_zoom,
+            commands::usage_count,
+            commands::usage_tick,
+            commands::usage_flush,
+            commands::usage_show,
             commands::problem_report,
             commands::problem_report_open,
             commands::problem_report_save,

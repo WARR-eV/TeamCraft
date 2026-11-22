@@ -603,6 +603,9 @@ async fn serve_with(
     }
     // Outgoing event webhooks (the outbox `webhook_deliveries`).
     teamcraft::webhooks::spawn(pool.clone(), state.webhooks.clone());
+    // Usage statistics (#383): old desktop reports go; the aggregate is
+    // shared only when switched on and a destination is configured.
+    services::usage::spawn(pool.clone(), state.config.clone());
 
     // Files from before the format registry (or reset to NULL) get their CAD
     // format, then the CAD files among them are scanned for references.

@@ -198,6 +198,9 @@ pub struct Settings {
     pub update_latest: Option<String>,
     /// The release version whose notice the user closed (*Skip this version*).
     pub update_dismissed: Option<String>,
+    /// Anonymous usage counts for the own server (#383, src/usage.rs).
+    #[serde(default)]
+    pub usage: crate::usage::Usage,
     /// *Settings → Report problems to*: the operator's own tracker (#381);
     /// `None` = TeamCraft's GitHub issue form.
     #[serde(default)]

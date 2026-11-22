@@ -112,6 +112,8 @@ export function enterShell() {
     $("status-server").textContent = state.session.server_url;
     $("status-ws").textContent = "Workspace: " + state.session.workspace_dir;
     checkServerVersion();
+    // usage statistics for the own server (#383): a finished day goes now
+    call("usage_flush").catch(function () {});
     applyBranding();
     selectView(state.view);
     renderTabs();
@@ -176,6 +178,10 @@ export function initUpdateNotice() {
   // the app may run for days: look again now and then (Rust asks GitHub
   // at most once a day)
   setInterval(function () { if (state.me) checkUpdate(); }, 6 * 3600 * 1000);
+  // active minutes (#383): a minute counts when the window is in front
+  setInterval(function () {
+    if (state.me && document.hasFocus()) call("usage_tick").catch(function () {});
+  }, 60 * 1000);
 }
 
 /** What *Update now* does for each kind of installation (#377). */

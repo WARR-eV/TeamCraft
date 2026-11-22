@@ -685,6 +685,18 @@ removed. Edit the text as you like, then:
 The error pages of the web UI have *Details for a bug report* with *Copy
 details* (status, message, page, time and version).
 
+## Usage report
+
+Once a day of use, the app sends your TeamCraft server an anonymous report of
+the day before: a random id of this installation, the app version, system,
+package type, the minutes the window was in front, and how often fixed
+actions were used (check-out, check-in, 3D preview …) – never names,
+numbers, paths, search terms or anything you type, and not who you are.
+*Settings → Privacy → Show what is sent* shows the exact report. The report
+stays with your organisation; your administrator decides whether the server
+shares a summary with the TeamCraft developers (off unless they turn it on) –
+see [Privacy](../admin/privacy.md).
+
 ## Crash reports
 
 When the app crashes – a panic in the app, an uncaught error in its user

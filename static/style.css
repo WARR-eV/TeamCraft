@@ -1496,3 +1496,7 @@ td.row-actions details.menu { display: inline-block; text-align: left; }
 /* Files card: files dropped onto it are uploaded */
 .drop-active { outline: 2px dashed var(--accent, currentColor); outline-offset: -4px; }
 .files-hint form { margin-top: .5rem; }
+
+/* Admin → Usage statistics (#383): the JSON that is sent, the summary tables */
+pre.json { max-height: 24rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.usage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 16px; align-items: start; }

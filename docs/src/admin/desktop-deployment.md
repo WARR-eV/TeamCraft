@@ -15,7 +15,7 @@ these *policies*, once at start; nothing about them is sent anywhere
 | `CrashReportPrompt` | switch | `0`: crash reports stay on the computer and are never offered for sharing; `1`: always offered          |
 | `WorkspaceRoot`     | text   | The folder new working folders are created in (an absolute path); users can still choose another one   |
 | `OrganizationName`  | text   | Shown as *Managed by …* in *Settings* and *About* (one line, at most 64 characters)                     |
-| `UsageStatistics`   | switch | `0`: no usage statistics sent or kept, no notice; `1`: sent, users cannot turn them off (read by app versions with usage statistics, #383) |
+| `UsageStatistics`   | switch | `0`: the app counts, keeps and sends no usage report to its server (#383); `1` or not set: it reports to its own server – whether the server shares a summary with the developers is its administrator's choice ([Privacy](privacy.md)) |
 
 A *switch* is the number `0` or `1` (`REG_DWORD` on Windows; an integer or a
 boolean in a profile or the JSON file). A value of the **wrong type or out of

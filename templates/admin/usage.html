@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Usage statistics{% endblock %}
+{% block nav_usage %}active{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Usage statistics</h1>
+    <p class="subtitle">
+      The desktop apps send this server one anonymous report per day of use: a random installation id, the app version,
+      operating system, package type, active minutes and counts of fixed actions – never names, numbers, paths, search
+      terms or anything typed. They stay on this server. Sharing an aggregate with the TeamCraft developers is off until
+      you turn it on.
+    </p>
+  </div>
+</div>
+
+<section class="card" id="sharing">
+  <h2>Share with the TeamCraft developers</h2>
+  <p>
+    {% if sharing.on %}<strong>On</strong> – once a day this server sends the report below{% if not sharing.destination %},
+    but no destination is configured (<code>TEAMCRAFT_USAGE_STATISTICS_URL</code>), so nothing leaves the server yet{% endif %}.
+    {% else %}<strong>Off</strong> – nothing leaves this server.{% endif %}
+  </p>
+  {% if sharing.fixed_by %}
+  <p class="hint">Set by {{ sharing.fixed_by }} on this server – it cannot be changed here.</p>
+  {% else %}
+  <form method="post" action="/admin/usage/sharing">
+    {% if sharing.on %}
+    <input type="hidden" name="share" value="0">
+    <button type="submit">Stop sharing</button>
+    {% else %}
+    <input type="hidden" name="share" value="1">
+    <button class="primary" type="submit">Share anonymous usage statistics</button>
+    {% endif %}
+  </form>
+  {% endif %}
+  <details>
+    <summary>Show what is sent</summary>
+    <p class="hint">The exact JSON this server would send now: sizes in classes, optional features on or off, and the desktop
+      reports of the last two days summed up.</p>
+    <pre class="json">{{ next }}</pre>
+    {% if last %}
+    <p class="hint">Sent last {{ last_sent_at }}:</p>
+    <pre class="json">{{ last }}</pre>
+    {% endif %}
+  </details>
+</section>
+
+<section class="card" id="desktop">
+  <h2>Desktop apps, last {{ desktop.days }} days</h2>
+  {% if desktop.installations == 0 %}
+  <p class="empty">No desktop app has reported yet.</p>
+  {% else %}
+  <p>{{ desktop.installations }} installation{% if desktop.installations != 1 %}s{% endif %},
+    {{ desktop.active_minutes }} active minutes in all.</p>
+  <div class="usage-grid">
+    <table class="data">
+      <thead><tr><th>Version</th><th class="num">Installations</th></tr></thead>
+      <tbody>{% for v, n in desktop.versions|dictsort %}<tr><td class="mono">{{ v }}</td><td class="num">{{ n }}</td></tr>{% endfor %}</tbody>
+    </table>
+    <table class="data">
+      <thead><tr><th>System</th><th class="num">Installations</th></tr></thead>
+      <tbody>{% for v, n in desktop.os|dictsort %}<tr><td>{{ v }}</td><td class="num">{{ n }}</td></tr>{% endfor %}
+        {% for v, n in desktop.packages|dictsort %}<tr><td>package: {{ v }}</td><td class="num">{{ n }}</td></tr>{% endfor %}</tbody>
+    </table>
+    <table class="data">
+      <thead><tr><th>Action</th><th class="num">Count</th></tr></thead>
+      <tbody>{% for a in actions %}<tr><td class="mono">{{ a }}</td><td class="num">{{ desktop.actions[a] or 0 }}</td></tr>{% endfor %}
+        {% for p, n in desktop.cad_exports|dictsort %}<tr><td class="mono">STEP export: {{ p }}</td><td class="num">{{ n }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -269,6 +269,19 @@ they may send to:
 By default webhooks reach public addresses only. An on-premises ERP or CI
 server is internal, so list it: `TEAMCRAFT_WEBHOOK_ALLOWED_HOSTS=erp.corp.example,ci.corp.example`.
 
+## Usage statistics (optional)
+
+The desktop apps report anonymous daily counts to this server; *Admin →
+Usage statistics* shows them. Sharing an aggregate with the TeamCraft
+developers is **off** until an administrator turns it on there – see
+[Privacy: what TeamCraft sends](privacy.md).
+
+| Variable                         | Default | Meaning                                                                                                           |
+|----------------------------------|---------|-------------------------------------------------------------------------------------------------------------------|
+| `TEAMCRAFT_USAGE_STATISTICS`     | –       | `1`/`0`: sharing with the developers is on/off and cannot be changed on the admin page; unset = the admin setting |
+| `TEAMCRAFT_USAGE_STATISTICS_URL` | –       | the `https://` address the daily aggregate is sent to; unset = nothing is sent, even when sharing is on           |
+| `TEAMCRAFT_NO_TELEMETRY`         | –       | `1`: never share (also `DO_NOT_TRACK=1`); set by `teamcraft local`                                                |
+
 ## Assistant (optional)
 
 The built-in assistant ([Ask TeamCraft](../guide/assistant.md)) is off
