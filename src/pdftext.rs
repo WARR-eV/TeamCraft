@@ -11,7 +11,7 @@
 //! The same child reads HTML reports (`--format html`, see [`crate::htmltext`])
 //! and spreadsheets of BOM and result imports (`--format sheet`, see
 //! [`crate::bomtable::run_sheet_job`], GHSA-54vc-vgp2-8whr); `extract_isolated`
-//! and [`run_isolated_bytes`] run them.
+//! and `run_isolated_bytes` run them.
 
 use std::{
     path::Path,

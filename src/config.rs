@@ -2002,7 +2002,14 @@ mod tests {
         for line in compose.lines().map(str::trim) {
             if let Some((key, value)) = line.split_once(": ") {
                 if key.starts_with("TEAMCRAFT_") {
-                    vars.insert(key.to_string(), value.trim_matches('"').to_string());
+                    let value = value.trim_matches('"');
+                    // `${NAME:-default}` from .env: what compose uses without one
+                    let value = value
+                        .strip_prefix("${")
+                        .and_then(|v| v.strip_suffix('}'))
+                        .and_then(|v| v.split_once(":-"))
+                        .map_or(value, |(_, default)| default);
+                    vars.insert(key.to_string(), value.to_string());
                     from_compose += 1;
                 }
             }
@@ -2023,6 +2030,10 @@ mod tests {
         assert_eq!(cfg.vault_dir, PathBuf::from("/var/lib/teamcraft/vault"));
         assert!(cfg.local_login);
         assert!(!cfg.summary().contains("generated-password"));
+        // without .env (install.sh writes it): loopback only
+        assert!(cfg
+            .summary()
+            .contains("trusted_proxies=127.0.0.0/8,::1/128"));
         std::fs::remove_dir_all(dir).ok();
     }
 

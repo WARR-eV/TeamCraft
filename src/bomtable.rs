@@ -1000,7 +1000,7 @@ mod tests {
     }
 
     /// A ZIP with one Deflate entry of `len` zero bytes that claims
-    /// `declared` bytes (CRC left at 0: the guard refuses before the end).
+    /// `declared` bytes (with the right CRC-32 of the zeros).
     fn zip_of_zeros(name: &str, len: usize, declared: u32) -> Vec<u8> {
         use std::io::Write as _;
         let mut enc = flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::best());
@@ -1012,12 +1012,20 @@ mod tests {
             left -= n;
         }
         let data = enc.finish().unwrap();
+        let mut crc = crc32fast::Hasher::new();
+        let mut left = len;
+        while left > 0 {
+            let n = left.min(chunk.len());
+            crc.update(&chunk[..n]);
+            left -= n;
+        }
+        let crc = crc.finalize();
         let (n, c) = (name.len() as u16, data.len() as u32);
         let mut out = Vec::new();
         // local file header
         out.extend_from_slice(&0x0403_4b50u32.to_le_bytes());
         out.extend_from_slice(&[20, 0, 0, 0, 8, 0, 0, 0, 0, 0]);
-        out.extend_from_slice(&0u32.to_le_bytes()); // crc
+        out.extend_from_slice(&crc.to_le_bytes());
         out.extend_from_slice(&c.to_le_bytes());
         out.extend_from_slice(&declared.to_le_bytes());
         out.extend_from_slice(&n.to_le_bytes());
@@ -1028,7 +1036,7 @@ mod tests {
         // central directory
         out.extend_from_slice(&0x0201_4b50u32.to_le_bytes());
         out.extend_from_slice(&[20, 0, 20, 0, 0, 0, 8, 0, 0, 0, 0, 0]);
-        out.extend_from_slice(&0u32.to_le_bytes());
+        out.extend_from_slice(&crc.to_le_bytes());
         out.extend_from_slice(&c.to_le_bytes());
         out.extend_from_slice(&declared.to_le_bytes());
         out.extend_from_slice(&n.to_le_bytes());
