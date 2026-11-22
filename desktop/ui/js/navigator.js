@@ -5,12 +5,13 @@
 import { $, ICONS, api, append, badge, call, clear, dialog, enc, errorText, field, h, lockIcon, setStatus, state, svgIcon, toast } from "./core.js";
 import { fmtDate, label } from "/static/shared/js/format.js";
 import { canSeeLocks, openLockOverview } from "./lock-overview.js";
-import { canEdit, checkInAll, fetchWorklist, refreshWorklistCount, reloadProjects, renderNotifications, rescanNewFiles, scanNewFiles, showWorklistCount } from "./shell.js";
+import { canEdit, checkInAll, fetchWorklist, refreshWorklistCount, reloadProjects, renderNotifications, rescanNewFiles, scanLocalChanges, scanNewFiles, sendLocalChanges, showWorklistCount } from "./shell.js";
 import { assistantContextChanged } from "./assistant.js";
 import { agent, renderAgentView } from "./agent.js";
 import { openRevision } from "./revision.js";
 import { impactGroups, relationShort, relationText } from "./references.js";
-import { lockAge } from "./workspace.js";
+import { getting, lockAge, reportDownload } from "./workspace.js";
+import { LOCAL_LABEL, localSummaryText, localVersionText, selectionActions } from "./local-changes.js";
 import { openChange } from "./change.js";
 import { openRequest } from "./requests.js";
 import { checkNewItemFiles, createItemFromFiles, editableGroupOfFolder, newItemDialog } from "./dialogs.js";
@@ -351,7 +352,8 @@ export function sectionTitle(text, n) {
 export function renderWorklist() {
   // the files on this computer are looked at again whenever the worklist is
   // opened or refreshed (#359); a failing scan never hides the worklist
-  return Promise.all([fetchWorklist(), scanNewFiles(true).catch(function () { return null; })]).then(function (r) {
+  return Promise.all([fetchWorklist(), scanNewFiles(true).catch(function () { return null; }),
+    scanLocalChanges(false).catch(function () { return null; })]).then(function (r) {
     showWorklistCount();
     drawWorklist(r[0]);
   });
@@ -377,6 +379,7 @@ export function drawWorklist(w) {
       h("span.meta.small.dim", { text: lockAge(r.checked_out_at) })
     ]));
   })) : h("p.empty", { text: "Nothing checked out." }));
+  localChangesSection(nav);
   if (canEdit()) newFilesSection(nav);
   nav.appendChild(sectionTitle("Waiting for my review", w.reviews.length));
   nav.appendChild(w.reviews.length ? h("ul.tree", null, w.reviews.map(changeNode)) : h("p.empty", { text: "Nothing to review." }));
@@ -392,6 +395,184 @@ export function drawWorklist(w) {
   nav.appendChild(sectionTitle("My open requests", mine.length));
   nav.appendChild(mine.length ? h("ul.tree", null, mine.map(requestNode)) : h("p.empty", { text: "Found a problem? Use “Request change…” on a revision or a workspace file." }));
   nav.scrollTop = top;
+}
+
+// ------------------------------------------------ Local changes (#416)
+
+/** What a row's buttons are called. */
+var LOCAL_ACTION_LABEL = { checkout: "Check out", get: "Get latest", checkin: "Check in…", merge: "Merge…", folder: "Folder" };
+var LOCAL_ACTION_TITLE = {
+  checkout: "Check out this revision and keep your file – it becomes yours to check in",
+  get: "Copy the current files of this revision into the working folder – local changes are kept",
+  checkin: "Check in your changed files of this revision (new versions; the check-out is released)",
+  merge: "Changed here and on the server – open the Workspace tab to merge",
+  folder: "Open the folder of this revision"
+};
+
+/** The worklist section *Local changes*: every file of the working folder
+ *  that is modified, outdated, in conflict, new or missing, grouped by item
+ *  (local-changes.js plans it, desktop/src/localchanges.rs scans). Ticked
+ *  rows take the bar's actions; every row has its own. */
+function localChangesSection(nav) {
+  var lc = state.localChanges;
+  if (!lc) return;
+  var plan = lc.plan, editor = canEdit();
+  state.localTicked = state.localTicked || {};
+  var ticked = state.localTicked, present = {};
+  plan.items.forEach(function (it) { it.revisions.forEach(function (rev) { rev.rows.forEach(function (r) { present[r.key] = true; }); }); });
+  Object.keys(ticked).forEach(function (k) { if (!present[k]) delete ticked[k]; });
+  var checkoutBtn = h("button.small", { type: "button", title: "Check out the revisions of the ticked files and keep your files",
+    on: { click: function () { localCheckout(selectionActions(plan, ticked).checkout); } } }, "Check out");
+  var getBtn = h("button.small", { type: "button", title: "Get the latest files of the ticked revisions – local changes are kept",
+    on: { click: function () { localGet(selectionActions(plan, ticked).get); } } }, "Get latest");
+  var checkinBtn = h("button.small", { type: "button", title: "Check in the ticked files of your check-outs",
+    on: { click: function () { localCheckin(selectionActions(plan, ticked).checkin); } } }, "Check in selected");
+  function updateBar() {
+    var sel = selectionActions(plan, ticked);
+    checkoutBtn.disabled = !sel.checkout.length;
+    getBtn.disabled = !sel.get.length;
+    checkinBtn.disabled = !sel.checkin.changed.length;
+  }
+  updateBar();
+  nav.appendChild(h("div.row", null, [sectionTitle("Local changes", plan.count),
+    plan.count ? h("span.row", null, [editor ? checkoutBtn : null, getBtn, editor ? checkinBtn : null]) : null]));
+  if (!plan.count) {
+    nav.appendChild(h("p.empty", { text: "No modified, outdated or missing files in your working folder." }));
+  } else {
+    nav.appendChild(h("p.small.dim", { text: localSummaryText(plan) }));
+    nav.appendChild(h("ul.tree", null, plan.items.map(function (it) {
+      return h("li", null, [
+        h("div.node", { title: it.project ? it.project + " / " + it.item : it.item }, [
+          h("span.twisty"), h("span.ico", { text: "◇" }),
+          h("span.label", null, [h("span.mono", { text: it.item }), it.project ? h("span.dim", { text: " " + it.project }) : null])
+        ]),
+        h("ul.tree", null, it.revisions.map(function (rev) { return localRevisionNode(rev, ticked, updateBar, editor); }))
+      ]);
+    })));
+  }
+  var notes = [];
+  if (plan.truncated) notes.push("Only part of the working folder was compared – it holds very many files.");
+  if (plan.tracked > plan.compared) notes.push((plan.tracked - plan.compared) + " of " + plan.tracked + " revisions compared on this computer only (no outdated or conflict check)");
+  if (notes.length) nav.appendChild(h("p.small.dim", { text: notes.join(" · ") }));
+  if (plan.errors.length) nav.appendChild(h("p.small.notice.error", { text: "Could not compare with the server: " + plan.errors.join("; ") }));
+  if (editor) {
+    nav.appendChild(h("p.small.dim", null, ["Files that belong to no item yet: ",
+      h("button.link.small", { type: "button", on: { click: function () {
+        var target = $("worklist-new-files");
+        if (target) target.scrollIntoView({ block: "start" });
+      } } }, "New on this computer")]));
+  }
+}
+
+/** One revision of *Local changes*: its line (opens the Workspace tab) and its files. */
+function localRevisionNode(rev, ticked, updateBar, editor) {
+  var head = h("div.node", { title: "Open the Workspace tab of " + rev.item + "/" + rev.code, "data-item": rev.item, "data-rev": rev.code,
+    on: { click: function () { openRevision(rev.item, rev.code, "workspace"); } } }, [
+    h("span.twisty"), h("span.ico", null, rev.checked_out ? lockIcon(true) : null),
+    h("span.label", null, [h("span.mono", { text: rev.item + "/" + rev.code }),
+      rev.inaccessible ? h("span.dim", { text: " – no longer accessible" }) : null,
+      !rev.compared ? h("span.dim", { text: " – not compared with the server" }) : null])
+  ]);
+  return h("li", null, [head, h("ul.tree", null, rev.rows.map(function (r) {
+    var box = h("input", { type: "checkbox", "aria-label": "Tick " + r.name, checked: !!ticked[r.key],
+      on: { click: function (ev) { ev.stopPropagation(); }, change: function () { ticked[r.key] = box.checked; updateBar(); } } });
+    var stateBadge = badge(r.state, LOCAL_LABEL[r.state] || r.state);
+    if (r.without_checkout) stateBadge.title = "Changed without a check-out – check out to keep your file";
+    var buttons = r.actions.filter(function (a) { return editor || (a !== "checkout" && a !== "checkin"); }).map(function (a) {
+      return h("button.small", { type: "button", title: LOCAL_ACTION_TITLE[a], on: { click: function (ev) {
+        ev.stopPropagation();
+        localRowAction(a, rev, r);
+      } } }, LOCAL_ACTION_LABEL[a]);
+    });
+    return h("li", null, h("div.node.local-change", { title: r.path }, [
+      box,
+      h("span.label", null, [h("span.fname", { text: r.name }), " ", stateBadge,
+        r.without_checkout ? h("span.small.dim", { text: " not checked out" }) : null]),
+      h("span.meta.small.dim", { text: localVersionText(r) }),
+      h("span.row", null, buttons)
+    ]));
+  }))]);
+}
+
+function localRef(rev) { return { project: rev.project || null, item: rev.item, code: rev.code }; }
+
+function localRowAction(action, rev, row) {
+  if (action === "checkout") localCheckout([localRef(rev)]);
+  else if (action === "get") localGet([localRef(rev)]);
+  else if (action === "checkin") localCheckin({ changed: [Object.assign(localRef(rev), {
+    upload: rev.rows.filter(function (r) { return r.actions.indexOf("checkin") >= 0 && r.key === row.key; }).map(function (r) { return r.name; }),
+    conflicts: rev.rows.filter(function (r) { return r.state === "conflict"; }).map(function (r) { return r.name; })
+  })], unreadable: [] });
+  else if (action === "merge") openRevision(rev.item, rev.code, "workspace");
+  else call("workspace_open", Object.assign(localRef(rev), { file: null })).catch(function (e) { toast(errorText(e), "error"); });
+}
+
+/** *Check out (keep my file)*: one revision after the other; the Get of the
+ *  check-out never overwrites a locally modified file. */
+function localCheckout(refs) {
+  if (!refs.length) return;
+  var done = [], failed = [];
+  refs.reduce(function (chain, r) {
+    return chain.then(function () {
+      setStatus("Checking out " + r.item + "/" + r.code + " …");
+      return getting(call("workspace_checkout", r)).then(function (res) {
+        done.push(r.item + "/" + r.code);
+        if (res.clashes.length || res.failed.length || res.unresolved.length) reportDownload(res);
+      }, function (err) { failed.push(r.item + "/" + r.code + ": " + errorText(err)); });
+    });
+  }, Promise.resolve()).then(function () {
+    setStatus("");
+    toast((done.length ? "Checked out " + done.join(", ") + " – your files were kept" : "Nothing checked out") +
+      (failed.length ? ". Failed: " + failed.join("; ") : "."), failed.length ? "error" : null);
+    state.localTicked = {};
+    refreshWorklistCount();
+  });
+}
+
+/** *Get latest* for the given revisions, one after the other. */
+function localGet(refs) {
+  if (!refs.length) return;
+  var failed = [], kept = [];
+  refs.reduce(function (chain, r) {
+    return chain.then(function () {
+      setStatus("Getting " + r.item + "/" + r.code + " …");
+      return getting(call("workspace_download", r)).then(function (res) {
+        kept = kept.concat(res.kept);
+        if (res.clashes.length || res.failed.length) reportDownload(res);
+      }, function (err) { failed.push(r.item + "/" + r.code + ": " + errorText(err)); });
+    });
+  }, Promise.resolve()).then(function () {
+    setStatus("");
+    toast("Got the latest files of " + (refs.length - failed.length) + " of " + refs.length + (refs.length === 1 ? " revision" : " revisions") +
+      (kept.length ? " – kept your changed " + kept.join(", ") : "") + (failed.length ? ". Failed: " + failed.join("; ") : "."), failed.length ? "error" : null);
+    state.localTicked = {};
+    refreshWorklistCount();
+  });
+}
+
+/** *Check in selected*: asks for a comment, then the Check in all flow for
+ *  the chosen files (revisions with a conflict stay checked out). */
+function localCheckin(report) {
+  if (!report.changed.length) return;
+  var comment = h("input", { type: "text", maxlength: "500", placeholder: "What changed?" });
+  var names = report.changed.map(function (c) { return c.item + "/" + c.code + " (" + c.upload.join(", ") + ")"; });
+  dialog("Check in selected", h("div.stack", null, [
+    h("p", { text: "New versions of the ticked files; the check-outs are released:" }),
+    h("ul.small", null, names.map(function (t) { return h("li", { text: t }); })),
+    field("Comment", comment)
+  ]), [
+    { label: "Cancel", onClick: function (d) { d.close(); } },
+    { label: "Check in", primary: true, submit: true, onClick: function (d) {
+      d.close();
+      sendLocalChanges(report, false, comment.value.trim() || "Checked in from Local changes").then(function (sent) {
+        var problems = sent.kept.concat(sent.failed);
+        toast((sent.done.length ? "Checked in " + sent.done.join(", ") : "Nothing checked in") +
+          (problems.length ? ". " + problems.join("; ") : "."), sent.failed.length ? "error" : null);
+        state.localTicked = {};
+        refreshWorklistCount();
+      });
+    } }
+  ]);
 }
 
 // ------------------------------------------------ New on this computer (#359)
@@ -412,7 +593,7 @@ function newFilesSection(nav) {
   var createBtn = h("button.small", { type: "button", title: "Create one item for each ticked file, in its folder",
     on: { click: function () { createSuggested(chosen()); } } }, "Create items…");
   createBtn.disabled = !chosen().length;
-  var head = h("div.row", null, [sectionTitle("New on this computer", list.length), list.length ? createBtn : null]);
+  var head = h("div.row", { id: "worklist-new-files" }, [sectionTitle("New on this computer", list.length), list.length ? createBtn : null]);
   nav.appendChild(head);
   if (!list.length) {
     nav.appendChild(h("p.empty", { text: "No new parts or assemblies in your working folder." }));

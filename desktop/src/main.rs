@@ -20,6 +20,7 @@ mod compat;
 mod crash;
 mod folderimport;
 mod layout;
+mod localchanges;
 mod localserver;
 mod newfiles;
 mod policy;
@@ -273,6 +274,7 @@ fn main() {
             commands::workspace_checkin,
             commands::workspace_park,
             commands::workspace_local_changes,
+            commands::local_changes_scan,
             commands::pick_files,
             commands::workspace_add_plan,
             commands::workspace_add_files,

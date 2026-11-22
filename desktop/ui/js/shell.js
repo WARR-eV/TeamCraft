@@ -16,6 +16,7 @@ import { openRequest } from "./requests.js";
 import { openSettings } from "./settings.js";
 import { formatKinds } from "./folder-import.js";
 import { planNewFiles } from "./new-files.js";
+import { planLocalChanges } from "./local-changes.js";
 
 // ======================================================================
 // Shell
@@ -310,9 +311,9 @@ export function initShell() {
     var t = activeTab();
     if (t && t.data && t.recheckLocal) t.recheckLocal();
     if (state.me) {
-      scanNewFiles(false).then(function () {
+      Promise.all([scanNewFiles(false).catch(function () {}), scanLocalChanges(false).catch(function () {})]).then(function () {
         if (state.view === "worklist" && state.worklist) drawWorklist(state.worklist);
-      }, function () {});
+      });
     }
   });
   document.addEventListener("keydown", function (e) {
@@ -621,14 +622,16 @@ export function fetchWorklist() {
   });
 }
 
-/** The count on the rail: the open worklist entries and the files on this
- *  computer suggested as new items (from the last scan, #359). */
+/** The count on the rail: the open worklist entries, the files on this
+ *  computer suggested as new items (from the last scan, #359) and the files
+ *  with local changes (#416). */
 export function showWorklistCount() {
   var w = state.worklist;
   if (!w) return;
   // dependents count once, however many changes they have to be checked against
   var n = w.checkouts.length + w.reviews.length + impactGroups(w).length + (w.requests_assigned || []).length +
-    (state.newFiles ? state.newFiles.plan.suggestions.length : 0);
+    (state.newFiles ? state.newFiles.plan.suggestions.length : 0) +
+    (state.localChanges ? state.localChanges.plan.count : 0);
   var el = $("worklist-count");
   el.textContent = String(n);
   el.classList.toggle("hidden", n === 0);
@@ -674,10 +677,42 @@ export function rescanNewFiles() {
 /** After anything that changes the worklist (check out, cancel check-out,
  * check in, a review …): the count on the rail, and the worklist navigator
  * when it is shown – an action in a tab on the right shows up on the left at
- * once (#347). */
+ * once (#347) – and *Local changes* is scanned again (#416). */
 export function refreshWorklistCount() {
+  // a check-in, Get or check-out changes the working folder too (#416)
+  rescanLocalChanges();
   return fetchWorklist().then(function (w) {
     if (state.view === "worklist") drawWorklist(w);
     return w;
   });
+}
+
+var localChangesScan = null;
+/** *Local changes* (#416): the modified, outdated, conflicting, new and
+ *  missing files of every revision in the working folder (desktop
+ *  src/localchanges.rs). At most every 15 s unless `force`; one scan at a
+ *  time. Only reads – the worklist section offers the actions. */
+export function scanLocalChanges(force) {
+  if (!state.me) { state.localChanges = null; return Promise.resolve(null); }
+  if (!force && state.localChanges && Date.now() - state.localChanges.at < 15000) return Promise.resolve(state.localChanges);
+  if (localChangesScan) return localChangesScan;
+  localChangesScan = call("local_changes_scan").then(function (scan) {
+    state.localChanges = { at: Date.now(), scan: scan, plan: planLocalChanges(scan) };
+    localChangesScan = null;
+    showWorklistCount();
+    return state.localChanges;
+  }, function (err) {
+    localChangesScan = null;
+    throw err;
+  });
+  return localChangesScan;
+}
+
+/** After a check-in, Get or check-out: scan again (once the running scan is
+ *  done) and redraw the worklist when it is shown. */
+export function rescanLocalChanges() {
+  var running = localChangesScan || Promise.resolve();
+  return running.catch(function () {}).then(function () { return scanLocalChanges(true); }).then(function () {
+    if (state.view === "worklist" && state.worklist) drawWorklist(state.worklist);
+  }, function () {});
 }

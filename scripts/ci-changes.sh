@@ -197,6 +197,8 @@ self_test() {
     check tests/fixtures/cad/nist/ctc-01/inventor/ctc_01.ipt server=true desktop_rust=true
     check clippy.toml server=true desktop_rust=true
     check scripts/desktop-tab-order.test.mjs server=false desktop_ui=true 'codeql=["javascript-typescript"]'
+    check scripts/desktop-local-changes.test.mjs,desktop/ui/js/local-changes.js server=false desktop_rust=false desktop_ui=true
+    check desktop/src/localchanges.rs server=false desktop_rust=true desktop_ui=false
     check src/services/lock_overview.rs server=true desktop_ui=true desktop_rust=false
     # documentation and examples read by the guard tests
     check docs/src/admin/configuration.md server=false guards=true docs_site=true 'codeql=[]'
