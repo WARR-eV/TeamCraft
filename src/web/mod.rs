@@ -912,6 +912,10 @@ async fn html_errors(State(st): State<AppState>, req: Request, next: Next) -> Re
         "status": info.status.as_u16(),
         "reason": info.status.canonical_reason().unwrap_or("Error"),
         "message": info.message,
+        // *Copy details* (#381): what a bug report needs, nothing more
+        "path": path,
+        "time": chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string(),
+        "version": env!("CARGO_PKG_VERSION"),
         "skin": skin,
         "branding": branding,
     });

@@ -198,6 +198,7 @@ docs/              mdBook documentation (Doxygen-style theme in docs/theme/), pu
 platforms/         short build-and-test guides: linux.md, macos.md, windows.md
 Dockerfile         server image (rust builder → distroless/cc, non-root, HEALTHCHECK), built by CI only
 deploy/            production Docker install: docker-compose.yml (teamcraft + postgres), teamcraft.env.example, install.sh;
+                   desktop-policies/ = ADMX/ADML, macOS profile and Linux JSON of the desktop policies (#378);
                    demo/demo.sh = snapshot and nightly reset of a hosted live demo (TEAMCRAFT_DEMO_USER: read-only
                    public account, auth::refuse_demo_write; data from scripts/seed-demo.sh over screenshots.sh seed_*)
 .github/workflows/ ci.yml (fmt, clippy, tests on PostgreSQL 16/18, macOS/Windows builds), docs.yml, desktop.yml, scale.yml (manual/weekly scale check, tests/scale.rs),
@@ -211,6 +212,7 @@ desktop/           TeamCraft Desktop (Tauri 2, own Cargo project – never part 
                    crash.js = crash reports; desktop/src/workspace.rs + layout.rs = working folder, park, local changes;
                    new-files.js + desktop/src/newfiles.rs = new items from local files, worklist *New on this computer* (#359);
                    desktop/src/localserver.rs = *Try TeamCraft on this computer* (starts the bundled teamcraft-server local);
+                   desktop/src/policy.rs = managed deployment policies (registry / macOS profile / /etc/teamcraft, #378);
                    tauri.local-server.conf.json = the *with local server* installers (externalBin teamcraft-server + postgresql/)
 plugins/solidcraft TeamCraft plugin for SolidCraft: WebAssembly component (craft:plugin@0.2.0, wit/plugin.wit = SolidCraft's
                    interface, MIT), own Cargo project; src/logic.rs = status, check, link, unlink over SolidCraft's commands

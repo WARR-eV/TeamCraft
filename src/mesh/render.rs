@@ -240,7 +240,8 @@ fn downsample(depth: &[f64], colour: &[[u8; 3]], w: usize, size: usize) -> Vec<u
 }
 
 /// An 8-bit RGBA PNG (no filtering, zlib-compressed).
-fn encode_png(width: u32, height: u32, rgba: &[u8]) -> Vec<u8> {
+/// An RGBA image (`width` × `height`, rows top down) as a PNG.
+pub fn encode_png(width: u32, height: u32, rgba: &[u8]) -> Vec<u8> {
     let mut raw = Vec::with_capacity(rgba.len() + height as usize);
     for row in rgba.chunks(width as usize * 4) {
         raw.push(0); // filter: none

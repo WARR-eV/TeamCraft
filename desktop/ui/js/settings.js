@@ -10,6 +10,25 @@ import { atRisk, checkUpdate, checkoutsWithChanges, localChangesList, refreshWor
 import { resetCompanyAi } from "./assistant.js";
 import { agent, agentSettingsDialog, endAgentPermissions, localAgentsAllowed, localAgentsOffText } from "./agent.js";
 
+/** Managed deployment policies (#378): is this setting (`server`,
+ *  `update_check`, `crash_prompt`, `usage_statistics`) fixed by the
+ *  organisation? Such a setting is shown disabled. */
+export function fixedByPolicy(key) {
+  var p = state.session && state.session.policy;
+  return !!(p && p.fixed && p.fixed.indexOf(key) !== -1);
+}
+
+/** `Managed by Example Lab` (or `by your organization`); `""` without policies. */
+export function managedText() {
+  var p = state.session && state.session.policy;
+  if (!p || !p.managed) return "";
+  return "Managed by " + (p.organization || "your organization");
+}
+
+function managedNote(key) {
+  return fixedByPolicy(key) ? h("p.hint.managed", { text: "Set by your organization" }) : null;
+}
+
 export function openSettings() {
   var current = document.documentElement.getAttribute("data-skin");
   var ws = h("input", { type: "text", value: state.session.workspace_dir, spellcheck: "false" });
@@ -20,17 +39,23 @@ export function openSettings() {
   } } });
   var notifyBox = h("div.stack");
   var notify = notificationSettings(notifyBox);
-  var updateCheck = h("input", { type: "checkbox", checked: !!state.session.update_check, on: { change: function () {
+  var updateCheck = h("input", { type: "checkbox", checked: !!state.session.update_check, disabled: fixedByPolicy("update_check"), on: { change: function () {
     var on = updateCheck.checked;
     call("set_update_check", { enabled: on }).then(function () {
       state.session.update_check = on;
       checkUpdate();
     }, function (e) { updateCheck.checked = !on; toast(errorText(e), "error"); });
   } } });
-  var crashPrompt = h("input", { type: "checkbox", checked: state.session.crash_prompt !== false, on: { change: function () {
+  var crashPrompt = h("input", { type: "checkbox", checked: state.session.crash_prompt !== false, disabled: fixedByPolicy("crash_prompt"), on: { change: function () {
     var on = crashPrompt.checked;
     call("set_crash_prompt", { enabled: on }).then(function () { state.session.crash_prompt = on; },
       function (e) { crashPrompt.checked = !on; toast(errorText(e), "error"); });
+  } } });
+  // *Report a problem* (#381): the operator's own tracker instead of GitHub
+  var reportUrl = h("input", { type: "url", value: state.session.report_url || "", spellcheck: "false", placeholder: "https://github.com/WARR-eV/TeamCraft/issues/new", on: { change: function () {
+    var url = reportUrl.value.trim();
+    call("set_report_url", { url: url }).then(function () { state.session.report_url = url || null; toast("Problem reports go to " + (url || "GitHub")); },
+      function (e) { toast(errorText(e), "error"); });
   } } });
   var serverInsecure = h("p.notice.warn.small.hidden", { text: "This server is reached over plain http:// – the token and all data cross the network unencrypted. Ask your administrator for the https:// address." });
   checkServerUrl(state.session.server_url || "", serverInsecure);
@@ -48,6 +73,7 @@ export function openSettings() {
       h("span.skin-swatch", { "aria-hidden": "true" }, [h("span"), h("span"), h("span"), h("span")])]);
   }));
   var body = h("div.stack", null, [
+    managedText() ? h("p.notice.small.managed", { text: managedText() + " – settings marked “Set by your organization” cannot be changed here." }) : null,
     h("h3", { text: "Appearance" }),
     h("p.hint", { text: "Choose how TeamCraft Desktop looks. The distribution skins are dark." }),
     skins,
@@ -70,13 +96,16 @@ export function openSettings() {
     notifyBox,
     h("h3", { text: "Updates" }),
     h("label.check", null, [updateCheck, "Tell me when a new version is out"]),
+    managedNote("update_check"),
     h("p.hint", { text: "Asks GitHub for the latest TeamCraft release at most once a day and shows a link in the status bar. Nothing is downloaded or installed by the app." }),
     h("h3", { text: "Privacy" }),
     h("p.hint", { text: "TeamCraft Desktop sends your TeamCraft server one anonymous report per day of use: a random id of this installation, the app version, operating system, package type, active minutes and counts of fixed actions (check-outs, check-ins, 3D previews …) – never names, numbers, paths, search terms or anything you type. Your administrator decides whether the server shares a summary with the TeamCraft developers (off unless they turn it on)." }),
     h("div.row", null, [h("button", { type: "button", on: { click: function () { showUsage(); } } }, "Show what is sent")]),
     h("h3", { text: "Crash reports" }),
     h("label.check", null, [crashPrompt, "After a crash, ask at the next start whether to share the report"]),
+    managedNote("crash_prompt"),
     h("p.hint", { text: "Crashes and uncaught errors are written to a report on this computer (in the app's settings folder, without your home folder, server addresses or tokens). It is only shared when you open the GitHub issue yourself. Switched off, the reports stay on this computer and are never shown." }),
+    field("Report problems to", reportUrl, "empty = the TeamCraft issue form on GitHub; your help desk's form address, which gets title and body"),
     h("h3", { text: "Account" }),
     h("p", null, ["Signed in to ", h("strong", { text: state.session.server_url }), " as ", h("strong", { text: state.me.display_name }), " (" + label(state.me.role) + ") on ", h("span", { text: state.session.device })]),
     state.session.token_storage === "file"
@@ -87,7 +116,7 @@ export function openSettings() {
       h("button.danger", { type: "button", on: { click: function () { dlg.close(); signOut(); } } }, "Sign out"),
       // single-sign-on accounts have no password here (older servers send no auth_source)
       state.me.auth_source === "oidc" ? null : h("button", { type: "button", on: { click: function () { dlg.close(); passwordDialog(); } } }, "Change password…"),
-      h("button", { type: "button", on: { click: function () { dlg.close(); showConnect("server"); } } }, "Switch server…")
+      fixedByPolicy("server") ? null : h("button", { type: "button", on: { click: function () { dlg.close(); showConnect("server"); } } }, "Switch server…")
     ]),
     h("h3", { text: "Connections" }),
     connectionsBox(function () { dlg.close(); })
@@ -138,7 +167,8 @@ function connectionsBox(closeSettings) {
           h("span.small.muted", { text: "Working folder: " + (c.workspace_dir || "the default folder") })
         ]),
         c.active ? h("span.badge", { text: "active" }) : h("span.row", null, [
-          h("button", { type: "button", on: { click: function () { closeSettings(); switchTo(c.id); } } }, "Switch"),
+          h("button", { type: "button", disabled: fixedByPolicy("server") && c.server_url !== state.session.policy.server_url,
+            title: fixedByPolicy("server") && c.server_url !== state.session.policy.server_url ? "Set by your organization: only " + state.session.policy.server_url + " can be used" : null, on: { click: function () { closeSettings(); switchTo(c.id); } } }, "Switch"),
           h("button", { type: "button", title: "Forget this connection and its sign-in; its working folder stays on disk", on: { click: function () {
             confirmDialog("Remove connection", "Forget the connection to " + c.server_url + (who ? " as " + who : "") +
               "? Its sign-in is removed from this computer; the working folder stays.", "Remove", true).then(function (ok) {
@@ -317,7 +347,8 @@ export function openAbout() {
     h("p", { text: "TeamCraft Desktop " + state.session.version + " – the rich client of TeamCraft, the open-source product lifecycle management." }),
     h("p.small", { text: "Pre-release: TeamCraft is a work in progress and has no official release yet. It is provided as is, without warranty of any kind (MPL-2.0, sections 6 and 7). Keep backups of your data." }),
     h("p.small.muted", { text: "TeamCraft is open source under the Mozilla Public License 2.0. Font: Montserrat (SIL Open Font License 1.1), text in the system UI face." }),
-    h("p.small.muted", { text: "Server: " + (state.session.server_url || "—") })
+    h("p.small.muted", { text: "Server: " + (state.session.server_url || "—") }),
+    managedText() ? h("p.small.muted", { text: managedText() + " (desktop policies)" }) : null
   ]), [{ label: "Close", primary: true, onClick: function (d) { d.close(); } }]);
 }
 

@@ -17,7 +17,7 @@ import { getProjectsDialog } from "./group-sync.js";
 import { formatKinds, importFolderDialog } from "./folder-import.js";
 import { renderFiles } from "./browser.js";
 import { ageText, batchSummary, newItemFindings, newItemPlacement } from "./new-files.js";
-import { favouriteKey, normalizeFavourite, suggestionKey } from "./files-view.js";
+import { checkedOutClass, favouriteKey, normalizeFavourite, suggestionKey } from "./files-view.js";
 import { cutLevel, describeNode, normalizeMode, pathKey, quantityText, rootNodes, usageBadge } from "./structure.js";
 
 // ======================================================================
@@ -760,7 +760,7 @@ export function structureNode(n, parentKey) {
       on: { click: function (ev) { ev.stopPropagation(); openRevision(n.item_number, n.code, "whereused"); } }
     }, usage));
   }
-  var node = h("div.node" + (state.active === "rev:" + n.item_number + ":" + n.code ? ".selected" : "") + (d.kind === "restricted" ? ".restricted" : ""), {
+  var node = h("div.node" + checkedOutClass(n) + (state.active === "rev:" + n.item_number + ":" + n.code ? ".selected" : "") + (d.kind === "restricted" ? ".restricted" : ""), {
     title: d.openable ? n.item_number + "/" + n.code + " – " + n.name : d.placeholder,
     "data-item": n.item_number || "",
     on: { click: function () {

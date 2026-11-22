@@ -10,7 +10,7 @@ import { typeIcon } from "./navigator.js";
 import { openRevision } from "./revision.js";
 import { canEdit, canEditProject } from "./shell.js";
 import { newItemDialog } from "./dialogs.js";
-import { countText, entryIconType, entryName, entryRevision, entryTitle, favouritePath, favouriteSuggestions, folderKey, groupTotal, mergeEntries, parentFolder, remaining, sortEntries, sortFolders } from "./files-view.js";
+import { checkedOutClass, countText, entryIconType, entryName, entryRevision, entryTitle, favouritePath, favouriteSuggestions, folderKey, groupTotal, mergeEntries, parentFolder, remaining, sortEntries, sortFolders } from "./files-view.js";
 
 /** Entries asked for per request (the server's maximum). */
 var PAGE = 500;
@@ -227,7 +227,7 @@ function entryNode(p, path, e) {
     var mine = !!state.me && e.checked_out_by_name === state.me.display_name;
     meta.push(h("span.lock-owner", { title: "Checked out by " + (mine ? "you" : e.checked_out_by_name) }, lockIcon(mine)));
   }
-  var node = row("div.node.file" + (state.active === key ? ".selected" : ""), {
+  var node = row("div.node.file" + checkedOutClass(e) + (state.active === key ? ".selected" : ""), {
     title: entryTitle(e, label), "data-item": e.item_number
   }, [
     h("span.twisty"), h("span.ico", { text: typeIcon(entryIconType(e)) }),

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: MPL-2.0
+     Group Policy template of TeamCraft Desktop (#378). Copy TeamCraft.admx to
+     %SystemRoot%\PolicyDefinitions (or the central store) and en-US\TeamCraft.adml
+     to its en-US folder; Intune: import both as custom ADMX. The app reads the
+     values under Software\Policies\TeamCraft (HKLM wins over HKCU). -->
+<policyDefinitions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="1.0" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <policyNamespaces>
+    <target prefix="teamcraft" namespace="TeamCraft.Policies.Desktop" />
+    <using prefix="windows" namespace="Microsoft.Policies.Windows" />
+  </policyNamespaces>
+  <resources minRequiredRevision="1.0" />
+  <supportedOn>
+    <definitions>
+      <definition name="SUPPORTED_TeamCraft_0_2_12" displayName="$(string.SUPPORTED_TeamCraft_0_2_12)" />
+    </definitions>
+  </supportedOn>
+  <categories>
+    <category name="TeamCraft" displayName="$(string.TeamCraft)" />
+  </categories>
+  <policies>
+    <policy name="ServerUrl" class="Both" displayName="$(string.ServerUrl)" explainText="$(string.ServerUrl_Explain)" presentation="$(presentation.ServerUrl)" key="Software\Policies\TeamCraft">
+      <parentCategory ref="TeamCraft" />
+      <supportedOn ref="SUPPORTED_TeamCraft_0_2_12" />
+      <elements>
+        <text id="ServerUrl" valueName="ServerUrl" maxLength="512" required="true" />
+      </elements>
+    </policy>
+    <policy name="AllowOtherServers" class="Both" displayName="$(string.AllowOtherServers)" explainText="$(string.AllowOtherServers_Explain)" key="Software\Policies\TeamCraft" valueName="AllowOtherServers">
+      <parentCategory ref="TeamCraft" />
+      <supportedOn ref="SUPPORTED_TeamCraft_0_2_12" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+    <policy name="CheckForUpdates" class="Both" displayName="$(string.CheckForUpdates)" explainText="$(string.CheckForUpdates_Explain)" key="Software\Policies\TeamCraft" valueName="CheckForUpdates">
+      <parentCategory ref="TeamCraft" />
+      <supportedOn ref="SUPPORTED_TeamCraft_0_2_12" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+    <policy name="CrashReportPrompt" class="Both" displayName="$(string.CrashReportPrompt)" explainText="$(string.CrashReportPrompt_Explain)" key="Software\Policies\TeamCraft" valueName="CrashReportPrompt">
+      <parentCategory ref="TeamCraft" />
+      <supportedOn ref="SUPPORTED_TeamCraft_0_2_12" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+    <policy name="UsageStatistics" class="Both" displayName="$(string.UsageStatistics)" explainText="$(string.UsageStatistics_Explain)" key="Software\Policies\TeamCraft" valueName="UsageStatistics">
+      <parentCategory ref="TeamCraft" />
+      <supportedOn ref="SUPPORTED_TeamCraft_0_2_12" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+    <policy name="WorkspaceRoot" class="Both" displayName="$(string.WorkspaceRoot)" explainText="$(string.WorkspaceRoot_Explain)" presentation="$(presentation.WorkspaceRoot)" key="Software\Policies\TeamCraft">
+      <parentCategory ref="TeamCraft" />
+      <supportedOn ref="SUPPORTED_TeamCraft_0_2_12" />
+      <elements>
+        <text id="WorkspaceRoot" valueName="WorkspaceRoot" maxLength="1024" required="true" />
+      </elements>
+    </policy>
+    <policy name="OrganizationName" class="Both" displayName="$(string.OrganizationName)" explainText="$(string.OrganizationName_Explain)" presentation="$(presentation.OrganizationName)" key="Software\Policies\TeamCraft">
+      <parentCategory ref="TeamCraft" />
+      <supportedOn ref="SUPPORTED_TeamCraft_0_2_12" />
+      <elements>
+        <text id="OrganizationName" valueName="OrganizationName" maxLength="64" required="true" />
+      </elements>
+    </policy>
+  </policies>
+</policyDefinitions>

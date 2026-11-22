@@ -22,7 +22,9 @@ mod folderimport;
 mod layout;
 mod localserver;
 mod newfiles;
+mod policy;
 mod profiles;
+mod report;
 mod resume;
 mod scprops;
 mod settings;
@@ -153,6 +155,8 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         .build()?;
     let help = SubmenuBuilder::new(app, "Help")
         .item(&item("import-help", "How to Import a CAD Folder", None)?)
+        .item(&item("report-problem", "Report a Problem…", None)?)
+        .item(&item("check-updates", "Check for Updates…", None)?)
         .item(&item("about", "About TeamCraft", None)?)
         .build()?;
     let menu = MenuBuilder::new(app);
@@ -174,6 +178,8 @@ fn main() {
             // crash reports: report sessions that ended unexpectedly, start ours;
             // one found later (a parallel instance that died) is announced to the UI
             let crash_dir = crash::open(&config_dir);
+            // the whole output of failed STEP exports (#342)
+            cadexport::set_log_dir(&config_dir);
             let handle = app.handle().clone();
             crash::start_session(&crash_dir, move || {
                 let _ = handle.emit("crash-reports", ());
@@ -181,7 +187,28 @@ fn main() {
             // the token's keychain entry belongs to this app's identifier:
             // TeamCraft Local (downloads with local server) has its own
             settings::set_keychain_service(&app.config().identifier);
-            let settings = settings::Settings::load(&config_dir);
+            // managed deployment policies (#378): read once; a fixed server
+            // is the one the app starts with (the connect screen is skipped)
+            let policies = policy::load();
+            let mut settings = settings::Settings::load(&config_dir);
+            if let Some(server) = policies.server_url.as_deref() {
+                let other = settings.server_url.as_deref() != Some(server);
+                if settings.server_url.is_none() || (other && policies.server_locked()) {
+                    let parking = profiles::OsParking { dir: &config_dir };
+                    let root = commands::default_workspace(app.handle());
+                    let connected = profiles::connect(
+                        &mut settings,
+                        &config_dir,
+                        &settings::OsKeychain,
+                        &parking,
+                        server,
+                        &root,
+                    );
+                    if connected.is_ok() {
+                        let _ = settings.save(&config_dir);
+                    }
+                }
+            }
             let zoom = settings.zoom.map(commands::clamp_zoom);
             let theme = window_theme(settings.skin.as_deref());
             app.manage(AppState {
@@ -252,8 +279,17 @@ fn main() {
             commands::usage_tick,
             commands::usage_flush,
             commands::usage_show,
+            commands::problem_report,
+            commands::problem_report_open,
+            commands::problem_report_save,
+            commands::set_report_url,
             commands::check_update,
             commands::dismiss_update,
+            commands::update_remind_later,
+            commands::check_update_now,
+            commands::update_offer,
+            commands::update_download,
+            commands::update_install,
             commands::set_update_check,
             commands::set_checkout_parts,
             commands::open_release_page,
@@ -269,6 +305,7 @@ fn main() {
             commands::import_bom,
             commands::cad_programs,
             commands::cad_export_step,
+            commands::cad_export_cancel,
             commands::solidcraft_write_item_data,
             commands::cad_installed,
             commands::cad_open_plan,

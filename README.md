@@ -394,6 +394,11 @@ there is no separate enterprise edition.
   statistics stay on your own server, sharing a summary with the developers is
   off by default and shown byte for byte before it is sent; see
   [Privacy: what TeamCraft sends](https://warr-ev.github.io/TeamCraft/admin/privacy.html).
+- **Desktop rollout** – policies per computer or user with the operating
+  system's tools (Group Policy/Intune ADMX templates, a macOS configuration
+  profile, `/etc/teamcraft/policies.json`): a fixed server, update checks,
+  crash-report prompts, the default working folder and *Managed by …*; see
+  [Deploying the desktop app](https://warr-ev.github.io/TeamCraft/admin/desktop-deployment.html).
 
 **Planned** – what is left of the issues above (all their steps are built):
 

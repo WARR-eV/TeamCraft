@@ -5,8 +5,8 @@ a user starts – and how to turn each off.
 
 | What | From → to | Content | Default | Off with |
 |---|---|---|---|---|
-| Update check | desktop app → `api.github.com` | the request for the latest release (the app's version in the `User-Agent`) | on, at most once a day | *Settings → Updates*; desktop policy `CheckForUpdates = 0` (#378) |
-| Usage report | desktop app → **your own** TeamCraft server | the daily report below | always (it stays in your organisation) | – |
+| Update check | desktop app → `api.github.com` | the request for the latest release (the app's version in the `User-Agent`) | on, at most once a day | *Settings → Updates*; desktop policy `CheckForUpdates = 0` ([Deploying the desktop app](desktop-deployment.md)) |
+| Usage report | desktop app → **your own** TeamCraft server | the daily report below | on (it stays in your organisation) | desktop policy `UsageStatistics = 0`: nothing is counted, kept or sent |
 | Usage statistics | your TeamCraft server → the TeamCraft developers | an aggregate of the server and its desktop apps (below) | **off** | stays off unless an administrator turns it on; `TEAMCRAFT_USAGE_STATISTICS=0`, `DO_NOT_TRACK=1`, `TEAMCRAFT_NO_TELEMETRY=1` |
 
 Crash reports of the desktop app are written on the computer and never sent;

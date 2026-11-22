@@ -151,8 +151,8 @@ export function checkTokenStorage() {
 }
 
 // ======================================================================
-// Update notice: a newer release on GitHub (src/update.rs) – a link to the
-// release page in the status bar, never a download or an installation
+// Update notice: a newer release on GitHub (src/update.rs) in the status bar;
+// it opens the update window (#377) – nothing is downloaded without a click
 // ======================================================================
 
 export function checkUpdate() {
@@ -168,7 +168,7 @@ export function showUpdate(notice) {
 
 export function initUpdateNotice() {
   $("status-update-open").addEventListener("click", function () {
-    call("open_release_page").catch(function (e) { toast(errorText(e), "error"); });
+    if (state.update) openUpdateWindow(state.update.version);
   });
   $("status-update-dismiss").addEventListener("click", function () {
     var notice = state.update;
@@ -182,6 +182,100 @@ export function initUpdateNotice() {
   setInterval(function () {
     if (state.me && document.hasFocus()) call("usage_tick").catch(function () {});
   }, 60 * 1000);
+}
+
+/** What *Update now* does for each kind of installation (#377). */
+var INSTALL_TEXT = {
+  "windows-msi": "Downloads the installer, checks it against the release's checksums, then closes TeamCraft and starts it.",
+  "windows-setup": "Downloads the installer, checks it against the release's checksums, then closes TeamCraft and starts it.",
+  "windows-portable": "Downloads the portable zip and checks it against the release's checksums – unpack it over your copy.",
+  "mac-dmg": "Downloads the disk image, checks it against the release's checksums and opens it – drag TeamCraft to Applications.",
+  "app-image": "Downloads the AppImage, checks it against the release's checksums and shows it – replace your copy with it.",
+  package: "",
+  other: "Download the new version from the release page."
+};
+
+/** The update window (#377): the new version, its release notes and what to
+ *  do – *Update now* (download, verify against SHA256SUMS.txt, start),
+ *  *Skip this version*, *Remind me later* or the release page. Never while
+ *  a check-in or download runs. */
+export function openUpdateWindow(version) {
+  var notes = h("pre.release-notes", { text: "Loading the release notes …" });
+  var how = h("p.hint");
+  var progress = h("p.small.muted.hidden", { role: "status" });
+  var actions = h("div.row");
+  var body = h("div.stack", null, [
+    h("p", { text: "TeamCraft " + version + " is available – you have " + state.session.version + "." }),
+    notes, how, actions, progress
+  ]);
+  var dlg = dialog("Update TeamCraft", body, [
+    { label: "Remind me later", onClick: function (d) {
+      showUpdate(null);
+      call("update_remind_later").catch(function (e) { toast(errorText(e), "error"); });
+      d.close();
+    } },
+    { label: "Skip this version", onClick: function (d) {
+      showUpdate(null);
+      call("dismiss_update", { version: version }).catch(function (e) { toast(errorText(e), "error"); });
+      d.close();
+    } },
+    { label: "Release page", onClick: function () {
+      call("open_release_page").catch(function (e) { toast(errorText(e), "error"); });
+    } }
+  ], { wide: true });
+  call("update_offer", { version: version }).then(function (offer) {
+    notes.textContent = offer.notes || "No release notes.";
+    how.textContent = offer.package_hint || INSTALL_TEXT[offer.install] || "";
+    if (!offer.asset) return;
+    var installer = offer.install === "windows-msi" || offer.install === "windows-setup";
+    var btn = h("button.primary", { type: "button", on: { click: function () {
+      if (busyWithTransfer()) { dlg.fail("A check-in or download is running – update when it has finished."); return; }
+      btn.disabled = true;
+      progress.textContent = "Downloading " + offer.asset + " and checking it …";
+      progress.classList.remove("hidden");
+      call("update_download", { version: version }).then(function (path) {
+        progress.textContent = "Verified: " + path;
+        if (!installer) return call("update_install").then(function () { dlg.close(); });
+        return confirmQuit().then(function (ok) {
+          btn.disabled = false;
+          if (ok) return call("update_install");
+        });
+      }).catch(function (e) {
+        btn.disabled = false;
+        progress.classList.add("hidden");
+        dlg.fail(e);
+      });
+    } } }, installer || offer.install === "mac-dmg" ? "Update now" : "Download");
+    actions.appendChild(btn);
+  }, function (e) {
+    notes.textContent = "The release notes could not be loaded: " + errorText(e);
+  });
+}
+
+/** Unfinished work before the installer replaces the app. */
+function confirmQuit() {
+  return new Promise(function (resolve) {
+    dialog("Close TeamCraft and install?", h("p", { text: "The installer replaces TeamCraft – the app closes now. Your working folder, sign-in and settings stay. Check in or park unfinished work first if you want it on the server." }), [
+      { label: "Not now", onClick: function (d) { d.close(); resolve(false); } },
+      { label: "Close and install", primary: true, submit: true, onClick: function (d) { d.close(); resolve(true); } }
+    ]);
+  });
+}
+
+/** A check-in, park or download is running (the status bar shows it). */
+function busyWithTransfer() {
+  return !!document.querySelector(".dialog [role=status]:not(.hidden)") || !$("status-get").classList.contains("hidden");
+}
+
+/** *Help → Check for updates*: asks now, also when the daily check is off,
+ *  and says the result. */
+export function checkUpdateNow() {
+  setStatus("Looking for a new version …");
+  call("check_update_now").then(function (r) {
+    setStatus("");
+    if (r.newer) { showUpdate({ version: r.latest, current: r.current }); openUpdateWindow(r.latest); return; }
+    toast(r.latest ? "TeamCraft " + r.current + " is up to date." : "No release is published yet.");
+  }, function (e) { setStatus(""); toast(errorText(e), "error"); });
 }
 
 export function initShell() {
