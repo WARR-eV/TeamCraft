@@ -1174,6 +1174,36 @@ mod tests {
     }
 
     #[test]
+    fn the_fuzz_seed_is_a_valid_file() {
+        // the seed the fuzzer starts from must pass every check of the reader
+        // (page checksums included): 3 single-precision points with an 8-bit
+        // intensity, moved 0.1 m along x by the scan's pose
+        let seed = include_bytes!("../../fuzz/seeds/e57/three-points.e57");
+        let mesh = crate::mesh::read("e57", seed).unwrap();
+        assert!(mesh.is_point_cloud());
+        assert_eq!(mesh.vertex_count(), 3);
+        assert_eq!(mesh.parts, 1);
+        assert!(
+            near(point(&mesh, 0), [100.0, 0.0, 0.0]),
+            "{:?}",
+            point(&mesh, 0)
+        );
+        assert!(
+            near(point(&mesh, 1), [1100.0, 0.0, 250.0]),
+            "{:?}",
+            point(&mesh, 1)
+        );
+        assert!(
+            near(point(&mesh, 2), [600.0, 1000.0, 500.0]),
+            "{:?}",
+            point(&mesh, 2)
+        );
+        assert_eq!(mesh.fields.len(), 1);
+        assert_eq!(mesh.fields[0].name, "Intensity");
+        assert_eq!(mesh.thinned, None);
+    }
+
+    #[test]
     fn crc32c_matches_the_standard_check_value() {
         assert_eq!(crc32c(&crc_table(), b"123456789"), 0xE306_9283);
         assert_eq!(crc32c(&crc_table(), b""), 0);

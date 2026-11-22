@@ -13,7 +13,8 @@ reader need, and should it be the `e57` crate or an own reader?
 
 * **ASTM E2807-11** *Standard Specification for 3D Imaging Data Exchange,
   Version 1.0* – the public description of the file layout (header, pages,
-  XML, binary sections), as summarised on the libE57 project pages.
+  XML, binary sections), as summarised on the libE57 project pages. The
+  standard text itself was not available (see the table below).
 * **libE57 format notes** (libe57.org, *E57 file format* and the reference
   implementation's documentation, Boost Software Licence): the checksum byte
   order, the packet layout of compressed vectors, the bit-pack codec and the
@@ -29,6 +30,32 @@ reader need, and should it be the `e57` crate or an own reader?
   sample data has no clear licence for redistribution.
 
 No proprietary scanner software was used or examined.
+
+### Source of each finding
+
+The text of ASTM E2807-11 itself (a paid standard) was **not available**, so
+no clause numbers are given; every finding below comes from the public
+documents named here instead. Where a finding says *libE57*, it is the
+libE57 project site (<http://www.libe57.org/>, reference implementation under
+the Boost Software Licence) – its *E57 file format* description and the
+*E57 Foundation API* reference documentation
+(<http://www.libe57.org/FoundationAPI/html/>); *e57 crate* is the source and
+documentation of <https://github.com/cry-inc/e57> (MIT/Apache-2.0,
+<https://docs.rs/e57>), read only as documentation, no code copied; *seed* is
+`fuzz/seeds/e57/three-points.e57` and the tests' own writer, which only
+confirm that the reader and the writer agree.
+
+| Finding | Source |
+|---|---|
+| File header: signature, versions, physical length, XML offset and logical length, page size | libE57 *E57 file format* (file header); field order and types confirmed in the e57 crate (file header reader) |
+| Pages of 1024 bytes = 1020 data + CRC-32C; physical vs logical offsets | libE57 *E57 file format* (paged file); e57 crate (paged reader) |
+| CRC-32C parameters (Castagnoli, reflected `0x82F63B78`, init/xor `0xFFFFFFFF`) | the public CRC-32C definition (RFC 3720, appendix B.4, check value `0xE3069283` for `123456789` – tested in `crc32c_matches_the_standard_check_value`) |
+| Checksum stored big endian | e57 crate (`crc.to_be_bytes()` in its page writer and check in its reader); libE57 writes it the same way |
+| XML element types and attributes (`Structure`, `Vector`, `CompressedVector`, `Integer`, `ScaledInteger`, `Float`, `String`, `Blob`) | libE57 *E57 Foundation API* (the node classes `StructureNode`, `VectorNode`, `CompressedVectorNode`, `IntegerNode`, `ScaledIntegerNode`, `FloatNode`, `StringNode`, `BlobNode` and their attributes) |
+| `e57Root`, `data3D`, `images2D`; per scan `pose` (quaternion + translation), `colorLimits`, `intensityLimits`, `points`, the prototype field names and the invalid states | libE57 *E57 file format* (the E57 elements of `data3D`) and the *E57 Simple API* header documentation on libe57.org; element names confirmed in the e57 crate (point cloud reader) |
+| Compressed vector section header (id 1, reserved bytes, logical length, data and index offsets) | libE57 *E57 file format* (binary sections); e57 crate (section header reader) |
+| Data, index and empty packets; length stored minus one, multiple of 4, 64 KiB at most; one byte stream per prototype field | e57 crate (packet reader); libE57 *E57 file format* (compressed vector packets) |
+| Bit-pack codec: floats as 4/8 LE bytes, integers as `value − minimum` in `⌈log₂(range + 1)⌉` bits, LSB first, continuous across packets | e57 crate (bit-pack decoder) and libE57 *E57 file format* (bit-pack codec) |
 
 ## The format, as far as the preview needs it
 

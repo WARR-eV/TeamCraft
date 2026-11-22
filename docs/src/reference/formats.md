@@ -411,7 +411,14 @@ process (`src/mesh/e57.rs`; format notes in the research page
   ignored; `String` or `Blob` fields inside the points are refused.
 
 The XML section may have at most 64 MiB and 1 000 000 elements, a file at most
-4096 scans; the usual size and time limits of the preview apply.
+4096 scans; the usual size and time limits of the preview apply. E57 shares
+the size cap of meshes and point clouds (`TEAMCRAFT_PREVIEW_MAX_MESH_MB`,
+default 256 MB), and real laser scans are often larger: such a file is refused
+as too large before any thinning starts. To preview larger scans, raise
+`TEAMCRAFT_PREVIEW_MAX_MESH_MB` and keep `TEAMCRAFT_PREVIEW_MAX_MEMORY_MB` at
+least about the file size plus 100 MB – the reader holds the whole file in
+memory to check the checksum of every page (see
+[Configuration](../admin/configuration.md)).
 
 ## Why not every format is previewed
 
