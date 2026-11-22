@@ -13,6 +13,14 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Fixed
+
+- CI on `main` is green again: the comment of the shared text-selection rule
+  (#436) quoted two hex colours, which the no-literal-colours guard of
+  `shared/css/` counts as colours in the stylesheet.
+
+## [0.2.12] - 2026-11-22
+
 ### Security
 
 - Client address: `X-Forwarded-For` is read only from trusted proxies (`TEAMCRAFT_TRUSTED_PROXIES`, default loopback; the Docker install trusts the Docker networks while the port is published on loopback), walked from the right (GHSA-98v7-pm3r-5934, F20).
@@ -186,6 +194,12 @@ see the notices in the README.
 
 ### Fixed
 
+- **Selected text is visible in every skin**, in the desktop app and on the
+  web: a selection now takes the skin's primary colour with its text colour.
+  It used the background of selected rows before, which in the dark skins is
+  barely lighter than a text field – in the CachyOS skin, Ctrl+A in the
+  server address of *Switch server…* selected the text but showed nothing.
+  One rule in `shared/css/components.css` instead of one per app.
 - **`url` 2.5.9 (RUSTSEC-2026-0592)**: `url` 2.5.8 overflowed the stack in
   `Url::origin()` on nested `blob:` URLs; `cargo deny` refuses it. Server and
   desktop lockfiles now take `url` 2.5.9 and the `form_urlencoded` 1.2.3 it
@@ -238,6 +252,19 @@ see the notices in the README.
   a failed export is kept in `export-logs/` (named in the message).
 
 ### Changed
+
+- **Releases without the installers *with local server*** (paused, to make
+  releases faster): `release.yml` no longer builds the desktop installers
+  *with local server* (`TeamCraft-with-local-server_…`, job `local-server`
+  switched off) nor the server builds only they needed – the Windows x64
+  server archive (no longer a release download) and the macOS sidecar. The
+  next releases have the Linux server archives and the regular desktop
+  installers. To try TeamCraft, use `teamcraft local` or the live demo; how to
+  switch the job on again is in CONTRIBUTING.md ("Releases"). An installed
+  *TeamCraft Local* finds no matching file in these releases – its update
+  window offers the release page instead.
+- **Pull requests that still need work are opened as drafts** (CLAUDE.md,
+  *Git rules*).
 
 - **Desktop: checked-out files stand out in Home** (#362). A checked-out row
   in the *Files* view and the *Structure* tree gets one marker in the lock
@@ -1422,7 +1449,8 @@ Changes since the `v0.2.0` tag.
   app keeps the private file and shows a warning. Server addresses with plain
   `http://` to another computer get a warning.
 
-[Unreleased]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.11...HEAD
+[Unreleased]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.12...HEAD
+[0.2.12]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.11...v0.2.12
 [0.2.11]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.10...v0.2.11
 [0.2.10]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.9...v0.2.10
 [0.2.9]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.8...v0.2.9

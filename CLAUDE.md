@@ -207,7 +207,8 @@ deploy/            production Docker install: docker-compose.yml (teamcraft + po
                    public account, auth::refuse_demo_write; data from scripts/seed-demo.sh over screenshots.sh seed_*)
 .github/workflows/ ci.yml (fmt, clippy, tests on PostgreSQL 16/18, macOS/Windows builds), docs.yml, desktop.yml, scale.yml (manual/weekly scale check, tests/scale.rs),
                    mutants.yml (cargo-mutants: PR diff report-only, weekly sharded full run; .cargo/mutants.toml),
-                   release.yml (binaries, installers, *with local server* installers with PostgreSQL, image + Docker install smoke test);
+                   release.yml (binaries, installers, image + Docker install smoke test; the *with local server* installers and the
+                   Windows/macOS server builds are paused for the next releases (since 2026-11-22, to make releases faster) – job local-server off);
                    scripts/ci-changes.sh = the one table from changed files to the jobs of ci/desktop/codeql/docs.yml
                    (self-test in every `changes` job) – a test that reads a new file outside its area adds it there
 desktop/           TeamCraft Desktop (Tauri 2, own Cargo project – never part of the server build); UI in desktop/ui/js
@@ -258,7 +259,7 @@ plugins/solidcraft TeamCraft plugin for SolidCraft: WebAssembly component (craft
 * **What to work on:** `docs/OPEN_WORK.md`, section *Direction* – proofing (tests,
   fuzzing, CI gates) and structure (module splits, guard tests) before new features;
   without a request from the user, pick the next task from its sections 1 and 2.
-* **Project status:** no stable release yet – only `0.x` pre-releases (`Cargo.toml` is at `0.2.9`). Keep the
+* **Project status:** no stable release yet – only `0.x` pre-releases (`Cargo.toml` is at `0.2.12`). Keep the
   work-in-progress / no-warranty notices
   in the README, `docs/src/index.md`, the web footer and the desktop *About*
   dialog until the user asks for a stable release.
