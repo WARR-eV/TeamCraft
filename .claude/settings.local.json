@@ -28,7 +28,9 @@
       "Bash(git diff *)",
       "Bash(git log *)",
       "Bash(git show *)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(docker ps *)",
+      "Bash(docker inspect *)"
     ],
     "deny": [
       "Bash(sudo *)",
