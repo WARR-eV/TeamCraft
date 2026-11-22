@@ -361,7 +361,11 @@ pub async fn server_version(state: State<'_, AppState>) -> CmdResult<Option<Stri
     };
     Ok(index["version"]
         .as_str()
-        .filter(|v| v.len() <= 32 && v.bytes().all(|b| b.is_ascii_alphanumeric() || b".-+".contains(&b)))
+        .filter(|v| {
+            v.len() <= 32
+                && v.bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b".-+".contains(&b))
+        })
         .map(str::to_string))
 }
 
