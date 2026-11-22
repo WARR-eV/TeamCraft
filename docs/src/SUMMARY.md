@@ -94,3 +94,4 @@
     - [As-built records](research/as-built.md)
     - [Fluent, STAR-CCM+ and Simcenter 3D files](research/solver-files.md)
     - [A sandboxed extension layer](research/extension-layer.md)
+    - [SolidCraft designs](research/solidcraft-design.md)
