@@ -427,13 +427,13 @@ export function thumbImage(f) {
 }
 
 export var cadProgramsPromise = null;
-/** CAD programs on this computer that export STEP: "inventor", "solid-edge" (Windows). */
+/** CAD programs on this computer that export STEP: "inventor", "solid-edge" (Windows), "solidcraft" (solidcraft-cli, every system). */
 export function cadPrograms() {
   if (!cadProgramsPromise) cadProgramsPromise = call("cad_programs").catch(function () { return []; });
   return cadProgramsPromise;
 }
 
-export var PROGRAM_LABEL = { "inventor": "Inventor", "solid-edge": "Solid Edge" };
+export var PROGRAM_LABEL = { "inventor": "Inventor", "solid-edge": "Solid Edge", "solidcraft": "SolidCraft" };
 
 /** The local program that can export this file to STEP, or null. */
 export function exportProgram(name, programs) {
@@ -441,6 +441,7 @@ export function exportProgram(name, programs) {
   var ext = m ? m[1].toLowerCase() : "";
   if ((ext === "ipt" || ext === "iam") && programs.indexOf("inventor") >= 0) return "inventor";
   if (["par", "psm", "pwd", "asm"].indexOf(ext) >= 0 && programs.indexOf("solid-edge") >= 0) return "solid-edge";
+  if ((ext === "sc" || ext === "solidcraft") && programs.indexOf("solidcraft") >= 0) return "solidcraft";
   return null;
 }
 

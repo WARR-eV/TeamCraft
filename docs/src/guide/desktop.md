@@ -184,6 +184,18 @@ check-outs and reviews, and a **local working folder**:
 * on Windows with Inventor or Solid Edge installed, *STEP* (workspace) and
   the check-in option (off by default) create STEP exports for the 3D preview with that
   program; the Files tab shows the preview image stored in native files.
+* on every system with SolidCraft installed, the same *STEP* button and
+  check-in option export SolidCraft designs (`.sc`) through SolidCraft's
+  command-line tool `solidcraft-cli` (set `SOLIDCRAFT_CLI` to its path if it
+  is not found); a design with a failing feature is not exported. An export
+  that fails or is not possible never stops the check-in – the file is
+  checked in without its STEP and the result names the reason.
+* for a SolidCraft design of your own check-out, *Item data* (Workspace tab)
+  writes the item number, the revision and the item name into the design's
+  properties (*Part number*, *Revision*, *Description* in SolidCraft), plus
+  TeamCraft's ids and server under the key `teamcraft.pdm`, through
+  `solidcraft-cli`. Refused while the design is read-only or open in
+  SolidCraft. The design changes and is checked in like any other change.
 * with a *Preferred CAD program* set on your account page in the web UI, the
   Files tab of a revision collapses the native files of other CAD programs
   (see [Files](files.md#preferred-cad-program)); the app reads the setting at
@@ -490,6 +502,13 @@ every file and folder name composed: the server composes what it receives,
 the folder import and the working folder use composed names on every system,
 and a file an older app version wrote under a decomposed name is renamed at
 the next Get or when the Workspace tab looks at it.
+
+**Files open in SolidCraft.** While SolidCraft has a design of the working
+folder open, the Workspace tab marks it *Open in SolidCraft* and names the
+computer and user (from the lock file SolidCraft keeps next to the design;
+locks not refreshed for three minutes are ignored). The check-in dialog warns
+about such files: changes not saved in SolidCraft are not checked in. You can
+check in anyway.
 
 **Read-only rule.** Files you have **not** checked out are read-only on disk (the read-only attribute on Windows, no
 write permission on Linux and macOS).

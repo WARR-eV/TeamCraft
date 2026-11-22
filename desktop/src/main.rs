@@ -14,6 +14,7 @@ mod autoallow;
 mod bomimport;
 mod cadexport;
 mod cadlaunch;
+mod cadlock;
 mod commands;
 mod compat;
 mod crash;
@@ -23,6 +24,7 @@ mod localserver;
 mod newfiles;
 mod profiles;
 mod resume;
+mod scprops;
 mod settings;
 mod signin;
 mod update;
@@ -262,6 +264,7 @@ fn main() {
             commands::import_bom,
             commands::cad_programs,
             commands::cad_export_step,
+            commands::solidcraft_write_item_data,
             commands::cad_installed,
             commands::cad_open_plan,
             commands::workspace_open_cad,

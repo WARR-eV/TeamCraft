@@ -322,7 +322,7 @@ end-to-end tests against a real PostgreSQL.
 - **SolidCraft and FieldCraft** – [SolidCraft](https://github.com/tangency-labs/solidcraft)
   designs (`.sc`, checked by content) and
   [FieldCraft](https://github.com/tangency-labs/fieldcraft) models (`.fieldcraft`) are recognised, SolidCraft's embedded picture is the preview image, linked designs are
-  file references with quantities, SolidCraft's BOM CSV imports as it is, and their STEP and 3MF
+  file references with quantities, SolidCraft's BOM CSV imports as it is, the desktop app exports designs to STEP with `solidcraft-cli`, a TeamCraft plugin for SolidCraft shows and checks the design's TeamCraft item inside SolidCraft, and their STEP and 3MF
   exports previewed –
   design, export and analysis in one revision ([more](https://warr-ev.github.io/TeamCraft/reference/interop.html)).
 
@@ -556,6 +556,7 @@ Third-party components (complete list with versions in `Cargo.lock` and
 | futures-core                                                                 | desktop app: cancellable streamed uploads                                            | MIT / Apache-2.0                                             |
 | Montserrat, Oswald                                                           | fonts                                                                                | SIL OFL 1.1                                                  |
 | libfuzzer-sys (libFuzzer)                                                    | fuzz targets in `fuzz/` only, never shipped                                          | MIT / Apache-2.0 (libFuzzer: Apache-2.0 with LLVM exception) |
+| wit-bindgen; SolidCraft's plugin interface (`plugins/solidcraft/wit/plugin.wit`, unchanged) | the TeamCraft plugin for SolidCraft in `plugins/solidcraft` only, never in the server or desktop app | Apache-2.0 WITH LLVM-exception / MIT / Apache-2.0; WIT file: MIT |
 
 SolidWorks, NX, Creo, CATIA, Inventor, Fusion,
 Revit and the other product names are trademarks of their respective
