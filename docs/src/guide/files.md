@@ -199,7 +199,9 @@ For the rest TeamCraft shows what other PLM systems show:
   assemblies none of whose parts are in TeamCraft, keep the stored image.
 * **The preview image stored in the file.** Inventor drawings and
   presentations (`.idw`, `.ipn`), Solid Edge (`.par`, `.psm`, `.asm`, `.pwd`, `.dft`), NX assemblies and drawings
-  (`.prt`, a JPEG) and
+  (`.prt`, a JPEG), SolidCraft designs (`.sc`, the picture SolidCraft keeps in the
+  design when it was saved with its model – shown only while it still belongs to the
+  saved design) and
   SolidWorks files (up to 2014 in their OLE container, from 2015 on in a
   compressed section that TeamCraft inflates) carry a picture the CAD program wrote when saving. It
   appears next to the file on the revision page and in the desktop app (`GET /api/v1/files/{id}/thumbnail`). Only the

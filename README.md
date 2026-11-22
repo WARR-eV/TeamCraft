@@ -321,7 +321,7 @@ end-to-end tests against a real PostgreSQL.
   service, or a local model (Ollama, vLLM). In the desktop app it is the *Agent* view's company AI.
 - **SolidCraft and FieldCraft** – [SolidCraft](https://github.com/tangency-labs/solidcraft)
   designs (`.sc`, checked by content) and
-  [FieldCraft](https://github.com/tangency-labs/fieldcraft) models (`.fieldcraft`) are recognised and their STEP and 3MF
+  [FieldCraft](https://github.com/tangency-labs/fieldcraft) models (`.fieldcraft`) are recognised, SolidCraft's embedded picture is the preview image, and their STEP and 3MF
   exports previewed –
   design, export and analysis in one revision ([more](https://warr-ev.github.io/TeamCraft/reference/interop.html)).
 
