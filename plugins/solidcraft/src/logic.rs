@@ -644,5 +644,23 @@ mod tests {
             assert!(commands.contains(&command), "{command} not declared");
         }
         assert_eq!(manifest["id"], "teamcraft");
+        // A ribbon slot's name is the button's label: four different ones,
+        // not four buttons that all read "TeamCraft".
+        let entries = manifest["runtime"]["entries"].as_array().unwrap();
+        let mut labels: Vec<&str> = entries
+            .iter()
+            .map(|e| e["slots"][0]["name"].as_str().unwrap())
+            .collect();
+        assert!(labels.iter().all(|l| *l != "TeamCraft"), "{labels:?}");
+        labels.sort_unstable();
+        labels.dedup();
+        assert_eq!(labels.len(), ENTRIES.len(), "one label per entry");
+        // SolidCraft refuses a command it does not class as `read` from a
+        // read entry, and it classes document.metadata, assembly.bom and
+        // component.links as edit commands. So every entry is `edit`; status
+        // and check only read.
+        for e in entries {
+            assert_eq!(e["effect"], "edit", "{}", e["name"]);
+        }
     }
 }

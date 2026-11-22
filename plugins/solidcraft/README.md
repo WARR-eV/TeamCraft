@@ -15,15 +15,20 @@ working folder stay in the TeamCraft desktop app.
 
 ## Entries
 
-All four are on the *TeamCraft* ribbon group (Plugins tab) and in the
-Plugins menu.
+Each has its own button in the ribbon's Plugins group (labelled as in the
+table) and a row in the Plugins menu.
 
 | Entry | Effect | What it does |
 |-------|--------|--------------|
-| **status** – *TeamCraft status* | read | The TeamCraft item and revision the design belongs to, the page of the revision on the server, and whether the design's part number and revision still say the same. |
-| **check** – *Check for TeamCraft* | read | What keeps the design from going into TeamCraft cleanly: no part number, a part number or revision that differs from the linked item, BOM rows without a part number, one part number with two descriptions, quantities SolidCraft cannot add up, linked designs with an absolute path or two linked designs with the same file name. `ready` is true when only notes are left. |
+| **status** – *TeamCraft status* | edit¹ | The TeamCraft item and revision the design belongs to, the page of the revision on the server, and whether the design's part number and revision still say the same. |
+| **check** – *Check for TeamCraft* | edit¹ | What keeps the design from going into TeamCraft cleanly: no part number, a part number or revision that differs from the linked item, BOM rows without a part number, one part number with two descriptions, quantities SolidCraft cannot add up, linked designs with an absolute path or two linked designs with the same file name. `ready` is true when only notes are left. |
 | **link** – *Link to TeamCraft item* | edit | Writes item number, revision and (optional) name into the design properties (*Part number*, *Revision*, *Description*) and TeamCraft's object – for designs edited without the desktop app. Ids written by the desktop app are kept while the item stays the same. One undo step; save the design afterwards. |
 | **unlink** – *Unlink from TeamCraft* | edit | Removes TeamCraft's object; part number and revision stay. |
+
+¹ *status* and *check* only read. They are declared `edit` because SolidCraft
+classes `document.metadata`, `assembly.bom` and `component.links` as edit
+commands and refuses them from a read entry (*permission denied: edit command
+document.metadata from read entry*).
 
 SolidCraft commands it calls (declared in `plugin.json`, none of them reads
 or writes files): `document.metadata`, `document.metadata.set`,
