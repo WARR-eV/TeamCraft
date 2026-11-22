@@ -93,7 +93,10 @@ async fn admins_and_managers_see_who_holds_which_lock() {
     let rover = app.project_id("ROVER").await;
     make_manager(&app.pool, rover, erika_actor.id).await;
     // GET /me names the managed groups, so the desktop app offers the view
-    let me = app.api(Method::GET, "/api/v1/me", &erika, None).await.json();
+    let me = app
+        .api(Method::GET, "/api/v1/me", &erika, None)
+        .await
+        .json();
     assert_eq!(me["managed_projects"], json!([rover]));
     let me = app.api(Method::GET, "/api/v1/me", &leo, None).await.json();
     assert_eq!(me["managed_projects"], json!([]));
