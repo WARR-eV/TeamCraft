@@ -6,7 +6,8 @@
 
 import { ICONS, api, badge, clear, enc, errorText, h, lockIcon, state, svgIcon, toast } from "./core.js";
 import { label } from "/static/shared/js/format.js";
-import { typeIcon } from "./navigator.js";
+import { emptyHint, typeIcon } from "./navigator.js";
+import { emptyGroupHint } from "./empty-rules.js";
 import { openRevision } from "./revision.js";
 import { canEdit, canEditProject } from "./shell.js";
 import { newItemDialog } from "./dialogs.js";
@@ -64,7 +65,10 @@ export function renderFiles(p, ul, opts) {
   return fetchLevel(p, root, 0).then(function (level) {
     if (opts.count) opts.count.textContent = String(groupTotal(level));
     drawBar(p, opts, level);
-    drawLevel(p, root, ul, level, opts, root ? "The favourite folder has no files." : "No files yet.");
+    // an empty group names the next step by role (#423)
+    drawLevel(p, root, ul, level, opts, root ? "The favourite folder has no files." : function () {
+      return emptyHint(emptyGroupHint(canEditProject(p.id)), { project: p.code, tag: "li" });
+    });
   }, function (err) {
     if (err && err.status === 404 && opts.olderServer) {
       if (opts.bar) clear(opts.bar);
@@ -151,7 +155,7 @@ function drawLevel(p, path, ul, level, opts, emptyText) {
     var folders = sortFolders(level.folders);
     var entries = sortEntries(loaded, opts.sort);
     if (!folders.length && !entries.length) {
-      ul.appendChild(h("li.empty", { text: emptyText }));
+      ul.appendChild(typeof emptyText === "function" ? emptyText() : h("li.empty", { text: emptyText }));
       return;
     }
     folders.forEach(function (f) { ul.appendChild(folderNode(p, f, opts)); });

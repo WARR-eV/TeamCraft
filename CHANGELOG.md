@@ -24,6 +24,20 @@ see the notices in the README.
 
 ### Added
 
+- **Empty states that name the next step** (#423, part of #408): no project
+  group → *Create a project group* for CAD editors, "ask a manager of a group
+  to add you" for viewers (vault, *Projects*, desktop *Home* and *Projects*);
+  an empty project group → *New item* / *Import BOM* in the vault and
+  *Import CAD folder…* / *New item* on desktop *Home*; *New on this computer*
+  without suggestions → *Get…*; the empty review, check-out and change lists
+  of the dashboard and the desktop worklist say how work arrives there.
+  Viewer accounts see a note on the dashboard and atop the desktop worklist
+  that editing needs the CAD editor role and that a server administrator
+  grants it. The texts are in the i18n catalogs (`empty.*`, English and
+  German); the desktop app loads its catalog before the first view draws.
+  Tests: `every_template_renders` renders the dashboard and the vault as
+  editor and viewer, `scripts/desktop-empty-rules.test.mjs` checks the
+  desktop rules (`ui/js/empty-rules.js`).
 - **Check-outs of a project group as a graph** (#428): administrators and
   the group's managers see who has what checked out right now – *Check-outs*
   on the group page (`/projects/{id}/checkouts`) and a lock button next to

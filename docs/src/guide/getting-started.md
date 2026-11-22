@@ -61,6 +61,16 @@ installations and the desktop app:
    files; its first revision *A* is *in work* and checked out to you.
 5. **Check in**, then release it with a change order.
 
+**Empty pages name the next step** (#423): with no project group yet, the
+vault and *Projects* offer *Create a project group* to CAD editors and tell
+viewers to ask a manager of a group to add them; an empty project group in
+the vault offers *New item* and *Import BOM*; the dashboard's empty cards
+(*Waiting for my review*, *Checked out by me*, *My open changes*) say how work
+arrives there. A **viewer account** sees a note on the dashboard that editing
+needs the CAD editor role and that an administrator of the server grants it –
+so the missing buttons are not a mystery. These texts come from the message
+catalogs and follow the browser's language (English, German).
+
 **Appearance:** TeamCraft follows the light or dark appearance of your
 operating system. The menu under your name (top right) and *Account →
 Appearance* switch between *System*, *Light* and *Dark*; choose *Dark* to keep

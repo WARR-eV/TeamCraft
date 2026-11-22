@@ -103,6 +103,9 @@ jobs:
       # main CAD file (Check out and open after Cancel, #348)
       - name: Test the Get rules
         run: node scripts/desktop-get-rules.test.mjs
+      # the empty states name the next step, by role (#423)
+      - name: Test the empty state rules
+        run: node scripts/desktop-empty-rules.test.mjs
       # new items from files on this computer (#359): group and folder from
       # where the file is, the duplicate findings, the worklist suggestions
       - name: Test the rules of new items from local files

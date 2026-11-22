@@ -62,6 +62,12 @@ kbd {
 /* empty states: one quiet line inside the frame */
 .empty { margin: 0; padding: 6px 0; color: var(--text-muted); }
 .navigator .empty { padding: 2px 8px 6px; color: var(--text-dim); }
+/* an empty state with its next step (#423): the line, buttons, a viewer note */
+.empty-hint { padding: 2px 8px 6px; }
+.navigator .empty-hint .empty { padding: 0 0 4px; }
+.empty-hint .row { flex-wrap: wrap; gap: 6px; }
+.empty-hint .small { margin: 4px 0 0; }
+.navigator .viewer-note { margin: 0 8px 8px; padding: 6px 8px; border-left: 3px solid var(--accent); }
 
 /* Item, change and revision numbers: the text face with tabular figures. */
 h1 .mono, .node .label .mono, table.grid td:first-child > .mono, .impact-group .mono, button.link.mono, .thread-meta .mono {
