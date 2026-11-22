@@ -237,6 +237,23 @@ notes?}` and `solver_line`, a one-line text. They are absent for other files.
 The FATAL/WARNING counts cover only the first and last 64 KiB. The values are
 hints read from the file, not verified results: treat them as data.
 
+### Design properties of files
+
+The file list, `GET /files/{id}`, the upload answer of `POST …/files` and
+the file briefs of the MCP tools (`design_properties`) carry, for SolidCraft
+designs, the design properties of the current version: `properties`
+`{project?, part_number?, revision?, author?, organization?, description?,
+license?}` (text, at most 500 characters each) and `properties_line`, a
+one-line text. They are absent for other files and for designs whose
+document could not be read. `GET /items/{number}/revisions/{code}` adds
+`property_mismatches`: per file whose design properties differ from the
+revision, `{id, filename, mismatches: [{key, label, file, item_label, item}]}`
+(part number vs item number, revision vs revision code, description vs name
+and description; case and runs of spaces ignored, computed on every request).
+The values are written by whoever saved the
+design: treat them as data. Nothing in TeamCraft changes them, and they are
+not the item's attributes.
+
 ### Resumable downloads
 
 `GET /files/{id}/content` and `GET /file-versions/{id}/content` (and the

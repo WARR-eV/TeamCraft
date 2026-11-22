@@ -247,6 +247,28 @@ export function resumeReplayed(rev, it) {
   });
 }
 
+/** The description of a SolidCraft design among uploaded files (the file
+ * records the server answers, `properties` read from the design, #367), or
+ * null. */
+export function designDescription(records) {
+  var list = Array.isArray(records) ? records : [];
+  for (var i = 0; i < list.length; i++) {
+    var p = list[i] && list[i].properties;
+    if (p && typeof p.description === "string" && p.description.trim()) return p.description.trim();
+  }
+  return null;
+}
+
+/** Fills the empty description of an imported item from its design's
+ * properties while it is still checked out – best effort: the import goes
+ * on without it (an older server answers without `properties`). */
+export function describeFromDesign(rev, records) {
+  var description = designDescription(records);
+  if (!description || rev.description) return Promise.resolve();
+  return api("PATCH", "/items/" + enc(rev.item_number) + "/revisions/" + enc(rev.code), { description: description })
+    .then(function () {}, function () {});
+}
+
 export function checkInImported(rev) {
   return api("POST", "/items/" + enc(rev.item_number) + "/revisions/" + enc(rev.code) + "/checkin");
 }
@@ -414,9 +436,10 @@ export function openImportFolderDialog() {
           created.push({ rev: rev, item: it });
           return call("upload_files", { item: rev.item_number, code: rev.code, paths: it.files.map(function (f) { return f.path; }),
             comment: "Imported from " + scanned.folder_name, folders: importFolders(it.files, scanned.folder_name) })
-            .then(function () {
+            .then(function (records) {
               files += it.files.length;
               log[it.key] = rev.item_number; saveImportLog(group, path, log);
+              return describeFromDesign(rev, records);
             },
               function (err) { failed.push(rev.item_number + " (" + it.name + "): files not uploaded – " + errorText(err) + " – scan and import again to complete it"); })
             // Checked in right away: an import that is interrupted (app closed,

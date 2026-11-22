@@ -301,6 +301,8 @@ pub async fn show(
             .collect(),
     )
     .to_string();
+    // Design properties (SolidCraft) that differ from this revision (#367).
+    let property_mismatches = files::property_mismatches(&rev, &file_list);
     // "Fill with AI…": report files to choose from, and whether the button
     // is offered (assistant configured, editor of the group, group has not
     // switched the assistant off).
@@ -509,6 +511,7 @@ pub async fn show(
             "file_groups": super::file_groups(&me.preferred_cad, &attachments),
             "files": attachments,
             "file_bases": file_bases,
+            "property_mismatches": property_mismatches,
             "native_without_preview": native_without_preview,
             "main_thumbnail": main_thumbnail,
             "similar": similar_parts,
@@ -1702,6 +1705,8 @@ mod tests {
             retention: "all".into(),
             solver_summary: None,
             solver_line: None,
+            properties: None,
+            properties_line: None,
             format_info: crate::cadformat::info(format),
         }
     }

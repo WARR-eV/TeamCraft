@@ -199,6 +199,228 @@ pub fn linked_designs(document: &[u8]) -> Option<BTreeMap<String, u32>> {
     Some(found)
 }
 
+/// Document formats of designs (`solvecraft/` from early drafts). Only the
+/// prefix is checked: the number changes with almost every release.
+const DOCUMENT_FORMATS: [&str; 2] = ["solidcraft/", "solvecraft/"];
+/// Longest text kept of one design property, in characters (SolidCraft
+/// allows 4 KiB; a part number or a description is far shorter).
+pub const MAX_PROPERTY_CHARS: usize = 500;
+
+/// The design properties SolidCraft keeps in the `metadata` object of the
+/// document (*Design properties*): text values only, trimmed, at most
+/// [`MAX_PROPERTY_CHARS`] each. Read from a user's file: data, never
+/// instructions.
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct DesignProperties {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub part_number: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub organization: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub license: Option<String>,
+}
+
+/// The known keys of [`DesignProperties`] with their labels, in the order
+/// they are shown.
+pub const PROPERTY_KEYS: [(&str, &str); 7] = [
+    ("part_number", "Part number"),
+    ("revision", "Revision"),
+    ("description", "Description"),
+    ("project", "Project"),
+    ("author", "Author"),
+    ("organization", "Organization"),
+    ("license", "License"),
+];
+
+/// A design property that differs from the item it is attached to.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct Mismatch {
+    /// Key of the property (`part_number`, `revision`, `description`).
+    pub key: &'static str,
+    /// What the design calls it (`Part number`).
+    pub label: &'static str,
+    /// The value in the design.
+    pub file: String,
+    /// What it is compared with on the item (`item number`).
+    pub item_label: &'static str,
+    /// The item's value.
+    pub item: String,
+}
+
+impl DesignProperties {
+    fn slot(&mut self, key: &str) -> Option<&mut Option<String>> {
+        Some(match key {
+            "project" => &mut self.project,
+            "part_number" => &mut self.part_number,
+            "revision" => &mut self.revision,
+            "author" => &mut self.author,
+            "organization" => &mut self.organization,
+            "description" => &mut self.description,
+            "license" => &mut self.license,
+            _ => return None,
+        })
+    }
+
+    /// The value of a known key (see [`PROPERTY_KEYS`]).
+    pub fn get(&self, key: &str) -> Option<&str> {
+        match key {
+            "project" => self.project.as_deref(),
+            "part_number" => self.part_number.as_deref(),
+            "revision" => self.revision.as_deref(),
+            "author" => self.author.as_deref(),
+            "organization" => self.organization.as_deref(),
+            "description" => self.description.as_deref(),
+            "license" => self.license.as_deref(),
+            _ => None,
+        }
+    }
+
+    /// Whether no property is set.
+    pub fn is_empty(&self) -> bool {
+        PROPERTY_KEYS.iter().all(|(key, _)| self.get(key).is_none())
+    }
+
+    /// The set properties as (label, value), in [`PROPERTY_KEYS`] order.
+    pub fn entries(&self) -> Vec<(&'static str, &str)> {
+        PROPERTY_KEYS
+            .iter()
+            .filter_map(|(key, label)| self.get(key).map(|v| (*label, v)))
+            .collect()
+    }
+
+    /// One line for file lists: `Part number BR-1 · Revision B · Bracket`.
+    pub fn line(&self) -> String {
+        self.entries()
+            .into_iter()
+            .map(|(label, value)| format!("{label} {value}"))
+            .collect::<Vec<_>>()
+            .join(" · ")
+    }
+
+    /// The values for the full-text search, one per line.
+    pub fn search_text(&self) -> String {
+        self.entries()
+            .into_iter()
+            .map(|(_, value)| value)
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// The properties as stored in `file_versions.properties`.
+    pub fn to_json(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_else(|_| serde_json::json!({}))
+    }
+
+    /// The properties stored in `file_versions.properties`; `None` for an
+    /// empty object or anything else.
+    pub fn from_json(value: &serde_json::Value) -> Option<DesignProperties> {
+        let mut props = DesignProperties::default();
+        for (key, value) in value.as_object()? {
+            if let (Some(slot), Some(text)) = (props.slot(key), value.as_str()) {
+                let text = clean_property(text);
+                if !text.is_empty() {
+                    *slot = Some(text);
+                }
+            }
+        }
+        (!props.is_empty()).then_some(props)
+    }
+
+    /// Where the design differs from the item revision it is attached to:
+    /// the part number from the item number, the revision from the
+    /// revision code, the description from the revision's name (and its
+    /// description). Case and runs of spaces do not count; a property the
+    /// design does not set is no difference. Nothing is changed – the
+    /// result is a hint for the user.
+    pub fn mismatches(
+        &self,
+        item_number: &str,
+        revision_code: &str,
+        name: &str,
+        description: &str,
+    ) -> Vec<Mismatch> {
+        let mut found = Vec::new();
+        let mut check = |key: &'static str,
+                         label: &'static str,
+                         item_label: &'static str,
+                         item: &str,
+                         also: &str| {
+            let Some(value) = self.get(key) else {
+                return;
+            };
+            if same_text(value, item) || (!also.is_empty() && same_text(value, also)) {
+                return;
+            }
+            found.push(Mismatch {
+                key,
+                label,
+                file: value.to_string(),
+                item_label,
+                item: item.to_string(),
+            });
+        };
+        check("part_number", "Part number", "item number", item_number, "");
+        check("revision", "Revision", "revision", revision_code, "");
+        check("description", "Description", "name", name, description);
+        found
+    }
+}
+
+/// Whether two texts are equal apart from case and runs of white space.
+fn same_text(a: &str, b: &str) -> bool {
+    let norm = |s: &str| {
+        s.split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_lowercase()
+    };
+    norm(a) == norm(b)
+}
+
+/// A property value as kept: control characters as spaces, trimmed, at
+/// most [`MAX_PROPERTY_CHARS`] characters.
+fn clean_property(text: &str) -> String {
+    let text: String = text
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .take(MAX_PROPERTY_CHARS)
+        .collect();
+    text.trim().to_string()
+}
+
+/// The design properties of a document (see [`document`]): the known text
+/// keys of its `metadata` object. Unknown keys (another tool's data under a
+/// reverse-DNS key) and values that are not text are left out. `None` when
+/// `document` is no design document (malformed JSON, another `format`),
+/// larger than [`MAX_DOCUMENT`], has no `metadata` object or no known
+/// property set – never an error.
+pub fn properties(document: &[u8]) -> Option<DesignProperties> {
+    #[derive(serde::Deserialize)]
+    struct Doc {
+        #[serde(default)]
+        format: Option<serde_json::Value>,
+        #[serde(default)]
+        metadata: Option<serde_json::Value>,
+    }
+    if document.len() as u64 > MAX_DOCUMENT {
+        return None;
+    }
+    let doc: Doc = serde_json::from_slice(document).ok()?;
+    let format = doc.format.as_ref()?.as_str()?;
+    if !DOCUMENT_FORMATS.iter().any(|f| format.starts_with(f)) {
+        return None;
+    }
+    DesignProperties::from_json(doc.metadata.as_ref()?)
+}
+
 /// Builders for small design containers, for the tests and the fuzz corpus.
 #[doc(hidden)]
 pub mod sample {
@@ -400,5 +622,139 @@ mod tests {
             None
         );
         assert_eq!(document(&mut Cursor::new(Vec::new())), None);
+    }
+
+    /// A part with every known property, another tool's data under a
+    /// reverse-DNS key and values that are not text.
+    const PROPERTIES: &str = r#"{
+        "format": "solidcraft/46",
+        "metadata": {
+            "project": " Rover 2027 ",
+            "part_number": "BR-7731",
+            "revision": "B",
+            "author": "Erika",
+            "organization": "Workshop",
+            "description": "Mounting   bracket\nleft",
+            "license": "CC-BY-4.0",
+            "org.example.tool": {"part_number": "ignored"},
+            "material": "AlMg3",
+            "unknown": "ignored"
+        },
+        "features": []
+    }"#;
+
+    #[test]
+    fn properties_come_from_json_and_zip_designs() {
+        let expected = DesignProperties {
+            project: Some("Rover 2027".into()),
+            part_number: Some("BR-7731".into()),
+            revision: Some("B".into()),
+            author: Some("Erika".into()),
+            organization: Some("Workshop".into()),
+            description: Some("Mounting   bracket left".into()),
+            license: Some("CC-BY-4.0".into()),
+        };
+        assert_eq!(properties(PROPERTIES.as_bytes()), Some(expected.clone()));
+        let zipped = sample::design(PROPERTIES.as_bytes(), None);
+        let document = document(&mut Cursor::new(zipped)).unwrap();
+        assert_eq!(properties(&document), Some(expected.clone()));
+        assert_eq!(
+            expected.line(),
+            "Part number BR-7731 · Revision B · Description Mounting   bracket left · \
+             Project Rover 2027 · Author Erika · Organization Workshop · License CC-BY-4.0"
+        );
+        assert!(expected.search_text().contains("BR-7731\nB\n"));
+        assert_eq!(
+            DesignProperties::from_json(&expected.to_json()),
+            Some(expected)
+        );
+    }
+
+    #[test]
+    fn missing_metadata_or_another_document_has_no_properties() {
+        assert_eq!(properties(DOC), None, "empty metadata");
+        assert_eq!(properties(br#"{"format":"solidcraft/46"}"#), None);
+        assert_eq!(
+            properties(br#"{"format":"solidcraft/46","metadata":[1]}"#),
+            None
+        );
+        assert_eq!(
+            properties(br#"{"format":"other/1","metadata":{"part_number":"X"}}"#),
+            None,
+            "another program's JSON"
+        );
+        assert_eq!(properties(br#"{"metadata":{"part_number":"X"}}"#), None);
+        assert_eq!(properties(b"not json"), None);
+        assert_eq!(properties(b""), None);
+        assert_eq!(
+            properties(br#"{"format":"solvecraft/30","metadata":{"part_number":"X"}}"#)
+                .and_then(|p| p.part_number),
+            Some("X".into()),
+            "early drafts"
+        );
+        assert_eq!(DesignProperties::from_json(&serde_json::json!({})), None);
+        assert_eq!(DesignProperties::from_json(&serde_json::json!(null)), None);
+    }
+
+    #[test]
+    fn values_that_are_not_text_are_left_out() {
+        let doc = br#"{"format":"solidcraft/46","metadata":{
+            "part_number": 7731, "revision": true, "author": null,
+            "organization": ["a"], "project": {"x": 1}, "license": "   ",
+            "description": "Plate"}}"#;
+        assert_eq!(
+            properties(doc),
+            Some(DesignProperties {
+                description: Some("Plate".into()),
+                ..DesignProperties::default()
+            })
+        );
+        let only_numbers = br#"{"format":"solidcraft/46","metadata":{"part_number":1}}"#;
+        assert_eq!(properties(only_numbers), None);
+    }
+
+    #[test]
+    fn long_values_are_cut_and_oversized_documents_refused() {
+        let long = "x".repeat(MAX_PROPERTY_CHARS * 3);
+        let doc = format!(r#"{{"format":"solidcraft/46","metadata":{{"description":"{long}"}}}}"#);
+        let cut = properties(doc.as_bytes()).unwrap().description.unwrap();
+        assert_eq!(cut.chars().count(), MAX_PROPERTY_CHARS);
+        let mut big =
+            br#"{"format":"solidcraft/46","metadata":{"part_number":"X"},"pad":""#.to_vec();
+        big.resize(MAX_DOCUMENT as usize + 1, b' ');
+        big.extend_from_slice(b"\"}");
+        assert_eq!(properties(&big), None);
+        // a plain-JSON design above the limit has no document at all
+        assert_eq!(document(&mut Cursor::new(big)), None);
+    }
+
+    #[test]
+    fn mismatches_name_what_differs_from_the_item() {
+        let props = properties(PROPERTIES.as_bytes()).unwrap();
+        assert_eq!(
+            props.mismatches("br-7731", "b", "Mounting bracket LEFT", ""),
+            Vec::new(),
+            "case and spaces do not count"
+        );
+        let found = props.mismatches("P-000012", "A", "Holder", "");
+        assert_eq!(
+            found.iter().map(|m| m.key).collect::<Vec<_>>(),
+            vec!["part_number", "revision", "description"]
+        );
+        assert_eq!(found[0].file, "BR-7731");
+        assert_eq!(found[0].item, "P-000012");
+        assert!(
+            props
+                .mismatches("BR-7731", "B", "bracket", "Mounting bracket left")
+                .is_empty(),
+            "the description may also match the revision's description"
+        );
+        let only_number = DesignProperties {
+            part_number: Some("X-1".into()),
+            ..DesignProperties::default()
+        };
+        assert!(only_number
+            .mismatches("X-1", "C", "Anything", "")
+            .is_empty());
     }
 }
