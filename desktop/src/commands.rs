@@ -745,6 +745,22 @@ pub async fn workspace_checkout(
     .await
 }
 
+/// *Check out parts…* (issue #415): checks out the ticked revisions of an
+/// assembly in one server call and makes their files in the working folder
+/// writable; the result lists what the server refused and why.
+#[tauri::command]
+pub async fn workspace_checkout_many(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    revisions: Vec<workspace::CheckoutPick>,
+) -> CmdResult<workspace::CheckedOutMany> {
+    usage(&state, |u| u.count("checkout"));
+    let api = signed_in_api(&state)?;
+    let (cancel, mut progress) = progress_events(&app, &state);
+    let root = workspace_root(&app, &state);
+    workspace::checkout_many(&api, &root, &revisions, &cancel, &mut progress).await
+}
+
 /// Copies the current files of a revision into the working folder without
 /// taking the lock (read-only on disk).
 #[tauri::command]

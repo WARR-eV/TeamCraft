@@ -197,7 +197,9 @@ end-to-end tests against a real PostgreSQL.
 **Files and versions**
 
 - **Check-out / check-in** – exclusive locks per revision; a check-in based on
-  an outdated version is refused instead of overwriting it.
+  an outdated version is refused instead of overwriting it. Several parts of an
+  assembly can be checked out in one step to edit them in its context
+  (`POST /api/v1/checkouts`, a result per part).
 - **Versions and rollback** – every upload is a new version; download or
   restore any of them, history is never rewritten.
 - **Vault explorer** – project groups as folders with lock owners, files and

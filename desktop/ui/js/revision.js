@@ -10,7 +10,7 @@ import { openTab, reloadActive, renderActive, renderTabs, table } from "./tabs.j
 import { agentButton } from "./agent.js";
 import { groupImpacts, impactGroup, revChanges, revHistory, revReferences } from "./references.js";
 import { graphBackControl, revGraph } from "./graph.js";
-import { addFilesDialog, checkinDialog, doCancelCheckout, doCheckout, doObsolete, doRevise, editDialog, filesHint, getStructureDialog, openFile, openWorkspaceFolder, releaseDialog, revViewer, revWorkspace } from "./workspace.js";
+import { addFilesDialog, checkinDialog, checkoutPartsDialog, doCancelCheckout, doCheckout, doObsolete, doRevise, editDialog, filesHint, getStructureDialog, openFile, openWorkspaceFolder, releaseDialog, revViewer, revWorkspace } from "./workspace.js";
 import { openChange } from "./change.js";
 import { openRequest, requestChangeDialog } from "./requests.js";
 import { bomFromCadDialog, importBomDialog } from "./bom-import.js";
@@ -183,6 +183,12 @@ export function renderRevision(tab, body, toolbar) {
   ] : [
     act("checkout", "Check out", "checkout", function () { doCheckout(tab); }, "Take the lock and copy the files into your workspace")
   ];
+  // an assembly: check out several of its parts in one step (#415)
+  var isAssembly = rev.item_type === "assembly" || d.bom.length > 0;
+  if (isAssembly && canEdit()) {
+    lock.push(tool("Check out parts…", "checkout", function () { checkoutPartsDialog(tab); },
+      { title: "Pick parts of this assembly and check them out together – their files become writable, so you can change them in the context of the assembly" }));
+  }
   var releaseButton = act("release", "Release…", "release", function () { releaseDialog(tab); }, "Create a change order with reviewers and submit it");
   // The working copy changes while the tab stays open (the CAD program saves
   // into it): look again when the tab is shown from its cache or the window
@@ -591,6 +597,10 @@ export function revStructure(tab, el) {
         type: "button", title: "Save the structure with this revision rule and all its files as ZIP",
         on: { click: function () { savePackage(rev, rule); } }
       }, "Pack and Go…"),
+      canEdit() && d.bom.length ? h("button.small", {
+        type: "button", title: "Pick parts of this structure and check them out together – their files become writable",
+        on: { click: function () { checkoutPartsDialog(tab); } }
+      }, "Check out parts…") : null,
       canEdit() ? h("button.small", {
         type: "button", disabled: rev.checked_out_by !== state.me.id,
         title: rev.checked_out_by === state.me.id ? "Add the lines of a BOM exported by the CAD program (CSV, Excel, STEP assembly)"

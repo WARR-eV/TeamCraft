@@ -756,7 +756,9 @@ needs an issue with a reason first (see *Direction*).
   review is #408: quick wins done (#409 check-in icon, #410 one vocabulary + glossary, #411 web check-out wording
   and *Get TeamCraft Desktop*, #412 preview at the top of the revision page, #413 no hash column, #414 revision vs
   version explained), #421 section nav of the revision page, #417 right-click menus in the desktop app; left: the
-  daily CAD loop (#415, #416, #418–#420) and onboarding (#422–#424)
+  daily CAD loop (#416, #418–#420) and onboarding (#422–#424); done: #415 check out several parts of an assembly at
+  once (`POST /api/v1/checkouts`, desktop *Check out parts…*) – open follow-up: *Revise and check out* for released
+  parts
 - [ ] Responsive pages on large data (1M files, 100k items, 10k-line BOMs – see the scale targets)
 - [ ] Faster opening of large CAD files and assemblies
 - [ ] Configurable lifecycle states and site-specific allowed transitions instead of one built-in state machine

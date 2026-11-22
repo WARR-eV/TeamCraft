@@ -423,6 +423,121 @@ export function doCheckout(tab, then) {
   }, function () {});
 }
 
+/** Why a part of the structure cannot be ticked in *Check out parts…*, or
+ * null; `info` is its revision in the working set (state, lock). */
+export function checkoutBlocker(info) {
+  if (!info) return "Not in the working set";
+  if (info.locked_by_me) return "Already checked out by you";
+  if (info.state === "released") return "Released – revise it first";
+  if (info.state === "in_review") return "In review";
+  if (info.state !== "in_work") return label(info.state) + " – cannot be checked out";
+  if (info.locked_by) return "Checked out by " + (info.locked_by_name || "another user");
+  return null;
+}
+
+/** "Check out parts…" (#415): the parts of an assembly as a tree with
+ * check boxes – state and lock holder per part, the ones that cannot be
+ * checked out disabled with the reason. One step checks out the ticked
+ * revisions (`POST /checkouts`, one transaction), makes their files in the
+ * working folder writable and lists what the server refused. */
+export function checkoutPartsDialog(tab) {
+  var rev = tab.data.rev;
+  var path = "/items/" + enc(rev.item_number) + "/revisions/" + enc(rev.code);
+  run("Loading the structure of " + rev.item_number + "/" + rev.code, function () {
+    return Promise.all([api("GET", path + "/bom?expand=true&rule=latest"), api("GET", path + "/workset?rule=latest")]);
+  }).then(function (r) { showCheckoutParts(tab, r[0], r[1]); }, function () {});
+}
+
+function showCheckoutParts(tab, tree, set) {
+  var rev = tab.data.rev;
+  var byId = {};
+  (set.revisions || []).forEach(function (w) { byId[w.revision_id] = w; });
+  var seen = {}, rows = [], boxes = [];
+  function row(depth, itemNumber, revision, name, note) {
+    var info = revision ? byId[revision.id] : null;
+    var blocker = revision ? checkoutBlocker(info) : note;
+    var box = h("input", { type: "checkbox", disabled: !!blocker, checked: !!(info && info.locked_by_me),
+      "aria-label": "Check out " + itemNumber + (revision ? "/" + revision.code : "") });
+    if (!blocker) boxes.push({ input: box, pick: { project: info.project_code || null, item: itemNumber, code: revision.code } });
+    var indent = h("span.indent");
+    indent.style.width = (depth * 1.2) + "rem";
+    rows.push({
+      cells: [
+        h("span", null, [indent, box, " ", h("span.mono", { text: itemNumber + (revision ? "/" + revision.code : "") })]),
+        name,
+        revision ? badge(revision.state) : "",
+        h("span" + (blocker ? ".muted" : ""), { text: blocker || (info && info.via === "reference" ? "Referenced by a CAD file" : "Can be checked out") })
+      ]
+    });
+  }
+  row(0, tree.root_item_number, tree.root, tree.root.name, null);
+  seen[tree.root.id] = true;
+  function walk(nodes, depth) {
+    (nodes || []).forEach(function (n) {
+      var r = n.revision;
+      if (n.restricted) { row(depth, "—", null, h("span.muted", { text: "Restricted item" }), "In a project group you are not a member of"); return; }
+      if (!r) { row(depth, n.item_number, null, "", "No revision"); return; }
+      // a part used more than once is offered at its first place only
+      if (seen[r.id]) return;
+      seen[r.id] = true;
+      row(depth, n.item_number, r, r.name, null);
+      walk(n.children, depth + 1);
+    });
+  }
+  walk(tree.children, 1);
+  // parts the CAD files reference without a BOM line
+  (set.revisions || []).forEach(function (w) {
+    if (seen[w.revision_id]) return;
+    seen[w.revision_id] = true;
+    row(1, w.item_number, { id: w.revision_id, code: w.code, state: w.state }, w.name, null);
+  });
+  function tickAll(on) { boxes.forEach(function (b) { b.input.checked = on; }); }
+  var body = h("div.stack", null, [
+    h("p", { text: "Tick the parts you want to change in the context of the assembly. They are checked out in one step and their files in your working folder become writable; " +
+      "the others stay read-only. Parts that are released, in review or checked out by someone else cannot be ticked." }),
+    boxes.length ? h("div.row", null, [
+      h("button.small", { type: "button", on: { click: function () { tickAll(true); } } }, "Tick all"),
+      h("button.small", { type: "button", on: { click: function () { tickAll(false); } } }, "Tick none")
+    ]) : h("p.notice", { text: "Nothing in this structure can be checked out by you right now." }),
+    table(["Item", "Name", "State", "Check-out"], rows)
+  ]);
+  dialog("Check out parts of " + rev.item_number + "/" + rev.code, body, [
+    { label: "Cancel", onClick: function (d) { d.close(); } },
+    { label: "Check out", primary: true, submit: true, onClick: function (d) {
+      var picks = boxes.filter(function (b) { return b.input.checked; }).map(function (b) { return b.pick; });
+      if (!picks.length) { d.fail("Tick at least one part."); return; }
+      d.close();
+      doCheckoutMany(picks);
+    } }
+  ], { wide: true });
+}
+
+/** Checks out `picks` ({project, item, code}) in one step and reports the
+ * result: a toast, and the refused revisions with the server's reason. */
+export function doCheckoutMany(picks) {
+  run("Checking out " + picks.length + (picks.length === 1 ? " revision" : " revisions"), function () {
+    return getting(call("workspace_checkout_many", { revisions: picks }));
+  }).then(function (r) {
+    toast(r.summary, r.refused.length ? "info" : null);
+    var f = r.files;
+    if (r.refused.length) {
+      dialog("Some parts were not checked out", h("div.stack", null, [
+        h("p", { text: r.summary }),
+        h("ul.small", null, r.refused.map(function (o) {
+          return h("li", null, [h("span.mono", { text: o.item ? o.item + "/" + o.code : (o.revision_id || "?") }), " – " + (o.message || o.reason || "refused")]);
+        })),
+        f.kept.length || f.clashes.length || f.failed.length
+          ? h("p.small.muted", { text: "Files: " + f.kept.length + " kept (your local changes), " + f.clashes.length + " name clash(es), " + f.failed.length + " failed." }) : null
+      ]), [{ label: "Close", primary: true, submit: true, onClick: function (d) { d.close(); } }], { wide: true });
+    } else if (f.kept.length || f.clashes.length || f.failed.length) {
+      reportDownload(f);
+    }
+    refreshStructure();
+    reloadActive();
+    refreshWorklistCount();
+  }, function () {});
+}
+
 // Cancelling one's own check-out takes effect at once (the local files stay
 // in the workspace); releasing someone else's lock is confirmed first.
 export function doCancelCheckout(tab) {
