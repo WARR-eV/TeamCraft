@@ -31,18 +31,56 @@ pub enum EntryError {
     Unsupported(String),
 }
 
+/// The label of a field of *Link to TeamCraft item*, as its dialog shows it.
+fn label(field: &str) -> &str {
+    match field {
+        "item_number" => "Item number",
+        "revision" => "Revision",
+        "name" => "Item name",
+        "server" => "TeamCraft server",
+        other => other,
+    }
+}
+
+/// A broken input. SolidCraft shows only the reason, so the reason names the
+/// field itself (`Item number is required`, not `is required`).
 fn input(field: &str, reason: &str) -> EntryError {
     EntryError::Input {
         field: field.into(),
-        reason: reason.into(),
+        reason: format!("{} {reason}. Nothing was changed.", label(field)),
     }
+}
+
+/// Why SolidCraft refused or failed `command`, in words a user can act on.
+/// The plugin never talks to a TeamCraft server or the desktop app (it has no
+/// network), so a failure here is always SolidCraft's answer about the open
+/// design – TeamCraft not running is never the cause.
+pub fn explain(command: &str, reason: &str) -> String {
+    let reason = reason.trim();
+    let lower = reason.to_ascii_lowercase();
+    let hint = if lower.contains("permission denied") || lower.contains("not granted") {
+        "This SolidCraft version does not let the TeamCraft plugin use it – install the TeamCraft \
+         plugin that matches your SolidCraft version."
+    } else if lower.contains("cancel") {
+        "The run was stopped."
+    } else if lower.contains("limit") || lower.contains("fuel") || lower.contains("deadline") {
+        "The design is too large for the plugin's limits."
+    } else {
+        "Is a design open? Nothing in the design was changed."
+    };
+    let reason = if reason.is_empty() {
+        "no reason given"
+    } else {
+        reason
+    };
+    format!("SolidCraft could not run {command} ({reason}). {hint}")
 }
 
 fn call(host: &mut dyn Host, command: &str, args: Value) -> Result<Value, EntryError> {
     host.run(command, args)
         .map_err(|reason| EntryError::Command {
             command: command.into(),
-            reason,
+            reason: explain(command, &reason),
         })
 }
 
@@ -84,6 +122,16 @@ fn text<'a>(map: &'a Map<String, Value>, key: &str) -> &'a str {
         .unwrap_or("")
 }
 
+/// The message for a design whose TeamCraft data is not an object (written
+/// by hand or by another tool), with what to do about it.
+const DAMAGED: &str = "The design's TeamCraft data (teamcraft.pdm) is damaged. Use *Link to \
+                       TeamCraft item* to write it again, or *Unlink from TeamCraft* to remove it.";
+
+/// Whether the design has a TeamCraft entry that is not an object.
+fn damaged(metadata: &Map<String, Value>) -> bool {
+    metadata.get(KEY).is_some_and(|v| !v.is_object())
+}
+
 /// TeamCraft's object in the design, if there is one.
 fn teamcraft(metadata: &Map<String, Value>) -> Option<&Map<String, Value>> {
     metadata.get(KEY).and_then(Value::as_object)
@@ -104,6 +152,15 @@ pub fn status(host: &mut dyn Host) -> Result<Value, EntryError> {
     let (metadata, props) = properties(host)?;
     let part_number = text(&props, "part_number");
     let revision = text(&props, "revision");
+    if damaged(&metadata) {
+        return Ok(json!({
+            "managed": false,
+            "damaged": true,
+            "part_number": part_number,
+            "revision": revision,
+            "message": DAMAGED,
+        }));
+    }
     let Some(tc) = teamcraft(&metadata) else {
         return Ok(json!({
             "managed": false,
@@ -179,6 +236,7 @@ pub fn check(host: &mut dyn Host) -> Result<Value, EntryError> {
         ));
     }
     match teamcraft(&metadata) {
+        None if damaged(&metadata) => findings.push(finding("warning", DAMAGED.into())),
         None => findings.push(finding(
             "info",
             "Not linked to a TeamCraft item yet.".into(),
@@ -221,9 +279,20 @@ pub fn check(host: &mut dyn Host) -> Result<Value, EntryError> {
 /// BOM rows TeamCraft cannot match: no part number, a quantity SolidCraft
 /// cannot count, one part number with different descriptions.
 fn check_bom(host: &mut dyn Host, findings: &mut Vec<Value>) {
-    // a part without components has no rows; a failure is no finding
-    let Ok(bom) = host.run("assembly.bom", json!({"levels": "all"})) else {
-        return;
+    // a part without components answers with no rows; a failure means the
+    // rows were not checked, which must not read as "ready"
+    let bom = match host.run("assembly.bom", json!({"levels": "all"})) {
+        Ok(bom) => bom,
+        Err(reason) => {
+            findings.push(finding(
+                "warning",
+                format!(
+                    "The bill of materials was not checked: {}",
+                    explain("assembly.bom", &reason)
+                ),
+            ));
+            return;
+        }
     };
     let rows = bom
         .get("rows")
@@ -277,8 +346,18 @@ fn check_bom(host: &mut dyn Host, findings: &mut Vec<Value>) {
 /// working folder) or two links with the same file name in different
 /// folders (TeamCraft finds references by file name).
 fn check_links(host: &mut dyn Host, findings: &mut Vec<Value>) {
-    let Ok(links) = host.run("component.links", json!({})) else {
-        return;
+    let links = match host.run("component.links", json!({})) {
+        Ok(links) => links,
+        Err(reason) => {
+            findings.push(finding(
+                "warning",
+                format!(
+                    "The linked designs were not checked: {}",
+                    explain("component.links", &reason)
+                ),
+            ));
+            return;
+        }
     };
     let links = links
         .get("links")
@@ -401,11 +480,16 @@ mod tests {
         rows: Vec<Value>,
         links: Vec<Value>,
         calls: Vec<(String, Value)>,
+        /// Commands that fail, with SolidCraft's reason.
+        fail: Vec<(&'static str, &'static str)>,
     }
 
     impl Host for Fake {
         fn run(&mut self, command: &str, args: Value) -> Result<Value, String> {
             self.calls.push((command.to_string(), args.clone()));
+            if let Some((_, why)) = self.fail.iter().find(|(c, _)| *c == command) {
+                return Err((*why).to_string());
+            }
             let props = |m: &Map<String, Value>| {
                 let mut p = Map::new();
                 for k in [
@@ -441,9 +525,6 @@ mod tests {
                     let key = args["key"].as_str().unwrap();
                     let was = self.metadata.remove(key).is_some();
                     Ok(json!({"removed": if was { vec![key] } else { vec![] }}))
-                }
-                "assembly.bom" if self.rows.is_empty() => {
-                    Err("the design has no components".into())
                 }
                 "assembly.bom" => Ok(json!({"rows": self.rows})),
                 "component.links" => Ok(json!({"links": self.links})),
@@ -595,7 +676,11 @@ mod tests {
             ),
         ] {
             match link(&mut f, &params) {
-                Err(EntryError::Input { field: got, .. }) => assert_eq!(got, field, "{params}"),
+                Err(EntryError::Input { field: got, reason }) => {
+                    assert_eq!(got, field, "{params}");
+                    // SolidCraft shows only the reason: it names the field
+                    assert!(reason.starts_with(label(field)), "{reason}");
+                }
                 other => panic!("{params}: {other:?}"),
             }
         }
@@ -603,6 +688,70 @@ mod tests {
             f.calls.iter().all(|(c, _)| c != "document.metadata.set"),
             "nothing written"
         );
+    }
+
+    /// No hard, unexplained failure: a refused or failed SolidCraft command
+    /// says which command, SolidCraft's reason and what to do.
+    #[test]
+    fn a_failed_command_is_explained() {
+        let mut refused = linked();
+        refused.fail = vec![(
+            "document.metadata",
+            "permission denied: edit command document.metadata from read entry",
+        )];
+        let Err(EntryError::Command { command, reason }) = status(&mut refused) else {
+            panic!("status must fail when the properties cannot be read");
+        };
+        assert_eq!(command, "document.metadata");
+        assert!(reason.contains("permission denied") && reason.contains("matches your SolidCraft"));
+        let mut closed = Fake {
+            fail: vec![("document.metadata", "no design is open")],
+            ..Fake::default()
+        };
+        let Err(EntryError::Command { reason, .. }) = check(&mut closed) else {
+            panic!("check must fail without properties");
+        };
+        assert!(reason.contains("no design is open") && reason.contains("Nothing in the design"));
+        assert!(explain("x", "  ").contains("no reason given"));
+        let mut write = linked();
+        write.fail = vec![("document.metadata.set", "the design is read-only")];
+        let params = json!({"item_number": "TC-1", "revision": "A"});
+        assert!(matches!(
+            link(&mut write, &params),
+            Err(EntryError::Command { reason, .. }) if reason.contains("read-only")
+        ));
+    }
+
+    /// A BOM or link list SolidCraft cannot give is a warning, never "ready".
+    #[test]
+    fn unread_bom_and_links_are_not_ready() {
+        let mut f = linked();
+        f.fail = vec![
+            ("assembly.bom", "evaluation failed"),
+            ("component.links", "evaluation failed"),
+        ];
+        let c = check(&mut f).unwrap();
+        assert_eq!(c["ready"], false);
+        let text = c["findings"].to_string();
+        assert!(text.contains("bill of materials was not checked"), "{text}");
+        assert!(text.contains("linked designs were not checked"), "{text}");
+        // a plain part answers with no rows and no links: ready
+        assert_eq!(check(&mut linked()).unwrap()["ready"], true);
+    }
+
+    /// TeamCraft data that is not an object is reported, and link repairs it.
+    #[test]
+    fn damaged_teamcraft_data_is_reported_and_repaired() {
+        let mut f = linked();
+        f.metadata.insert(KEY.into(), json!("garbage"));
+        let s = status(&mut f).unwrap();
+        assert_eq!(s["damaged"], true);
+        assert!(s["message"].as_str().unwrap().contains("damaged"));
+        let c = check(&mut f).unwrap();
+        assert_eq!(c["ready"], false);
+        let params = json!({"item_number": "TC-1042", "revision": "B"});
+        link(&mut f, &params).unwrap();
+        assert_eq!(status(&mut f).unwrap()["managed"], true);
     }
 
     #[test]

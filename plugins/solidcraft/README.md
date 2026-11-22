@@ -34,6 +34,24 @@ SolidCraft commands it calls (declared in `plugin.json`, none of them reads
 or writes files): `document.metadata`, `document.metadata.set`,
 `document.metadata.remove`, `assembly.bom`, `component.links`.
 
+## When something fails
+
+The plugin needs neither a TeamCraft server nor the desktop app: TeamCraft
+not running never makes it fail. What it says when something does go wrong:
+
+- **Bad input** to *Link to TeamCraft item* names the field and changes
+  nothing (*Item number is required. Nothing was changed.*).
+- **A design without TeamCraft data** is *not linked*, with how to link it.
+  **Damaged TeamCraft data** (not an object) is reported, with *Link* or
+  *Unlink* as the fix.
+- **A SolidCraft command that fails** ends the run: SolidCraft shows its own
+  message, prefixed *TeamCraft:*, and keeps the design as it was. The plugin
+  cannot catch it (SolidCraft 0.45). So the plugin only calls commands that
+  answer on any design – a part without components gives an empty BOM and no
+  links – and checks its input before it writes. On a host that hands the
+  error back, the plugin adds what to do, and *check* reports a BOM or link
+  list it could not read as a warning instead of *ready*.
+
 ## Build
 
 ```sh

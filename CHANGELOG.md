@@ -116,6 +116,10 @@ see the notices in the README.
   (they still change nothing). The four ribbon buttons, all labelled
   *TeamCraft* before, now read *TeamCraft status*, *Check for TeamCraft*,
   *Link to TeamCraft item* and *Unlink from TeamCraft*.
+  Failures explain themselves: bad input names the field, damaged TeamCraft
+  data in a design is reported with the fix, and *check* never reports
+  *ready* when it could not read the BOM or the linked designs. All four
+  entries were run on SolidCraft 0.45.0 (flatpak) through `solidcraft-cli`.
 - **Desktop: a slow STEP export no longer holds the check-in hostage**
   (#342). With *Create STEP exports* ticked, the files are uploaded first
   (parked), then exported, then checked in with the STEP files. *Cancel*
