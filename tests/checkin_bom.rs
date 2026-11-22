@@ -253,11 +253,19 @@ async fn a_checkin_with_the_box_updates_the_bom_from_the_cad_file() {
     assert_eq!(r.status, StatusCode::OK, "{}", r.text());
     let body = r.json();
     let result = &body["bom"];
-    assert_eq!(strings(&result["added"]), [nut.clone()], "{body}");
-    assert_eq!(strings(&result["updated"]), [bolt.clone()], "{body}");
+    assert_eq!(
+        strings(&result["added"]),
+        std::slice::from_ref(&nut),
+        "{body}"
+    );
+    assert_eq!(
+        strings(&result["updated"]),
+        std::slice::from_ref(&bolt),
+        "{body}"
+    );
     assert_eq!(
         strings(&result["kept_not_in_cad"]),
-        [glue.clone()],
+        std::slice::from_ref(&glue),
         "{body}"
     );
     assert_eq!(
@@ -292,7 +300,10 @@ async fn a_checkin_with_the_box_updates_the_bom_from_the_cad_file() {
     let again = r.json();
     assert_eq!(again["bom"]["added"], json!([]), "{again}");
     assert_eq!(again["bom"]["updated"], json!([]), "{again}");
-    assert_eq!(strings(&again["bom"]["kept_not_in_cad"]), [glue.clone()]);
+    assert_eq!(
+        strings(&again["bom"]["kept_not_in_cad"]),
+        std::slice::from_ref(&glue)
+    );
     assert_eq!(bom_audits(&app, rev).await.len(), 1);
     app.teardown().await;
 }
@@ -325,7 +336,11 @@ async fn an_assumed_quantity_never_overwrites_an_existing_line() {
     .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.text());
     let body = r.json();
-    assert_eq!(strings(&body["bom"]["added"]), [bolt.clone()], "{body}");
+    assert_eq!(
+        strings(&body["bom"]["added"]),
+        std::slice::from_ref(&bolt),
+        "{body}"
+    );
     assert_eq!(body["bom"]["updated"], json!([]), "assumed: {body}");
     let mut expected = vec![(bolt.clone(), 1.0), (plate.clone(), 3.0)];
     expected.sort_by(|a, b| a.0.cmp(&b.0));
@@ -361,7 +376,11 @@ async fn a_circular_child_is_refused_at_checkin() {
     .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.text());
     let body = r.json();
-    assert_eq!(strings(&body["bom"]["added"]), [part.clone()], "{body}");
+    assert_eq!(
+        strings(&body["bom"]["added"]),
+        std::slice::from_ref(&part),
+        "{body}"
+    );
     assert_eq!(body["bom"]["refused"][0]["child"], json!(sub), "{body}");
     assert!(body["bom"]["refused"][0]["reason"]
         .as_str()
@@ -509,7 +528,11 @@ async fn a_chunked_checkin_updates_the_bom_too() {
         .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.text());
     let body = r.json();
-    assert_eq!(strings(&body["bom"]["added"]), [bolt.clone()], "{body}");
+    assert_eq!(
+        strings(&body["bom"]["added"]),
+        std::slice::from_ref(&bolt),
+        "{body}"
+    );
     assert_eq!(bom(&app, &eng, &asm).await, [(bolt.clone(), 3.0)]);
     app.teardown().await;
 }
