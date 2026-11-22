@@ -13,6 +13,13 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Fixed
+
+- CI: `tests/checkin_bom.rs` (#407) compared with one-element arrays built
+  by `[x.clone()]`, which clippy refuses (`cloned_ref_to_slice_refs`); it
+  uses `std::slice::from_ref` now. Server and desktop are clippy-clean on
+  all targets.
+
 ### Added
 
 - **Panning in the 3D viewer** (#459), in the browser and the desktop app:
