@@ -57,6 +57,13 @@ see the notices in the README.
   the lines – part properties, placement counts, purchased/standard parts not
   expanded, phantoms passed through, reference components left out
   (`src/scbom.rs`, fuzzed by the `scdesign` target).
+- **Desktop: report a problem from any error** (#381). Every error message
+  (and *Help → Report a Problem…*) opens one review dialog, prefilled with
+  the action, its key inputs, the error and the versions, optionally the
+  session's recent error messages – redacted like crash reports. Nothing is
+  sent without a click: *Open issue form* (GitHub or the tracker under
+  *Settings → Report problems to*), *Copy report*, *Save report…*. Web error
+  pages get *Copy details*.
 - **Desktop: update window with verified downloads** (#377). The update
   notice opens a window with the release notes, *Update now* / *Download*,
   *Skip this version*, *Remind me later* (three days) and the release page.

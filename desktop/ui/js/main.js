@@ -24,6 +24,7 @@ import { importBomDialog } from "./bom-import.js";
 import { getProjectsDialog } from "./group-sync.js";
 import { importFolderDialog, importTutorial } from "./folder-import.js";
 import { openAbout, openSettings, signOut } from "./settings.js";
+import { reportDialog } from "./report.js";
 import { checkCrashReports, initCrashWatch } from "./crash.js";
 
 // ======================================================================
@@ -84,6 +85,7 @@ export function handleMenu(id) {
   var shellVisible = !$("shell").classList.contains("hidden");
   switch (id) {
     case "about": case "about-app": openAbout(); return;
+    case "report-problem": reportDialog({}); return;
     case "check-updates": checkUpdateNow(); return;
     case "zoom-in": setZoom(state.zoom * 1.1); return;
     case "zoom-out": setZoom(state.zoom / 1.1); return;

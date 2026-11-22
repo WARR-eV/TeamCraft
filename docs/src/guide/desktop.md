@@ -666,6 +666,25 @@ available*. A click opens the **update window** with the release notes and:
 and says whether you are up to date. *Settings → Updates* switches the daily
 check off (for example on computers without internet access).
 
+## Report a problem
+
+Every error message has a **Report…** link, and *Help → Report a Problem…*
+opens the same dialog without one. It shows the report before anything
+leaves the app: a title (what you did and the error), the action, its key
+inputs (no file contents or item data), the error and the versions; add what
+you were trying to do (left out if empty) and, if you like, the error
+messages of this session. Your home folder, server addresses and tokens are
+removed. Edit the text as you like, then:
+
+* *Open issue form* opens a new issue at the TeamCraft repository on GitHub –
+  or your help desk's form, if *Settings → Report problems to* names one. A
+  long report is cut in the link and copied to the clipboard in full;
+* *Copy report* puts it on the clipboard;
+* *Save report…* writes it to a file (both work without a network).
+
+The error pages of the web UI have *Details for a bug report* with *Copy
+details* (status, message, page, time and version).
+
 ## Crash reports
 
 When the app crashes – a panic in the app, an uncaught error in its user

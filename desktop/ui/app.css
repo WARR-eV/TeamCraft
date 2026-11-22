@@ -1308,6 +1308,14 @@ ul.file-picks li .mono { overflow: hidden; text-overflow: ellipsis; white-space:
   overflow: auto;
 }
 
+/* Report a problem (#381): the editable report and the recent messages. */
+textarea.report-text { font-family: var(--font-mono, monospace); font-size: 12px; }
+pre.report-log {
+  max-height: 10rem; overflow: auto; margin: 0; padding: 8px 10px; white-space: pre-wrap; font-size: 12px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.toast .link { margin-left: 8px; }
+.error-text .link { margin-left: 4px; }
 /* The update window (#377): the release notes as plain text, scrolled. */
 pre.release-notes {
   max-height: 16rem; overflow: auto; margin: 0; padding: 8px 10px;

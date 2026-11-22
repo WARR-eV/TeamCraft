@@ -198,6 +198,10 @@ pub struct Settings {
     pub update_latest: Option<String>,
     /// The release version whose notice the user closed (*Skip this version*).
     pub update_dismissed: Option<String>,
+    /// *Settings → Report problems to*: the operator's own tracker (#381);
+    /// `None` = TeamCraft's GitHub issue form.
+    #[serde(default)]
+    pub report_url: Option<String>,
     /// *Remind me later*: no notice before this time (seconds since the epoch, #377).
     #[serde(default)]
     pub update_remind_until: Option<u64>,

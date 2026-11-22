@@ -580,6 +580,19 @@ mod tests {
             "error.html",
             json!({ "status": 404, "reason": "Not Found", "message": "gone", "flash": null, "local_login": true }),
         );
+        // *Copy details* (#381): status, message, page, time and version
+        let html = render(
+            &env,
+            "error.html",
+            json!({ "status": 500, "reason": "Internal Server Error", "message": "Something went wrong <b>",
+                    "flash": null, "local_login": true, "path": "/items/PRT-000042",
+                    "time": "2026-11-22 08:00:00 UTC", "version": "0.2.12" }),
+        );
+        assert!(
+            html.contains("data-copy=\"error-details\"")
+                && html.contains("Page: /items/PRT-000042")
+        );
+        assert!(html.contains("Something went wrong &lt;b&gt;"), "escaped");
         // a hosted live demo: the account on the login page, the banner on every page
         let demo = json!({ "username": "demo", "password": "try-it-<out>" });
         let html = render(

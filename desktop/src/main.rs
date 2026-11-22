@@ -24,6 +24,7 @@ mod localserver;
 mod newfiles;
 mod policy;
 mod profiles;
+mod report;
 mod resume;
 mod scprops;
 mod settings;
@@ -153,6 +154,7 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         .build()?;
     let help = SubmenuBuilder::new(app, "Help")
         .item(&item("import-help", "How to Import a CAD Folder", None)?)
+        .item(&item("report-problem", "Report a Problem…", None)?)
         .item(&item("check-updates", "Check for Updates…", None)?)
         .item(&item("about", "About TeamCraft", None)?)
         .build()?;
@@ -272,6 +274,10 @@ fn main() {
             commands::workspace_open,
             commands::open_web,
             commands::set_zoom,
+            commands::problem_report,
+            commands::problem_report_open,
+            commands::problem_report_save,
+            commands::set_report_url,
             commands::check_update,
             commands::dismiss_update,
             commands::update_remind_later,

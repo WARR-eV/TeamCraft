@@ -108,6 +108,8 @@ pub struct Session {
     pub checkout_parts: bool,
     /// After a crash, ask at the next start whether to share the report.
     pub crash_prompt: bool,
+    /// *Settings → Report problems to* (#381); `None` = GitHub.
+    pub report_url: Option<String>,
     /// A *with local server* installation: the connect screen offers *Try
     /// TeamCraft on this computer* (src/localserver.rs).
     pub local_server_available: bool,
@@ -126,6 +128,7 @@ pub fn session(app: AppHandle, state: State<'_, AppState>) -> Session {
         token_storage: s.token.as_ref().and(s.token_storage),
         update_check: policy::current().update_check(s.update_check),
         checkout_parts: s.checkout_parts != Some(false),
+        report_url: s.report_url.clone(),
         crash_prompt: policy::current().crash_prompt(s.crash_prompt),
         server_url: s.server_url.clone(),
         signed_in: s.token.is_some(),
@@ -2510,4 +2513,70 @@ pub async fn workspace_add_files(
     addfiles::record(&root, &item, &code, &done)
         .map_err(|e| ApiError::local(format!("Cannot remember the added files: {e}")))?;
     Ok(json!({ "copied": copied, "skipped": skipped }))
+}
+
+// ------------------------------------------------------ report a problem (#381)
+
+/// The prefilled, redacted report of a failure for the review dialog.
+#[tauri::command]
+pub fn problem_report(problem: crate::report::Problem) -> Value {
+    let home = crate::report::home();
+    json!({
+        "title": crate::report::title(&problem, home.as_deref()),
+        "body": crate::report::body(&problem, home.as_deref()),
+        "target": "github",
+    })
+}
+
+/// *Open issue form*: the reviewed text in a new issue on GitHub, or in the
+/// tracker set under *Settings → Report problems to*. Returns whether the
+/// text had to be cut in the address (the UI then copies the full text).
+#[tauri::command]
+pub fn problem_report_open(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    title: String,
+    body: String,
+) -> CmdResult<bool> {
+    let base = snapshot(&state)
+        .report_url
+        .unwrap_or_else(|| crate::crash::ISSUE_URL.to_string());
+    let (url, cut) = crate::report::form_url(&base, &title, &body).map_err(ApiError::local)?;
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| ApiError::local(format!("The browser could not be opened: {e}")))?;
+    Ok(cut)
+}
+
+/// *Save report…*: the reviewed text into a file the user picks.
+#[tauri::command]
+pub async fn problem_report_save(app: AppHandle, text: String) -> CmdResult<Option<PathBuf>> {
+    let Some(path) = ask_save_path(
+        &app,
+        "teamcraft-problem-report.md",
+        ("Markdown", &["md", "txt"]),
+    )
+    .await?
+    else {
+        return Ok(None);
+    };
+    std::fs::write(&path, text)
+        .map_err(|e| ApiError::local(format!("The report could not be saved: {e}")))?;
+    Ok(Some(path))
+}
+
+/// *Settings → Report problems to*: an http(s) address of the operator's
+/// tracker (`title` and `body` are added as query parameters); empty = the
+/// TeamCraft issue form on GitHub.
+#[tauri::command]
+pub fn set_report_url(state: State<'_, AppState>, url: String) -> CmdResult<()> {
+    let url = url.trim();
+    let value = if url.is_empty() {
+        None
+    } else {
+        crate::report::form_url(url, "", "").map_err(ApiError::local)?;
+        Some(url.to_string())
+    };
+    update_settings(&state, |s| s.report_url = value)?;
+    Ok(())
 }
