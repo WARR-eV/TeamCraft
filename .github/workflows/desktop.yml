@@ -92,6 +92,9 @@ jobs:
       # the reviewers of the release dialog and when a draft can be submitted
       - name: Test the release rules
         run: node scripts/desktop-release-rules.test.mjs
+      # the key inputs of a failed action in *Report…* (#381)
+      - name: Test the report inputs
+        run: node scripts/desktop-report-inputs.test.mjs
       # the entries of the right-click menu of an item and why one is
       # disabled – the revision toolbar's rules (#417)
       - name: Test the item menu rules

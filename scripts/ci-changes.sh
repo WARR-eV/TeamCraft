@@ -64,6 +64,8 @@ DESKTOP_UI='^(desktop/ui|static|shared)/|^scripts/[^/]*\.mjs$|^\.github/workflow
 # scripts/desktop-lock-layout.test.mjs compares the desktop layout with the
 # server's sizes in this file (#428)
 DESKTOP_UI+='|^src/services/lock_overview\.rs$'
+# scripts/desktop-report-inputs.test.mjs checks its caps against this file (#381)
+DESKTOP_UI+='|^desktop/src/report\.rs$'
 
 # codeql – codeql.yml, one analysis per language.
 CODEQL_ACTIONS='^\.github/(workflows|actions|codeql)/'
@@ -178,6 +180,7 @@ self_test() {
     check desktop/src/workspace.rs server=false desktop_rust=true desktop_ui=false 'codeql=["rust"]' 'deny=[]'
     check desktop/src/compat.rs server=true desktop_rust=true
     check desktop/src/usage.rs server=true desktop_rust=true
+    check desktop/src/report.rs server=false desktop_rust=true desktop_ui=true
     check desktop/Cargo.lock server=false desktop_rust=true 'deny=["desktop/Cargo.toml"]' 'codeql=["rust"]'
     check desktop/tauri.conf.json server=false desktop_rust=true desktop_ui=false 'codeql=[]'
     check desktop/README.md server=false desktop_rust=false desktop_ui=false

@@ -13,6 +13,22 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Added
+
+- **Request ids** (#381): every answer of the server carries an
+  `x-request-id` header (a new UUID, or a reverse proxy's own id of 1–64
+  characters `[A-Za-z0-9-]`), the request's log line records it as
+  `request_id`, and the web UI's error pages show it under *Details for a bug
+  report* and in *Copy details*.
+- **Desktop: key inputs in problem reports** (#381): *Report…* on an error
+  now names what the action worked on – project group, item, revision, file
+  and format, the ticked files of a check-in, the options of a BOM or folder
+  import – for check-out, check-in and park, *Get files*, opening files, the
+  3D preview and STL export, STEP exports, new items, adding files, BOM and
+  folder imports and request attachments. Names and short values only (a path
+  is reduced to its file name, at most 12 values of 200 characters); a 3D
+  preview that fails now also shows an error message with *Report…*.
+
 ## [0.2.12] - 2026-11-22
 
 ### Security

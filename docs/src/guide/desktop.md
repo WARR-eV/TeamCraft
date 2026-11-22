@@ -713,7 +713,7 @@ check off (for example on computers without internet access).
 Every error message has a **Report…** link, and *Help → Report a Problem…*
 opens the same dialog without one. It shows the report before anything
 leaves the app: a title (what you did and the error), the action, its key
-inputs (no file contents or item data), the error and the versions; add what
+inputs, the error and the versions; add what
 you were trying to do (left out if empty) and, if you like, the error
 messages of this session. Your home folder, server addresses and tokens are
 removed. Edit the text as you like, then:
@@ -725,8 +725,17 @@ removed. Edit the text as you like, then:
 * *Copy report* puts it on the clipboard;
 * *Save report…* writes it to a file (both work without a network).
 
+The key inputs are what the action worked on, for example the project group,
+item number and revision of a check-out or check-in, the names of the ticked
+files, the file and format of a 3D preview, or the file name and options of a
+BOM or folder import. They are names and short values only: a path is
+reduced to the file name, and file contents, item names, descriptions and
+BOM lines are never included.
+
 The error pages of the web UI have *Details for a bug report* with *Copy
-details* (status, message, page, time and version).
+details* (status, message, page, time, version and the request id). The
+request id is also in the server log, so your administrator can find the
+error there.
 
 ## Usage report
 
