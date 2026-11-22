@@ -173,6 +173,8 @@ fn main() {
             // crash reports: report sessions that ended unexpectedly, start ours;
             // one found later (a parallel instance that died) is announced to the UI
             let crash_dir = crash::open(&config_dir);
+            // the whole output of failed STEP exports (#342)
+            cadexport::set_log_dir(&config_dir);
             let handle = app.handle().clone();
             crash::start_session(&crash_dir, move || {
                 let _ = handle.emit("crash-reports", ());
@@ -264,6 +266,7 @@ fn main() {
             commands::import_bom,
             commands::cad_programs,
             commands::cad_export_step,
+            commands::cad_export_cancel,
             commands::solidcraft_write_item_data,
             commands::cad_installed,
             commands::cad_open_plan,

@@ -1,4 +1,4 @@
-# TeamCraft Desktop
+A failed export never stops the check-in: the file goes without its STEP and the result says why. With exports the ticked files are uploaded first (parked), then exported, then checked in with the STEP files; *Cancel* during an export skips it and ends the CAD program the script started (`teamcraft-started-pid:` line, `taskkill`); rejected COM calls (`RPC_E_CALL_REJECTED`, `RPC_E_SERVERCALL_RETRYLATER`) are retried for a minute; the whole error output goes to `<config>/export-logs/` (newest 20, 64 KiB each, local only) – #342 |# TeamCraft Desktop
 
 The rich client of TeamCraft for **Linux, macOS and Windows**: a navigation
 rail, a navigator tree of the project groups, object tabs with sub-tabs, a

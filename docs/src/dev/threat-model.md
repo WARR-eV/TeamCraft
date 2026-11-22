@@ -1,4 +1,5 @@
 # Threat model
+| STEP export ends the wrong process or leaks the export log | T / I | *Cancel* during a STEP export (#342) ends only the PowerShell child the app started and the one process id the app's own script printed as `teamcraft-started-pid:` after starting the CAD program (`taskkill /PID … /T`; never ids below 5, never a program the user had open – the script reuses that one and prints nothing); the whole error output of a failed export is written to `<config>/export-logs/` on this computer only (newest 20, 64 KiB each, may hold file paths), never sent | `desktop/src/cadexport.rs` `the_started_program_is_read_from_its_line`, `a_skipped_export_stops_its_process_at_once`, `export_logs_are_cut_and_the_oldest_go` | mitigated; a process id can be reused after the program ended – the kill runs only while the export script is still running |
 
 What TeamCraft protects, from whom, where the trust boundaries are, and – per
 threat – what the code does about it and which test pins it. Every claim

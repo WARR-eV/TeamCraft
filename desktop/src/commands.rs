@@ -1606,6 +1606,13 @@ pub async fn cad_export_step(
         .to_string())
 }
 
+/// *Skip the export* in the check-in dialog (#342): stops the running STEP
+/// export; the check-in goes on without it.
+#[tauri::command]
+pub fn cad_export_cancel() {
+    cadexport::cancel();
+}
+
 /// Writes the item number, revision and name (and TeamCraft's ids) into the
 /// properties of a SolidCraft design of my check-out, with SolidCraft's
 /// command-line tool (#369). Refused for a design that is read-only or open
