@@ -491,6 +491,13 @@ the folder import and the working folder use composed names on every system,
 and a file an older app version wrote under a decomposed name is renamed at
 the next Get or when the Workspace tab looks at it.
 
+**Files open in SolidCraft.** While SolidCraft has a design of the working
+folder open, the Workspace tab marks it *Open in SolidCraft* and names the
+computer and user (from the lock file SolidCraft keeps next to the design;
+locks not refreshed for three minutes are ignored). The check-in dialog warns
+about such files: changes not saved in SolidCraft are not checked in. You can
+check in anyway.
+
 **Read-only rule.** Files you have **not** checked out are read-only on disk (the read-only attribute on Windows, no
 write permission on Linux and macOS).
 CAD programs then open them read-only, and nobody edits a file that cannot be

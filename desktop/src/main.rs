@@ -14,6 +14,7 @@ mod autoallow;
 mod bomimport;
 mod cadexport;
 mod cadlaunch;
+mod cadlock;
 mod commands;
 mod compat;
 mod crash;
