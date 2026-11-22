@@ -111,3 +111,8 @@ debug = "none"
 
 [target."cfg(unix)".dependencies]
 rlimit = "0.10"
+
+# Memory limit of the parser child processes on Windows (job object,
+# GHSA-7q9q-g6rr-pc58); already in the tree through tokio and mio.
+[target."cfg(windows)".dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading"] }

@@ -122,9 +122,11 @@ src/mcp/           MCP server at POST /api/v1/mcp (stateless JSON-RPC, bearer PA
                    dispatch; tools/*.rs = handlers per area, schemas, args, prompts – over services::* (read-mostly,
                    writes only draft changes); tests/mcp_contract.rs snapshots the tool list, schemas and prompts
                    (tests/fixtures/mcp/contract.json); `teamcraft mcp` = stdio bridge in main.rs
-src/auth.rs        Argon2 passwords, tokens, cookies, WebUser/ApiUser extractors
-src/oidc.rs        OIDC authorization code + PKCE (any provider), group → role mapping; back-channel logout tokens
-                   checked against the provider's jwks_uri (RS256/ES256 via ring) for POST /auth/oidc/backchannel-logout
+src/auth.rs        Argon2 passwords, tokens, cookies, WebUser/ApiUser extractors, client_address (X-Forwarded-For only from
+                   TEAMCRAFT_TRUSTED_PROXIES, read from the right)
+src/oidc.rs        OIDC authorization code + PKCE (any provider), group → role mapping; ID tokens and back-channel logout
+                   tokens checked against the provider's jwks_uri (RS/PS/ES via ring, HS* ID tokens with the client secret;
+                   verified_payload), https endpoints except loopback (secure_endpoint); POST /auth/oidc/backchannel-logout
                    (mounted in lib.rs outside the web CSRF guard)
 src/llm/           provider-neutral LLM layer (no TeamCraft types): Turn/ToolCall/Reply/Usage/LlmError, pure Provider trait
                    (encode/decode/error table), Transport trait; http.rs = the one reqwest client (no redirects),
@@ -152,7 +154,8 @@ src/preview.rs     preview cache (vault/previews/), isolated conversion in a chi
 src/massprops.rs   pure mass properties of closed meshes (Eberly), edge check, inverted-mesh fix, parallel axis
 src/textindex.rs   text extraction from uploads for the full-text search (plain text with its numbers, STEP/IGES strings;
                    PDF via pdftext, HTML via htmltext – both in the isolated `text-extract` child)
-src/pdftext.rs     text layer of PDF reports and the isolated `teamcraft text-extract [--format pdf|html]` child
+src/pdftext.rs     text layer of PDF reports and the isolated `teamcraft text-extract [--format pdf|html|sheet]` child
+                   (sheet = spreadsheets of BOM and result imports, see bomtable::read_grid_isolated)
                    (size, page, time, memory limits; MAX_CHARS of the extracted text)
 src/htmltext.rs    text of HTML reports (FEA/CFD report generators): own bounded tokenizer, table rows as ` | ` lines,
                    scripts/styles/hidden elements skipped, charset sniffing; run in `text-extract --format html`
@@ -176,7 +179,8 @@ src/catprod.rs     CATIA V5 products: container table (document UUIDs), CATProdC
                    placements; components found by document UUID or part number in services/assemblies.rs
 src/thumbnail.rs   preview images stored in Inventor / Solid Edge / SolidWorks / NX files (OLE via cfb, PNG, DIB → BMP, JPEG), cached in previews/;
                    NX, SOLIDWORKS and Inventor parts/assemblies, CATIA parts/products, Creo parts/assemblies, Rhino and SketchUp models, Fusion designs: a PNG rendered from the 3D preview instead (mesh/render.rs, software z-buffer)
-src/bomtable.rs    BOM tables exported by CAD programs (CSV/TSV, Excel, ODS): header synonyms, levels, units – heuristic
+src/bomtable.rs    BOM tables exported by CAD programs (CSV/TSV, Excel, ODS): header synonyms, levels, units – heuristic;
+                   the server reads spreadsheets only through read_isolated (text-extract child, ZIP unpacked-size check)
 src/stepbom.rs     product structure of STEP assemblies (own Part 21 reader: PRODUCT … NEXT_ASSEMBLY_USAGE_OCCURRENCE) → BomTable
 src/assets.rs      embedded CSS/JS/logos/fonts, cache busting (?v=<asset hash>, ETag)
 src/notify.rs      Mattermost error webhook (rate limited)

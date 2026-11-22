@@ -38,7 +38,7 @@ Keycloak, Entra ID, Google, …). Register the redirect URI
 
 | Variable                                      | Default                | Meaning                            |
 |-----------------------------------------------|------------------------|------------------------------------|
-| `TEAMCRAFT_OIDC_ISSUER_URL`                   | –                      | issuer; enables SSO                |
+| `TEAMCRAFT_OIDC_ISSUER_URL`                   | –                      | issuer (https); enables SSO        |
 | `TEAMCRAFT_OIDC_CLIENT_ID` / `_CLIENT_SECRET` | –                      | client credentials                 |
 | `TEAMCRAFT_OIDC_DISPLAY_NAME`                 | `Single Sign-On`       | label of the login button          |
 | `TEAMCRAFT_OIDC_SCOPES`                       | `openid profile email` | requested scopes                   |
@@ -48,6 +48,13 @@ Keycloak, Entra ID, Google, …). Register the redirect URI
 | `TEAMCRAFT_OIDC_EDITOR_GROUP`                 | `teamcraft-editors`    | members become CAD editors         |
 | `TEAMCRAFT_OIDC_VIEWER_GROUP`                 | –                      | if set, required to sign in at all |
 | `TEAMCRAFT_OIDC_TOKEN_IDLE_DAYS`              | `90` (`0` = off)       | idle lifetime of SSO users' tokens |
+
+**The provider must speak HTTPS.** The issuer and every endpoint of its discovery document (authorization, token,
+userinfo, `jwks_uri`) must be `https://`; plain `http://` only on `localhost`, `127.0.0.1` or `[::1]` (a provider on the
+same computer). TeamCraft checks the signature of every ID token against the provider's keys at `jwks_uri` (RS256–512,
+PS256–512, ES256, ES384) or, for HS256–512, against the client secret; an unsigned token (`alg: none`) or one signed
+with another key signs nobody in (GHSA-864x-fmpf-4p73). The server must therefore reach `jwks_uri` as well as the token
+endpoint.
 
 **Set a viewer group with a shared identity provider.** Without
 `TEAMCRAFT_OIDC_VIEWER_GROUP`, every account the identity provider

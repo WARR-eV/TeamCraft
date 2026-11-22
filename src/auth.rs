@@ -351,7 +351,7 @@ impl FromRequestParts<AppState> for WebUser {
             .ok_or(AppError::Unauthorized)?;
         // conditions on membership that depend on the request (#151)
         let origin = Origin {
-            client: request_client(parts),
+            client: request_client(parts, state),
             session_started: Some(started),
             key: Some(hash_token(&token)[..16].to_string()),
             token: false,
@@ -365,12 +365,12 @@ impl FromRequestParts<AppState> for WebUser {
 }
 
 /// The client address of a request (see [`client_address`]).
-fn request_client(parts: &Parts) -> Option<IpAddr> {
+fn request_client(parts: &Parts, state: &AppState) -> Option<IpAddr> {
     let peer = parts
         .extensions
         .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
         .map(|c| c.0.ip());
-    client_address(&parts.headers, peer)
+    client_address(&parts.headers, peer, &state.config.trusted_proxies)
 }
 
 /// Where the signed-in request comes from (client address, session start, a
@@ -456,7 +456,7 @@ impl FromRequestParts<AppState> for ApiCaller {
             // conditions on membership that depend on the request (#151);
             // a token's age is the user's last sign-in (checked in SQL)
             let origin = Origin {
-                client: request_client(parts),
+                client: request_client(parts, state),
                 session_started: None,
                 key: Some(hash_token(token)[..16].to_string()),
                 token: true,
@@ -489,7 +489,7 @@ impl FromRequestParts<AppState> for services::access_log::AccessCtx {
 
     async fn from_request_parts(
         parts: &mut Parts,
-        _state: &AppState,
+        state: &AppState,
     ) -> Result<Self, Self::Rejection> {
         let bearer = parts
             .headers
@@ -502,7 +502,7 @@ impl FromRequestParts<AppState> for services::access_log::AccessCtx {
             } else {
                 services::access_log::Channel::Web
             },
-            client: request_client(parts),
+            client: request_client(parts, state),
         })
     }
 }
@@ -612,27 +612,52 @@ impl SignInThrottle {
     }
 }
 
-/// The client address of a request: the peer, or – when the peer is a
-/// reverse proxy on an internal address – the last `X-Forwarded-For` entry,
-/// the one that proxy added (a client can only prepend to the header). In
-/// tests without a peer address, the header alone.
-pub fn client_address(headers: &HeaderMap, peer: Option<IpAddr>) -> Option<IpAddr> {
-    let forwarded = || {
-        headers
-            .get("x-forwarded-for")?
-            .to_str()
-            .ok()?
-            .rsplit(',')
-            .next()?
-            .trim()
-            .parse::<IpAddr>()
-            .ok()
-    };
-    match peer {
-        Some(ip) if !crate::webhooks::is_internal(ip) => Some(ip),
-        Some(ip) => forwarded().or(Some(ip)),
-        None => forwarded(),
+/// Entries of `X-Forwarded-For` read at most: a proxy chain is a few hops
+/// long, the rest of a longer header is the client's own text.
+const MAX_FORWARDED_HOPS: usize = 32;
+
+/// The client address of a request (GHSA-98v7-pm3r-5934, F20).
+///
+/// The peer, unless the peer is one of the `trusted` proxies
+/// (`TEAMCRAFT_TRUSTED_PROXIES`, default loopback only). Then the
+/// `X-Forwarded-For` entries are read from the right – every proxy appends
+/// the address it received the request from, a client can only write to the
+/// left – skipping further trusted proxies, and the first other address is
+/// the client. An entry that is not an address ends the walk at the last
+/// trusted hop. A private peer is no longer enough: behind Docker's published
+/// port the peer is the bridge gateway, and on a campus network every client
+/// has a private address. Requests without a peer (in-process tests) read
+/// the header as if a trusted proxy had sent it.
+pub fn client_address(
+    headers: &HeaderMap,
+    peer: Option<IpAddr>,
+    trusted: &[services::membership_conditions::Network],
+) -> Option<IpAddr> {
+    let is_trusted = |ip: IpAddr| trusted.iter().any(|n| n.contains(ip));
+    if let Some(ip) = peer {
+        if !is_trusted(ip) {
+            return Some(ip);
+        }
     }
+    let mut client = peer;
+    let mut hops = 0;
+    'walk: for value in headers.get_all("x-forwarded-for").iter().rev() {
+        let Ok(text) = value.to_str() else { break };
+        for entry in text.rsplit(',') {
+            hops += 1;
+            if hops > MAX_FORWARDED_HOPS {
+                break 'walk;
+            }
+            let Ok(ip) = entry.trim().parse::<IpAddr>() else {
+                break 'walk;
+            };
+            client = Some(ip);
+            if !is_trusted(ip) {
+                break 'walk;
+            }
+        }
+    }
+    client
 }
 
 #[cfg(test)]
@@ -698,17 +723,127 @@ mod tests {
             "x-forwarded-for",
             HeaderValue::from_static("198.51.100.1, 203.0.113.9"),
         );
+        use services::membership_conditions::Network;
+        let loopback = [
+            Network::parse("127.0.0.0/8").unwrap(),
+            Network::parse("::1").unwrap(),
+        ];
         let proxy: IpAddr = "127.0.0.1".parse().unwrap();
         let public: IpAddr = "192.0.2.44".parse().unwrap();
         // the proxy's own entry, not what the client prepended
-        assert_eq!(client_address(&h, Some(proxy)), "203.0.113.9".parse().ok());
+        assert_eq!(
+            client_address(&h, Some(proxy), &loopback),
+            "203.0.113.9".parse().ok()
+        );
         // a client talking to the server directly cannot choose its address
-        assert_eq!(client_address(&h, Some(public)), Some(public));
-        assert_eq!(client_address(&HeaderMap::new(), Some(proxy)), Some(proxy));
-        assert_eq!(client_address(&h, None), "203.0.113.9".parse().ok());
+        assert_eq!(client_address(&h, Some(public), &loopback), Some(public));
+        assert_eq!(
+            client_address(&HeaderMap::new(), Some(proxy), &loopback),
+            Some(proxy)
+        );
+        assert_eq!(
+            client_address(&h, None, &loopback),
+            "203.0.113.9".parse().ok()
+        );
         let mut bad = HeaderMap::new();
         bad.insert("x-forwarded-for", HeaderValue::from_static("not-an-ip"));
-        assert_eq!(client_address(&bad, Some(proxy)), Some(proxy));
+        assert_eq!(client_address(&bad, Some(proxy), &loopback), Some(proxy));
+        // IPv4 peer mapped into IPv6 (dual-stack listener) is still loopback
+        let mapped: IpAddr = "::ffff:127.0.0.1".parse().unwrap();
+        assert_eq!(
+            client_address(&h, Some(mapped), &loopback),
+            "203.0.113.9".parse().ok()
+        );
+    }
+
+    /// GHSA-98v7-pm3r-5934 (F20): a private peer is not a proxy unless listed.
+    #[test]
+    fn forwarded_for_is_only_read_from_trusted_proxies() {
+        use services::membership_conditions::Network;
+        let loopback = [Network::parse("127.0.0.0/8").unwrap()];
+        let mut spoofed = HeaderMap::new();
+        spoofed.insert("x-forwarded-for", HeaderValue::from_static("10.1.2.3"));
+        // Docker's bridge gateway or a client on the campus network
+        for peer in ["172.17.0.1", "10.20.30.40", "192.168.1.50", "fd00::5"] {
+            let peer: IpAddr = peer.parse().unwrap();
+            assert_eq!(
+                client_address(&spoofed, Some(peer), &loopback),
+                Some(peer),
+                "{peer}"
+            );
+        }
+        // no proxy trusted at all: even loopback is the client
+        let proxy: IpAddr = "127.0.0.1".parse().unwrap();
+        assert_eq!(client_address(&spoofed, Some(proxy), &[]), Some(proxy));
+
+        // two proxies (edge proxy on another host → gate on this host): the
+        // walk skips both and stops at the first untrusted entry
+        let chain = [
+            Network::parse("127.0.0.0/8").unwrap(),
+            Network::parse("192.168.2.10").unwrap(),
+        ];
+        let mut h = HeaderMap::new();
+        h.insert(
+            "x-forwarded-for",
+            HeaderValue::from_static("10.9.9.9, 198.51.100.7, 192.168.2.10"),
+        );
+        assert_eq!(
+            client_address(&h, Some(proxy), &chain),
+            "198.51.100.7".parse().ok()
+        );
+        // only the gate trusted: the edge proxy's address is the client
+        assert_eq!(
+            client_address(&h, Some(proxy), &loopback),
+            "192.168.2.10".parse().ok()
+        );
+        // the edge proxy talking to the server directly
+        let edge: IpAddr = "192.168.2.10".parse().unwrap();
+        let mut one = HeaderMap::new();
+        one.insert("x-forwarded-for", HeaderValue::from_static("198.51.100.7"));
+        assert_eq!(
+            client_address(&one, Some(edge), &chain),
+            "198.51.100.7".parse().ok()
+        );
+
+        // several header lines count as one list, the last line last
+        let mut lines = HeaderMap::new();
+        lines.append("x-forwarded-for", HeaderValue::from_static("10.9.9.9"));
+        lines.append("x-forwarded-for", HeaderValue::from_static("198.51.100.8"));
+        assert_eq!(
+            client_address(&lines, Some(proxy), &loopback),
+            "198.51.100.8".parse().ok()
+        );
+
+        // every hop trusted: the leftmost one
+        let mut inner = HeaderMap::new();
+        inner.insert(
+            "x-forwarded-for",
+            HeaderValue::from_static("127.0.0.2, 127.0.0.3"),
+        );
+        assert_eq!(
+            client_address(&inner, Some(proxy), &loopback),
+            "127.0.0.2".parse().ok()
+        );
+
+        // a garbage entry ends the walk at the last trusted hop
+        let mut junk = HeaderMap::new();
+        junk.insert(
+            "x-forwarded-for",
+            HeaderValue::from_static("10.9.9.9, junk, 192.168.2.10"),
+        );
+        assert_eq!(
+            client_address(&junk, Some(proxy), &chain),
+            "192.168.2.10".parse().ok()
+        );
+
+        // a header of thousands of trusted entries is not walked to its end
+        let long = String::from("10.0.0.1,") + &vec!["127.0.0.9"; 5000].join(",");
+        let mut huge = HeaderMap::new();
+        huge.insert("x-forwarded-for", HeaderValue::from_str(&long).unwrap());
+        assert_eq!(
+            client_address(&huge, Some(proxy), &loopback),
+            "127.0.0.9".parse().ok()
+        );
     }
 
     #[test]

@@ -80,10 +80,11 @@ user and for the whole vault are set with the CLI, see
 
 ### Malware scanning
 
-| Variable                 | Default | Meaning                                                                                                                  |
-|--------------------------|---------|--------------------------------------------------------------------------------------------------------------------------|
-| `TEAMCRAFT_CLAMD_ADDR`   | –       | ClamAV daemon that scans every upload: `host:port` (e.g. `clamav:3310`) or `unix:/run/clamav/clamd.ctl`; unset = no scan |
-| `TEAMCRAFT_CLAMD_MAX_MB` | `25`    | larger files are stored without a scan (logged); match clamd's `StreamMaxLength`, 1–4096                                 |
+| Variable                   | Default  | Meaning                                                                                                                  |
+|----------------------------|----------|--------------------------------------------------------------------------------------------------------------------------|
+| `TEAMCRAFT_CLAMD_ADDR`     | –        | ClamAV daemon that scans every upload: `host:port` (e.g. `clamav:3310`) or `unix:/run/clamav/clamd.ctl`; unset = no scan |
+| `TEAMCRAFT_CLAMD_MAX_MB`   | `25`     | largest file sent to clamd; match clamd's `StreamMaxLength`, 1–4096                                                      |
+| `TEAMCRAFT_CLAMD_OVERSIZE` | `refuse` | a larger file: `refuse` it (413) or `store` it unscanned (logged as a warning)                                           |
 
 With a scanner, every file is sent to clamd (`INSTREAM`) before it is moved
 into the vault – uploads, check-ins, chunked uploads, imports. Infected
@@ -93,6 +94,14 @@ upload is refused with `503` instead of stored unscanned. ClamAV is a separate
 service (e.g. the `clamav/clamav` image next to TeamCraft); raise its
 `StreamMaxLength` together with `TEAMCRAFT_CLAMD_MAX_MB` to scan large CAD
 files too.
+
+A file larger than `TEAMCRAFT_CLAMD_MAX_MB` cannot be scanned and is refused
+with `413` – a chunked upload already when it starts, before any data is sent.
+Storing such files unscanned (the behaviour before 0.2.12) let anyone skip the
+scan by padding a file above the limit (GHSA-qw27-m6gj-m6wm);
+`TEAMCRAFT_CLAMD_OVERSIZE=store` brings it back for teams that accept that,
+with a warning in the log for every such file. The startup log shows the
+setting (`malware_scan=clamav:3310(max=25MiB,oversize=refuse)`).
 
 ### Encrypted backups
 
@@ -135,11 +144,13 @@ results are stored as they are, never parsed fully – see
 
 The same process limits protect the text extraction of PDF and HTML reports (`teamcraft text-extract`: at most 32 MB per
 PDF and 100 pages, the first 16 MB
-of an HTML file, 60 s, the memory limit below).
+of an HTML file, 60 s, the memory limit below) and the spreadsheets of BOM and result imports (XLSX, XLSM, XLSB, XLS,
+ODS: `--format sheet`, at most 20 MiB, unpacked at most 256 MiB, the first worksheet; GHSA-54vc-vgp2-8whr). CSV tables,
+STEP assemblies and SolidCraft designs are read on a blocking thread of the server.
 
-The memory limit (`RLIMIT_AS`) is enforced on Linux; on macOS the system may
-ignore it, and on Windows it is **not enforced** (the size caps and the time
-limit still are). Every variable also exists as `NAME_FILE`.
+The memory limit is the address space (`RLIMIT_AS`) on Linux – on macOS the system may ignore it – and the committed
+memory of the child through a job object on Windows (GHSA-7q9q-g6rr-pc58); the size caps and the time limit hold
+everywhere. Every variable also exists as `NAME_FILE`.
 
 ## Sign-in
 
@@ -175,12 +186,32 @@ page answers `429 Too Many Requests` with `Retry-After` – even for the right
 password – until the 15 minutes have passed. A successful sign-in clears the
 username's counter. The public account of a live demo (`TEAMCRAFT_DEMO_USER`)
 is counted per client address only, so nobody can lock every visitor out with
-wrong passwords. The counters live in the memory of each server process (a restart clears them). Behind a reverse
-proxy on the same host or an
-internal network, the client address is the last `X-Forwarded-For` entry,
-the one the proxy added; a client that talks to the server directly is
-counted by its own address. Sign-in, failed sign-in and sign-out are in
+wrong passwords. The counters live in the memory of each server process (a restart clears them). The client address
+is explained [below](#client-address-behind-a-reverse-proxy). Sign-in, failed sign-in and sign-out are in
 the audit log (`user.sign_in`, `user.sign_in_failed`, `user.sign_out`).
+
+### Client address behind a reverse proxy
+
+| Variable                    | Default                | Meaning                                                                                                     |
+|-----------------------------|------------------------|-------------------------------------------------------------------------------------------------------------|
+| `TEAMCRAFT_TRUSTED_PROXIES` | `127.0.0.0/8, ::1`     | reverse proxies whose `X-Forwarded-For` is believed: addresses or ranges, comma separated; `none` = no proxy |
+
+The client address counts for the sign-in throttle, the allowed networks of restricted groups and the read log. It is
+the address the request came from (the peer) – unless the peer is one of `TEAMCRAFT_TRUSTED_PROXIES`. Then TeamCraft
+reads `X-Forwarded-For` from the right (every proxy appends the address it received the request from; a client can
+only write to the left), skips further trusted proxies and takes the first other address. A private peer address alone
+is no longer enough (GHSA-98v7-pm3r-5934): behind Docker's published port the peer is the bridge gateway, and on a
+campus network every client has a private address, so a client could have claimed any address.
+
+* Reverse proxy on the same computer (Caddy, nginx): nothing to set.
+* Docker install ([Docker](docker.md#reverse-proxy-and-tls)): `install.sh` writes the value into `.env` – the Docker
+  networks while the port is published on `127.0.0.1` (only this computer reaches it), loopback only when it is
+  published to the network.
+* Proxy on another computer, or a chain (an edge proxy in front of an authentication gateway): list every proxy, e.g.
+  `TEAMCRAFT_TRUSTED_PROXIES=127.0.0.1,192.168.2.10`. Without it every request seems to come from the proxy – one
+  sign-in counter for everybody.
+
+The startup log shows the list (`trusted_proxies=…`).
 
 ## Notifications (optional)
 

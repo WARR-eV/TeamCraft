@@ -456,10 +456,31 @@ case "${BIND##*:}" in ""|*[!0-9]*) BIND_OK=0 ;; *) BIND_OK=1 ;; esac
 case "$BIND" in *:*) ;; *) BIND_OK=0 ;; esac
 case "$BIND" in *[!A-Za-z0-9.:\[\]-]*) BIND_OK=0 ;; esac
 [ "$BIND_OK" -eq 1 ] || die "--bind needs host:port, e.g. 127.0.0.1:8080 or 0.0.0.0:8080"
+# Who may name the client in X-Forwarded-For (GHSA-98v7-pm3r-5934). The
+# published port reaches the container from the gateway of the Docker
+# network. A port published on loopback is reached only from this computer
+# (the reverse proxy), so the private ranges of Docker networks are trusted;
+# a port open to the network is not – there a client could claim any address.
+# A value set by hand in .env is kept.
+LOOPBACK_ONLY="127.0.0.0/8,::1"
+LOCAL_DOCKER="127.0.0.0/8,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+case "${BIND%:*}" in
+  127.*|localhost|"[::1]") PROXIES=$LOCAL_DOCKER ;;
+  *) PROXIES=$LOOPBACK_ONLY ;;
+esac
+OLD_PROXIES=""
+[ "$EXISTING" -eq 1 ] && OLD_PROXIES=$(env_value "$DIR/.env" TEAMCRAFT_TRUSTED_PROXIES)
+case "$OLD_PROXIES" in
+  ""|"$LOOPBACK_ONLY"|"$LOCAL_DOCKER") ;;
+  *[!0-9A-Za-z.:/,]*) die "TEAMCRAFT_TRUSTED_PROXIES in $DIR/.env: only addresses and ranges, comma separated" ;;
+  *) PROXIES=$OLD_PROXIES ;;
+esac
 write_file "$DIR/.env" 644 <<EOF
 # Written by install.sh – used by docker compose in this directory.
 TEAMCRAFT_VERSION=$VERSION
 TEAMCRAFT_BIND=$BIND
+# Reverse proxies whose X-Forwarded-For is believed (none = no proxy).
+TEAMCRAFT_TRUSTED_PROXIES=$PROXIES
 EOF
 
 if [ "$PULL" -eq 1 ]; then

@@ -201,8 +201,9 @@ pub async fn import_results(
         let (filename, bytes) = file
             .filter(|(name, bytes)| !name.is_empty() && !bytes.is_empty())
             .ok_or_else(|| AppError::BadRequest("Choose a CSV or Excel file.".into()))?;
-        let rows =
-            simulations::parse_results_table(&filename, &bytes).map_err(AppError::BadRequest)?;
+        let rows = simulations::parse_results_upload(&filename, &bytes)
+            .await
+            .map_err(AppError::BadRequest)?;
         let replace = fields.get("replace").is_some_and(|v| v == "1");
         simulations::import_results(&st.db, &ctx.me, id, rows, replace).await
     }

@@ -190,7 +190,9 @@ async fn a_table_over_the_row_limit_is_refused_before_any_write() {
     let csv = csv_of(bomtable::MAX_ROWS + 1);
     let before = snapshot(&app.pool).await;
     assert!(bomtable::read("t.csv", csv.as_bytes()).is_err());
-    assert!(imports::read_table("big.csv", csv.as_bytes()).is_err());
+    assert!(imports::read_table("big.csv", csv.as_bytes())
+        .await
+        .is_err());
     let r = app
         .api_multipart(
             "/api/v1/bom-imports",

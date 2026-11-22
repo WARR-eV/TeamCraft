@@ -251,7 +251,11 @@ pub struct ImportResult {
 
 /// Reads an uploaded BOM table or STEP assembly (format and size checks
 /// included).
-pub fn read_table(filename: &str, bytes: &[u8]) -> AppResult<BomTable> {
+/// Reads an uploaded BOM: a table, a STEP assembly or a SolidCraft design.
+/// Never parses in the async task (GHSA-54vc-vgp2-8whr, F13): spreadsheets in
+/// the isolated `text-extract` child with memory and time limits, CSV, STEP
+/// and designs on a blocking thread.
+pub async fn read_table(filename: &str, bytes: &[u8]) -> AppResult<BomTable> {
     let step = stepbom::is_step(filename);
     let design = crate::scbom::is_design(filename);
     if !step && !design && !bomtable::supported(filename) {
@@ -263,12 +267,22 @@ pub fn read_table(filename: &str, bytes: &[u8]) -> AppResult<BomTable> {
     if bytes.len() > max_bytes(filename) {
         return Err(too_large(filename));
     }
-    if step {
-        stepbom::read(bytes).map_err(AppError::BadRequest)
-    } else if design {
-        crate::scbom::read(bytes).map_err(AppError::BadRequest)
+    if step || design {
+        let data = bytes.to_vec();
+        let read = tokio::task::spawn_blocking(move || {
+            if step {
+                stepbom::read(&data)
+            } else {
+                crate::scbom::read(&data)
+            }
+        });
+        read.await
+            .map_err(|e| AppError::Other(anyhow::anyhow!("BOM reader stopped: {e}")))?
+            .map_err(AppError::BadRequest)
     } else {
-        bomtable::read(filename, bytes).map_err(AppError::BadRequest)
+        bomtable::read_isolated(filename, bytes)
+            .await
+            .map_err(AppError::BadRequest)
     }
 }
 
@@ -1070,8 +1084,8 @@ pub struct Staged {
 }
 
 impl Staged {
-    pub fn table(&self) -> AppResult<BomTable> {
-        read_table(&self.filename, &self.content)
+    pub async fn table(&self) -> AppResult<BomTable> {
+        read_table(&self.filename, &self.content).await
     }
 
     /// The staged STEP file, to attach to the new assembly.
@@ -1095,7 +1109,7 @@ pub async fn stage(
     options: ImportOptions,
 ) -> AppResult<Uuid> {
     actor.require(Role::Editor)?;
-    read_table(filename, &content)?;
+    read_table(filename, &content).await?;
     let (kind, row_content, sha256) = if stepbom::is_step(filename) {
         let blob = vault.store_bytes(&content).await?;
         ("step", None, Some(blob.sha256))
@@ -1171,7 +1185,7 @@ pub async fn preview(
     id: Uuid,
 ) -> AppResult<(Staged, Plan)> {
     let staged = staged(pool, vault, actor, id).await?;
-    let table = staged.table()?;
+    let table = staged.table().await?;
     let mut conn = pool.acquire().await?;
     let plan = plan(&mut conn, actor, &table, &staged.filename, &staged.options).await?;
     Ok((staged, plan))
@@ -1206,7 +1220,7 @@ pub async fn run_staged(
     .await?
     .ok_or_else(|| AppError::not_found(GONE))?;
     let staged = staged_of(vault, row).await?;
-    let table = staged.table()?;
+    let table = staged.table().await?;
     let source = staged.source(vault).await;
     let result = run_tx(
         &mut tx,
@@ -1303,8 +1317,8 @@ pub async fn purge_stale(pool: &PgPool, vault: &Vault) -> AppResult<u64> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn options_and_keys() {
+    #[tokio::test]
+    async fn options_and_keys() {
         assert_eq!(NumberSource::parse("").unwrap(), NumberSource::File);
         assert_eq!(
             NumberSource::parse("generate").unwrap().as_str(),
@@ -1313,15 +1327,17 @@ mod tests {
         assert!(NumberSource::parse("random").is_err());
         let o: ImportOptions = serde_json::from_str("{}").unwrap();
         assert!(o.match_existing && o.target.is_none() && o.numbers == NumberSource::File);
-        let t = read_table("a.csv", b"Part Number,Name,QTY\nab-1,One,1\n,Screw M6,2\n").unwrap();
+        let t = read_table("a.csv", b"Part Number,Name,QTY\nab-1,One,1\n,Screw M6,2\n")
+            .await
+            .unwrap();
         assert_eq!(item_key(&t.rows[0]), "number:AB-1");
         assert_eq!(item_key(&t.rows[1]), "name:screw m6");
         assert_eq!(file_stem("Pump BOM.xlsx"), "Pump BOM");
-        assert!(read_table("a.pdf", b"x").is_err());
+        assert!(read_table("a.pdf", b"x").await.is_err());
     }
 
-    #[test]
-    fn size_limits_per_file_kind() {
+    #[tokio::test]
+    async fn size_limits_per_file_kind() {
         assert_eq!(max_bytes("pump.STEP"), MAX_STEP_BYTES);
         assert_eq!(max_bytes("pump.p21"), MAX_STEP_BYTES);
         assert_eq!(max_bytes("bom.xlsx"), MAX_TABLE_BYTES);
@@ -1335,33 +1351,38 @@ mod tests {
         ));
         let big = vec![b'a'; MAX_TABLE_BYTES + 1];
         assert!(matches!(
-            read_table("bom.csv", &big),
+            read_table("bom.csv", &big).await,
             Err(AppError::PayloadTooLarge(_))
         ));
     }
 
-    #[test]
-    fn tables_and_step_assemblies_are_routed_by_name() {
+    #[tokio::test]
+    async fn tables_and_step_assemblies_are_routed_by_name() {
         // A STEP name goes to the STEP reader, whatever the content.
-        let err = read_table("bom.stp", b"Part Number,Name\nA,B\n").unwrap_err();
+        let err = read_table("bom.stp", b"Part Number,Name\nA,B\n")
+            .await
+            .unwrap_err();
         assert!(
             matches!(&err, AppError::BadRequest(m) if m.contains("Not a STEP")),
             "{err:?}"
         );
         // Table names go to the table reader.
-        let t = read_table("bom.TSV", b"Part Number\tName\nA\tB\n").unwrap();
+        let t = read_table("bom.TSV", b"Part Number\tName\nA\tB\n")
+            .await
+            .unwrap();
         assert_eq!(t.rows[0].number, "A");
         // Unsupported names are refused with the list of formats.
-        let err = read_table("bom.docx", b"").unwrap_err();
+        let err = read_table("bom.docx", b"").await.unwrap_err();
         assert!(matches!(&err, AppError::BadRequest(m) if m.contains("STEP assemblies")));
     }
 
-    #[test]
-    fn keys_and_labels_of_rows() {
+    #[tokio::test]
+    async fn keys_and_labels_of_rows() {
         let t = read_table(
             "a.csv",
             b"Part Number,Name\n  ab-1 ,One\nAB-1,Same item\n,  Screw M6 \n",
         )
+        .await
         .unwrap();
         assert_eq!(
             item_key(&t.rows[0]),

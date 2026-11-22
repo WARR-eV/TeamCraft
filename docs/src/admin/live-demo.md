@@ -125,7 +125,7 @@ in as `demo` with a wrong password until the login page answers *too many
 attempts*; then sign in as `demo` with the right password from another
 network (a phone on mobile data). If that works, each visitor has their own
 counter. If it is refused too, the server sees every visitor under one
-address (the proxy passes no `X-Forwarded-For`), and anyone typing wrong
+address (the proxy passes no `X-Forwarded-For`, or it is not in `TEAMCRAFT_TRUSTED_PROXIES`), and anyone typing wrong
 passwords for `demo` locks it for everybody for 15 minutes (see
 [Sign-in](configuration.md#sign-in)).
 
