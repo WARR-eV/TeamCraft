@@ -173,6 +173,11 @@ see the notices in the README.
 
 ### Fixed
 
+- **`url` 2.5.9 (RUSTSEC-2026-0592)**: `url` 2.5.8 overflowed the stack in
+  `Url::origin()` on nested `blob:` URLs; `cargo deny` refuses it. Server and
+  desktop lockfiles now take `url` 2.5.9 and the `form_urlencoded` 1.2.3 it
+  needs (same dependencies otherwise).
+
 - **Same words in the web UI and the desktop app** (#410): the desktop
   toolbar says *Edit attributes* like the web UI, the web UI's *More* menu
   says *Release…* like the desktop toolbar (was *Release via new change…*),
