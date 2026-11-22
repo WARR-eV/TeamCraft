@@ -230,6 +230,9 @@ pub(super) struct FinishBody {
     /// Also release the check-out (like a check-in with this one file).
     #[serde(default)]
     check_in: bool,
+    /// With `check_in`: update the BOM from the CAD file (#407); off by default.
+    #[serde(default)]
+    bom_from_references: bool,
 }
 
 pub(super) async fn finish(
@@ -245,8 +248,19 @@ pub(super) async fn finish(
         serde_json::from_slice(&body)
             .map_err(|e| AppError::BadRequest(format!("Invalid JSON body: {e}")))?
     };
-    let finished =
-        uploads::finish(&st.db, &st.vault, &me, id, &body.comment, body.check_in).await?;
+    let options = crate::services::files::CheckInOptions {
+        bom_from_references: body.bom_from_references,
+    };
+    let finished = uploads::finish(
+        &st.db,
+        &st.vault,
+        &me,
+        id,
+        &body.comment,
+        body.check_in,
+        options,
+    )
+    .await?;
     web::warm_previews(&st, std::slice::from_ref(&finished.upload));
     let files: Vec<Value> = finished
         .stored
@@ -257,7 +271,7 @@ pub(super) async fn finish(
         })
         .collect();
     Ok(Json(
-        json!({ "files": files, "revision": finished.revision }),
+        json!({ "files": files, "revision": finished.revision, "bom": finished.bom }),
     ))
 }
 

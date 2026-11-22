@@ -847,7 +847,10 @@ pub async fn workspace_status(
 }
 
 /// Check in the chosen files (new versions) and release the lock.
+/// `bom_from_references` (`bomFromReferences` in JS, off when left out): also
+/// update the BOM from the CAD file on the server (#407).
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn workspace_checkin(
     app: AppHandle,
     state: State<'_, AppState>,
@@ -856,6 +859,7 @@ pub async fn workspace_checkin(
     code: String,
     files: Vec<String>,
     comment: String,
+    bom_from_references: Option<bool>,
 ) -> CmdResult<Value> {
     usage(&state, |u| u.count("checkin"));
     let api = signed_in_api(&state)?;
@@ -874,6 +878,7 @@ pub async fn workspace_checkin(
         &code,
         &files,
         &comment,
+        bom_from_references.unwrap_or(false),
         &transfer,
     )
     .await

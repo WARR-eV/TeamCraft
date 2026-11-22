@@ -117,6 +117,10 @@ jobs:
       # where the file is, the duplicate findings, the worklist suggestions
       - name: Test the rules of new items from local files
         run: node scripts/desktop-new-files.test.mjs
+      # Update the BOM from the CAD file at check-in (#407): when the box is
+      # offered, the result line
+      - name: Test the check-in BOM rules
+        run: node scripts/desktop-checkin-bom.test.mjs
       # files dropped on the window (#418): New, Add files… or a refusal
       - name: Test the drop routing
         run: node scripts/desktop-drop-route.test.mjs

@@ -84,8 +84,8 @@ check-outs and reviews, and a **local working folder**:
   numbering scheme), and whether items with the same number are reused, are
   chosen in the dialog;
 * *Quantities from CAD…* (next to *Import BOM…*) compares the BOM with the
-  instances counted in the revision's CAD files (SOLIDWORKS 2015+, NX, STEP
-  assemblies with external part files): missing lines and lines whose
+  instances counted in the revision's CAD files (SOLIDWORKS 2015+, NX,
+  Inventor, SolidCraft, STEP assemblies with external part files): missing lines and lines whose
   quantity differs – such as the quantity 1 of an assembly imported before
   the counts existed – are ticked; *Apply* adds and corrects them in one step (the same plan as *Create BOM from CAD
   references…* in the web UI). A
@@ -147,6 +147,25 @@ check-outs and reviews, and a **local working folder**:
   `Bracket.ipt` – the same name stem makes it a candidate) is offered
   **unticked**, with *New item from this file*: it is usually an item of its
   own (#359);
+* **Update the BOM from the CAD file** (#407) – a box in *Check in…*,
+  **ticked by default** every time (the choice is not remembered) and shown
+  when the revision has an assembly whose references are read: the server
+  knows a structure file of it (`bom_structure` of `file-status` – an
+  assembly, or an NX part, STEP file or SolidCraft design with counted
+  instances), the item is an assembly, or a file is an assembly (Inventor
+  `.iam`, SOLIDWORKS, Creo `.asm`) or a SolidCraft `.sc` / `.solidcraft`
+  design. A plain part check-in (an NX or Creo part, its STEP export) shows
+  no box. The
+  server applies the plan of *Quantities from CAD…* to the version being
+  checked in, in the same transaction: missing children are added, a
+  quantity the CAD file counts (*CAD instances*) is corrected – an *assumed
+  1* never replaces an existing quantity –, circular children are refused,
+  and **no line is removed**: lines whose part the assembly no longer uses
+  (glue, cable ties, bought parts) are kept and reported. The result says
+  what changed, e.g. *BOM: 4 lines added, 1 quantity changed · not in
+  TeamCraft: Lager.ipt · no longer in the CAD file: PRT-000012 (kept)*;
+  nothing changed – no line. Unticking it keeps the BOM as it is for that
+  one check-in; *Park* never changes the BOM;
 * the worklist in the navigator follows what you do in the tabs: checking
   out, cancelling a check-out, checking in or acknowledging a dependent
   updates it at once, while it stays open on the left;

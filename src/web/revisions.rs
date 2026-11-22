@@ -26,7 +26,7 @@ use crate::{
     preview::PreviewFormat,
     services::{
         access_log::{self, AccessCtx},
-        as_built, attributes, audit, bom, changes,
+        as_built, attributes, audit, bom, bom_references, changes,
         file_check::ClashGuard,
         files, impacts, interchange, items, notifications, ownership, projects, references,
         requests, result_proposals, revisions, similar, simulations, uploads,
@@ -394,17 +394,22 @@ pub async fn show(
         "add_to_change": can_work && open_change.is_none(),
         "acknowledge": me.can_edit() && me.can_edit_project(item.project_id),
     });
-    // CAD files of this revision that lead to other items (assemblies and
-    // NX models): offers "Create BOM from CAD references"
+    // CAD files of this revision that lead to other items (assemblies, NX
+    // models, STEP assemblies with external parts): offers "Create BOM from
+    // CAD references"
     let cad_structure = file_refs.iter().any(|f| {
         matches!(
             f.format_kind,
-            Some(crate::cadformat::FormatKind::Assembly | crate::cadformat::FormatKind::Model)
+            Some(FormatKind::Assembly | FormatKind::Model | FormatKind::Exchange)
         ) && f
             .references
             .iter()
             .any(|r| r.matches.iter().any(|m| !m.same_revision))
     });
+    // the check-in box (#407): also a structure file by the rule of the
+    // check-in step (e.g. an assembly whose parts are not in TeamCraft yet)
+    let bom_structure =
+        rev.checked_out_by == Some(me.id) && bom_references::has_structure(&st.db, rev.id).await?;
     let files_hint = domain::files_hint(
         state,
         rev.checked_out_by,
@@ -517,6 +522,7 @@ pub async fn show(
             "similar": similar_parts,
             "lines": lines,
             "cad_structure": cad_structure,
+            "bom_structure": bom_structure,
             "where_used": where_used,
             "interchange": interchange,
             "hidden": {
@@ -713,8 +719,21 @@ pub async fn checkin(
         // Large files sent before in chunks by app.js (field `uploads`).
         let sessions =
             take_session_uploads(&st, &ctx.me, uploads::Scope::Revision(id), &mut received).await?;
-        let result =
-            files::check_in(&st.db, &ctx.me, id, &received.uploads, &received.comment).await;
+        let options = files::CheckInOptions::from_field(
+            received
+                .fields
+                .get("bom_from_references")
+                .map(String::as_str),
+        );
+        let result = files::check_in_with(
+            &st.db,
+            &ctx.me,
+            id,
+            &received.uploads,
+            &received.comment,
+            options,
+        )
+        .await;
         if result.is_ok() {
             uploads::forget(&st.db, &st.vault, &sessions).await;
             warm_previews(&st, &received.uploads);
@@ -722,7 +741,7 @@ pub async fn checkin(
         result
     }
     .await;
-    finish(&st, result, &back, |(rev, stored)| {
+    finish(&st, result, &back, |(rev, stored, bom)| {
         let changed: Vec<String> = stored
             .iter()
             .filter(|s| s.changed)
@@ -736,6 +755,11 @@ pub async fn checkin(
                 revisions::label(&rev),
                 changed.join(", ")
             )
+        };
+        // what the BOM step changed (#407); nothing changed: no line
+        let message = match bom.as_ref().and_then(|b| b.summary()) {
+            Some(summary) => format!("{message} · {summary}"),
+            None => message,
         };
         (back.clone(), message)
     })

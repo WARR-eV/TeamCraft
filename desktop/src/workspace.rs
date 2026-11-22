@@ -874,6 +874,10 @@ pub struct Status {
     /// last checked out (the server's `released`: `by_name`, `at`, `reason`,
     /// `message`): local changes stay, but need a new check-out.
     pub released: Option<Value>,
+    /// The server knows a structure file of the revision (`bom_structure` of
+    /// `file-status`, false from older servers): *Check in…* offers *Update
+    /// the BOM from the CAD file* (#407).
+    pub bom_structure: bool,
 }
 
 /// A local file of a revision: where it is and what the state says.
@@ -986,6 +990,7 @@ pub fn inaccessible_status(root: &Path, project: Option<&str>, item: &str, code:
         locked_by_name: None,
         inaccessible: true,
         released: None,
+        bom_structure: false,
         files,
     }
 }
@@ -1145,6 +1150,7 @@ pub async fn status(
         locked_by_name: rev.locked_by_name,
         inaccessible: false,
         released: Some(server["released"].clone()).filter(Value::is_object),
+        bom_structure: server["bom_structure"].as_bool().unwrap_or(false),
         files: out,
     })
 }
@@ -1210,6 +1216,9 @@ pub async fn locate(
 /// [`crate::api::CHUNKED_ABOVE`] are sent before in resumable chunks (see
 /// [`Api::send_files`]), with progress and cancel through `transfer`.
 /// Afterwards the files are read-only again.
+/// With `bom_from_references` the server also updates the BOM of the
+/// revision from the CAD references of the checked-in version, in the same
+/// transaction (#407); the answer then carries `bom`.
 #[allow(clippy::too_many_arguments)]
 pub async fn check_in(
     api: &Api,
@@ -1219,6 +1228,7 @@ pub async fn check_in(
     code: &str,
     names: &[String],
     comment: &str,
+    bom_from_references: bool,
     transfer: &Transfer<'_>,
 ) -> Result<Value, ApiError> {
     send_local(
@@ -1228,7 +1238,9 @@ pub async fn check_in(
         names,
         comment,
         transfer,
-        SendMode::CheckIn,
+        SendMode::CheckIn {
+            bom_from_references,
+        },
     )
     .await
 }
@@ -1271,8 +1283,9 @@ pub async fn park(
 /// What [`send_local`] does with the lock.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum SendMode {
-    /// `…/checkin`: new versions and the lock released in one transaction.
-    CheckIn,
+    /// `…/checkin`: new versions and the lock released in one transaction
+    /// (with `bom_from_references`: the BOM updated from the CAD file, #407).
+    CheckIn { bom_from_references: bool },
     /// `…/files`: new versions, the lock stays.
     Park,
 }
@@ -1394,20 +1407,28 @@ async fn send_local(
     // Large files go first as resumable chunked uploads (with their base and
     // folder) and join this check-in by id – one transaction on the server.
     let endpoint = match send {
-        SendMode::CheckIn => "checkin",
+        SendMode::CheckIn { .. } => "checkin",
         SendMode::Park => "files",
     };
+    let mut fields = vec![
+        ("comment", comment.to_string()),
+        ("bases", Value::Object(bases).to_string()),
+        ("folders", Value::Object(folders).to_string()),
+    ];
+    // never on a park: the revision stays checked out, nothing is final yet
+    if let SendMode::CheckIn {
+        bom_from_references: true,
+    } = send
+    {
+        fields.push(("bom_from_references", "true".to_string()));
+    }
     let result = api
         .send_files(
             &format!("{}/{endpoint}", rev_path(item, code)),
             item,
             code,
             &files,
-            &[
-                ("comment", comment.to_string()),
-                ("bases", Value::Object(bases).to_string()),
-                ("folders", Value::Object(folders).to_string()),
-            ],
+            &fields,
             transfer,
         )
         .await?;

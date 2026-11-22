@@ -15,6 +15,30 @@ see the notices in the README.
 
 ### Added
 
+- **Check-in: *Update the BOM from the CAD file*** (#407): a box in the web
+  check-in form and the desktop app's *Check in…*, ticked by default every
+  time, shown when the revision has an assembly whose references are read (an
+  assembly item, an assembly file, or an NX part, STEP file or SolidCraft
+  design with counted instances – `bom_structure` in `file-status` for the
+  desktop app; not for a plain part check-in). The plan of *Create BOM from
+  CAD references…* is applied to the version being checked in, in the
+  check-in's transaction: new children added, quantities the CAD file counts
+  corrected (never from an *assumed 1*), circular children refused, no line
+  removed – lines the CAD file no longer uses are kept and reported, as are
+  referenced files TeamCraft does not have. The result says what changed
+  (*BOM: 4 lines added, 1 quantity changed · …*). REST API: the multipart
+  field `bom_from_references` on `POST …/checkin` and in the body of
+  `POST /uploads/{id}/finish` (off by default), the answer adds `bom`;
+  audit `bom.from_references` with `"source": "checkin"`. *Park* never
+  changes the BOM. Parts still in the assembly but only excluded from its BOM
+  there are not reported as *no longer in the CAD file*; the manual plan no
+  longer holds a database connection while it reads the CAD files.
+
+### Changed
+
+- BOM from CAD references: SolidCraft designs with linked designs count as
+  structure files (their placements are the quantities); the guides now name
+  Inventor and SolidCraft as sources of instance counts too.
 - Desktop: drag and drop of files from Explorer, Finder or the file manager onto the window (#418). On a revision tab you have checked out (or that *Add files…* would check out) the drop opens *Add files…*; elsewhere it opens *New item* with the files. A frame shows what the drop does; frozen revisions, revisions checked out by someone else, viewers and editors without a group are refused with the reason. Only regular files are taken (folders are skipped), with the same checks as the file dialog. Tab reordering keeps working (pointer events, not HTML5 drag and drop).
 - **Getting started in the desktop app** (#422): after the first sign-in
   TeamCraft Desktop opens a short wizard – server (skipped when a policy fixes

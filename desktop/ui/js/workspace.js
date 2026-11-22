@@ -16,6 +16,7 @@ import { incompleteGet, notOpenedText } from "./get-rules.js";
 import { formatKinds } from "./folder-import.js";
 import { isNewModelOfItsOwn, workspacePath } from "./new-files.js";
 import { newItemDialog } from "./dialogs.js";
+import { offerBomUpdate, checkinBomText } from "./checkin-bom.js";
 import { revisionInputs } from "./report-inputs.js";
 import { t } from "/static/shared/js/i18n.js";
 
@@ -619,6 +620,11 @@ export function checkinDialog(tab, park) {
         .filter(function (v, i, a) { return a.indexOf(v) === i; }).join(" / ") +
       " for the 3D preview (" + exportable.length + (exportable.length === 1 ? " file" : " files") +
       ") – your files are uploaded first, a slow export can be skipped"]) : null;
+    // #407: on by default every time (the choice is not remembered); only on
+    // a check-in – Park keeps the revision checked out, nothing is final yet
+    var withBom = h("input", { type: "checkbox", checked: true });
+    var bomNote = offerBomUpdate(ws, rev, kinds) ? h("label.check", null, [withBom,
+      "Update the BOM from the CAD file – adds the parts the assembly uses and corrects counted quantities, never removes a line (not when parking)"]) : null;
     var body = h("div.stack", null, [
       h("p.small.muted", null, ["From ", h("span.mono", { text: ws.dir })]),
       candidates.length ? h("div.stack", null, boxes.map(function (b) {
@@ -637,6 +643,7 @@ export function checkinDialog(tab, park) {
       boxes.some(function (b) { return b.state === "conflict"; }) ? h("p.notice.error", { text: "Conflict: these files changed on the server since you got them. " +
         "The server refuses to overwrite the newer version (nothing is stored) – save your copy under another name, get the current files and merge." }) : null,
       stepNote,
+      bomNote,
       field("Comment", comment, "stored with every new version"),
       progressLine
     ]);
@@ -688,11 +695,18 @@ export function checkinDialog(tab, park) {
       var ref = rev.item_number + "/" + rev.code;
       var args = { project: rev.project_code, item: rev.item_number, code: rev.code, comment: comment.value };
       function show(text) { if (!cancelled) { progressLine.textContent = text; progressLine.classList.remove("hidden"); } }
+      var bomResult = null; // the `bom` part of the check-in answer (#407)
       function upload(command, names, text) {
         phase = "upload";
         show(text);
         uploadWatcher = function (p) { show(uploadLine(p)); };
-        return call(command, Object.assign({}, args, { files: names })).then(function (r) { uploadWatcher = null; return r; });
+        var extra = { files: names };
+        if (command === "workspace_checkin") extra.bomFromReferences = !!(bomNote && withBom.checked);
+        return call(command, Object.assign({}, args, extra)).then(function (r) {
+          uploadWatcher = null;
+          if (command === "workspace_checkin" && r) bomResult = r.bom || null;
+          return r;
+        });
       }
       var steps = [], exportFailures = [], stored = false;
       // one export after the other: the CAD program handles one document at a
@@ -737,8 +751,10 @@ export function checkinDialog(tab, park) {
         setStatus("");
         d.close();
         var all = files.concat(steps);
+        var bomLine = parking ? "" : checkinBomText(bomResult);
         toast((parking ? "Parked " + all.join(", ") + " on the server – " + ref + " stays checked out to you"
           : "Checked in " + ref + (all.length ? " with " + all.join(", ") : "")) +
+          (bomLine ? ". " + bomLine : "") +
           (cancelled ? " – the server already had every file when you cancelled" : "") +
           (exportFailures.length ? ". No STEP export for " + exportFailures.join("; ") : ""),
           cancelled || exportFailures.length ? "info" : null);

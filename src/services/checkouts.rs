@@ -19,7 +19,7 @@ use crate::{
     domain::{self, BaseVersion, FileSyncState, ServerFile},
     error::{AppError, AppResult},
     models::Revision,
-    services::{access, audit, files, projects, revisions},
+    services::{access, audit, bom_references, files, projects, revisions},
 };
 
 /// A file of the client's workspace, as the client reports it.
@@ -104,6 +104,10 @@ pub struct RevisionStatus {
     /// The item's folder in its group (`items.folder`): where a revision
     /// without files has its place in the working folder.
     pub item_folder: String,
+    /// The revision has a structure file by what the reference scan stored
+    /// (`bom_references::has_structure`): the desktop app offers *Update the
+    /// BOM from the CAD file* in *Check in…* (#407).
+    pub bom_structure: bool,
     pub files: Vec<FileStatus>,
 }
 
@@ -185,9 +189,10 @@ pub async fn file_status(
     client: &[ClientFile],
 ) -> AppResult<RevisionStatus> {
     let rev = revisions::get(pool, actor, revision_id).await?;
-    let (list, versions) = tokio::try_join!(
+    let (list, versions, bom_structure) = tokio::try_join!(
         files::list(pool, actor, revision_id),
-        files::versions_of_revision(pool, revision_id)
+        files::versions_of_revision(pool, revision_id),
+        bom_references::has_structure(pool, revision_id)
     )?;
     let mut history: HashMap<Uuid, Vec<(i32, String)>> = HashMap::new();
     for v in versions {
@@ -286,6 +291,7 @@ pub async fn file_status(
         locked_by_me: rev.checked_out_by == Some(actor.id),
         locked_by_other: rev.checked_out_by.is_some_and(|id| id != actor.id),
         item_folder: rev.item_folder.clone(),
+        bom_structure,
         files: out,
     })
 }

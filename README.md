@@ -244,6 +244,10 @@ end-to-end tests against a real PostgreSQL.
 - **Alternates and supersession** – alternate parts, superseded parts and *Replace in assemblies* with a preview.
 - **BOM import** – items and BOMs from CAD BOM tables (CSV, Excel, ODS) or a
   STEP assembly; preview first, one transaction.
+- **BOM from the CAD file** – the parts an assembly uses, with the instance
+  counts of Inventor, SOLIDWORKS, NX, STEP and SolidCraft files; updated at
+  check-in when *Update the BOM from the CAD file* is ticked (the default),
+  never removing a line.
 - **Pack and Go** – a ZIP of a whole assembly with all its files.
 
 **Change and release**
