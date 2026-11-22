@@ -211,6 +211,9 @@ desktop/           TeamCraft Desktop (Tauri 2, own Cargo project – never part 
                    new-files.js + desktop/src/newfiles.rs = new items from local files, worklist *New on this computer* (#359);
                    desktop/src/localserver.rs = *Try TeamCraft on this computer* (starts the bundled teamcraft-server local);
                    tauri.local-server.conf.json = the *with local server* installers (externalBin teamcraft-server + postgresql/)
+plugins/solidcraft TeamCraft plugin for SolidCraft: WebAssembly component (craft:plugin@0.2.0, wit/plugin.wit = SolidCraft's
+                   interface, MIT), own Cargo project; src/logic.rs = status, check, link, unlink over SolidCraft's commands
+                   (fake host in tests); build.sh → target/package/teamcraft; workflow solidcraft-plugin.yml
 ```
 
 ## Conventions

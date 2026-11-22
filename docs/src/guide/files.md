@@ -212,6 +212,8 @@ For the rest TeamCraft shows what other PLM systems show:
   – the *STEP* button in the workspace or the option at check-in, like the
   CAD add-ins of other PDM systems. It uses your licence (student licences included, within their
   terms); TeamCraft contains no Autodesk or Siemens software.
+  SolidCraft designs are exported on every system through SolidCraft's own
+  command-line tool (`solidcraft-cli`), when SolidCraft is installed.
 
 ## Full-text search
 

@@ -1,0 +1,60 @@
+# The TeamCraft plugin for SolidCraft (plugins/solidcraft): formatting,
+# lints and tests on Linux, then the WebAssembly component, checked to import
+# nothing but SolidCraft's plugin interface, kept as an artifact. Its own
+# Cargo project – never part of the server or desktop build.
+name: SolidCraft plugin
+
+on:
+  push:
+    branches: [main]
+    paths: ["plugins/solidcraft/**", ".github/workflows/solidcraft-plugin.yml"]
+  pull_request:
+    paths: ["plugins/solidcraft/**", ".github/workflows/solidcraft-plugin.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: solidcraft-plugin-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  plugin:
+    name: SolidCraft plugin
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: plugins/solidcraft
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: plugins/solidcraft
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-tools
+      - name: Formatting
+        run: cargo fmt --check
+      - name: Clippy (tests on this computer)
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test
+      - name: Clippy (the component)
+        run: cargo clippy --release --target wasm32-unknown-unknown -- -D warnings
+      - name: Build the package
+        run: ./build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: teamcraft-solidcraft-plugin
+          path: plugins/solidcraft/target/package/teamcraft
+          if-no-files-found: error
