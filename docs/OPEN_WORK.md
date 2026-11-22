@@ -698,14 +698,16 @@ real files and belong to section 3 once such files are at hand.
 **SolidCraft** (research page *SolidCraft designs*)
 
 - [x] Research page on the `.sc` design container and its sources (#363)
-- [ ] Preview image from the embedded thumbnail (#364)
-- [ ] Linked designs as file references with quantities (#365)
-- [ ] BOM import from SolidCraft's BOM CSV and from the design (#366)
+- [x] Preview image from the embedded thumbnail (#364); left: rendered pictures for designs saved without one (#368)
+- [x] Linked designs as file references with quantities (#365); left: rewriting link paths after a rename (with #369)
+- [x] BOM import from SolidCraft's BOM CSV and from the design (#366); left: lengths and expressions in `bom_quantity`, keeping the `.sc` with a new assembly (as STEP)
 - [ ] Design properties read, shown, searchable, mismatches with the item flagged (#367)
-- [ ] Desktop: STEP export through `solidcraft-cli` at check-in, all OSes (#368)
-- [ ] Desktop: item number and revision written into the design properties (#369)
-- [ ] Desktop: designs open in SolidCraft (lock file) shown, warning at check-in (#370)
-- [ ] (research first) 3D preview from the `.sc` file alone (#371)
+- [x] Desktop: STEP export through `solidcraft-cli` at check-in, all OSes (#368); left: a rendered thumbnail (`solidcraft-cli snapshot`) for designs saved without one
+- [x] Desktop: item number and revision written into the design properties (#369); left: automatically at check-out (a setting), link paths after a rename
+- [x] Desktop: designs open in SolidCraft (lock file) shown, warning at check-in (#370)
+- [x] (research first) 3D preview from the `.sc` file alone (#371): research page *3D preview of SolidCraft designs without an export*; left: read `cache/preview.bin` when present, an SCBREP05 reader later
+- [x] TeamCraft plugin for SolidCraft (`plugins/solidcraft`): status, check before check-in, link/unlink; left: tested
+  in a real SolidCraft, a release package, a *Check in* hand-over to the desktop app
 
 ### 5. Feature demand (backlog)
 

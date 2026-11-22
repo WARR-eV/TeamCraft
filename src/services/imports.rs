@@ -57,7 +57,7 @@ pub const MAX_STEP_BYTES: usize = 200 * 1024 * 1024;
 
 /// Largest import file accepted with this name.
 pub fn max_bytes(filename: &str) -> usize {
-    if stepbom::is_step(filename) {
+    if stepbom::is_step(filename) || crate::scbom::is_design(filename) {
         MAX_STEP_BYTES
     } else {
         MAX_TABLE_BYTES
@@ -70,6 +70,8 @@ pub fn too_large(filename: &str) -> AppError {
         "{} can be at most {} MiB.",
         if stepbom::is_step(filename) {
             "STEP files"
+        } else if crate::scbom::is_design(filename) {
+            "SolidCraft designs"
         } else {
             "Tables (BOM, result values)"
         },
@@ -251,10 +253,11 @@ pub struct ImportResult {
 /// included).
 pub fn read_table(filename: &str, bytes: &[u8]) -> AppResult<BomTable> {
     let step = stepbom::is_step(filename);
-    if !step && !bomtable::supported(filename) {
+    let design = crate::scbom::is_design(filename);
+    if !step && !design && !bomtable::supported(filename) {
         return Err(AppError::BadRequest(format!(
-            "{filename}: BOMs are read from CSV, TSV, TXT, XLSX, XLSM, XLSB, XLS and ODS tables \
-             and from STEP assemblies (STEP, STP, P21)."
+            "{filename}: BOMs are read from CSV, TSV, TXT, XLSX, XLSM, XLSB, XLS and ODS tables, \
+             from STEP assemblies (STEP, STP, P21) and from SolidCraft designs (SC)."
         )));
     }
     if bytes.len() > max_bytes(filename) {
@@ -262,6 +265,8 @@ pub fn read_table(filename: &str, bytes: &[u8]) -> AppResult<BomTable> {
     }
     if step {
         stepbom::read(bytes).map_err(AppError::BadRequest)
+    } else if design {
+        crate::scbom::read(bytes).map_err(AppError::BadRequest)
     } else {
         bomtable::read(filename, bytes).map_err(AppError::BadRequest)
     }

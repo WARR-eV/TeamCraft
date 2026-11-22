@@ -18,7 +18,7 @@ allocate what a file only claims.
 
 The targets are `stepbom`, `swpart`, `nxpart`, `invpart` (Inventor segments, part meshes and assembly placements),
 `creopart` (the Creo B-rep container, tagged format and tessellation), `cadrefs`, `bomtable`,
-`thumbnail`, `textindex`, `htmltext` (HTML reports and the charset detection of text files), `mesh` (STL, OBJ, PLY, OFF,
+`thumbnail`, `scdesign` (SolidCraft designs: document, linked designs, thumbnail), `textindex`, `htmltext` (HTML reports and the charset detection of text files), `mesh` (STL, OBJ, PLY, OFF,
 3MF, AMF, glTF, 3DS,
 points, LAS, VTK legacy and XML, CalculiX FRD) and `mesh_step` (the STEP
 tessellation through `truck`, kept apart because it is slow), `cadformat` (the
@@ -38,7 +38,7 @@ crash only when it reaches the harness.
 Every reader of untrusted files denies `clippy::unwrap_used`, `expect_used`,
 `indexing_slicing`, `panic` and `unreachable` with `#![deny(...)]` at the
 top of the module. These are `swpart`, `mesh` with its submodules,
-`simmesh`, `stepbom`, `nxpart`, `thumbnail`, `cadrefs`, `bomtable`,
+`simmesh`, `stepbom`, `nxpart`, `thumbnail`, `scdesign`, `cadrefs`, `bomtable`,
 `textindex`, `htmltext`, `resultscan` and `cadformat`, and `config` too. Clippy in CI therefore
 refuses a new `data[at]`, `data[a..b]` or `.unwrap()` there. Read through the
 bounded helpers in `mesh` (`bytes_at`, `u16_le`, `u32_le`, `f32_le`, `range`,

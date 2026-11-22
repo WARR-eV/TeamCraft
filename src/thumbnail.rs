@@ -14,6 +14,9 @@
 //!   and poor, so NX parts get a thumbnail rendered from their 3D preview
 //!   instead ([`rendered`], [`render_mesh`]); the JPEG stays the fallback
 //!   for NX files without one (assemblies, drawings).
+//! * SolidCraft designs (`.sc`) keep a PNG in their ZIP container
+//!   (`cache/thumbnail.png`), shown only when its key names this exact
+//!   document and picture (`scdesign`).
 //!
 //! Every candidate is validated (PNG chunk structure and checksums, plausible
 //! DIB header and sizes); the summary information wins, then streams named
@@ -76,6 +79,7 @@ pub fn supports(format_id: &str) -> bool {
                 | "creo-part"
                 | "creo-assembly"
                 | "fusion-design"
+                | "solidcraft-design"
         )
 }
 
@@ -134,6 +138,15 @@ pub fn extract_from<R: Read + Seek>(mut file: R) -> io::Result<Option<Thumbnail>
     }
     if crate::fusion::is_archive(head) {
         return from_fusion(file);
+    }
+    if crate::scdesign::is_zip(head) {
+        if let Some(mut design) = crate::scdesign::Container::open(&mut file) {
+            return Ok(design
+                .thumbnail()
+                .and_then(|png| png_at(&png))
+                .map(|f| f.thumbnail));
+        }
+        file.rewind()?;
     }
     let mut data = Vec::new();
     file.take(MAX_SCAN).read_to_end(&mut data)?;
@@ -528,7 +541,7 @@ pub fn render_mesh(mesh_bytes: &[u8]) -> Option<Thumbnail> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use std::io::{Cursor, Write};
 
@@ -859,5 +872,18 @@ mod tests {
         for cut in 0..full.len() {
             let _ = jpeg_size(&full[..cut]);
         }
+    }
+
+    #[test]
+    fn solidcraft_designs_show_their_embedded_picture() {
+        let doc: &[u8] = br#"{"format":"solidcraft/35"}"#;
+        let picture = png(240, 150);
+        let design = crate::scdesign::sample::design(doc, Some(&picture));
+        let found = extract_from(Cursor::new(design)).unwrap().unwrap();
+        assert_eq!(found.content_type, "image/png");
+        assert_eq!(found.bytes, picture);
+        let bare = crate::scdesign::sample::design(doc, None);
+        assert_eq!(extract_from(Cursor::new(bare)).unwrap(), None);
+        assert!(supports("solidcraft-design"));
     }
 }

@@ -95,3 +95,4 @@
     - [Fluent, STAR-CCM+ and Simcenter 3D files](research/solver-files.md)
     - [A sandboxed extension layer](research/extension-layer.md)
     - [SolidCraft designs](research/solidcraft-design.md)
+    - [3D preview of SolidCraft designs without an export](research/solidcraft-3d-preview.md)

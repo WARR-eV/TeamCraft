@@ -148,8 +148,9 @@ cannot see are only counted.
 Besides the BOM, revisions reference other items: *drawing of*, *specification for*, *references*. CAD files are scanned
 for the files they
 reference (assemblies, drawings, STEP, KiCad; ASCII and UTF-16 paths as
-written by SolidWorks, Inventor, Solid Edge, CATIA, …; NX parts and
-SOLIDWORKS 2015+ files through their containers, see
+written by SolidWorks, Inventor, Solid Edge, CATIA, …; NX parts,
+SOLIDWORKS 2015+ files and SolidCraft assemblies (their linked designs)
+through their structure, see
 [Formats](../reference/formats.md)) and matched against
 the vault: referenced files that are *not in TeamCraft* are flagged and the
 missing BOM lines are suggested. The other direction warns before damage:

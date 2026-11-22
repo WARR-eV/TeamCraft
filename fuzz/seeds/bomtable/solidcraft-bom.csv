@@ -1,0 +1,5 @@
+"item","part_number","description","revision","count","definition","material","quantity"
+"1","TC-200","Side frame","B","2","Frame","",""
+"1.1","ISO 4017 M6x20","Bolt","","6","Bolt","Steel",""
+"1.2","TC-210","Rail","A","2","Rail","6060","1200 mm"
+"2","TC-300","Foot","A","4","Foot","PA6",""

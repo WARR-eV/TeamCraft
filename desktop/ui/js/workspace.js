@@ -111,6 +111,21 @@ export function revWorkspace(tab, el) {
         } }
       }, "STEP");
     }
+    // SolidCraft designs of my check-out: the item number, revision and name
+    // into the design's properties (solidcraft-cli, #369)
+    function itemDataButton(f) {
+      if (!rev.checked_out_by || lockedByOther || exportProgram(f.name, programs) !== "solidcraft") return null;
+      if (f.state === "missing" || f.state === "clash") return null;
+      return h("button.small", {
+        type: "button", title: "Write " + rev.item_number + ", revision " + rev.code + " and the item name into the design's properties in SolidCraft",
+        on: { click: function () {
+          run("Writing the item data into " + f.name, function () {
+            return call("solidcraft_write_item_data", { project: rev.project_code, item: rev.item_number, code: rev.code, file: f.name,
+              data: { item_number: rev.item_number, revision: rev.code, name: rev.name, item_id: String(rev.item_id || ""), revision_id: String(rev.id) } });
+          }).then(function () { toast(f.name + " now carries " + rev.item_number + "/" + rev.code + " – check it in to keep it"); renderActive(); }, function () {});
+        } }
+      }, "Item data");
+    }
     el.appendChild(h("section.panel", null, [
       h("div.panel-head", null, [
         h("h2", { text: "Working folder" }),
@@ -141,6 +156,11 @@ export function revWorkspace(tab, el) {
           var stateBadge = badge(f.state, SYNC_LABEL[f.state] || label(f.state));
           if (f.state === "clash") stateBadge.title = "Another file is at this place: " + f.clash_with + " – it is never overwritten.";
           if (lockedByOther && f.state !== "missing") stateBadge = h("span", null, [stateBadge, " ", badge("lock", "Locked by " + rev.checked_out_by_name)]);
+          if (f.open_in) {
+            var openBadge = badge("pending", "Open in " + f.open_in.program);
+            openBadge.title = openInText(f) + " – save there before checking in.";
+            stateBadge = h("span", null, [stateBadge, " ", openBadge]);
+          }
           return {
             cls: f.state === "conflict" ? "row-conflict" : f.state === "clash" ? "row-clash" : null,
             cells: [h("span", null, [
@@ -153,6 +173,7 @@ export function revWorkspace(tab, el) {
               h("span.row", null, [
                 f.state !== "missing" && f.state !== "clash" ? h("button.small", { type: "button", on: { click: function () { openLocalFile(tab, f); } } }, "Open") : null,
                 f.state !== "missing" && f.state !== "clash" ? stepButton(f) : null,
+                itemDataButton(f),
                 h("button.small", { type: "button", title: "Request a change to " + f.name + " (change request)", on: { click: function () { requestChangeDialog(rev, f.name); } } }, "Request…")
               ])]
           };
@@ -426,6 +447,12 @@ export function doCancelCheckout(tab) {
 /** Follows the check-in upload of the open check-in dialog (`upload-progress`). */
 export var uploadWatcher = null;
 
+/** "bracket.sc is open in SolidCraft on WS-12 (kim)" – from the lock file the program keeps (cadlock.rs). */
+function openInText(f) {
+  var o = f.open_in;
+  return f.name + " is open in " + o.program + " on " + o.computer + (o.user ? " (" + o.user + ")" : "");
+}
+
 /** "Check in…" (`park` false) or "Park…" (`park` true, issue #173 step 10):
  * the same dialog with both buttons; `park` only decides the default one. */
 export function checkinDialog(tab, park) {
@@ -463,6 +490,9 @@ export function checkinDialog(tab, park) {
           } } }, "New item from this file")
         ])]);
       })) : h("p.empty", { text: "No modified or new files – checking in only ends your check-out; the revision stays in work." }),
+      candidates.some(function (f) { return f.open_in; }) ? h("p.notice", { text: "Still open: " +
+        candidates.filter(function (f) { return f.open_in; }).map(openInText).join("; ") +
+        ". Unsaved changes there are not checked in – save first, or check in anyway." }) : null,
       boxes.some(function (b) { return b.state === "conflict"; }) ? h("p.notice.error", { text: "Conflict: these files changed on the server since you got them. " +
         "The server refuses to overwrite the newer version (nothing is stored) – save your copy under another name, get the current files and merge." }) : null,
       stepNote,
@@ -498,12 +528,16 @@ export function checkinDialog(tab, park) {
       running = true; cancelled = false; opts.modal = true;
       var toExport = stepNote && withStep.checked ? files.filter(function (n) { return exportProgram(n, programs); }) : [];
       function show(text) { if (!cancelled) { progressLine.textContent = text; progressLine.classList.remove("hidden"); } }
-      // one export after the other: the CAD program handles one document at a time
+      // one export after the other: the CAD program handles one document at a
+      // time. A failed export never stops the check-in (#342, #368): the file
+      // goes without its STEP and the result says why.
+      var exportFailures = [];
       var exported = toExport.reduce(function (chain, name) {
         return chain.then(function () {
           if (cancelled) throw stopped();
           show("Exporting " + name + " to STEP with " + PROGRAM_LABEL[exportProgram(name, programs)] + " …");
-          return exportStep(rev, name).then(function (step) { if (files.indexOf(step) < 0) files.push(step); });
+          return exportStep(rev, name).then(function (step) { if (files.indexOf(step) < 0) files.push(step); },
+            function (e) { if (cancelled) throw stopped(); exportFailures.push(name + ": " + errorText(e)); });
         });
       }, Promise.resolve());
       exported.then(function () {
@@ -517,7 +551,9 @@ export function checkinDialog(tab, park) {
         d.close();
         toast((parking ? "Parked " + files.join(", ") + " on the server – " + rev.item_number + "/" + rev.code + " stays checked out to you"
           : "Checked in " + rev.item_number + "/" + rev.code + (files.length ? " with " + files.join(", ") : "")) +
-          (cancelled ? " – the server already had every file when you cancelled" : ""), cancelled ? "info" : null);
+          (cancelled ? " – the server already had every file when you cancelled" : "") +
+          (exportFailures.length ? ". No STEP export for " + exportFailures.join("; ") : ""),
+          cancelled || exportFailures.length ? "info" : null);
         reloadActive();
         refreshWorklistCount();
       }, function (err) {

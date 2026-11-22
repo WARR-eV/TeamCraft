@@ -13,9 +13,22 @@ use serde::Deserialize;
 use crate::api::{Api, ApiError};
 use crate::workspace;
 
-/// File types the server reads as a BOM (`bomtable::supported`, `stepbom::is_step`).
+/// File types the server reads as a BOM (`bomtable::supported`, `stepbom::is_step`,
+/// `scbom::is_design`).
 pub const EXTENSIONS: &[&str] = &[
-    "csv", "tsv", "txt", "xlsx", "xlsm", "xlsb", "xls", "ods", "step", "stp", "p21",
+    "csv",
+    "tsv",
+    "txt",
+    "xlsx",
+    "xlsm",
+    "xlsb",
+    "xls",
+    "ods",
+    "step",
+    "stp",
+    "p21",
+    "sc",
+    "solidcraft",
 ];
 
 /// The server's limits (`services::imports::MAX_TABLE_BYTES` / `MAX_STEP_BYTES`),
@@ -46,6 +59,12 @@ fn is_step(name: &str) -> bool {
         .is_some_and(|(_, ext)| matches!(ext.to_ascii_lowercase().as_str(), "step" | "stp" | "p21"))
 }
 
+/// SolidCraft designs have the STEP limit (they can hold imported STEP models).
+fn is_design(name: &str) -> bool {
+    name.rsplit_once('.')
+        .is_some_and(|(_, ext)| matches!(ext.to_ascii_lowercase().as_str(), "sc" | "solidcraft"))
+}
+
 /// Checks the file before it is sent: a known type, not larger than the
 /// server takes. Returns the file name sent to the server.
 pub fn check_file(path: &Path, size: u64) -> Result<String, ApiError> {
@@ -61,11 +80,13 @@ pub fn check_file(path: &Path, size: u64) -> Result<String, ApiError> {
     if !EXTENSIONS.contains(&ext.as_str()) {
         return Err(ApiError::local(format!(
             "{name}: BOMs are read from CSV, TSV, TXT, XLSX, XLSM, XLSB, XLS and ODS tables \
-             and from STEP assemblies (STEP, STP, P21)."
+             and from STEP assemblies (STEP, STP, P21) and SolidCraft designs (SC)."
         )));
     }
     let (limit, what) = if is_step(&name) {
         (MAX_STEP_BYTES, "STEP assemblies")
+    } else if is_design(&name) {
+        (MAX_STEP_BYTES, "SolidCraft designs")
     } else {
         (MAX_TABLE_BYTES, "BOM tables")
     };

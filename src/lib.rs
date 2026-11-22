@@ -53,6 +53,8 @@ pub mod pagecontext;
 pub mod pdftext;
 pub mod preview;
 pub mod resultscan;
+pub mod scbom;
+pub mod scdesign;
 pub mod services;
 pub mod shape;
 pub mod simmesh;

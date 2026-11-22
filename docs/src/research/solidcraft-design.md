@@ -15,7 +15,11 @@ All findings come from SolidCraft's public documentation and its source
 code, licensed MIT OR Apache-2.0, as of SolidCraft 0.46.1 (commit
 `18c9760e3`, <https://github.com/tangency-labs/solidcraft>). They were read as
 a specification; TeamCraft's readers are its own code and no SolidCraft code
-is copied or vendored (see [FieldCraft and SolidCraft](../reference/interop.md)).
+is copied or vendored (see [FieldCraft and SolidCraft](../reference/interop.md)). The
+TeamCraft plugin for SolidCraft (`plugins/solidcraft`) is the one exception:
+it contains SolidCraft's plugin interface definition `plugin.wit`, unchanged
+and under its MIT licence, because a component for SolidCraft's runtime is
+built against it.
 
 | Topic                                     | Source                                                     |
 |-------------------------------------------|------------------------------------------------------------|
