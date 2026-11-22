@@ -359,6 +359,17 @@ explains the two levels in one sentence, on hover and on keyboard focus
 (#414; the words are in the [Glossary](glossary.md)); the SHA-256 of a file
 is in the tooltip of its version.
 
+**Right-click menu** (#417): a right-click on an item or file – in the
+navigator, Home *Files* / *All items* / *Structure*, the worklist's
+check-outs and the cards of the *Graph* tab – opens *Check out and open*
+(for your own check-out *Open in CAD* and *Check in…*), *Check out*, *Get…*,
+*Show in folder*, *Copy number*, *Where used*, *Request change…* and *Open in
+browser*, without opening the item first. The entries follow the toolbar's
+rules: one that does not apply is greyed out and its tooltip says why
+(*Checked out by Mia*, *no native CAD file*). Shift+F10 or the context-menu
+key opens it on the row that has the focus; the arrow keys move, `Esc`
+closes.
+
 Rare actions are in **More ▾** at the end: *Pack and Go…*, *Open in browser*, *Refresh* (`F5`) and *Mark obsolete…*. The
 menu works with the keyboard:
 `Enter`, `Space` or `↓` opens it, `↑`/`↓`, `Home`/`End` move, `Enter` runs

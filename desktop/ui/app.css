@@ -1335,3 +1335,6 @@ pre.release-notes {
   width: max-content; max-width: 32ch; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm);
   background: var(--surface); color: var(--text); font-size: 12px; font-weight: 400; line-height: 1.35; white-space: normal; text-align: left;
   box-shadow: 0 4px 14px rgba(0, 0, 0, .15); }
+
+/* right-click menu of an item (#417, item-menu.js): busy while its revision loads */
+body.menu-loading, body.menu-loading * { cursor: progress; }

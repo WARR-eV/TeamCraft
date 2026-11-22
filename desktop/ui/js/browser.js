@@ -228,7 +228,7 @@ function entryNode(p, path, e) {
     meta.push(h("span.lock-owner", { title: "Checked out by " + (mine ? "you" : e.checked_out_by_name) }, lockIcon(mine)));
   }
   var node = row("div.node.file" + checkedOutClass(e) + (state.active === key ? ".selected" : ""), {
-    title: entryTitle(e, label), "data-item": e.item_number
+    title: entryTitle(e, label), "data-item": e.item_number, "data-rev": e.code
   }, [
     h("span.twisty"), h("span.ico", { text: typeIcon(entryIconType(e)) }),
     h("span.label", null, [h("span.fname", { text: entryName(e) }), h("span.dim.mono", { text: " " + entryRevision(e) })]),

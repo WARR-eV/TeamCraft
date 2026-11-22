@@ -55,6 +55,8 @@ export function itemNode(it, opts) {
     : [h("span.mono", { text: ref }), " ", it.name];
   return h("li", null, h("div.node" + (state.active === key ? ".selected" : ""), {
     title: ref + " – " + it.name,
+    // right-click menu (item-menu.js, #417)
+    "data-item": it.number, "data-rev": it.latest_code,
     on: { click: function () { openRevision(it.number, it.latest_code); } }
   }, [
     h("span.twisty", null, opts.indent ? "" : ""),
@@ -360,7 +362,7 @@ export function drawWorklist(w) {
   ]));
   nav.appendChild(sectionTitle("Checked out by me", w.checkouts.length));
   nav.appendChild(w.checkouts.length ? h("ul.tree", null, w.checkouts.map(function (r) {
-    return h("li", null, h("div.node", { title: "Checked out " + fmtDate(r.checked_out_at), on: { click: function () { openRevision(r.item_number, r.code); } } }, [
+    return h("li", null, h("div.node", { title: "Checked out " + fmtDate(r.checked_out_at), "data-item": r.item_number, "data-rev": r.code, on: { click: function () { openRevision(r.item_number, r.code); } } }, [
       h("span.twisty"), h("span.ico", null, lockIcon(true)),
       h("span.label", null, [h("span.mono", { text: r.item_number + "/" + r.code }), " ", r.name]),
       h("span.meta.small.dim", { text: lockAge(r.checked_out_at) })
@@ -763,6 +765,7 @@ export function structureNode(n, parentKey) {
   var node = h("div.node" + checkedOutClass(n) + (state.active === "rev:" + n.item_number + ":" + n.code ? ".selected" : "") + (d.kind === "restricted" ? ".restricted" : ""), {
     title: d.openable ? n.item_number + "/" + n.code + " – " + n.name : d.placeholder,
     "data-item": n.item_number || "",
+    "data-rev": d.openable && n.code ? n.code : null,
     on: { click: function () {
       if (!d.openable) return;
       markTwins(n.item_number);

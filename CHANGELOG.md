@@ -25,6 +25,14 @@ see the notices in the README.
   - **Glossary** (#410): `docs/src/guide/glossary.md` explains items,
     revisions, versions, states, check out / get / park / check in, change
     requests and change orders in CAD terms.
+  - **Desktop: right-click menu on items** (#417): items and files in the
+    navigator, Home *Files* / *All items* / *Structure*, the worklist's
+    check-outs and the Graph cards open a menu – *Check out and open* (or
+    *Open in CAD* and *Check in…* for your own check-out), *Check out*,
+    *Get…*, *Show in folder*, *Copy number*, *Where used*, *Request change…*,
+    *Open in browser*. Same rules as the toolbar: a greyed-out entry says why
+    in its tooltip. Shift+F10 and the context-menu key open it on the row
+    that has the focus.
   - **Section nav on the revision page** (#421): a bar under the title block
     links every card of the page – Overview, Lifecycle, Revisions, Files,
     Structure, References, Where used, Changes, History and the cards only

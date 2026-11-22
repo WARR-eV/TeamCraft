@@ -92,6 +92,10 @@ jobs:
       # the reviewers of the release dialog and when a draft can be submitted
       - name: Test the release rules
         run: node scripts/desktop-release-rules.test.mjs
+      # the entries of the right-click menu of an item and why one is
+      # disabled – the revision toolbar's rules (#417)
+      - name: Test the item menu rules
+        run: node scripts/desktop-item-menu.test.mjs
       # whether a Get left the working folder complete enough to open the
       # main CAD file (Check out and open after Cancel, #348)
       - name: Test the Get rules

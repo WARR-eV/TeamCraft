@@ -267,7 +267,8 @@ function draw(pane, center, nodes, onOpen) {
   var layer = h("div.g-cards-layer");
 
   function cardNode(n, isCenter) {
-    var holder = h("div.g-card");
+    // right-click menu (item-menu.js, #417) on cards of an openable revision
+    var holder = h("div.g-card", n.number && n.code ? { "data-item": n.number, "data-rev": n.code } : null);
     placeCard(holder, n);
     holder.appendChild(nodeCard(n, isCenter, onOpen));
     layer.appendChild(holder);
