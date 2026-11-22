@@ -28,7 +28,7 @@ pub(super) fn read_text(data: &[u8]) -> Result<Mesh> {
             continue;
         };
         row += 1;
-        if (row - 1) % stride != 0 {
+        if (row - 1) % stride != 0 || mesh.vertex_count() >= MAX_POINTS {
             continue;
         }
         mesh.vertex([*x, *y, *z]);
@@ -39,12 +39,13 @@ pub(super) fn read_text(data: &[u8]) -> Result<Mesh> {
                 colors.extend(rgb.iter().map(|c| *c as u8));
             }
         }
-        if mesh.vertex_count() > MAX_POINTS {
-            break;
-        }
     }
     if colors.len() == mesh.positions.len() {
         mesh.colors = colors;
+    }
+    // every row was counted, also those past the budget
+    if mesh.vertex_count() < row {
+        mesh.thinned = Some(row as u64);
     }
     Ok(mesh)
 }
@@ -84,6 +85,7 @@ pub(super) fn read_las(data: &[u8]) -> Result<Mesh> {
     let stride = stride_for(count);
     let mut mesh = Mesh {
         parts: 1,
+        thinned: (count > MAX_POINTS).then_some(count as u64),
         ..Mesh::default()
     };
     let mut raw_colors: Vec<u16> = Vec::new();

@@ -1,7 +1,7 @@
 //! Triangle meshes and point clouds for the 3D preview.
 //!
 //! Pure-Rust readers for the common mesh, 3D-printing, visualisation and
-//! point-cloud formats, plus STEP B-rep tessellation with the `truck` CAD
+//! point-cloud formats (PTS, XYZ, LAS, E57), plus STEP B-rep tessellation with the `truck` CAD
 //! kernel (Apache-2.0). Every reader produces one [`Mesh`] in model
 //! coordinates; [`Mesh::encode`] writes the compact binary form that
 //! `shared/js/viewer.js` draws (`TCMESH01`, little endian).
@@ -26,6 +26,7 @@ use anyhow::{bail, Result};
 
 mod catia;
 pub mod creo;
+mod e57;
 mod earcut;
 mod f3d;
 mod gltf;
@@ -52,6 +53,7 @@ mod test_support;
 mod three_ds;
 mod three_mf;
 
+pub(crate) use e57::seal_pages as seal_e57_pages;
 pub(crate) use helpers::*;
 pub use model::{color_map, Field, Mesh, MAX_FIELDS, MAX_POINTS, MAX_TRIANGLES};
 pub use step::MAX_STEP_BYTES;
@@ -69,6 +71,7 @@ pub fn read(format: &str, data: &[u8]) -> Result<Mesh> {
         "3ds" => three_ds::read(data)?,
         "pts" | "xyz" => points::read_text(data)?,
         "las" => points::read_las(data)?,
+        "e57" => e57::read_e57(data)?,
         "step" => step::read(data)?,
         "nx-part" => jt::read_nx(data)?,
         "jt" => jt10::read(data)?,

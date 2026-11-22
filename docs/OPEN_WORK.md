@@ -585,8 +585,12 @@ real files and belong to section 3 once such files are at hand.
 
 - [ ] Test real STEP exports of the CAD programs, assembly placements (`mapped_item` – parts of an assembly can
   overlap) and length units
-- [ ] Readers for IGES, BREP, Parasolid, FBX, DAE, USD and E57 – recognised, not previewed (no pure-Rust readers
-  yet; candidate: `e57` crate). JT 9 and 10 are read with their scene graph (`src/mesh/jt10.rs`); open there: JT 8, shattered
+- [x] E57 point clouds (#373): own bounded reader `src/mesh/e57.rs` – page CRC-32C checked first, every scan
+  placed by its pose, cartesian/spherical, float/scaled integer, colour or intensity, invalid points dropped, thinned
+  evenly with a note in the viewer. Open: an openly licensed real scan as a test file (the tests build synthetic
+  files), per-scan grouping in the viewer, colours from embedded images
+- [ ] Readers for IGES, BREP, Parasolid, FBX, DAE and USD – recognised, not previewed (no pure-Rust readers
+  yet). JT 9 and 10 are read with their scene graph (`src/mesh/jt10.rs`); open there: JT 8, shattered
   JT files (parts in other `.jt` files), a real JT 9.5 assembly as a test file (the tests build synthetic ones) – no
   openly licensed test files yet
 - [x] Creo assemblies from their parts (`src/mesh/creo/asm.rs`, section `NeuAsmSld`, components by `<name>.prt` /

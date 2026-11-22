@@ -92,7 +92,12 @@ pub(crate) fn check_triangles(n: usize) -> Result<()> {
 
 /// Every `stride`-th point of a point cloud with `count` points.
 pub(crate) fn stride_for(count: usize) -> usize {
-    count.div_ceil(MAX_POINTS).max(1)
+    stride_within(count, MAX_POINTS)
+}
+
+/// Every `stride`-th point of `count` points keeps at most `budget` of them.
+pub(crate) fn stride_within(count: usize, budget: usize) -> usize {
+    count.div_ceil(budget.max(1)).max(1)
 }
 
 /// Thins out a point cloud that has more than [`MAX_POINTS`] points.
@@ -101,6 +106,8 @@ pub(crate) fn thin_out(mesh: &mut Mesh) {
         return;
     }
     let stride = stride_for(mesh.vertex_count());
+    let count = mesh.vertex_count() as u64;
+    mesh.thinned = Some(mesh.thinned.map_or(count, |t| t.max(count)));
     let keep = |v: &[f32]| v.to_vec();
     mesh.positions = mesh
         .positions
@@ -208,6 +215,9 @@ mod tests {
         assert_eq!(stride_for(MAX_POINTS + 1), 2);
         assert_eq!(stride_for(3 * MAX_POINTS), 3);
         assert_eq!(stride_for(3 * MAX_POINTS + 1), 4);
+        assert_eq!(stride_within(5, 2), 3);
+        assert_eq!(stride_within(5, 0), 5, "a budget of 0 counts as 1");
+        assert_eq!(stride_within(0, 2), 1);
     }
 
     #[test]
@@ -227,6 +237,7 @@ mod tests {
         };
         thin_out(&mut cloud);
         assert_eq!(cloud.vertex_count(), 10);
+        assert_eq!(cloud.thinned, None);
         // one point more: every second point, with its colour and field value
         let n = MAX_POINTS + 1;
         let mut cloud = Mesh {
@@ -241,6 +252,7 @@ mod tests {
         };
         thin_out(&mut cloud);
         assert_eq!(cloud.vertex_count(), n.div_ceil(2));
+        assert_eq!(cloud.thinned, Some(n as u64));
         assert_eq!(cloud.colors.len(), cloud.positions.len());
         assert_eq!(cloud.fields[0].values.len(), cloud.vertex_count());
         assert_eq!(&cloud.positions[3..6], &[2.0, 0.0, 0.0]);

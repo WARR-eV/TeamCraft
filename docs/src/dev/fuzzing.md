@@ -20,8 +20,11 @@ The targets are `stepbom`, `swpart`, `nxpart`, `invpart` (Inventor segments, par
 `creopart` (the Creo B-rep container, tagged format and tessellation), `cadrefs`, `bomtable`,
 `thumbnail`, `scdesign` (SolidCraft designs: document, linked designs, thumbnail), `textindex`, `htmltext` (HTML reports and the charset detection of text files), `mesh` (STL, OBJ, PLY, OFF,
 3MF, AMF, glTF, 3DS,
-points, LAS, VTK legacy and XML, CalculiX FRD) and `mesh_step` (the STEP
-tessellation through `truck`, kept apart because it is slow), `cadformat` (the
+points, LAS, E57, VTK legacy and XML, CalculiX FRD), `mesh_step` (the STEP
+tessellation through `truck`, kept apart because it is slow), `e57` (E57 point
+clouds: the bytes as they are, then cut to whole pages with every page checksum
+recomputed, so the fuzzer gets past the CRC-32C to the XML, the packets and the
+bit-packed streams; seed `fuzz/seeds/e57/three-points.e57`), `cadformat` (the
 format detection over a file's first 1024 bytes) and `resultscan` (the
 extraction templates and the exchange file) and `solversummary` (the solver
 summary of Fluent, Nastran and STAR-CCM+ output).

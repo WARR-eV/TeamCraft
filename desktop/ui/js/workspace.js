@@ -43,7 +43,7 @@ export function revViewer(tab, el) {
   var resetBtn = h("button.small", { type: "button", title: "Back to the initial view (double-click)" }, "Reset view");
   var upBtn = h("button.small", { type: "button", title: "Switch between Z-up and Y-up models" }, "Z up");
   // STL export of STEP/3MF/… models (e.g. for 3D printing); saved through a native dialog in Rust.
-  var noExport = ["stl", "pts", "xyz", "las"].indexOf(previewFormat(current)) !== -1;
+  var noExport = ["stl", "pts", "xyz", "las", "e57"].indexOf(previewFormat(current)) !== -1;
   var stlBtn = noExport ? null : h("button.small", {
     type: "button", disabled: true, title: "Save the tessellated model as STL (units as in the file, usually mm)",
     on: {

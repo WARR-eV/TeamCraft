@@ -28,7 +28,7 @@
   their content address; identical content is stored once.
 * **3D preview**: `mesh.rs` dispatches to one reader per format in `src/mesh/`
   (`stl.rs`, `obj.rs`, `ply.rs`, `off.rs`, `three_mf.rs` for 3MF and AMF,
-  `gltf.rs`, `three_ds.rs`, `points.rs` for PTS/XYZ/LAS); the mesh and its
+  `gltf.rs`, `three_ds.rs`, `points.rs` for PTS/XYZ/LAS, `e57.rs` for E57 scans with their page checksums); the mesh and its
   `TCMESH01` encoding are in `mesh/model.rs`, the shared bounded byte access
   in `mesh/helpers.rs`. It reads STL/OBJ/PLY/OFF/3MF/AMF/glTF/3DS/point
   clouds and tessellates STEP with the truck kernel (`mesh/step.rs`; an own

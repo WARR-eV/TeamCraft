@@ -287,7 +287,7 @@ SHA-256 of this `document.json` and of the PNG; otherwise none.
 
 | Format             | Extensions                            |
 |--------------------|---------------------------------------|
-| ASTM E57           | `.e57`                                |
+| ASTM E57           | `.e57` (3D)                           |
 | LAS / LAZ          | `.las` (3D), `.laz`                   |
 | PTS, PTX, XYZ, PCD | `.pts` (3D) `.ptx` `.xyz` (3D) `.pcd` |
 
@@ -386,6 +386,32 @@ assembly placements (`MAPPED_ITEM`, `CONTEXT_DEPENDENT_SHAPE_REPRESENTATION`
 – every shell appears in its own coordinates). STEP files above 256 MB are
 not previewed; the conversion has a time limit of 180 s and the usual
 triangle limit.
+
+## E57 in the 3D preview
+
+E57 files (ASTM E2807) are read by an own reader in the isolated preview
+process (`src/mesh/e57.rs`; format notes in the research page
+[3D preview of E57 point clouds](../research/e57-preview.md)):
+
+* the **CRC-32C of every 1 KiB page** is checked before anything is read; a
+  file with a damaged page is refused (*the checksum of page N … does not
+  match*), never shown as a wrong cloud;
+* every scan (`data3D` entry) is moved by its **pose** (rotation quaternion and
+  translation), so the stations of a multi-scan file line up;
+* positions from `cartesianX/Y/Z` or from `sphericalRange/Azimuth/Elevation`,
+  stored as floats or as scaled integers; points marked invalid
+  (`cartesianInvalidState`, `sphericalInvalidState`) are left out;
+* colours from `colorRed/Green/Blue`, scaled by the scan's `colorLimits`;
+  without colours the intensity (scaled by `intensityLimits`) colours the cloud
+  as a field;
+* metres are converted to millimetres;
+* more than 3 million points are thinned evenly over all scans, and the
+  viewer says so;
+* embedded images (`images2D`), other point fields and extensions are
+  ignored; `String` or `Blob` fields inside the points are refused.
+
+The XML section may have at most 64 MiB and 1 000 000 elements, a file at most
+4096 scans; the usual size and time limits of the preview apply.
 
 ## Why not every format is previewed
 

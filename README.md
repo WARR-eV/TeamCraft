@@ -216,6 +216,7 @@ end-to-end tests against a real PostgreSQL.
   Rhino models (`.3dm`, SubD included),
   SketchUp models (`.skp`, SketchUp 3 to today), JT files with their whole
   assembly, Fusion designs (`.f3d`), STL, OBJ, PLY, 3MF, glTF, point clouds
+  (PTS, XYZ, LAS and laser-scanner E57 with every scan placed by its pose)
   and more.
 - **CAD thumbnails** – the preview images stored in Inventor drawings and Solid
   Edge files; NX, SOLIDWORKS, Inventor, CATIA, Creo, Rhino, SketchUp, JT and

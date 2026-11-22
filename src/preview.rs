@@ -247,6 +247,8 @@ pub enum PreviewFormat {
     Pts,
     Xyz,
     Las,
+    /// E57 scans (ASTM E2807): every scan placed by its pose.
+    E57,
     /// Simulation results (see `simmesh`): legacy VTK, VTU, VTP, CalculiX FRD.
     VtkLegacy,
     Vtu,
@@ -255,7 +257,7 @@ pub enum PreviewFormat {
 }
 
 impl PreviewFormat {
-    pub const ALL: [PreviewFormat; 30] = [
+    pub const ALL: [PreviewFormat; 31] = [
         PreviewFormat::Stl,
         PreviewFormat::Obj,
         PreviewFormat::Ply,
@@ -282,6 +284,7 @@ impl PreviewFormat {
         PreviewFormat::Pts,
         PreviewFormat::Xyz,
         PreviewFormat::Las,
+        PreviewFormat::E57,
         PreviewFormat::VtkLegacy,
         PreviewFormat::Vtu,
         PreviewFormat::Vtp,
@@ -327,6 +330,7 @@ impl PreviewFormat {
             PreviewFormat::Pts => "pts",
             PreviewFormat::Xyz => "xyz",
             PreviewFormat::Las => "las",
+            PreviewFormat::E57 => "e57",
             PreviewFormat::VtkLegacy => "vtk-legacy",
             PreviewFormat::Vtu => "vtk-unstructured",
             PreviewFormat::Vtp => "vtk-polydata",
@@ -365,7 +369,7 @@ impl PreviewFormat {
     pub fn is_point_cloud(self) -> bool {
         matches!(
             self,
-            PreviewFormat::Pts | PreviewFormat::Xyz | PreviewFormat::Las
+            PreviewFormat::Pts | PreviewFormat::Xyz | PreviewFormat::Las | PreviewFormat::E57
         )
     }
 
@@ -1376,6 +1380,8 @@ mod tests {
         assert_eq!(PreviewFormat::of(".stl"), None);
         assert!(PreviewFormat::Step.is_brep() && !PreviewFormat::Stl.is_brep());
         assert!(PreviewFormat::Las.is_point_cloud());
+        assert_eq!(PreviewFormat::of("scan.e57"), Some(PreviewFormat::E57));
+        assert!(PreviewFormat::E57.is_point_cloud() && !PreviewFormat::E57.is_brep());
         assert_eq!(PreviewFormat::of("chair.3dm"), Some(PreviewFormat::Rhino));
         assert_eq!(PreviewFormat::of("beam.vtu"), Some(PreviewFormat::Vtu));
         assert_eq!(

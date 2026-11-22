@@ -761,8 +761,12 @@ fn preview_mesh(
                 .faces
                 .map(|(shown, total)| format!(", partial preview: {shown} of {total} faces"))
                 .unwrap_or_default();
+            let thinned = mesh
+                .thinned
+                .map(|total| format!(", thinned from {total} points"))
+                .unwrap_or_default();
             println!(
-                "{} triangles, {} vertices, {} bodies{partial}",
+                "{} triangles, {} vertices, {} bodies{partial}{thinned}",
                 mesh.triangle_count(),
                 mesh.vertex_count(),
                 mesh.parts.max(1)
