@@ -34,6 +34,10 @@ check-outs and reviews, and a **local working folder**:
   locked; parts you changed locally, or whose place is taken by another file,
   are never overwritten and are listed in the report (*Settings → Workspace*
   switches this off);
+* *Check out parts…* on an assembly (revision toolbar, group **Lock**, and
+  the *Structure* tab) checks out several of its parts at once, to change
+  them in the context of the assembly – see
+  [Check out parts of an assembly](#check-out-parts-of-an-assembly);
 * *Files / All items / Structure* in the navigator head: *Files* shows the
   folders and files of the project group as in its working folder (see
   below); *Structure* shows, per project
@@ -86,6 +90,19 @@ check-outs and reviews, and a **local working folder**:
   the counts existed – are ticked; *Apply* adds and corrects them in one step (the same plan as *Create BOM from CAD
   references…* in the web UI). A
   quantity the CAD file does not tell never replaces an existing one;
+* *Add line…* (also in the *Structure* tab of a revision you have checked
+  out) adds a single component: type part of its number, name or file name
+  and choose one of the matching items – shown with the preview image from
+  the CAD file, revision, state and project group (↑/↓ and Enter work too, Esc closes the list);
+  enter quantity, find number (empty = next free one) and notes, *Add*. An
+  exact item number works without choosing. Only items you may read are
+  offered (restricted groups you are not in stay hidden). Under your
+  check-out the quantity of every first-level line is an input – a change is
+  saved when you leave it or press Enter (Esc restores it) – and *Remove*
+  deletes a line after a confirmation; the tab reloads after each change.
+  These use the same REST routes as the web UI (`GET /items/suggest`,
+  `POST …/bom`, `PATCH`/`DELETE /bom-lines/{id}`); an older server without
+  the suggest route is searched through `GET /items?q=`;
 * the *Graph* tab draws a navigable reference and BOM graph around the
   revision: the focused item in the middle, its BOM children and references
   below (*ref*), the assemblies that use it above (*uses*). Every node is a
@@ -225,6 +242,12 @@ check-outs and reviews, and a **local working folder**:
   TeamCraft's ids and server under the key `teamcraft.pdm`, through
   `solidcraft-cli`. Refused while the design is read-only or open in
   SolidCraft. The design changes and is checked in like any other change.
+  The Files tab of a revision lists the design properties TeamCraft read
+  from a design under its name (*Part number … · Revision … · Description …*),
+  with the notice *Design properties differ from this revision* when they
+  do not match the item; *New item* from local files and *Import a CAD
+  folder* fill an empty description from them, the name stays the file name
+  (see [Files](files.md#design-properties-of-solidcraft-designs)).
 * with a *Preferred CAD program* set on your account page in the web UI, the
   Files tab of a revision collapses the native files of other CAD programs
   (see [Files](files.md#preferred-cad-program)); the app reads the setting at
@@ -342,7 +365,7 @@ shown or the app window gets the focus back – save in the CAD program, switch
 back, and *Check in…* is highlighted.
 
 * revision tab: **Lock** (*Check out*, or *Check in…* and *Cancel check-out*
-  / *Force unlock* while checked out) · **Open** (*Check out and open*, or *Open in CAD* for your own
+  / *Force unlock* while checked out; *Check out parts…* on an assembly) · **Open** (*Check out and open*, or *Open in CAD* for your own
   check-out, with the CAD program that will open the file next to it – see
   [Check out and open](#check-out-and-open)) · **Work** (*Edit attributes*, *Get…*, *Open
   folder*) · **Lifecycle** (*Release…*, *Revise*) · **Collaborate**
@@ -437,6 +460,15 @@ this computer.
   number);
 * *Structure*: the assemblies with their parts.
 
+**Pictures in the rows** (#420). In all three views and in the search, a
+row shows a small picture of its model in place of the type icon: in
+*Files* the preview image of the file itself, in *All items*, *Structure*
+and the search the picture of the item's main model (the assembly before the
+part before the drawing, as at the top of the revision page). The server
+names the picture in the list, and the app fetches it only when the row
+scrolls into view, once per file content; rows without a picture keep the
+type icon.
+
 **Favourite folder.** When your work is several folders down, make that
 folder the group's favourite: point at the folder in *Files* and click its
 ☆. Home then starts in that folder instead of at the top of the group. A
@@ -466,6 +498,28 @@ shows without restarting the app.
 Keyboard: `Ctrl/Cmd+N` new item, `Ctrl/Cmd+F` search, `F5` refresh,
 `Ctrl/Cmd+1/2/3/4/5` Home, Worklist, Changes, Agent, Projects, `Ctrl/Cmd+W` close the tab,
 `Ctrl/Cmd` + `+` / `-` / `0` (or `Ctrl` + mouse wheel) zoom.
+
+## Check out parts of an assembly
+
+CAD users change parts **in the context of the assembly**. *Check out
+parts…* (revision toolbar, group **Lock**, on an assembly, and the
+*Structure* tab) shows the assembly's structure as a tree with check boxes:
+every part with its state and who holds it. Parts that cannot be checked
+out are greyed out with the reason – *Not a member of project group …*,
+*Released – revise it first*, *In review*, *Checked out by …*, or
+*Already checked out by you* (ticked). A
+part used several times is offered once; parts the CAD files reference
+without a BOM line follow at the end. *Tick all* / *Tick none* help with
+large assemblies.
+
+*Check out* takes the locks of all ticked parts in **one step** on the
+server (`POST /api/v1/checkouts`) and makes their files in the working
+folder writable – missing or outdated files are downloaded, an unchanged
+copy only loses its read-only flag, a copy you changed is kept – so the CAD
+program can save them. What the server refused (someone took a part a
+moment earlier, a part was released meanwhile, you are not a member of its
+project group) is listed with the reason; the rest is checked out anyway.
+The other parts stay read-only.
 
 ## Check out and open
 
@@ -608,8 +662,26 @@ files in *Check in…* – also files with an unrelated name, which TeamCraft
 remembers in `.teamcraft/added.json` until they are checked in – or tick *Check in now*. The Files section explains why
 the button is disabled:
 checked out by someone else (add after check-in), in review, or released (frozen: *Revise* and add the files to the new
-revision). Dropping files
-onto the window is not supported yet.
+revision).
+
+**Drop files.** Drag CAD files from Explorer, Finder or your file manager
+onto the window. A frame shows what the drop does before you let go:
+
+* on an open revision tab that you have checked out, or that *Add files…*
+  would check out for you, the files go into *Add files…* (with the same
+  dialog, sub-folder and confirmations as picked files);
+* anywhere else (the start page, a change, a request) the drop opens
+  *New item* with the files already chosen – name, type, group and folder
+  follow from them like from picked files, and the duplicate check runs;
+* a revision that takes no files (released, in review, checked out by
+  someone else) refuses the drop with the same reason the Files section
+  gives, and so does the app for viewers and for editors without a project
+  group to create items in. While a dialog is open, close it first.
+
+Only files are taken: dropped folders are skipped, with a note. The files
+are copied, never moved, and nothing in the working folder is overwritten
+without asking – a drop has exactly the checks of the file dialog. Tabs are
+still reordered by dragging them.
 
 **Get.** *Get…* on a revision resolves its structure on the server – the
 multi-level BOM with the revision rule you choose (*latest*: the newest
@@ -657,6 +729,75 @@ place is already taken by a different file, and older revisions of an item
 whose newer revision takes the place, stay where they are; files you
 changed are moved first. Identical copies are removed, emptied old folders
 too, and every step is written to `.teamcraft/migration.log`.
+
+## Getting started
+
+After the **first sign-in** the app opens a short wizard, *Getting
+started*; *Help → Getting Started…* opens it again at any time. It guides
+you from the sign-in to your first opened assembly:
+
+1. **Server** – the server the app works with. Skipped when your
+   organization fixed the server ([Managed computers](#managed-computers)).
+2. **Sign-in** – already done when the wizard opens; shown as a ticked step.
+3. **Working folder** – what it is and where your CAD files will live
+   (`<working folder>/<group>/<folder>/<file>`). *Change…* picks another
+   folder (the same setting as *Settings → Workspace*), *Open folder* shows
+   it in the file manager.
+4. **Project group** – the groups you are a member of and *Get project
+   groups…*, which copies their files into the working folder (latest
+   revision, also in work). Skipped when you are in no group yet, or when a
+   complete *Get project groups* on this computer (no failed item or name
+   clash, *Latest revision*) already fetched all of
+   them into this working folder.
+5. **CAD setup** – for information only: the Inventor project file
+   (`.ipj`), the NX load options and the Solid Edge search paths that a later
+   version will offer to create. The wizard creates none of them.
+6. **Your daily loop in 3 steps** – *Check out and open* → save in your CAD
+   program → *Check in…*. *Finish and open* with the group code makes one of your
+   groups the active one (a group you already fetched first) and shows its
+   files in *Home* – right-click the assembly → *Check out and open*. Without
+   a group, *Finish and show Projects* lists the groups instead; *Finish and
+   open my worklist* shows what you have checked out.
+
+Every step has *Don't show again*; *Back*, *Skip* and *Next* move between
+the steps, and the last step has *Finish*. The step list on the left ticks
+the steps you went through with *Next* and marks the ones you skipped with
+a dash (also read out by screen readers). The wizard
+itself creates no file or folder – only the app's own actions it opens do,
+after you confirm them (the folder picker, *Get files*). Once you finish it
+or choose *Don't show again* it no longer opens by itself; an app that
+starts already signed in – after an update from an older version – does not
+show it either.
+
+## Empty views
+
+An empty list says what to do next, and the answer depends on your role
+(#423):
+
+* **No project group yet** – CAD editors get *Create a project group* (you
+  become its manager and add the others); viewers are asked to have a
+  manager of a group add them.
+* **An empty project group** on *Home* (*Files*, *All items* and
+  *Structure*) – *Import CAD folder…* and *New item*, for CAD editors who may
+  create items in the group; CAD editors who are not members of it are asked
+  to have a manager of the group add them; viewers learn that the group's CAD
+  editors add the items.
+* **New on this computer** in the worklist without suggestions – *Get…*
+  copies the files of a project group into your working folder; the dialog
+  starts with the active group ticked.
+* **Checked out by me**, **Waiting for my review** and **My open changes**
+  say in one line how work gets there – in the worklist and on the *Home*
+  tab.
+* A **viewer account** sees a note at the top of the worklist and of the
+  *Home* tab: editing –
+  items, check-outs, changes – needs the CAD editor role; ask an
+  administrator of the server.
+
+An empty working folder on a revision tells the holder of the check-out to
+save the CAD files there and check them in, tells who may check the revision
+out to do so, and everyone else only that it has no files yet.
+
+The texts follow *Settings → Language*.
 
 ## Install or run it
 
@@ -732,7 +873,7 @@ check off (for example on computers without internet access).
 Every error message has a **Report…** link, and *Help → Report a Problem…*
 opens the same dialog without one. It shows the report before anything
 leaves the app: a title (what you did and the error), the action, its key
-inputs (no file contents or item data), the error and the versions; add what
+inputs, the error and the versions; add what
 you were trying to do (left out if empty) and, if you like, the error
 messages of this session. Your home folder, server addresses and tokens are
 removed. Edit the text as you like, then:
@@ -744,15 +885,26 @@ removed. Edit the text as you like, then:
 * *Copy report* puts it on the clipboard;
 * *Save report…* writes it to a file (both work without a network).
 
+The key inputs are what the action worked on, for example the project group,
+item number and revision of a check-out or check-in, the names of the ticked
+files, the file and format of a 3D preview, or the file name and options of a
+BOM or folder import. They are names and short values only: a path is
+reduced to the file name, and file contents, item names, descriptions and
+BOM lines are never included.
+
 The error pages of the web UI have *Details for a bug report* with *Copy
-details* (status, message, page, time and version).
+details* (status, message, page, time, version and the request id). The
+request id is also in the server log, so your administrator can find the
+error there.
 
 ## Usage report
 
 Once a day of use, the app sends your TeamCraft server an anonymous report of
 the day before: a random id of this installation, the app version, system,
 package type, the minutes the window was in front, and how often fixed
-actions were used (check-out, check-in, 3D preview …) – never names,
+actions were used (check-out, check-in, cancel check-out, get files, open in
+CAD, 3D preview, BOM and folder imports, new items, releases, searches and
+assistant questions, STEP exports per CAD program) – never names,
 numbers, paths, search terms or anything you type, and not who you are.
 *Settings → Privacy → Show what is sent* shows the exact report. The report
 stays with your organisation; your administrator decides whether the server

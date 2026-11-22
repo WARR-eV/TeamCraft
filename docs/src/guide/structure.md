@@ -55,6 +55,26 @@ that released it and who approved it when (`released_by`: change, title,
 release time, approvals); a change order the downloader may not see is only
 marked `restricted`.
 
+### Adding components by search
+
+*Add component* on the BOM card of a revision you have checked out picks the
+child item by search: type at least two characters of its **number, name or
+file name** and a list of matching items opens under the field – with the
+preview image stored in the CAD file (when there is one), number and latest
+revision, state, project group and the file name that matched. Choose a row
+with the mouse or with ↑/↓ and Enter (Esc closes the list); the field then
+holds the item number, and *Add* adds the line with quantity, find number and
+notes as before. At most 10 items are listed, best matches first.
+
+The list only offers items you may read: items of a restricted project group
+you are not a member of never appear, by name, file name or number. Without
+JavaScript the field takes the exact item number, as it always did. The list
+comes from `GET /items/suggest?q=&limit=` (signed-in session; the REST twin
+for scripts and the desktop app is `GET /api/v1/items/suggest`).
+
+The desktop app offers the same in its *Structure* tab – see
+[Desktop app](desktop.md).
+
 ## Creating a BOM from the CAD references
 
 An assembly uploaded as a file has no BOM, although the server already knows

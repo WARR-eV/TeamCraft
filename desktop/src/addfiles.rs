@@ -85,6 +85,12 @@ pub fn plan(
         let disk = source.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
             ApiError::local(format!("{} has no usable file name.", source.display()))
         })?;
+        // picked or dropped from the file manager (#418): regular files only
+        if !is_regular_file(source) {
+            return Err(ApiError::local(format!(
+                "{disk} is not a file – folders and other entries cannot be added."
+            )));
+        }
         if is_ignored(disk) {
             return Err(ApiError::local(format!(
                 "{disk} is a temporary or backup file and cannot be added."
@@ -117,6 +123,28 @@ pub fn plan(
         });
     }
     Ok(out)
+}
+
+/// A regular file (a symbolic link counts by what it points to); folders,
+/// devices, pipes and paths that do not exist are not.
+pub fn is_regular_file(path: &Path) -> bool {
+    std::fs::metadata(path).is_ok_and(|m| m.is_file())
+}
+
+/// Paths dropped on the window from the file manager (#418), split into the
+/// regular files (in their order, each once) and the number of entries
+/// left out – folders and everything else that is not a regular file.
+pub fn split_dropped(paths: &[PathBuf]) -> (Vec<PathBuf>, usize) {
+    let mut files: Vec<PathBuf> = Vec::new();
+    let mut skipped = 0;
+    for path in paths {
+        if !is_regular_file(path) {
+            skipped += 1;
+        } else if !files.contains(path) {
+            files.push(path.clone());
+        }
+    }
+    (files, skipped)
 }
 
 fn same_file(a: &Path, b: &Path) -> bool {
@@ -398,6 +426,27 @@ mod tests {
             plan(ws.path(), None, &[], "", &[a.clone(), a.clone()], "").is_err(),
             "picked twice"
         );
+        // a dropped folder or a path that is gone is not a file (#418)
+        let folder = src.path().join("assembly");
+        std::fs::create_dir(&folder).unwrap();
+        let err = plan(ws.path(), None, &[], "", &[folder], "").unwrap_err();
+        assert!(err.to_string().contains("not a file"), "{err}");
+        let gone = src.path().join("gone.step");
+        assert!(plan(ws.path(), None, &[], "", &[gone], "").is_err());
+    }
+
+    #[test]
+    fn dropped_paths_keep_regular_files_only() {
+        let src = tempfile::tempdir().unwrap();
+        let a = write(src.path(), "a.step", "1");
+        let b = write(src.path(), "b.ipt", "2");
+        let folder = src.path().join("parts");
+        std::fs::create_dir(&folder).unwrap();
+        let gone = src.path().join("gone.prt");
+        let (files, skipped) = split_dropped(&[b.clone(), folder, a.clone(), gone, b.clone()]);
+        assert_eq!(files, [b, a], "in order, each once");
+        assert_eq!(skipped, 2);
+        assert_eq!(split_dropped(&[]), (Vec::new(), 0));
     }
 
     #[test]

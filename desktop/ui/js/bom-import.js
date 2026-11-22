@@ -9,6 +9,7 @@ import { selectView } from "./navigator.js";
 import { activeTab, reloadActive, stat, table } from "./tabs.js";
 import { openRevision } from "./revision.js";
 import { baseName } from "./dialogs.js";
+import { revisionInputs } from "./report-inputs.js";
 
 // ------------------------------------------------------------ Import BOM
 
@@ -65,7 +66,7 @@ export function bomFromCadDialog(rev) {
         }, function (err) { applyButton.disabled = false; d.fail(err); });
       }
     }
-  ], { wide: true });
+  ], { wide: true, inputs: revisionInputs(rev) });
   applyButton = handle.form.querySelector(".dialog-actions button.primary");
   applyButton.disabled = true;
   api("GET", base).then(function (p) {
@@ -236,7 +237,11 @@ export function openImportBomDialog(rev) {
         });
       }
     }
-  ], { wide: true });
+  ], { wide: true, inputs: function () {
+    // *Report…* (#381): the file name and the options, never the BOM lines
+    var extra = [["file", path ? baseName(path) : ""], ["numbers", numbers.value], ["match existing", match.checked ? "yes" : "no"]];
+    return rev ? revisionInputs(rev, extra) : [["group", project.value]].concat(extra);
+  } });
   importButton = handle.form.querySelector(".dialog-actions button.primary");
   importButton.disabled = true;
 }

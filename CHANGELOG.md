@@ -39,6 +39,92 @@ see the notices in the README.
 - BOM from CAD references: SolidCraft designs with linked designs count as
   structure files (their placements are the quantities); the guides now name
   Inventor and SolidCraft as sources of instance counts too.
+- Desktop: drag and drop of files from Explorer, Finder or the file manager onto the window (#418). On a revision tab you have checked out (or that *Add files…* would check out) the drop opens *Add files…*; elsewhere it opens *New item* with the files. A frame shows what the drop does; frozen revisions, revisions checked out by someone else, viewers and editors without a group are refused with the reason. Only regular files are taken (folders are skipped), with the same checks as the file dialog. Tab reordering keeps working (pointer events, not HTML5 drag and drop).
+- **Getting started in the desktop app** (#422): after the first sign-in
+  TeamCraft Desktop opens a short wizard – server (skipped when a policy fixes
+  it), sign-in, the working folder (*Change…*, *Open folder*), *Get project
+  groups…* for your groups (latest revision, also in work; skipped without
+  groups or when they are already fetched), the CAD setup for information
+  (the Inventor `.ipj`, NX load options and Solid Edge search paths a later
+  version will create – nothing is created now) and the daily loop *Check out
+  and open* → save in CAD → *Check in…*, ending in *Finish and open* with
+  one of your groups: its files open in Home, ready for *Check out and open*
+  on the assembly. Every step but the last can be skipped; *Finish*
+  or *Don't show again* is kept in the settings (`onboarding`), and *Help →
+  Getting Started…* opens it again. The wizard creates no file or folder by
+  itself. Step rules in `desktop/ui/js/onboarding-rules.js`, tested by
+  `scripts/desktop-onboarding-rules.test.mjs`.
+- **Check out several parts of an assembly at once** (#415): `POST /api/v1/checkouts`
+  takes a list of revisions (by id, or item and code) and checks them out in one
+  transaction with a result per revision – the ones that can be taken are checked
+  out, the rest are reported with a reason (`not_found`, `released`, `in_review`,
+  `locked`, `forbidden`), so one released or locked part does not stop the others.
+  The rows are locked in a fixed order, so overlapping batches cannot deadlock and
+  every revision has one winner; each changed revision gets its own
+  `revision.checkout` audit record. A server batch rather than one call per part:
+  one round trip and one consistent moment for the whole set, with the rules of
+  the single check-out in one place. TeamCraft Desktop: *Check out parts…* on an
+  assembly (revision toolbar and *Structure* tab) shows the structure as a tree
+  with check boxes, state and lock holder (parts that cannot be checked out are
+  disabled with the reason), checks out the ticked ones in one step, makes their
+  files in the working folder writable and lists what was refused.
+- **BOM components picked by search** (#419, UX B5 of #408): *Add component*
+  on the web BOM card lists matching items as you type part of their number,
+  name or file name – with the preview image from the CAD file, latest
+  revision, state, project group and the file name that matched; ↑/↓, Enter
+  and Esc work, and without JavaScript the field still takes the exact item
+  number. The desktop app's *Structure* tab gets *Add line…* with the same
+  picker, an editable quantity and *Remove* on every first-level line of an
+  own check-out. New routes: `GET /items/suggest` (web session) and
+  `GET /api/v1/items/suggest`; both use the item search with the user's read
+  rights, so items of restricted groups the user is not in never appear (at
+  most 10 rows, nothing for fewer than 2 characters).
+- **Request ids** (#381): every answer of the server carries an
+  `x-request-id` header (a new UUID, or a reverse proxy's own id of 1–64
+  characters `[A-Za-z0-9-]`), the request's log line records it as
+  `request_id`, and the web UI's error pages show it under *Details for a bug
+  report* and in *Copy details*.
+- **Desktop: key inputs in problem reports** (#381): *Report…* on an error
+  now names what the action worked on – project group, item, revision, file
+  and format, the ticked files of a check-in, the options of a BOM or folder
+  import – for check-out, check-in and park, *Get files*, opening files, the
+  3D preview and STL export, STEP exports, new items, adding files, BOM and
+  folder imports and request attachments. Names and short values only (a path
+  is reduced to its file name, at most 12 values of 200 characters); a 3D
+  preview that cannot be loaded from the server now also shows an error
+  message with *Report…*.
+- SolidCraft design properties (#367): part number, revision, description, project, author, organisation and licence are read from `.sc` designs at upload and check-in (bounded, text values only, migration `0078_file_properties`), listed under the file on the revision page and in the desktop app, returned as `properties`/`properties_line` with the file in the REST API (and `design_properties` in the MCP file briefs), and found by the full-text search. The revision page – web and desktop – shows a notice when they differ from the item number, revision code or name (`property_mismatches` of `GET /api/v1/items/{n}/revisions/{c}`) – worked out on every view, nothing is changed automatically. A new item created in the web UI with a design and no name takes the design's description; the desktop's *New item* (and *Create items…* of the worklist) and *Import a CAD folder* fill an empty description from it.
+- **Thumbnails in lists** (#420): the picture of a revision's main model (the
+  rule of the revision page, now in `services::thumbnails`; a stand-alone JT
+  file after the native files) heads every row of the web item list and its
+  search results, the vault explorer, and the desktop app's Home *Files*,
+  *All items*, *Structure* and the search. The list answers carry
+  `thumbnail_file_id` / `thumbnail_sha256` (`GET /items`, `/favorites`, the
+  structure levels) or per file `thumbnail` / `sha256` (`GET
+  /projects/{code}/files`), filled for the whole page in one query; the
+  images load lazily (web `loading="lazy"`, desktop only for rows in view)
+  and are cached by content hash. New: `GET /revisions/{id}/thumbnail` on
+  web and REST API (404 without a picture or read access); thumbnail
+  responses answer `If-None-Match` with 304 (not for assemblies composed from
+  their parts' previews, whose picture changes with a component). Similar-part hits use the same
+  picture rule.
+
+### Changed
+
+- **Usage statistics: the desktop app counts every listed action** (#383).
+  Besides check-out, check-in, park, get files, open in CAD, 3D preview and
+  STEP exports, the daily report now also counts BOM imports (not the
+  preview), folder imports that created items, new items, releases (a change
+  created from *Release…*), cancelled check-outs, submitted searches and
+  answered assistant questions – still only counts, never names, numbers or
+  search terms. A test checks that every name of the fixed list has a place
+  in the app that counts it.
+
+### Fixed
+
+- CI on `main` is green again: the comment of the shared text-selection rule
+  (#436) quoted two hex colours, which the no-literal-colours guard of
+  `shared/css/` counts as colours in the stylesheet.
 
 ## [0.2.12] - 2026-11-22
 
@@ -53,6 +139,24 @@ see the notices in the README.
 
 ### Added
 
+- **Empty states that name the next step** (#423, part of #408): no project
+  group → *Create a project group* for CAD editors, "ask a manager of a group
+  to add you" for viewers (vault, *Projects*, desktop *Home* and *Projects*);
+  an empty project group → *New item* / *Import BOM* in the vault and
+  *Import CAD folder…* / *New item* on desktop *Home* for those who may create
+  items in it (CAD editors outside the group are asked to have a manager add
+  them); *New on this computer* without suggestions → *Get…* with the active
+  group ticked; the empty review, check-out and change lists of the dashboard,
+  the desktop *Home* tab and the desktop worklist say how work arrives there;
+  an empty working folder of a revision names the next step by check-out.
+  Viewer accounts see a note on the dashboard, the desktop *Home* tab and atop
+  the desktop worklist
+  that editing needs the CAD editor role and that a server administrator
+  grants it. The texts are in the i18n catalogs (`empty.*`, English and
+  German); the desktop app loads its catalog before the first view draws.
+  Tests: `every_template_renders` renders the dashboard and the vault as
+  editor and viewer, `scripts/desktop-empty-rules.test.mjs` checks the
+  desktop rules (`ui/js/empty-rules.js`).
 - **Check-outs of a project group as a graph** (#428): administrators and
   the group's managers see who has what checked out right now – *Check-outs*
   on the group page (`/projects/{id}/checkouts`) and a lock button next to
@@ -208,6 +312,10 @@ see the notices in the README.
   organization*, and *Managed by …* appears in Settings and About. The
   templates ship with each release as
   `teamcraft-desktop-policies-<version>.zip`.
+- **German Group Policy texts** (#378): `deploy/desktop-policies/windows/de-DE/TeamCraft.adml`
+  shows the TeamCraft Desktop policies in German in the Group Policy editor
+  (same string and presentation IDs as `en-US`, checked by
+  `tests/architecture_guards.rs`); it ships in the policy zip.
 
 ### Fixed
 
@@ -287,6 +395,19 @@ see the notices in the README.
   in the *Files* view and the *Structure* tree gets one marker in the lock
   colour – a bar at its left edge and a light tint of the row – whoever holds
   the lock; the text colour is unchanged.
+
+### Documentation
+
+- **Research page *CAD add-ins: Inventor and Siemens NX first*** (#425):
+  extension mechanism and runtime (Inventor 2025–2026 on .NET 8, 2027 on
+  .NET 10 templates; NX Open journals vs signed startup applications and the
+  author licence), events, UI, licences (vendor assemblies referenced, never
+  redistributed), build and tests (a CAD-independent core with a fake host,
+  FreeCAD as the reference add-in for CI), install and update (*Settings →
+  CAD add-ins*, a `CadAddins` policy). Decision: an Inventor MVP, an NX MVP
+  after the licence check, both talking to the desktop app over per-user
+  local IPC (protocol `teamcraft.cad` v1, no token in the add-in, requests are
+  untrusted intents). Nothing of it is built yet.
 
 ## [0.2.11] - 2026-11-21
 

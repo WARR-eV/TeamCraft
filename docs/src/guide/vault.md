@@ -13,7 +13,7 @@ changes.
 | Pane    | Shows                                                                                                            |
 |---------|------------------------------------------------------------------------------------------------------------------|
 | Folders | **My check-outs**, **★ Favorites**, **All check-outs**, every project group (items, locks), items without group |
-| Items   | number, revision, name, state and **who holds the lock** – filterable                                            |
+| Items   | picture of the main model (#420), number, revision, name, state and **who holds the lock** – filterable           |
 | Detail  | files with version, size, format and a 3D button; *Check out*, *Check in*, *Cancel check-out*                    |
 
 Every action returns to the explorer, so a typical session is: pick the

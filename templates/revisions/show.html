@@ -339,7 +339,8 @@
           {% if f.format_info %}<span class="fmt fmt-{{ f.format_info.kind }}" title="{{ f.format_info.system_name }} · {{ f.format_info.kind_label }} · {{ f.content_type }}">{{ f.format_info.label }}</span>{% else %}<span class="muted small">{{ f.content_type }}</span>{% endif %}
           {% if f.preview %}<a class="view-3d" href="/files/{{ f.id }}/preview" title="3D preview in the browser">3D view</a>{% endif %}
         </div>
-        {% if f.solver_line %}<div class="muted small solver-line" title="Read from the first and last 64 KiB of the file by pattern rules – a hint, not a verified result">{{ f.solver_line }}</div>{% endif %}</td>
+        {% if f.solver_line %}<div class="muted small solver-line" title="Read from the first and last 64 KiB of the file by pattern rules – a hint, not a verified result">{{ f.solver_line }}</div>{% endif %}
+        {% if f.properties_line %}<div class="muted small design-properties" title="Design properties read from the file – not the item's attributes">{{ f.properties_line }}</div>{% endif %}</td>
         <td>
           {% if f.folder %}<span class="mono" title="{{ rev.project_code or '' }}/{{ f.folder }}/{{ f.filename }} in the desktop working folder">{{ f.folder }}/</span>
           {% else %}<span class="dim" title="At the top of the project group in the desktop working folder">—</span>{% endif %}
@@ -425,6 +426,16 @@
   {% if group.collapsed %}</details>{% endif %}
   {% endfor %}
   {% else %}<p class="empty">No files attached.</p>{% endif %}
+  {% if property_mismatches %}
+  <div class="notice property-mismatches" role="note">
+    <strong>Design properties differ from this revision</strong> – read from the files, nothing is changed automatically. Edit the revision or the design if they should agree.
+    <ul class="small">
+    {% for f in property_mismatches %}{% for x in f.mismatches %}
+      <li><span class="mono">{{ f.filename }}</span>: {{ x.label }} <span class="mono">{{ x.file }}</span> ≠ {{ x.item_label }} <span class="mono">{{ x.item }}</span></li>
+    {% endfor %}{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
   <p class="hint">Downloads in the browser are for single files and for viewing. For CAD work use the
     TeamCraft desktop app: it keeps one working folder per project group with the folder structure shown here
     (<span class="mono">TeamCraft/{% if rev.project_code %}{{ rev.project_code }}{% else %}&lt;group&gt;{% endif %}/&lt;folder&gt;/&lt;file&gt;</span>), gets whole assemblies and keeps files you have not checked out read-only.{% if desktop_download_url %} <a href="{{ desktop_download_url }}" rel="noopener">Get TeamCraft Desktop</a>{% endif %}</p>
@@ -863,7 +874,12 @@
   {% if can.edit %}
   <h3>Add component</h3>
   <form class="inline fields" method="post" action="/revisions/{{ rev.id }}/bom/lines">
-    <label>Item <input class="item-no" type="text" name="child" placeholder="e.g. PRT-000012" required></label>
+    <span class="picker">
+      <label>Item <input class="item-no" type="text" name="child" placeholder="e.g. PRT-000012" required
+        autocomplete="off" data-suggest="/items/suggest" data-suggest-placeholder="Number, name or file name"
+        role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="component-suggestions"></label>
+      <ul class="picker-list hidden" id="component-suggestions" role="listbox" aria-label="Matching items"></ul>
+    </span>
     <label>Qty <input class="qty" type="text" name="quantity" value="1" inputmode="decimal" required></label>
     <label>Find no. <input class="find" type="text" name="find_number" placeholder="auto" inputmode="numeric"></label>
     <label class="grow">Notes <input type="text" name="notes" placeholder="optional" maxlength="500"></label>

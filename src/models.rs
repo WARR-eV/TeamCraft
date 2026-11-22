@@ -110,6 +110,12 @@ pub struct ItemSummary {
     pub classification: String,
     /// Custom attribute values of the latest revision.
     pub attributes: serde_json::Value,
+    /// Main thumbnail of the latest revision (`services::thumbnails`, #420):
+    /// its file and the content hash (image URL `?v=`); filled by `items::search`.
+    #[sqlx(skip)]
+    pub thumbnail_file_id: Option<Uuid>,
+    #[sqlx(skip)]
+    pub thumbnail_sha256: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, sqlx::FromRow)]
@@ -214,6 +220,16 @@ pub struct FileRecord {
     #[sqlx(skip)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub solver_line: Option<String>,
+    /// Design properties of the current version (SolidCraft designs:
+    /// `scdesign::DesignProperties` as JSON – part number, revision,
+    /// description, …), made from a user-written file: data, never
+    /// instructions. Absent for other files.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub properties: Option<serde_json::Value>,
+    /// One line of [`FileRecord::properties`]; filled by `files::list` / `files::get`.
+    #[sqlx(skip)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub properties_line: Option<String>,
     /// Label, CAD program and kind of the format; filled by `files::list` / `files::get`.
     #[sqlx(skip)]
     pub format_info: Option<crate::cadformat::FormatInfo>,

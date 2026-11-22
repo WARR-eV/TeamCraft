@@ -139,7 +139,13 @@ without components answers `assembly.bom` with no rows and
   missing entry or a malformed part is "nothing found", never an error** –
   the format moves daily and a file must never fail an upload.
 * Parse only the fields needed, with serde defaults and unknown fields
-  ignored; never depend on the format number.
+  ignored; never depend on the format number. For the design properties
+  (#367) an *unknown format* is a `format` that does not start with
+  `solidcraft/` (or `solvecraft/` from early drafts): a newer number than the
+  ones seen is still read, because the `metadata` text keys have stayed the
+  same across format numbers and the number changes with almost every
+  release – refusing it would hide the properties of every design saved by a
+  newer SolidCraft. Unknown keys and non-text values are left out instead.
 * Shell out to `solidcraft-cli` only in the desktop app (#368, #369), like the
   Inventor and Solid Edge exports; conversions on the server stay pure Rust.
 * The model cache (native B-rep) is not read now; a 3D preview without an

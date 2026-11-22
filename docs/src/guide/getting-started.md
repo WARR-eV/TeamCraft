@@ -66,6 +66,25 @@ installations and the desktop app:
    files; its first revision *A* is *in work* and checked out to you.
 5. **Check in**, then release it with a change order.
 
+**Desktop app, first start:** after you connect to the server and sign in,
+TeamCraft Desktop opens *Getting started* – a short wizard through the
+working folder, *Get project groups…* for your groups, the CAD setup (for
+information) and the daily loop *Check out and open* → save in CAD →
+*Check in…*. Every step can be skipped; *Help → Getting Started…* opens it
+again. See [Desktop app](desktop.md#getting-started).
+
+**Empty pages name the next step** (#423): with no project group yet, the
+vault and *Projects* offer *Create a project group* to CAD editors and tell
+viewers to ask a manager of a group to add them; an empty project group in
+the vault offers *New item* and *Import BOM* to those who may create items
+in it (its CAD editor members and administrators) and asks other CAD editors
+to have a manager of the group add them; the dashboard's empty cards
+(*Waiting for my review*, *Checked out by me*, *My open changes*) say how work
+arrives there. A **viewer account** sees a note on the dashboard that editing
+needs the CAD editor role and that an administrator of the server grants it –
+so the missing buttons are not a mystery. These texts come from the message
+catalogs and follow the browser's language (English, German).
+
 **Appearance:** TeamCraft follows the light or dark appearance of your
 operating system. The menu under your name (top right) and *Account →
 Appearance* switch between *System*, *Light* and *Dark*; choose *Dark* to keep

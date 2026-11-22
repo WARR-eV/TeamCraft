@@ -104,11 +104,12 @@
   <div class="table-wrap">
   <table>
     <thead>
-      <tr><th scope="col">Number</th><th scope="col">Name</th><th scope="col">Type</th><th scope="col">Rev</th><th scope="col">State</th><th scope="col">Project</th><th scope="col">Created</th></tr>
+      <tr><th scope="col" class="thumb-col"><span class="visually-hidden">Preview</span></th><th scope="col">Number</th><th scope="col">Name</th><th scope="col">Type</th><th scope="col">Rev</th><th scope="col">State</th><th scope="col">Project</th><th scope="col">Created</th></tr>
     </thead>
     <tbody>
     {% for i in items %}
       <tr data-tc-row="{{ i.number }}">
+        <td class="thumb-col">{% if i.thumbnail_file_id %}<a class="thumb-link" href="/revisions/{{ i.latest_revision_id }}" tabindex="-1" aria-hidden="true"><img class="list-thumb" src="/files/{{ i.thumbnail_file_id }}/thumbnail?v={{ i.thumbnail_sha256 }}" alt="" loading="lazy" decoding="async" width="40" height="40" data-hide-broken></a>{% endif %}</td>
         <td class="nowrap mono"><a href="/revisions/{{ i.latest_revision_id }}">{{ i.number }}</a>
           <button type="button" class="small copy-number" data-copy-text="{{ i.number }}" title="Copy {{ i.number }}" aria-label="Copy the item number {{ i.number }}">⧉</button></td>
         <td>{{ i.name }}{% if i.matched_file %} <span class="small muted" title="The search term was found in this file">· found in {{ i.matched_file }}</span>{% endif %}</td>
@@ -124,7 +125,7 @@
   </div>
   {{ m.pager(pagination, base_query) }}
   {% else %}
-  <p class="empty">No items match the filter.{% if me.can_edit %} <a href="/items/new">Create the first one.</a>{% endif %}</p>
+  <p class="empty">No items match the filter.{% if me.can_edit %} <a href="/items/new">Create the first one.</a>{% else %} {{ t("empty.items.viewer") }}{% endif %}</p>
   {% endif %}
 </div>
 {% endblock %}

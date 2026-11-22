@@ -7,9 +7,10 @@ import { label } from "/static/shared/js/format.js";
 import { canEdit, canEditProject, freshProjects, refreshWorklistCount, rescanNewFiles } from "./shell.js";
 import { activeProject, selectView } from "./navigator.js";
 import { newItemFolder } from "./files-view.js";
-import { formatKinds } from "./folder-import.js";
+import { describeFromDesign, formatKinds } from "./folder-import.js";
 import { newItemFindings, newItemKeyText, newItemPlacement, newItemSummary } from "./new-files.js";
 import { openRevision } from "./revision.js";
+import { revisionInputs } from "./report-inputs.js";
 
 // ======================================================================
 // Dialogs: new item, settings, about
@@ -85,7 +86,8 @@ export function checkNewItemFiles(project, places, targets) {
  *
  * `spec`: {body (POST /items fields), project, folder, places, targets, main,
  * allowSameName}. Resolves with the new revision; an upload failure rejects
- * with `err.createdRevision` set.
+ * with `err.createdRevision` set. An empty description is filled from a
+ * SolidCraft design among the files (#367).
  */
 export function createItemFromFiles(spec) {
   var places = spec.places || [];
@@ -104,13 +106,17 @@ export function createItemFromFiles(spec) {
     if (hex) body.idempotency_key = "new-item:" + hex;
     return api("POST", "/items", body);
   }).then(function (rev) {
+    call("usage_count", { action: "new_item" }).catch(function () {});
     if (!places.length) return rev;
     var folders = {};
     places.forEach(function (p, i) { folders[p.name] = spec.targets[i] != null ? spec.targets[i] : spec.folder; });
     return call("upload_files", {
       item: rev.item_number, code: rev.code, paths: paths, comment: null, folders: folders,
       project: spec.project, track: true, refuseClash: true, refuseSameName: !spec.allowSameName
-    }).then(function () { return rev; }, function (err) {
+    }).then(function (records) {
+      // an empty description from a SolidCraft design's properties (#367) – best effort
+      return describeFromDesign(rev, records).then(function () { return rev; });
+    }, function (err) {
       var e = new Error(errorText(err));
       e.createdRevision = rev;
       throw e;
@@ -259,6 +265,11 @@ export function openNewItemDialog(opts) {
       runCheck(token).catch(function (err) { if (token === inspection) { findings = null; showInfo(); info.appendChild(line(".notice.error", errorText(err))); } });
     }, 400);
   }
+  // *Report…* (#381): what the new item was to be, never its description
+  function newItemInputs() {
+    return [["group", group()], ["type", type.value], ["item folder", itemFolder()], ["number", number.value.trim()],
+      ["files", paths.map(baseName).join(", ")]];
+  }
   dialog("New item", h("div.stack", null, [
     field("Files", h("div.stack", null, [pick, fileList]), "the CAD model with its drawing and a STEP export for the 3D preview – uploaded right after the item is created; files in the working folder keep their folder"),
     h("div.grid-2", null, [field("Type", type), field("Project group", project)]),
@@ -308,7 +319,8 @@ export function openNewItemDialog(opts) {
           if (err && err.createdRevision) {
             var rev = err.createdRevision;
             d.close();
-            toast("Created " + rev.item_number + "/" + rev.code + ", but the files could not be uploaded: " + errorText(err), "error");
+            toast("Created " + rev.item_number + "/" + rev.code + ", but the files could not be uploaded: " + errorText(err), "error",
+              "Uploading the files of the new item", revisionInputs(rev, [["files", paths.map(baseName).join(", ")]]));
             afterCreate(rev);
             return;
           }
@@ -316,7 +328,7 @@ export function openNewItemDialog(opts) {
         });
       }
     }
-  ], { wide: true });
+  ], { wide: true, inputs: newItemInputs });
   function afterCreate(rev) {
     openRevision(rev.item_number, rev.code);
     if (createdIn) delete state.expanded[createdIn];

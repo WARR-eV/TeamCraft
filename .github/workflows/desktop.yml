@@ -92,6 +92,9 @@ jobs:
       # the reviewers of the release dialog and when a draft can be submitted
       - name: Test the release rules
         run: node scripts/desktop-release-rules.test.mjs
+      # the key inputs of a failed action in *Report…* (#381)
+      - name: Test the report inputs
+        run: node scripts/desktop-report-inputs.test.mjs
       # the entries of the right-click menu of an item and why one is
       # disabled – the revision toolbar's rules (#417)
       - name: Test the item menu rules
@@ -103,6 +106,13 @@ jobs:
       # main CAD file (Check out and open after Cancel, #348)
       - name: Test the Get rules
         run: node scripts/desktop-get-rules.test.mjs
+      # the steps of the first-start wizard *Getting started* (#422): which
+      # are skipped, when it shows by itself, the texts
+      - name: Test the first-start wizard rules
+        run: node scripts/desktop-onboarding-rules.test.mjs
+      # the empty states name the next step, by role (#423)
+      - name: Test the empty state rules
+        run: node scripts/desktop-empty-rules.test.mjs
       # new items from files on this computer (#359): group and folder from
       # where the file is, the duplicate findings, the worklist suggestions
       - name: Test the rules of new items from local files
@@ -111,6 +121,9 @@ jobs:
       # offered, the result line
       - name: Test the check-in BOM rules
         run: node scripts/desktop-checkin-bom.test.mjs
+      # files dropped on the window (#418): New, Add files… or a refusal
+      - name: Test the drop routing
+        run: node scripts/desktop-drop-route.test.mjs
       # the mesh check of the shared 3D viewer: empty, cut-off or invalid
       # models end in a message, not in an empty canvas (#290)
       - name: Test the 3D viewer's mesh check
