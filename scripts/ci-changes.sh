@@ -51,12 +51,13 @@ DENY_DESKTOP='^desktop/Cargo\.(toml|lock)$|^deny\.toml$|^\.github/workflows/ci\.
 # test on every platform. The app's Rust code, configuration and icons, the
 # shared/ mirror and the media/ logos (desktop/build.rs copies both), the NIST
 # files of the folder-import test, the lint configuration of the repository
-# root – but not the scripts and styles in desktop/ui/ (the ui job checks
-# them), except desktop/ui/index.html, which a Rust test reads.
+# root – but not the styles and other files in desktop/ui/ (the ui job checks
+# them), except desktop/ui/index.html and the scripts in desktop/ui/js, which
+# Rust tests read (usage::tests::every_action_has_a_count_site).
 DESKTOP_RUST='^(desktop|shared|media/logos|media/icons|tests/fixtures/cad/nist)/'
 DESKTOP_RUST+='|^(clippy\.toml|rustfmt\.toml|\.rustfmt\.toml|rust-toolchain|rust-toolchain\.toml)$|^\.github/workflows/desktop\.yml$'
 DESKTOP_RUST_NOT='^desktop/ui/|\.md$'
-DESKTOP_RUST_ALSO='^desktop/ui/index\.html$'
+DESKTOP_RUST_ALSO='^desktop/ui/index\.html$|^desktop/ui/js/[^/]*\.js$'
 
 # desktop_ui – desktop.yml: syntax of every script of the desktop and web UI,
 # the imports of the desktop modules and the Node tests in scripts/.
@@ -167,11 +168,12 @@ check() {
 }
 
 self_test() {
-    # desktop UI scripts: the UI job and the JavaScript analysis only
-    check desktop/ui/js/graph.js server=false desktop_rust=false desktop_ui=true guards=false \
+    # desktop UI scripts: the UI job, the JavaScript analysis and the desktop
+    # Rust tests (usage.rs reads them)
+    check desktop/ui/js/graph.js server=false desktop_rust=true desktop_ui=true guards=false \
         'codeql=["javascript-typescript"]' 'deny=[]' docs_site=false
     # … except the files server tests compare with their own
-    check desktop/ui/js/core.js server=true desktop_rust=false desktop_ui=true
+    check desktop/ui/js/core.js server=true desktop_rust=true desktop_ui=true
     check desktop/ui/app.css server=true desktop_rust=false desktop_ui=true 'codeql=[]'
     check desktop/ui/index.html server=true desktop_rust=true desktop_ui=true
     # desktop Rust code
@@ -215,7 +217,7 @@ self_test() {
     check .github/workflows/codeql.yml server=false 'codeql=["actions","javascript-typescript","rust"]'
     check .github/workflows/docs.yml docs_site=true server=false
     # several areas at once
-    check src/lib.rs,desktop/ui/js/graph.js server=true desktop_ui=true desktop_rust=false \
+    check src/lib.rs,desktop/ui/js/graph.js server=true desktop_ui=true desktop_rust=true \
         'codeql=["javascript-typescript","rust"]'
     # this table: everything
     check scripts/ci-changes.sh all=true server=true guards=true desktop_rust=true desktop_ui=true \
