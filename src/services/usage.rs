@@ -131,7 +131,7 @@ fn counts(value: &Value, known: &[&str]) -> AppResult<BTreeMap<String, i64>> {
 }
 
 /// Checks a desktop report: exactly the documented fields, version 1, a day
-/// in the last [`MAX_AGE_DAYS`] days, known OS and architecture.
+/// in the last `MAX_AGE_DAYS` (7) days, known OS and architecture.
 pub fn check_report(report: &Value, today: NaiveDate) -> AppResult<DesktopReport> {
     let Some(map) = report.as_object() else {
         return Err(bad("not an object"));

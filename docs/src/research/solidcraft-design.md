@@ -114,6 +114,23 @@ Both are already skipped by the desktop app's `is_ignored`.
 SolidCraft's plugins are sandboxed WebAssembly components without sockets,
 HTTP or fetch: an add-in inside SolidCraft cannot talk to a TeamCraft server.
 
+An entry declared `"effect": "read"` may only call commands SolidCraft's
+command catalog classes as `read`; anything else fails with *permission
+denied: edit command … from read entry*. A command is `edit` unless its
+spec says it is read-only, and `document.metadata`, `assembly.bom` and
+`component.links` do not (SolidCraft's open source, `crates/engine/src/cmd/`
+and `crates/craft-plugin-wasm/src/native.rs`, as of November 2026). So the
+plugin's `status` and `check` entries are declared `edit` even though they
+only read. A ribbon slot's `name` is the label of the entry's button
+(`crates/ui-egui/src/plugin_menu.rs`).
+
+A command that fails or is refused inside an entry ends the whole run: the
+host records the first failure and returns it as the entry's result, even when
+the guest handles the error (`crates/craft-plugin-wasm/src/native.rs`,
+`fail` and `check`; seen on SolidCraft 0.45.0 with `solidcraft-cli`). A part
+without components answers `assembly.bom` with no rows and
+`component.links` with no links, so neither fails on a plain part.
+
 ## Decision
 
 * Read `.sc` designs on the server with TeamCraft's own bounded ZIP/JSON

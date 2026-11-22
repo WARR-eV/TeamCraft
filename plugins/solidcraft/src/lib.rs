@@ -59,7 +59,7 @@ mod component {
             let params: serde_json::Value = serde_json::from_str(&params).map_err(|e| {
                 PluginError::InvalidInput(FieldFailure {
                     field: "params".into(),
-                    reason: e.to_string(),
+                    reason: format!("the entry's input is not JSON ({e}); nothing was changed"),
                 })
             })?;
             match logic::execute(&mut Commands, &entry, &params) {

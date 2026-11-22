@@ -9,15 +9,15 @@
     "entries": [
       {
         "name": "status",
-        "effect": "read",
+        "effect": "edit",
         "input_schema": {"type": "object", "properties": {}},
-        "slots": [{"kind": "ribbon", "name": "TeamCraft"}]
+        "slots": [{"kind": "ribbon", "name": "TeamCraft status"}]
       },
       {
         "name": "check",
-        "effect": "read",
+        "effect": "edit",
         "input_schema": {"type": "object", "properties": {}},
-        "slots": [{"kind": "ribbon", "name": "TeamCraft"}]
+        "slots": [{"kind": "ribbon", "name": "Check for TeamCraft"}]
       },
       {
         "name": "link",
@@ -32,13 +32,13 @@
             "server": {"type": "string", "title": "TeamCraft server (https://…)", "maxLength": 256}
           }
         },
-        "slots": [{"kind": "ribbon", "name": "TeamCraft"}]
+        "slots": [{"kind": "ribbon", "name": "Link to TeamCraft item"}]
       },
       {
         "name": "unlink",
         "effect": "edit",
         "input_schema": {"type": "object", "properties": {}},
-        "slots": [{"kind": "ribbon", "name": "TeamCraft"}]
+        "slots": [{"kind": "ribbon", "name": "Unlink from TeamCraft"}]
       }
     ],
     "commands": [

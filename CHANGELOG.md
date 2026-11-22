@@ -104,6 +104,22 @@ see the notices in the README.
 
 ### Fixed
 
+- **CI on `main` is green again.** The usage statistics page (#383) gives
+  its table headers a `scope` (accessibility check), its background and
+  reporting functions are named in the audit guard's `NOT_AUDITED` list with
+  their reasons, the web module list is in rustfmt's order, and the error
+  page test expects the escaped `/` MiniJinja writes (#381).
+- **SolidCraft plugin: *status* and *check* run again, and each button has
+  its own label.** SolidCraft refused both with *permission denied: edit
+  command document.metadata from read entry*, because it classes the
+  commands they read with as edit commands, so they are now declared `edit`
+  (they still change nothing). The four ribbon buttons, all labelled
+  *TeamCraft* before, now read *TeamCraft status*, *Check for TeamCraft*,
+  *Link to TeamCraft item* and *Unlink from TeamCraft*.
+  Failures explain themselves: bad input names the field, damaged TeamCraft
+  data in a design is reported with the fix, and *check* never reports
+  *ready* when it could not read the BOM or the linked designs. All four
+  entries were run on SolidCraft 0.45.0 (flatpak) through `solidcraft-cli`.
 - **Desktop: a slow STEP export no longer holds the check-in hostage**
   (#342). With *Create STEP exports* ticked, the files are uploaded first
   (parked), then exported, then checked in with the STEP files. *Cancel*

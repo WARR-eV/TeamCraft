@@ -630,9 +630,10 @@ mod tests {
                     "flash": null, "local_login": true, "path": "/items/PRT-000042",
                     "time": "2026-11-22 08:00:00 UTC", "version": "0.2.12" }),
         );
+        // (MiniJinja escapes `/` in text as `&#x2f;`; the copied text is decoded)
         assert!(
             html.contains("data-copy=\"error-details\"")
-                && html.contains("Page: /items/PRT-000042")
+                && html.contains("Page: &#x2f;items&#x2f;PRT-000042")
         );
         assert!(html.contains("Something went wrong &lt;b&gt;"), "escaped");
         // a hosted live demo: the account on the login page, the banner on every page
