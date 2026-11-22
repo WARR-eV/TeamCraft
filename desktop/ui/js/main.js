@@ -9,7 +9,7 @@
 // Every server call goes through the Rust commands (src/commands.rs); data
 // from the server is only ever inserted as text, never as HTML.
 //
-// Modules: core.js, skins.js, connect.js, shell.js, navigator.js, tabs.js, assistant.js, agent.js, revision.js, references.js, workspace.js, change.js, requests.js, dialogs.js, bom-import.js, group-sync.js, folder-import.js, settings.js, crash.js, main.js.
+// Modules: core.js, skins.js, connect.js, shell.js, navigator.js, tabs.js, assistant.js, agent.js, revision.js, references.js, workspace.js, change.js, requests.js, dialogs.js, bom-import.js, bom-lines.js, group-sync.js, folder-import.js, settings.js, crash.js, main.js.
 
 import { $, TAURI, call, errorText, h, invoke, setStatus, state, toast } from "./core.js";
 import { applySkin } from "./skins.js";

@@ -630,6 +630,143 @@
     select.addEventListener("blur", apply);
   });
 
+  // Component picker (#419): <input data-suggest="/items/suggest"> searches
+  // number, name and file name as the user types (from 2 characters, at most
+  // 10 rows, the user's read rights) and lists the matches in the listbox
+  // named by aria-controls; choosing one fills the item number. Without
+  // JavaScript the field takes the exact item number as before.
+  document.querySelectorAll("input[data-suggest]").forEach(function (input) {
+    var list = document.getElementById(input.getAttribute("aria-controls") || "");
+    if (!list) return;
+    var url = input.getAttribute("data-suggest");
+    var placeholder = input.getAttribute("data-suggest-placeholder");
+    if (placeholder) input.placeholder = placeholder;
+    var timer = null, request = null, rows = [], active = -1, lastQuery = null;
+
+    function close() {
+      list.classList.add("hidden");
+      list.replaceChildren();
+      input.setAttribute("aria-expanded", "false");
+      input.removeAttribute("aria-activedescendant");
+      rows = []; active = -1;
+    }
+    function highlight(index) {
+      rows.forEach(function (row, i) { row.el.setAttribute("aria-selected", i === index ? "true" : "false"); });
+      active = index;
+      if (index >= 0 && rows[index]) {
+        input.setAttribute("aria-activedescendant", rows[index].el.id);
+        rows[index].el.scrollIntoView({ block: "nearest" });
+      } else {
+        input.removeAttribute("aria-activedescendant");
+      }
+    }
+    function choose(index) {
+      var row = rows[index];
+      if (!row) return;
+      input.value = row.item.number;
+      lastQuery = row.item.number;
+      close();
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    function text(tag, cls, value) {
+      var el = document.createElement(tag);
+      if (cls) el.className = cls;
+      el.textContent = value;
+      return el;
+    }
+    function render(items) {
+      list.replaceChildren();
+      rows = [];
+      active = -1;
+      if (!items.length) {
+        var empty = text("li", "picker-empty", "No readable item matches.");
+        empty.setAttribute("role", "presentation");
+        list.appendChild(empty);
+      }
+      items.forEach(function (item, i) {
+        var li = document.createElement("li");
+        li.id = list.id + "-" + i;
+        li.className = "picker-option";
+        li.setAttribute("role", "option");
+        li.setAttribute("aria-selected", "false");
+        if (item.thumbnail_url) {
+          var img = document.createElement("img");
+          img.className = "picker-thumb";
+          img.alt = "";
+          img.loading = "lazy";
+          img.src = item.thumbnail_url;
+          img.addEventListener("error", function () { img.remove(); });
+          li.appendChild(img);
+        } else {
+          li.appendChild(text("span", "picker-thumb picker-thumb-none", ""));
+        }
+        var main = document.createElement("span");
+        main.className = "picker-main";
+        var head = document.createElement("span");
+        head.appendChild(text("span", "mono", item.number + "/" + item.latest_code));
+        head.appendChild(document.createTextNode(" "));
+        head.appendChild(text("span", "badge badge-" + item.latest_state, item.latest_state.replace(/_/g, " ")));
+        if (item.project_code) {
+          head.appendChild(document.createTextNode(" "));
+          head.appendChild(text("span", "small muted", item.project_code));
+        }
+        main.appendChild(head);
+        main.appendChild(text("span", "picker-name", item.name));
+        if (item.matched_file) main.appendChild(text("span", "small muted mono", item.matched_file));
+        li.appendChild(main);
+        // mousedown, not click: the input must not lose focus (and close) first
+        li.addEventListener("mousedown", function (event) { event.preventDefault(); choose(i); });
+        list.appendChild(li);
+        rows.push({ el: li, item: item });
+      });
+      list.classList.remove("hidden");
+      input.setAttribute("aria-expanded", "true");
+    }
+    function lookup() {
+      var q = input.value.trim();
+      if (q === lastQuery) return;
+      lastQuery = q;
+      if (request) request.abort();
+      if (q.length < 2) { close(); return; }
+      request = new AbortController();
+      fetch(url + "?limit=10&q=" + encodeURIComponent(q), {
+        credentials: "same-origin", headers: { Accept: "application/json" }, signal: request.signal
+      }).then(function (response) {
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        return response.json();
+      }).then(function (body) {
+        if (input.value.trim() !== q) return;
+        render(body.items || []);
+      }).catch(function (err) {
+        if (err && err.name === "AbortError") return;
+        close(); // the field still takes an exact number
+      });
+    }
+    input.addEventListener("input", function () {
+      clearTimeout(timer);
+      timer = setTimeout(lookup, 200);
+    });
+    input.addEventListener("keydown", function (event) {
+      var open = !list.classList.contains("hidden") && rows.length > 0;
+      if (event.key === "ArrowDown") {
+        if (!open) { lastQuery = null; lookup(); return; }
+        event.preventDefault();
+        highlight(active < rows.length - 1 ? active + 1 : 0);
+      } else if (event.key === "ArrowUp" && open) {
+        event.preventDefault();
+        highlight(active > 0 ? active - 1 : rows.length - 1);
+      } else if (event.key === "Enter" && open && active >= 0) {
+        event.preventDefault(); // pick the row, do not submit yet
+        choose(active);
+      } else if (event.key === "Escape" && !list.classList.contains("hidden")) {
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+      }
+    });
+    input.addEventListener("blur", function () { setTimeout(close, 100); });
+  });
+
   // BOM tree: every line with lines below it gets a toggle button that folds
   // its branch. Without JavaScript all rows stay visible. Rows carry
   // data-level; the lines below a row are the following rows with a higher

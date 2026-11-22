@@ -116,6 +116,8 @@ pub fn router(state: &AppState) -> Router<AppState> {
                 .delete(uploads::abort),
         )
         .route("/items/new", get(items::new_form))
+        // component picker of the BOM (static/app.js, #419)
+        .route("/items/suggest", get(items::suggest))
         .route("/items/{id}", get(items::show))
         .route("/items/{id}/label", get(items::label))
         .route("/items/{id}/qr.svg", get(items::qr_svg))

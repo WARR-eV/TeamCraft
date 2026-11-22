@@ -230,7 +230,8 @@ end-to-end tests against a real PostgreSQL.
 **Structure**
 
 - **Multi-level BOM** – mass and cost roll-up, revision rules, comparison of
-  two revisions, CSV/Excel export.
+  two revisions, CSV/Excel export; components are picked by searching their
+  number, name or file name (web and desktop).
 - **Mass properties** – mass, centre of gravity and inertia tensor of a whole
   assembly or vehicle from the exported meshes of its parts, a material
   library of densities and measured masses of bought parts; CSV/JSON export.

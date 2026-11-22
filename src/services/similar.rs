@@ -470,7 +470,10 @@ pub async fn find(
 }
 
 /// Per revision the first file with an embedded preview image.
-async fn thumbnails(pool: &PgPool, revision_ids: &[Uuid]) -> AppResult<HashMap<Uuid, Uuid>> {
+pub(crate) async fn thumbnails(
+    pool: &PgPool,
+    revision_ids: &[Uuid],
+) -> AppResult<HashMap<Uuid, Uuid>> {
     if revision_ids.is_empty() {
         return Ok(HashMap::new());
     }
