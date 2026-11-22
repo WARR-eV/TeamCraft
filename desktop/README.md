@@ -134,8 +134,19 @@ loopback addresses are fine).
 
 Update notice: at most once a day the app asks the GitHub releases API
 (`api.github.com/repos/WARR-eV/TeamCraft/releases/latest`, no redirects, 10 s timeout) for the latest
-release. A newer version shows a link in the status bar to the release page; nothing is downloaded or
-installed. *×* hides it until the next version, *Settings → Updates* switches the check off.
+release. A newer version shows a notice in the status bar; it opens the **update window** (#377): the
+release notes (`releases/tags/v<version>`), *Update now* / *Download*, *Skip this version* (= *×*),
+*Remind me later* (three days) and *Release page*. *Update now* picks this installation's file
+(`update::install_kind`, `update::pick_asset`: MSI under *Program Files*, `-setup.exe` under
+`AppData\Local`, the portable zip, the `.dmg`, the AppImage; *with local server* builds their own
+files), downloads it into the Downloads folder – only from
+`github.com/WARR-eV/TeamCraft/releases/download/v<version>/`, redirects over https only, at most 1 GiB – and
+checks it against the release's `SHA256SUMS.txt`; a missing line or a mismatch deletes the file and
+nothing changes. A verified Windows installer starts after a question and the app closes; a `.dmg`
+opens; a zip or AppImage is shown in its folder (replacing it in place is not built yet). Flatpak and
+`.deb`/`.rpm` installations show the package-manager way instead. Nothing is downloaded without a
+click, and not while a check-in or Get runs. *Help → Check for Updates…* asks at once, also with the
+daily check off, and says *up to date* or the error. *Settings → Updates* switches the daily check off.
 
 Where the app keeps its data:
 
@@ -181,7 +192,8 @@ src/layout.rs      working-folder rules (pure): folder mapping, state.json, Get 
 src/resume.rs      Get resumes a large file half-way: partial file per content, Range/If-Range, SHA-256 check before the rename
 src/workspace.rs   Get, status, read-only handling, check-in, migration of the old layout
 src/settings.rs    settings.json (incl. the configured agents), the token in the OS keychain (file fallback), http:// check
-src/update.rs      update notice: latest GitHub release at most daily, version comparison
+src/update.rs      update notice and window: latest GitHub release at most daily, version comparison, install kind,
+                   release file, SHA256SUMS.txt verification of the download (#377)
 src/scprops.rs     item number, revision and name written into a SolidCraft design's properties through solidcraft-cli (#369)
 src/cadlock.rs     files a CAD program has open, from its lock files (SolidCraft `.~<file>.lock`; stale locks ignored)
 src/crash.rs       crash reports: panic hook, session markers (unexpected exits), UI errors – redacted, kept locally until the user shares them

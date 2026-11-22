@@ -57,6 +57,14 @@ see the notices in the README.
   the lines – part properties, placement counts, purchased/standard parts not
   expanded, phantoms passed through, reference components left out
   (`src/scbom.rs`, fuzzed by the `scdesign` target).
+- **Desktop: update window with verified downloads** (#377). The update
+  notice opens a window with the release notes, *Update now* / *Download*,
+  *Skip this version*, *Remind me later* (three days) and the release page.
+  *Update now* downloads this installation's file (MSI, setup.exe, portable
+  zip, dmg, AppImage) and checks it against the release's `SHA256SUMS.txt` –
+  a mismatch or missing line deletes it; a verified Windows installer starts
+  after a question and the app closes, a `.dmg` opens. Package installations
+  get the package-manager way. *Help → Check for Updates…* checks at once.
 
 ## [0.2.11] - 2026-11-21
 

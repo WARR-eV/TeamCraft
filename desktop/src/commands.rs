@@ -988,16 +988,173 @@ pub async fn check_update(state: State<'_, AppState>) -> CmdResult<Option<Update
     }
     let current = env!("CARGO_PKG_VERSION");
     Ok(latest
-        .filter(|v| update::is_newer(v, current) && s.update_dismissed.as_ref() != Some(v))
+        .filter(|v| {
+            update::notice_due(
+                v,
+                current,
+                s.update_dismissed.as_deref(),
+                s.update_remind_until,
+                now,
+            )
+        })
         .map(|version| UpdateNotice { version, current }))
 }
 
-/// Hides the notice of this release version (a newer one shows again).
+/// *Skip this version*: hides the notice of this release version (a newer
+/// one shows again).
 #[tauri::command]
 pub fn dismiss_update(state: State<'_, AppState>, version: String) -> CmdResult<()> {
     let version = update::tag_version(&version)
         .ok_or_else(|| ApiError::local(format!("'{version}' is not a version.")))?;
     update_settings(&state, |s| s.update_dismissed = Some(version))?;
+    Ok(())
+}
+
+/// *Remind me later*: no notice for three days (#377).
+#[tauri::command]
+pub fn update_remind_later(state: State<'_, AppState>) -> CmdResult<()> {
+    let until = update::now_secs() + update::REMIND_LATER_SECS;
+    update_settings(&state, |s| s.update_remind_until = Some(until))?;
+    Ok(())
+}
+
+/// The answer of *Help → Check for updates*.
+#[derive(Serialize)]
+pub struct UpdateCheck {
+    pub current: &'static str,
+    /// The latest release, `None` when none is published yet.
+    pub latest: Option<String>,
+    pub newer: bool,
+}
+
+/// *Help → Check for updates*: asks GitHub now – also when the daily check
+/// is switched off – and says whether a newer release is out (#377).
+#[tauri::command]
+pub async fn check_update_now(state: State<'_, AppState>) -> CmdResult<UpdateCheck> {
+    let latest = update::latest_release()
+        .await
+        .map_err(|e| ApiError::local(format!("The release check did not work: {e}")))?;
+    let now = update::now_secs();
+    update_settings(&state, |s| {
+        s.update_checked_at = Some(now);
+        s.update_latest = latest.clone();
+        // asked on purpose: a running *Remind me later* ends
+        s.update_remind_until = None;
+    })?;
+    let current = env!("CARGO_PKG_VERSION");
+    Ok(UpdateCheck {
+        newer: latest
+            .as_deref()
+            .is_some_and(|v| update::is_newer(v, current)),
+        latest,
+        current,
+    })
+}
+
+/// What the update window shows for a release: its notes, how this copy was
+/// installed and what *Update now* does for it.
+#[derive(Serialize)]
+pub struct UpdateOffer {
+    pub version: String,
+    pub current: &'static str,
+    pub notes: String,
+    pub install: update::InstallKind,
+    /// The release file *Update now* downloads; `None` = release page only.
+    pub asset: Option<String>,
+    /// For package installations: how to update.
+    pub package_hint: Option<&'static str>,
+}
+
+/// The release of `version` for the update window (#377).
+#[tauri::command]
+pub async fn update_offer(version: String) -> CmdResult<UpdateOffer> {
+    let release = update::release(&version)
+        .await
+        .map_err(|e| ApiError::local(format!("The release could not be loaded: {e}")))?;
+    let install = update::this_install();
+    let names: Vec<String> = release.assets.iter().map(|(n, _)| n.clone()).collect();
+    let asset = update::pick_asset(
+        install,
+        std::env::consts::ARCH,
+        &release.version,
+        localserver::sidecar().is_some(),
+        &names,
+    )
+    .map(str::to_string);
+    Ok(UpdateOffer {
+        package_hint: (install == update::InstallKind::Package)
+            .then(|| update::package_hint(std::env::var_os("FLATPAK_ID").is_some())),
+        version: release.version,
+        current: env!("CARGO_PKG_VERSION"),
+        notes: release.notes,
+        install,
+        asset,
+    })
+}
+
+/// The update file downloaded and verified last: the only one
+/// [`update_install`] starts – never a path from the web view.
+static VERIFIED_UPDATE: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+
+/// *Update now* / *Download*: downloads this install's file of `version`
+/// into the Downloads folder and checks it against the release's
+/// `SHA256SUMS.txt`; a mismatch deletes it (#377). Returns the file's path.
+#[tauri::command]
+pub async fn update_download(app: AppHandle, version: String) -> CmdResult<String> {
+    let release = update::release(&version)
+        .await
+        .map_err(|e| ApiError::local(format!("The release could not be loaded: {e}")))?;
+    let names: Vec<String> = release.assets.iter().map(|(n, _)| n.clone()).collect();
+    let name = update::pick_asset(
+        update::this_install(),
+        std::env::consts::ARCH,
+        &release.version,
+        localserver::sidecar().is_some(),
+        &names,
+    )
+    .ok_or_else(|| ApiError::local("This release has no download for this installation."))?
+    .to_string();
+    let dir = app
+        .path()
+        .download_dir()
+        .or_else(|_| app.path().home_dir())
+        .map_err(|e| ApiError::local(e.to_string()))?;
+    let file = update::download_verified(&release, &name, &dir)
+        .await
+        .map_err(ApiError::local)?;
+    *VERIFIED_UPDATE.lock().expect("update lock") = Some(file.clone());
+    Ok(file.to_string_lossy().into_owned())
+}
+
+/// Starts the verified update: a Windows installer runs and the app closes
+/// (the installer replaces it); a `.dmg` opens for dragging the app to
+/// *Applications*; anything else is shown in its folder.
+#[tauri::command]
+pub fn update_install(app: AppHandle) -> CmdResult<()> {
+    let file = VERIFIED_UPDATE
+        .lock()
+        .expect("update lock")
+        .clone()
+        .filter(|f| f.is_file())
+        .ok_or_else(|| ApiError::local("Download and verify the update first."))?;
+    let name = file
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let installer = name.ends_with(".msi") || name.ends_with("-setup.exe");
+    if installer || name.ends_with(".dmg") {
+        app.opener()
+            .open_path(file.to_string_lossy().to_string(), None::<&str>)
+            .map_err(|e| ApiError::local(format!("The update could not be started: {e}")))?;
+        if installer {
+            app.exit(0);
+        }
+    } else {
+        app.opener()
+            .reveal_item_in_dir(&file)
+            .map_err(|e| ApiError::local(format!("The folder could not be opened: {e}")))?;
+    }
     Ok(())
 }
 

@@ -145,10 +145,16 @@ feature milestone – the features in *What works* are enough; what is missing i
 *Clients and packaging*
 
 - [ ] Flatpak on Flathub with offline cargo sources; AUR packages published. Done: the desktop app's update notice
-  (daily GitHub release check, opt-out, a link only – no silent auto-update). Binaries and installers stay **unsigned**
+  (daily GitHub release check, opt-out; an update window with a checksum-verified download, #377 – no silent
+  auto-update). Binaries and installers stay **unsigned**
   (no code signing or notarisation): the checksums
   in `SHA256SUMS.txt` and the build provenance are the verification, and the docs explain the first start past
   SmartScreen and Gatekeeper
+- [ ] Desktop: one-click update (#377). Done: update window (release notes, *Skip this version*, *Remind me later*),
+  *Help → Check for Updates…*, download of this installation's file verified against `SHA256SUMS.txt`, Windows
+  installers started, `.dmg` opened. Left: swapping a portable zip or AppImage in place with *Restart now*, a
+  signature on the checksum list (release key built into the app), the *server needs desktop x.y* hint, a manual
+  test script per install type for each RC
 - [ ] Desktop app run and tested on Windows x64/ARM64, macOS and Linux for each RC (a short manual test script in
   `docs/src/dev/release-checklist.md`)
 - [x] One download to try TeamCraft on a laptop: desktop installers *with local server* (Windows x64, macOS Apple

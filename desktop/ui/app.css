@@ -1299,3 +1299,10 @@ ul.file-picks li .mono { overflow: hidden; text-overflow: ellipsis; white-space:
   font-family: var(--mono); font-size: 12px; line-height: 1.45; white-space: pre;
   overflow: auto;
 }
+
+/* The update window (#377): the release notes as plain text, scrolled. */
+pre.release-notes {
+  max-height: 16rem; overflow: auto; margin: 0; padding: 8px 10px;
+  white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 13px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}

@@ -152,6 +152,7 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         .build()?;
     let help = SubmenuBuilder::new(app, "Help")
         .item(&item("import-help", "How to Import a CAD Folder", None)?)
+        .item(&item("check-updates", "Check for Updates…", None)?)
         .item(&item("about", "About TeamCraft", None)?)
         .build()?;
     let menu = MenuBuilder::new(app);
@@ -249,6 +250,11 @@ fn main() {
             commands::set_zoom,
             commands::check_update,
             commands::dismiss_update,
+            commands::update_remind_later,
+            commands::check_update_now,
+            commands::update_offer,
+            commands::update_download,
+            commands::update_install,
             commands::set_update_check,
             commands::set_checkout_parts,
             commands::open_release_page,
