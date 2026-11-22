@@ -639,6 +639,36 @@ whose newer revision takes the place, stay where they are; files you
 changed are moved first. Identical copies are removed, emptied old folders
 too, and every step is written to `.teamcraft/migration.log`.
 
+## Empty views
+
+An empty list says what to do next, and the answer depends on your role
+(#423):
+
+* **No project group yet** – CAD editors get *Create a project group* (you
+  become its manager and add the others); viewers are asked to have a
+  manager of a group add them.
+* **An empty project group** on *Home* (*Files*, *All items* and
+  *Structure*) – *Import CAD folder…* and *New item*, for CAD editors who may
+  create items in the group; CAD editors who are not members of it are asked
+  to have a manager of the group add them; viewers learn that the group's CAD
+  editors add the items.
+* **New on this computer** in the worklist without suggestions – *Get…*
+  copies the files of a project group into your working folder; the dialog
+  starts with the active group ticked.
+* **Checked out by me**, **Waiting for my review** and **My open changes**
+  say in one line how work gets there – in the worklist and on the *Home*
+  tab.
+* A **viewer account** sees a note at the top of the worklist and of the
+  *Home* tab: editing –
+  items, check-outs, changes – needs the CAD editor role; ask an
+  administrator of the server.
+
+An empty working folder on a revision tells the holder of the check-out to
+save the CAD files there and check them in, tells who may check the revision
+out to do so, and everyone else only that it has no files yet.
+
+The texts follow *Settings → Language*.
+
 ## Install or run it
 
 The installers of every version are on the
