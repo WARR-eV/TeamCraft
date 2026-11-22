@@ -13,6 +13,10 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Added
+
+- Desktop: drag and drop of files from Explorer, Finder or the file manager onto the window (#418). On a revision tab you have checked out (or that *Add files…* would check out) the drop opens *Add files…*; elsewhere it opens *New item* with the files. A frame shows what the drop does; frozen revisions, revisions checked out by someone else, viewers and editors without a group are refused with the reason. Only regular files are taken (folders are skipped), with the same checks as the file dialog. Tab reordering keeps working (pointer events, not HTML5 drag and drop).
+
 ## [0.2.12] - 2026-11-22
 
 ### Security

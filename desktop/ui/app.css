@@ -935,6 +935,30 @@ canvas.viewer-measuring { cursor: crosshair; }
 .toast.info { box-shadow: inset 3px 0 0 var(--link), var(--shadow-pop); }
 .toast.info::before { content: "i"; color: var(--link); }
 
+/* Files dragged from the file manager over the window (#418, js/drop.js):
+   a dashed frame over the whole window with what the drop does; a refusal
+   (viewer, frozen revision, checked out by someone else) in the danger colour.
+   The overlay never takes pointer events – the native drop reports to Tauri. */
+.drop-overlay {
+  position: fixed; inset: 8px; z-index: 55;
+  display: none; place-items: center; padding: 24px;
+  pointer-events: none;
+  background: var(--backdrop);
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius-lg);
+}
+body.drop-target .drop-overlay { display: grid; }
+.drop-overlay-text {
+  margin: 0; max-width: 520px; padding: 12px 16px;
+  color: var(--text); text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: inset 3px 0 0 var(--accent), var(--shadow-pop);
+}
+body.drop-refused .drop-overlay { border-color: var(--st-danger-fg); }
+body.drop-refused .drop-overlay-text { box-shadow: inset 3px 0 0 var(--st-danger-fg), var(--shadow-pop); }
+
 @media (prefers-reduced-motion: reduce) {
   /* fades stay, movement goes */
   .dialog, .toast, .toast.leaving { transform: none; }

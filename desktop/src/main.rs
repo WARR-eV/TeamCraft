@@ -274,6 +274,7 @@ fn main() {
             commands::workspace_park,
             commands::workspace_local_changes,
             commands::pick_files,
+            commands::dropped_files,
             commands::workspace_add_plan,
             commands::workspace_add_files,
             commands::workspace_open,

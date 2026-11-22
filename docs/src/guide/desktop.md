@@ -589,8 +589,26 @@ files in *Check in…* – also files with an unrelated name, which TeamCraft
 remembers in `.teamcraft/added.json` until they are checked in – or tick *Check in now*. The Files section explains why
 the button is disabled:
 checked out by someone else (add after check-in), in review, or released (frozen: *Revise* and add the files to the new
-revision). Dropping files
-onto the window is not supported yet.
+revision).
+
+**Drop files.** Drag CAD files from Explorer, Finder or your file manager
+onto the window. A frame shows what the drop does before you let go:
+
+* on an open revision tab that you have checked out, or that *Add files…*
+  would check out for you, the files go into *Add files…* (with the same
+  dialog, sub-folder and confirmations as picked files);
+* anywhere else (the start page, a change, a request) the drop opens
+  *New item* with the files already chosen – name, type, group and folder
+  follow from them like from picked files, and the duplicate check runs;
+* a revision that takes no files (released, in review, checked out by
+  someone else) refuses the drop with the same reason the Files section
+  gives, and so does the app for viewers and for editors without a project
+  group to create items in. While a dialog is open, close it first.
+
+Only files are taken: dropped folders are skipped, with a note. The files
+are copied, never moved, and nothing in the working folder is overwritten
+without asking – a drop has exactly the checks of the file dialog. Tabs are
+still reordered by dragging them.
 
 **Get.** *Get…* on a revision resolves its structure on the server – the
 multi-level BOM with the revision rule you choose (*latest*: the newest

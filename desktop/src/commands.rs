@@ -1632,6 +1632,12 @@ pub async fn new_item_copy(
         let disk = src.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
             ApiError::local(format!("{} has no usable file name.", src.display()))
         })?;
+        // picked or dropped from the file manager (#418): regular files only
+        if !addfiles::is_regular_file(&src) {
+            return Err(ApiError::local(format!(
+                "{disk} is not a file – nothing was copied."
+            )));
+        }
         let rel = layout::local_rel(Some(group), &folder, &layout::nfc(disk));
         let dst = layout::join_rel(&root, &rel);
         if dst == src {
@@ -2481,6 +2487,26 @@ pub async fn pick_files(app: AppHandle) -> CmdResult<Vec<PathBuf>> {
     })
     .await
     .map_err(|e| ApiError::local(format!("The file dialog failed: {e}")))
+}
+
+/// Files dropped on the window from the file manager (#418): the regular
+/// files among the dropped paths and how many entries (folders, anything
+/// that is not a regular file) were left out. The paths then take the same
+/// way as picked ones – *New* or *Add files…* with all their checks.
+#[derive(Serialize)]
+pub struct DroppedFiles {
+    pub files: Vec<PathBuf>,
+    pub skipped: usize,
+}
+
+#[tauri::command]
+pub async fn dropped_files(paths: Vec<PathBuf>) -> CmdResult<DroppedFiles> {
+    tokio::task::spawn_blocking(move || {
+        let (files, skipped) = addfiles::split_dropped(&paths);
+        DroppedFiles { files, skipped }
+    })
+    .await
+    .map_err(|e| ApiError::local(format!("The dropped files could not be read: {e}")))
 }
 
 /// *Add files…*: what copying `paths` into the working folder would do

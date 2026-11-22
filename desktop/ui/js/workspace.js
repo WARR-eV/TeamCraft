@@ -822,13 +822,16 @@ export function filesHint(d) {
 
 /** "Add files…": pick files, copy them into the working folder of the
  * revision (checking it out first if needed), optionally check in now.
- * The originals stay where they are; a name that exists asks first. */
-export function addFilesDialog(tab) {
+ * The originals stay where they are; a name that exists asks first.
+ * `presetPaths`: files dropped on the window (#418, js/drop.js) – used
+ * instead of the file dialog, with the same checks. */
+export function addFilesDialog(tab, presetPaths) {
   var rev = tab.data.rev, hint = filesHint(tab.data);
   if (!hint.ok) { toast(hint.text, "error"); return; }
   var mine = rev.checked_out_by === state.me.id;
   var where = { project: rev.project_code, item: rev.item_number, code: rev.code };
-  call("pick_files").then(function (paths) {
+  var chosen = presetPaths && presetPaths.length ? Promise.resolve(presetPaths.slice()) : call("pick_files");
+  chosen.then(function (paths) {
     if (!paths.length) return;
     var subfolder = h("input", { type: "text", placeholder: "revision's main folder", spellcheck: "false" });
     var checkNow = h("input", { type: "checkbox" });
