@@ -74,7 +74,7 @@ export function revViewer(tab, el) {
   var previewInputs = revisionInputs(tab.data.rev, [["file", current.filename], ["format", previewFormat(current)],
     ["version", versionId ? "older version" : "v" + current.version]]);
   try {
-    state.viewer = window.TeamCraftViewer.mount(canvas, {
+    var viewer = state.viewer = window.TeamCraftViewer.mount(canvas, {
       statusEl: status,
       overlayEl: overlay,
       resetBtn: resetBtn,
@@ -82,7 +82,12 @@ export function revViewer(tab, el) {
       onReady: function () { if (stlBtn) stlBtn.disabled = false; },
       load: function () {
         return invoke("file_bytes", versionId ? { kind: "version-mesh", id: versionId } : { kind: "mesh", id: current.id })
-          .catch(function (e) { toast(errorText(e), "error", "Loading the 3D preview of " + current.filename, previewInputs); throw e; });
+          .catch(function (e) {
+            // only while this viewer is still on screen: a late failure of a viewer already
+            // replaced or disposed is not about the preview the user sees
+            if (state.viewer === viewer) toast(errorText(e), "error", "Loading the 3D preview of " + current.filename, previewInputs);
+            throw e;
+          });
       }
     });
   } catch (err) {

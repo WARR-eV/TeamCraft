@@ -27,7 +27,8 @@ see the notices in the README.
   3D preview and STL export, STEP exports, new items, adding files, BOM and
   folder imports and request attachments. Names and short values only (a path
   is reduced to its file name, at most 12 values of 200 characters); a 3D
-  preview that fails now also shows an error message with *Report…*.
+  preview that cannot be loaded from the server now also shows an error
+  message with *Report…*.
 
 ## [0.2.12] - 2026-11-22
 
