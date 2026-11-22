@@ -120,8 +120,7 @@ check-outs and reviews, and a **local working folder**:
   resumable chunks – a dropped connection resumes where it stopped (see
   [Large files](vault.md#large-files-chunked-resumable-uploads)). The dialog
   stays open with the progress while the check-in runs, and **Cancel** stops
-  it at any point until the last byte is sent: before the next STEP export,
-  between two chunks of a large file (the chunks on the server are
+  it at any point until the last byte is sent: between two chunks of a large file (the chunks on the server are
   discarded – a cancelled upload starts over next time) or half-way through
   the request with the small files. Nothing is stored then, the revision
   stays checked out to you and your local files are untouched. Once every
@@ -191,6 +190,16 @@ check-outs and reviews, and a **local working folder**:
   is not found); a design with a failing feature is not exported. An export
   that fails or is not possible never stops the check-in – the file is
   checked in without its STEP and the result names the reason.
+* with the check-in option ticked, the ticked files are **uploaded first**
+  (parked – the revision stays checked out), then the exports run one after
+  the other with the time each has taken so far, then the check-in follows
+  with the STEP files (#342). An export of a large assembly can take many
+  minutes: **Cancel** during an export skips it (and the remaining ones) and
+  ends an Inventor or Solid Edge the export started – your files are already
+  on the server. Calls Inventor rejects while it is busy are tried again for
+  up to a minute. The whole error output of a failed export is kept in
+  `export-logs/` in the app's configuration folder (the newest 20, on this
+  computer only); the error message names the log.
 * for a SolidCraft design of your own check-out, *Item data* (Workspace tab)
   writes the item number, the revision and the item name into the design's
   properties (*Part number*, *Revision*, *Description* in SolidCraft), plus

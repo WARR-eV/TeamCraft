@@ -58,6 +58,16 @@ see the notices in the README.
   expanded, phantoms passed through, reference components left out
   (`src/scbom.rs`, fuzzed by the `scdesign` target).
 
+### Fixed
+
+- **Desktop: a slow STEP export no longer holds the check-in hostage**
+  (#342). With *Create STEP exports* ticked, the files are uploaded first
+  (parked), then exported, then checked in with the STEP files. *Cancel*
+  during an export skips it and ends the Inventor or Solid Edge the export
+  started; the progress shows how long the export has taken. Calls Inventor
+  rejects while busy are retried for a minute, and the whole error output of
+  a failed export is kept in `export-logs/` (named in the message).
+
 ## [0.2.11] - 2026-11-21
 
 ### Added
