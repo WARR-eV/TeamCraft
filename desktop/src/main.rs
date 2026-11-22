@@ -155,6 +155,7 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         .item(&item("open-web", "Open in Browser", None)?)
         .build()?;
     let help = SubmenuBuilder::new(app, "Help")
+        .item(&item("getting-started", "Getting Started…", None)?)
         .item(&item("import-help", "How to Import a CAD Folder", None)?)
         .item(&item("report-problem", "Report a Problem…", None)?)
         .item(&item("check-updates", "Check for Updates…", None)?)
@@ -289,6 +290,7 @@ fn main() {
             commands::set_report_url,
             commands::check_update,
             commands::dismiss_update,
+            commands::set_onboarding,
             commands::update_remind_later,
             commands::check_update_now,
             commands::update_offer,

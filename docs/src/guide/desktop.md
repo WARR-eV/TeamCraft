@@ -639,6 +639,38 @@ whose newer revision takes the place, stay where they are; files you
 changed are moved first. Identical copies are removed, emptied old folders
 too, and every step is written to `.teamcraft/migration.log`.
 
+## Getting started
+
+After the **first sign-in** the app opens a short wizard, *Getting
+started*; *Help → Getting Started…* opens it again at any time. It guides
+you from the sign-in to your first opened assembly:
+
+1. **Server** – the server the app works with. Skipped when your
+   organization fixed the server ([Managed computers](#managed-computers)).
+2. **Sign-in** – already done when the wizard opens; shown as a ticked step.
+3. **Working folder** – what it is and where your CAD files will live
+   (`<working folder>/<group>/<folder>/<file>`). *Change…* picks another
+   folder (the same setting as *Settings → Workspace*), *Open folder* shows
+   it in the file manager.
+4. **Project group** – the groups you are a member of and *Get project
+   groups…*, which copies their files into the working folder (latest
+   revision, also in work). Skipped when you are in no group yet, or when a
+   finished *Get project groups* on this computer already fetched all of
+   them into this working folder.
+5. **CAD setup** – for information only: the Inventor project file
+   (`.ipj`), the NX load options and the Solid Edge search paths that a later
+   version will offer to create. The wizard creates none of them.
+6. **Your daily loop in 3 steps** – *Check out and open* → save in your CAD
+   program → *Check in…*; *Finish and show Projects* or *Finish and open my
+   worklist* takes you to where the loop starts.
+
+Every step has *Skip*, *Back*, *Next* and *Don't show again*. The wizard
+itself creates no file or folder – only the app's own actions it opens do,
+after you confirm them (the folder picker, *Get files*). Once you finish it
+or choose *Don't show again* it no longer opens by itself; an app that
+starts already signed in – after an update from an older version – does not
+show it either.
+
 ## Install or run it
 
 The installers of every version are on the

@@ -884,6 +884,28 @@ canvas.viewer-measuring { cursor: crosshair; }
 .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap; }
 .dialog .error-text { color: var(--st-danger-fg); margin: 8px 0 0; }
 
+/* Getting started (#422, js/onboarding.js): the steps on the left, the
+   current one on the right; narrow windows stack them. */
+.onboarding { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 20px; }
+.onboarding-steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; align-content: start; counter-reset: onboarding; }
+.onboarding-steps li {
+  counter-increment: onboarding;
+  display: grid; gap: 2px; padding: 6px 8px 6px 28px; position: relative;
+  border-radius: var(--radius); color: var(--text-dim);
+}
+.onboarding-steps li::before { content: counter(onboarding); position: absolute; left: 8px; top: 6px; font-variant-numeric: tabular-nums; }
+.onboarding-steps li.current { color: var(--text); background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); font-weight: 600; }
+.onboarding-steps li.done { color: var(--text); }
+.onboarding-steps li.done::before { content: "\2713"; color: var(--st-ok-fg); }
+.onboarding-steps li.skipped::before { content: "\2013"; }
+.onboarding-body h3 { margin: 0; }
+.onboarding-body p { margin: 0; }
+.onboarding-path { display: block; padding: 6px 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); overflow-wrap: anywhere; }
+.onboarding-cad { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+@media (max-width: 640px) {
+  .onboarding { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* Appearance: the three house cards (System, Light, Dark) first and larger,
    the distribution skins after them. Each card renders its own tokens. */
 .skin-grid { display: grid; gap: 8px; grid-template-columns: repeat(12, minmax(0, 1fr)); }

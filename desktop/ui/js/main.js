@@ -9,7 +9,7 @@
 // Every server call goes through the Rust commands (src/commands.rs); data
 // from the server is only ever inserted as text, never as HTML.
 //
-// Modules: core.js, skins.js, connect.js, shell.js, navigator.js, tabs.js, assistant.js, agent.js, revision.js, references.js, workspace.js, change.js, requests.js, dialogs.js, bom-import.js, group-sync.js, folder-import.js, settings.js, crash.js, main.js.
+// Modules: core.js, skins.js, connect.js, shell.js, navigator.js, tabs.js, assistant.js, agent.js, revision.js, references.js, workspace.js, change.js, requests.js, dialogs.js, bom-import.js, group-sync.js, folder-import.js, settings.js, onboarding-rules.js, onboarding.js, crash.js, main.js.
 
 import { $, TAURI, call, errorText, h, invoke, setStatus, state, toast } from "./core.js";
 import { applySkin } from "./skins.js";
@@ -29,6 +29,7 @@ import { reportDialog } from "./report.js";
 import { checkCrashReports, initCrashWatch } from "./crash.js";
 import { onSolidcraftRequest } from "./solidcraft-bridge.js";
 import { initItemMenu } from "./item-menu.js";
+import { openOnboarding } from "./onboarding.js";
 
 // ======================================================================
 // Zoom: Ctrl + mouse wheel (trackpads: pinch), Ctrl/Cmd + + / - / 0
@@ -101,6 +102,7 @@ export function handleMenu(id) {
     case "import-folder": importFolderDialog(); break;
     case "import-bom": importBomDialog(null); break;
     case "import-help": importTutorial(); break;
+    case "getting-started": openOnboarding(true); break;
     case "settings": case "settings-app": openSettings(); break;
     case "sign-out": signOut(); break;
     case "refresh": selectView(state.view); reloadActive(); refreshWorklistCount(); break;
@@ -155,6 +157,8 @@ export function boot() {
   loadLanguage(preferredLanguage()).catch(function () {});
   call("session").then(function (s) {
     state.session = s;
+    // signed in already: no first-start wizard (onboarding.js)
+    state.signedInAtStart = !!s.signed_in;
     showAppVersion(s.version);
     state.zoom = s.zoom || 1;
     showZoom();

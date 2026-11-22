@@ -13,6 +13,21 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Added
+
+- **Getting started in the desktop app** (#422): after the first sign-in
+  TeamCraft Desktop opens a short wizard – server (skipped when a policy fixes
+  it), sign-in, the working folder (*Change…*, *Open folder*), *Get project
+  groups…* for your groups (latest revision, also in work; skipped without
+  groups or when they are already fetched), the CAD setup for information
+  (the Inventor `.ipj`, NX load options and Solid Edge search paths a later
+  version will create – nothing is created now) and the daily loop *Check out
+  and open* → save in CAD → *Check in…*. Every step can be skipped; *Finish*
+  or *Don't show again* is kept in the settings (`onboarding`), and *Help →
+  Getting Started…* opens it again. The wizard creates no file or folder by
+  itself. Step rules in `desktop/ui/js/onboarding-rules.js`, tested by
+  `scripts/desktop-onboarding-rules.test.mjs`.
+
 ## [0.2.12] - 2026-11-22
 
 ### Security

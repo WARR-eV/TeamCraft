@@ -306,7 +306,8 @@ end-to-end tests against a real PostgreSQL.
   part, #379): the header follows the browser's language, the desktop app has
   *Settings → Language*.
 - **Desktop app** – Linux, macOS and Windows client with a local working
-  folder, *Get* of whole assemblies, an import wizard, a *Files* view of each
+  folder, a *Getting started* wizard after the first sign-in (working folder,
+  *Get* of your project groups, the daily loop), *Get* of whole assemblies, an import wizard, a *Files* view of each
   project group (with *New item here* on every folder, starting in a favourite folder, e.g. the one with the
   Inventor project file, if you like), a navigable *Graph* of every revision (BOM children,
   references and where-used, coloured by state, with quantities and preview

@@ -20,6 +20,30 @@ export function projectItems(code) {
   return page(0);
 }
 
+/** Key of the groups fetched with *Get project groups* into this working
+ *  folder (per folder: each connection has its own). */
+function gotGroupsKey() {
+  return "teamcraft.got-groups:" + String(state.session && state.session.workspace_dir || "");
+}
+
+/** Codes of the project groups a finished *Get project groups* copied into
+ *  the current working folder on this computer – the first-start wizard
+ *  (onboarding.js) skips its group step for them. Only a convenience: an
+ *  empty answer (private window, cleared storage) just shows the step. */
+export function gotGroups() {
+  try {
+    var list = JSON.parse(window.localStorage.getItem(gotGroupsKey()) || "[]");
+    return Array.isArray(list) ? list.filter(function (c) { return typeof c === "string"; }) : [];
+  } catch (e) { return []; }
+}
+
+/** Remembers the groups of a Get that ran to its end (not stopped). */
+export function rememberGotGroups(list) {
+  var all = gotGroups();
+  (list || []).forEach(function (c) { if (all.indexOf(c) === -1) all.push(c); });
+  try { window.localStorage.setItem(gotGroupsKey(), JSON.stringify(all.slice(-200))); } catch (e) { /* storage blocked: the step shows again */ }
+}
+
 /** For new team members or a fresh computer: copies the files of every item
  * of the chosen project groups into the workspace, one folder per group. */
 export function getProjectsDialog() { freshProjects().then(openGetProjectsDialog); }
@@ -82,6 +106,7 @@ export function openGetProjectsDialog() {
           }, Promise.resolve());
         }).then(function () {
           running = false;
+          if (!stop) rememberGotGroups(codes);
           var text = (stop ? "Stopped. " : "Done. ") + done.items + " items, " + done.files + " files copied" +
             (done.kept ? ", " + done.kept + " locally modified files kept" : "") +
             (done.skipped ? ", " + done.skipped + " items without a released revision skipped" : "") +

@@ -103,6 +103,10 @@ jobs:
       # main CAD file (Check out and open after Cancel, #348)
       - name: Test the Get rules
         run: node scripts/desktop-get-rules.test.mjs
+      # the steps of the first-start wizard *Getting started* (#422): which
+      # are skipped, when it shows by itself, the texts
+      - name: Test the first-start wizard rules
+        run: node scripts/desktop-onboarding-rules.test.mjs
       # new items from files on this computer (#359): group and folder from
       # where the file is, the duplicate findings, the worklist suggestions
       - name: Test the rules of new items from local files

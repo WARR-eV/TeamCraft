@@ -66,6 +66,13 @@ installations and the desktop app:
    files; its first revision *A* is *in work* and checked out to you.
 5. **Check in**, then release it with a change order.
 
+**Desktop app, first start:** after you connect to the server and sign in,
+TeamCraft Desktop opens *Getting started* – a short wizard through the
+working folder, *Get project groups…* for your groups, the CAD setup (for
+information) and the daily loop *Check out and open* → save in CAD →
+*Check in…*. Every step can be skipped; *Help → Getting Started…* opens it
+again. See [Desktop app](desktop.md#getting-started).
+
 **Appearance:** TeamCraft follows the light or dark appearance of your
 operating system. The menu under your name (top right) and *Account →
 Appearance* switch between *System*, *Light* and *Dark*; choose *Dark* to keep
