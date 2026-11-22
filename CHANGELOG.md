@@ -12,6 +12,14 @@ TeamCraft has no stable release yet. The project status is work in progress:
 see the notices in the README.
 
 ## [Unreleased]
+
+### Fixed
+
+- CI: the self-test of `scripts/ci-changes.sh` expected a desktop UI script
+  (`desktop/ui/js/local-changes.js`, #416) to skip the desktop Rust jobs,
+  but the table now runs them for every desktop UI script (#448); the
+  `changes` job of every workflow failed on `main`.
+
 ### Added
 
 - **3D preview of E57 point clouds** (#373). Laser-scanner exports (`.e57`,
