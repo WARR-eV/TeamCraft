@@ -154,15 +154,19 @@ feature milestone – the features in *What works* are enough; what is missing i
   SmartScreen and Gatekeeper
 - [x] Usage statistics (#383): desktop → own server always (anonymous daily report, fixed fields, *Show what is
   sent*), *Admin → Usage statistics*, sharing an aggregate with the developers off by default
-  (`TEAMCRAFT_USAGE_STATISTICS[_URL]`, `DO_NOT_TRACK`, `TEAMCRAFT_NO_TELEMETRY`). Left: a collection service run
-  by the project (where, who operates it, retention) and its published results; counting `new_item`, `release`,
-  `search`, `assistant`, `import_*`, `cancel_checkout` in the desktop UI (the names are accepted already); the
+  (`TEAMCRAFT_USAGE_STATISTICS[_URL]`, `DO_NOT_TRACK`, `TEAMCRAFT_NO_TELEMETRY`); the desktop counts every
+  listed action (guard test in `desktop/src/usage.rs`). Left: a collection service run
+  by the project (where, who operates it, retention) and its published results; the
   desktop policy `UsageStatistics` (#378) once the developers' share is decided per desktop
 - [ ] Desktop: report a problem from any error (#381). Done: *Report…* on every toast and dialog error, *Help → Report a
   Problem…*, redacted prefilled report (`desktop/src/report.rs`), *Open issue form* / *Copy* / *Save*, own tracker
-  setting, *Copy details* on web error pages. Left: screenshot and affected-file attachments, the key inputs of
-  each action (most messages name only the action), a request id on web errors (the server version in the report: done)
-  (the tracker as a desktop policy: done, `ReportUrl`)
+  setting, *Copy details* on web error pages, the server version in the report, the tracker as a desktop policy
+  (`ReportUrl`), a request id on every answer and web error page (`x-request-id`, in the log line), the key inputs
+  of the main actions (check-out/in, park, get, open, 3D preview, STEP/STL export, new item, add files, BOM and
+  folder import, request attachments). Left: screenshot and affected-file attachments (pending a decision: what a
+  screenshot may show, and the warning for a file that leaves the organisation); key inputs for the remaining
+  smaller actions (change orders, requests, settings); *Report…* on inline error notices (new-item duplicate check, BOM
+  preview "No BOM lines found", the 3D viewer's canvas overlay incl. parse and graphics-memory errors)
 - [ ] Desktop: one-click update (#377). Done: update window (release notes, *Skip this version*, *Remind me later*),
   *Help → Check for Updates…*, download of this installation's file verified against `SHA256SUMS.txt`, Windows
   installers started, `.dmg` opened. Left: swapping a portable zip or AppImage in place with *Restart now*, a
@@ -170,7 +174,7 @@ feature milestone – the features in *What works* are enough; what is missing i
   test script per install type for each RC
 - [x] Desktop: managed deployment policies (#378) – Windows registry with ADMX/ADML templates, macOS configuration
   profile, `/etc/teamcraft/policies.json`; fixed server, updates, crash prompts, working folder, organisation name,
-  `UsageStatistics` (read for #383), `ReportUrl` (the problem-report tracker, #381). Left: a manual test per OS (Group Policy, Intune, an MDM profile), a German ADML,
+  `UsageStatistics` (read for #383), `ReportUrl` (the problem-report tracker, #381), English and German ADML. Left: a manual test per OS (Group Policy, Intune, an MDM profile),
   a per-machine MSI checked for silent installs
 - [ ] Desktop app run and tested on Windows x64/ARM64, macOS and Linux for each RC (a short manual test script in
   `docs/src/dev/release-checklist.md`)
@@ -667,17 +671,25 @@ real files and belong to section 3 once such files are at hand.
 
 **All CAD programs**
 
-- [ ] (research first) CAD add-ins through the official APIs (Inventor API, Solid Edge API, SolidWorks API, NX Open):
+- [x] (research first) CAD add-ins through the official APIs (Inventor API, Solid Edge API, SolidWorks API, NX Open):
   check out, "save and check in", "get latest" inside the CAD program – also to report conflicts when a file is opened
-  inside the CAD program (the desktop app already asks before opening)
+  inside the CAD program (the desktop app already asks before opening). Research page *CAD add-ins: Inventor and
+  Siemens NX first* (#425): Inventor MVP (.NET 8, registry-free `.addin`), NX MVP after the author-licence check, both
+  over per-user local IPC to the desktop app (protocol `teamcraft.cad` v1); SOLIDWORKS/Solid Edge after Inventor,
+  FreeCAD as the reference add-in for CI. Left: the follow-up issues *Inventor add-in MVP* and *NX add-in MVP* (desktop
+  listener, shared core with a fake host, *Settings → CAD add-ins*, `CadAddins` policy, threat-model entry)
 - [ ] Check-in takes dependent files along automatically (from the reference scan)
 - [ ] Create viewables (STEP) in the background without blocking the check-in
-- [ ] Sync file properties with item attributes: part number, name, material, mass
+- [ ] Sync file properties with item attributes: part number, name, material, mass – SolidCraft designs done
+  read-only (#367: shown, searchable, mismatches flagged, prefill of new items); left: other CAD formats, material
 - [ ] Recognise standard and library parts (Content Center, Toolbox, Standard Parts) and treat them as purchased parts
   instead of importing them again and again
 - [ ] Workspace setup wizard (first start or when getting a project group): optional CAD settings to tick – Inventor
   `.ipj`, NX load options, Solid Edge search paths; nothing ticked by default, preview of what would be created, never
-  created automatically, existing files never overwritten without asking; can be opened again from the settings
+  created automatically, existing files never overwritten without asking; can be opened again from the settings.
+  The wizard frame exists (#422: *Getting started* in the desktop app, also *Help → Getting Started…*); its *CAD
+  setup* step only lists what would be created. Left: creating the files themselves (needs the CAD programs to
+  verify the generated `.ipj`, load options and search paths); issue #422 stays open for this step 5 of its plan
 
 **Autodesk Inventor**
 
@@ -718,7 +730,10 @@ real files and belong to section 3 once such files are at hand.
 **Siemens NX**
 
 - [ ] (research first) How other PLMs connect NX (native vs. through a PLM integration), licences (student/academic) and
-  what is feasible for an open-source project
+  what is feasible for an open-source project – the add-in part is answered in the research page *CAD add-ins: Inventor
+  and Siemens NX first* (#425: NX Open journals vs signed startup applications, author licence, vendor assemblies never
+  redistributed). Left: whether the team's academic NX licence includes an NX Open author licence (checked on a licensed
+  machine, recorded on that page)
 - [ ] Folder import for the master model concept: the drawing `*_dwg*.prt` belongs into the item of the model
 - [ ] Test the BOM import with real NX BOM exports
 - [ ] STEP export through the local NX (NX Open / journal), on Windows and Linux
@@ -730,7 +745,8 @@ real files and belong to section 3 once such files are at hand.
 - [x] Preview image from the embedded thumbnail (#364); left: rendered pictures for designs saved without one (#368)
 - [x] Linked designs as file references with quantities (#365); left: rewriting link paths after a rename (with #369)
 - [x] BOM import from SolidCraft's BOM CSV and from the design (#366); left: lengths and expressions in `bom_quantity`, keeping the `.sc` with a new assembly (as STEP)
-- [ ] Design properties read, shown, searchable, mismatches with the item flagged (#367)
+- [x] Design properties read, shown, searchable, mismatches with the item flagged (#367); left: reading the
+  properties of designs stored before (next version), component properties (`material`) of assemblies
 - [x] Desktop: STEP export through `solidcraft-cli` at check-in, all OSes (#368); left: a rendered thumbnail (`solidcraft-cli snapshot`) for designs saved without one
 - [x] Desktop: item number and revision written into the design properties (#369); left: automatically at check-out (a setting), link paths after a rename
 - [x] Desktop: designs open in SolidCraft (lock file) shown, warning at check-in (#370)
@@ -756,8 +772,19 @@ needs an issue with a reason first (see *Direction*).
   review is #408: quick wins done (#409 check-in icon, #410 one vocabulary + glossary, #411 web check-out wording
   and *Get TeamCraft Desktop*, #412 preview at the top of the revision page, #413 no hash column, #414 revision vs
   version explained), #421 section nav of the revision page, #417 right-click menus in the desktop app; left: the
-  daily CAD loop (#415, #418–#420; done: #416 one *Local changes* list of the whole working folder in the desktop
-  worklist) and onboarding (#422–#424)
+  daily CAD loop (#416, #418–#420) and onboarding (#422–#424); done: #415 check out several parts of an assembly at
+  once (`POST /api/v1/checkouts`, desktop *Check out parts…*) – open follow-up: *Revise and check out* for released
+  parts
+  version explained), #421 section nav of the revision page, #417 right-click menus in the desktop app, #423 empty
+  states that name the next step (web and desktop, by role, i18n catalogs), #420 thumbnails in the item list,
+  search, vault explorer and the desktop Home views (left from #420: a revision with only STEP or mesh files gets
+  no list picture yet – a fallback rendered from its 3D preview needs `thumbnail::supports` and `cadformat`
+  widened), #419 BOM components picked by search (number, name, file name) in web and desktop, with Add line /
+  quantity / remove in the desktop *Structure* tab; left: the daily CAD loop (#415, #416, #418) and onboarding (#422,
+  #424); the other empty states
+  (detail tabs, admin pages) still in English only;
+  #423 left: a *Get…* hint for viewers (they may get read-only copies, but *New on this computer* is shown to CAD
+  editors only) and a check whether the working folder really lacks the active group's files
 - [ ] Responsive pages on large data (1M files, 100k items, 10k-line BOMs – see the scale targets)
 - [ ] Faster opening of large CAD files and assemblies
 - [ ] Configurable lifecycle states and site-specific allowed transitions instead of one built-in state machine
@@ -766,7 +793,8 @@ needs an issue with a reason first (see *Direction*).
 - [ ] Central conversion queue for previews and derivatives with retries and a failure view
 - [ ] 3D preview of more native formats; IFC geometry in the viewer
 - [ ] PMI in the 3D preview, also PMI authored on assemblies
-- [ ] Native CAD add-ins (see the research entry in section 4): check in/out, search, revise, BOM and references inside
+- [ ] Native CAD add-ins (research page *CAD add-ins: Inventor and Siemens NX first*, #425; Inventor and NX MVPs are
+  follow-up issues): check in/out, search, revise, BOM and references inside
   SolidWorks, Inventor, Solid Edge (occurrence semantics), Creo, CATIA, AutoCAD (xrefs) and Revit/BIM; NX comparable
   to a managed mode (Save As, revise, structure, numbering)
 - [ ] ECAD/EPLAN integration: electrical design files and their BOM connectivity as first-class data, not
@@ -856,7 +884,8 @@ needs an issue with a reason first (see *Direction*).
 - [ ] Upgrades: proven upgrade chain per release, restore-based rollback guide, a plugin/extension layer (design: research page *A sandboxed extension layer*, #382)
 - [ ] CAD clone workflows: clone an assembly with selective reuse, Save As / revise per component over a whole
   structure, shown as an indented tree
-- [ ] Interactive onboarding and contextual help
+- [ ] Interactive onboarding and contextual help – the desktop first-start wizard *Getting started* is done (#422);
+  left: empty states that name the next step (#423) and contextual help
 - [ ] Migration tooling from commercial PLM/PDM systems
 - [ ] GA proofs: production readiness, migration and concurrency safety, scale validation, external security review,
   support and versioning policy

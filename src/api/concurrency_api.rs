@@ -62,3 +62,28 @@ pub(super) async fn checkin_all(
         "revisions": outcomes,
     })))
 }
+
+#[derive(Deserialize)]
+pub(super) struct CheckoutManyBody {
+    /// `[{id}]` or `[{item, code}]` (code `latest` = the newest revision).
+    revisions: Vec<checkouts::CheckoutTarget>,
+}
+
+/// Checks out several revisions at once (issue #415, the parts of an
+/// assembly). One transaction with a result per revision: the ones that can
+/// be taken are checked out, the rest come back with `ok = false`, a
+/// `reason` (`not_found`, `released`, `in_review`, `locked`, `forbidden`)
+/// and a `message` – a refused part does not stop the others.
+pub(super) async fn checkout_many(
+    State(st): State<AppState>,
+    ApiUser(me): ApiUser,
+    ApiJson(body): ApiJson<CheckoutManyBody>,
+) -> AppResult<Json<Value>> {
+    let outcomes = checkouts::checkout_many(&st.db, &me, &body.revisions).await?;
+    Ok(Json(json!({
+        "checked_out": outcomes.iter().filter(|o| o.ok).count(),
+        "refused": outcomes.iter().filter(|o| !o.ok).count(),
+        "summary": checkouts::checkout_summary(&outcomes),
+        "revisions": outcomes,
+    })))
+}

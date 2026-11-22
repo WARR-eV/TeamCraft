@@ -39,9 +39,10 @@ SERVER+='|^desktop/ui/(app\.css|index\.html)$|^desktop/ui/js/(core|settings|shel
 
 # guards – ci.yml, without a database: config::tests and
 # tests/architecture_guards.rs, for the files outside the server area they
-# read: every page of the book (each configuration variable is documented)
-# and the shipped configuration examples. Runs only when `server` does not.
-GUARDS='^docs/src/|^deploy/(teamcraft\.env\.example|docker-compose\.yml)$|^packaging/linux/teamcraft\.env$'
+# read: every page of the book (each configuration variable is documented),
+# the shipped configuration examples and the desktop Group Policy template
+# (its language files must match the ADMX). Runs only when `server` does not.
+GUARDS='^docs/src/|^deploy/(teamcraft\.env\.example|docker-compose\.yml)$|^deploy/desktop-policies/windows/|^packaging/linux/teamcraft\.env$'
 
 # cargo deny – ci.yml, one leg per lock file.
 DENY_SERVER='^(Cargo\.toml|Cargo\.lock|deny\.toml)$|^vendor/|^\.github/workflows/ci\.yml$'
@@ -51,12 +52,13 @@ DENY_DESKTOP='^desktop/Cargo\.(toml|lock)$|^deny\.toml$|^\.github/workflows/ci\.
 # test on every platform. The app's Rust code, configuration and icons, the
 # shared/ mirror and the media/ logos (desktop/build.rs copies both), the NIST
 # files of the folder-import test, the lint configuration of the repository
-# root – but not the scripts and styles in desktop/ui/ (the ui job checks
-# them), except desktop/ui/index.html, which a Rust test reads.
+# root – but not the styles and other files in desktop/ui/ (the ui job checks
+# them), except desktop/ui/index.html and the scripts in desktop/ui/js, which
+# Rust tests read (usage::tests::every_action_has_a_count_site).
 DESKTOP_RUST='^(desktop|shared|media/logos|media/icons|tests/fixtures/cad/nist)/'
 DESKTOP_RUST+='|^(clippy\.toml|rustfmt\.toml|\.rustfmt\.toml|rust-toolchain|rust-toolchain\.toml)$|^\.github/workflows/desktop\.yml$'
 DESKTOP_RUST_NOT='^desktop/ui/|\.md$'
-DESKTOP_RUST_ALSO='^desktop/ui/index\.html$'
+DESKTOP_RUST_ALSO='^desktop/ui/index\.html$|^desktop/ui/js/[^/]*\.js$'
 
 # desktop_ui – desktop.yml: syntax of every script of the desktop and web UI,
 # the imports of the desktop modules and the Node tests in scripts/.
@@ -64,6 +66,8 @@ DESKTOP_UI='^(desktop/ui|static|shared)/|^scripts/[^/]*\.mjs$|^\.github/workflow
 # scripts/desktop-lock-layout.test.mjs compares the desktop layout with the
 # server's sizes in this file (#428)
 DESKTOP_UI+='|^src/services/lock_overview\.rs$'
+# scripts/desktop-report-inputs.test.mjs checks its caps against this file (#381)
+DESKTOP_UI+='|^desktop/src/report\.rs$'
 
 # codeql – codeql.yml, one analysis per language.
 CODEQL_ACTIONS='^\.github/(workflows|actions|codeql)/'
@@ -167,17 +171,19 @@ check() {
 }
 
 self_test() {
-    # desktop UI scripts: the UI job and the JavaScript analysis only
-    check desktop/ui/js/graph.js server=false desktop_rust=false desktop_ui=true guards=false \
+    # desktop UI scripts: the UI job, the JavaScript analysis and the desktop
+    # Rust tests (usage.rs reads them)
+    check desktop/ui/js/graph.js server=false desktop_rust=true desktop_ui=true guards=false \
         'codeql=["javascript-typescript"]' 'deny=[]' docs_site=false
     # … except the files server tests compare with their own
-    check desktop/ui/js/core.js server=true desktop_rust=false desktop_ui=true
+    check desktop/ui/js/core.js server=true desktop_rust=true desktop_ui=true
     check desktop/ui/app.css server=true desktop_rust=false desktop_ui=true 'codeql=[]'
     check desktop/ui/index.html server=true desktop_rust=true desktop_ui=true
     # desktop Rust code
     check desktop/src/workspace.rs server=false desktop_rust=true desktop_ui=false 'codeql=["rust"]' 'deny=[]'
     check desktop/src/compat.rs server=true desktop_rust=true
     check desktop/src/usage.rs server=true desktop_rust=true
+    check desktop/src/report.rs server=false desktop_rust=true desktop_ui=true
     check desktop/Cargo.lock server=false desktop_rust=true 'deny=["desktop/Cargo.toml"]' 'codeql=["rust"]'
     check desktop/tauri.conf.json server=false desktop_rust=true desktop_ui=false 'codeql=[]'
     check desktop/README.md server=false desktop_rust=false desktop_ui=false
@@ -204,6 +210,7 @@ self_test() {
     check docs/src/admin/configuration.md server=false guards=true docs_site=true 'codeql=[]'
     check deploy/teamcraft.env.example server=false guards=true
     check packaging/linux/teamcraft.env server=false guards=true
+    check deploy/desktop-policies/windows/de-DE/TeamCraft.adml server=false guards=true 'codeql=[]'
     # nothing in these workflows
     check README.md all=false server=false guards=false desktop_rust=false desktop_ui=false \
         'codeql=[]' 'deny=[]' docs_site=false
@@ -217,7 +224,7 @@ self_test() {
     check .github/workflows/codeql.yml server=false 'codeql=["actions","javascript-typescript","rust"]'
     check .github/workflows/docs.yml docs_site=true server=false
     # several areas at once
-    check src/lib.rs,desktop/ui/js/graph.js server=true desktop_ui=true desktop_rust=false \
+    check src/lib.rs,desktop/ui/js/graph.js server=true desktop_ui=true desktop_rust=true \
         'codeql=["javascript-typescript","rust"]'
     # this table: everything
     check scripts/ci-changes.sh all=true server=true guards=true desktop_rust=true desktop_ui=true \

@@ -17,6 +17,7 @@ import { openSettings } from "./settings.js";
 import { formatKinds } from "./folder-import.js";
 import { planNewFiles } from "./new-files.js";
 import { planLocalChanges } from "./local-changes.js";
+import { maybeStartOnboarding } from "./onboarding.js";
 
 // ======================================================================
 // Shell
@@ -134,6 +135,8 @@ export function enterShell() {
     checkWorkspaceLayout();
     checkTokenStorage();
     checkUpdate();
+    // the first start after the sign-in: *Getting started* (#422)
+    maybeStartOnboarding();
   }).catch(function (err) {
     if (!(err && err.status === 401)) showConnect("signin", errorText(err));
   });
@@ -292,6 +295,8 @@ export function initShell() {
   $("search-form").addEventListener("submit", function (e) {
     e.preventDefault();
     state.query = $("search-input").value.trim();
+    // usage statistics (#383): one per submitted search, never the terms
+    if (state.query) call("usage_count", { action: "search" }).catch(function () {});
     selectView("search");
   });
   $("open-settings").addEventListener("click", openSettings);

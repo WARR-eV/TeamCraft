@@ -21,7 +21,7 @@ use uuid::Uuid;
 use crate::{
     auth::Actor,
     error::{AppError, AppResult},
-    services::{access, Page},
+    services::{access, thumbnails, Page},
 };
 
 /// More lines than this are never returned in one level.
@@ -73,6 +73,15 @@ pub struct StructureNode {
     pub find_number: Option<i32>,
     pub quantity: Option<f64>,
     pub restricted: bool,
+    /// The resolved revision (internal: the key of its thumbnail).
+    #[serde(skip)]
+    pub revision_id: Option<Uuid>,
+    /// Main thumbnail of the resolved revision (`services::thumbnails`,
+    /// #420): its file and the content hash; none for a hidden child.
+    #[sqlx(skip)]
+    pub thumbnail_file_id: Option<Uuid>,
+    #[sqlx(skip)]
+    pub thumbnail_sha256: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -88,12 +97,20 @@ struct Counted {
     total: i64,
 }
 
-fn level(rows: Vec<Counted>) -> Level {
+/// The level of `rows`, with the thumbnails of all its revisions from one
+/// query (#420).
+async fn level(pool: &PgPool, rows: Vec<Counted>) -> AppResult<Level> {
     let total = rows.first().map(|r| r.total).unwrap_or(0);
-    Level {
-        nodes: rows.into_iter().map(|r| r.node).collect(),
-        total,
+    let mut nodes: Vec<StructureNode> = rows.into_iter().map(|r| r.node).collect();
+    let ids: Vec<Uuid> = nodes.iter().filter_map(|n| n.revision_id).collect();
+    let thumbs = thumbnails::main_for_revisions(pool, &ids).await?;
+    for node in &mut nodes {
+        if let Some(thumb) = node.revision_id.and_then(|id| thumbs.get(&id)) {
+            node.thumbnail_file_id = Some(thumb.file_id);
+            node.thumbnail_sha256 = Some(thumb.sha256.clone());
+        }
     }
+    Ok(Level { nodes, total })
 }
 
 /// The top-level items of a project group: not used in any BOM line whose
@@ -113,6 +130,7 @@ pub async fn roots(pool: &PgPool, actor: &Actor, project_id: Uuid, page: Page) -
                   WHERE x.child_item_id = i.id AND {pv}) AS used_in,
                 (SELECT COUNT(*) FROM bom_lines x WHERE x.parent_revision_id = lr.id) AS bom_lines,
                 NULL::int AS find_number, NULL::float8 AS quantity, FALSE AS restricted,
+                lr.id AS revision_id,
                 COUNT(*) OVER () AS total
          FROM items i
          CROSS JOIN LATERAL (SELECT r.id, r.code, r.state, r.name, r.checked_out_by
@@ -134,7 +152,7 @@ pub async fn roots(pool: &PgPool, actor: &Actor, project_id: Uuid, page: Page) -
     .bind(page.offset)
     .fetch_all(pool)
     .await?;
-    Ok(level(rows))
+    level(pool, rows).await
 }
 
 /// The BOM lines of a revision (one level), resolved by the rule. The caller
@@ -154,7 +172,7 @@ pub async fn children(
                    JOIN items pi ON pi.id = pr.item_id
                   WHERE x.child_item_id = ci.id AND {pv}) AS used_in,
                 (SELECT COUNT(*) FROM bom_lines x WHERE x.parent_revision_id = cr.id) AS bom_lines,
-                bl.find_number, bl.quantity, NOT {iv} AS restricted,
+                bl.find_number, bl.quantity, NOT {iv} AS restricted, cr.id AS revision_id,
                 COUNT(*) OVER () AS total
          FROM bom_lines bl
          JOIN items ci ON ci.id = bl.child_item_id
@@ -186,6 +204,7 @@ pub async fn children(
         n.checked_out_by_name = None;
         n.used_in = 0;
         n.bom_lines = 0;
+        n.revision_id = None;
     }
-    Ok(level(rows))
+    level(pool, rows).await
 }

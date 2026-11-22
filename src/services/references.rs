@@ -316,6 +316,17 @@ pub async fn files_of_revision(
     actor: &Actor,
     revision_id: Uuid,
 ) -> AppResult<Vec<FileWithReferences>> {
+    let mut conn = pool.acquire().await?;
+    files_of_revision_on(&mut conn, actor, revision_id).await
+}
+
+/// [`files_of_revision`] on a connection – inside a transaction it sees the
+/// references the transaction stored (the check-in's BOM step, #407).
+pub(crate) async fn files_of_revision_on(
+    conn: &mut PgConnection,
+    actor: &Actor,
+    revision_id: Uuid,
+) -> AppResult<Vec<FileWithReferences>> {
     #[derive(sqlx::FromRow)]
     struct Row {
         file_id: Uuid,
@@ -334,7 +345,7 @@ pub async fn files_of_revision(
          ORDER BY lower(f.filename), lower(fr.name)",
     )
     .bind(revision_id)
-    .fetch_all(pool)
+    .fetch_all(&mut *conn)
     .await?;
     if rows.is_empty() {
         return Ok(Vec::new());
@@ -361,7 +372,7 @@ pub async fn files_of_revision(
     .bind(&keys)
     .bind(revision_id)
     .bind(&actor.hidden_projects)
-    .fetch_all(pool)
+    .fetch_all(&mut *conn)
     .await?;
     let mut by_key: HashMap<String, Vec<FileMatch>> = HashMap::new();
     for m in found {
@@ -392,7 +403,7 @@ pub async fn files_of_revision(
         .bind(&unmatched)
         .bind(revision_id)
         .bind(&actor.hidden_projects)
-        .fetch_all(pool)
+        .fetch_all(&mut *conn)
         .await?;
         for m in weak {
             by_key.entry(m.key.clone()).or_default().push(m);

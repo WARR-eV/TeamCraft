@@ -647,6 +647,152 @@ pub fn checkout_summary(r: &Downloaded, item: &str, code: &str) -> String {
     }
 }
 
+/// A revision the user ticked in *Check out parts…* (issue #415).
+#[derive(Clone, Debug, Deserialize)]
+pub struct CheckoutPick {
+    pub project: Option<String>,
+    pub item: String,
+    pub code: String,
+}
+
+/// One server answer of `POST /checkouts` for one revision.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct CheckoutResult {
+    #[serde(default)]
+    pub revision_id: Option<String>,
+    #[serde(default)]
+    pub item: String,
+    #[serde(default)]
+    pub code: String,
+    #[serde(default)]
+    pub ok: bool,
+    #[serde(default)]
+    pub already: bool,
+    #[serde(default)]
+    pub reason: Option<String>,
+    #[serde(default)]
+    pub message: Option<String>,
+    #[serde(default)]
+    pub checked_out_by_name: Option<String>,
+}
+
+/// The result of checking out several revisions: the server's answer per
+/// revision and the files brought into the working folder.
+#[derive(Debug, Default, Serialize)]
+pub struct CheckedOutMany {
+    pub results: Vec<CheckoutResult>,
+    pub refused: Vec<CheckoutResult>,
+    pub files: Downloaded,
+    pub summary: String,
+}
+
+/// Checks out several revisions in one server call (`POST /checkouts`,
+/// one transaction, a result per revision) and copies the files of every
+/// revision now checked out into the working folder – writable, because
+/// the user holds their lock now (`layout::read_only_wanted`). A file that
+/// was already here unchanged only loses its read-only flag; a changed one
+/// is kept. The refused revisions are listed with the server's reason.
+pub async fn checkout_many(
+    api: &Api,
+    root: &Path,
+    picks: &[CheckoutPick],
+    cancel: &AtomicBool,
+    progress: &mut (dyn FnMut(&Progress) + Send),
+) -> Result<CheckedOutMany, ApiError> {
+    let body = serde_json::json!({
+        "revisions": picks
+            .iter()
+            .map(|p| serde_json::json!({ "item": p.item, "code": p.code }))
+            .collect::<Vec<_>>(),
+    });
+    let answer = api.json(Method::POST, "/checkouts", Some(&body)).await?;
+    // The server has committed the check-outs by now: an answer we cannot
+    // read is an error (refresh), never "nothing was checked out".
+    let results: Vec<CheckoutResult> = serde_json::from_value(answer["revisions"].clone())
+        .map_err(|e| {
+            ApiError::local(format!(
+                "Unexpected answer of POST /checkouts: {e}. Some parts may be checked out – refresh to see them."
+            ))
+        })?;
+    let mut files = Vec::new();
+    let mut dirs = Vec::new();
+    let mut failed = Vec::new();
+    for r in results.iter().filter(|r| r.ok) {
+        let project = picks
+            .iter()
+            .find(|p| p.item.eq_ignore_ascii_case(&r.item) && p.code.eq_ignore_ascii_case(&r.code))
+            .and_then(|p| p.project.clone());
+        match revision_files(api, project.as_deref(), &r.item, &r.code).await {
+            Ok(rev) => {
+                dirs.push(main_dir(
+                    root,
+                    project.as_deref(),
+                    &rev.files,
+                    &rev.item_folder,
+                ));
+                files.extend(rev.files);
+            }
+            Err(e) => failed.push(format!("{}/{}: {e}", r.item, r.code)),
+        }
+    }
+    let mut report = fetch(api, root, &files, cancel, progress).await?;
+    report.failed.extend(failed);
+    report.revisions = results.iter().filter(|r| r.ok).count();
+    report.dir = dirs
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| root.to_path_buf());
+    let refused: Vec<CheckoutResult> = results.iter().filter(|r| !r.ok).cloned().collect();
+    let summary = checkout_many_summary(report.revisions, &refused, &report);
+    Ok(CheckedOutMany {
+        results,
+        refused,
+        files: report,
+        summary,
+    })
+}
+
+/// The sentence after *Check out parts…*: how many revisions were checked
+/// out, how many were refused, and what happened to their files.
+pub fn checkout_many_summary(
+    checked_out: usize,
+    refused: &[CheckoutResult],
+    r: &Downloaded,
+) -> String {
+    let mut head = match checked_out {
+        0 => "Nothing was checked out".to_string(),
+        1 => "Checked out 1 revision".to_string(),
+        n => format!("Checked out {n} revisions"),
+    };
+    if !refused.is_empty() {
+        head.push_str(&format!("; {} refused", refused.len()));
+    }
+    let mut parts = Vec::new();
+    if !r.downloaded.is_empty() {
+        parts.push(format!("{} file(s) downloaded", r.downloaded.len()));
+    }
+    if r.up_to_date > 0 {
+        parts.push(format!("{} up to date and writable now", r.up_to_date));
+    }
+    if !r.kept.is_empty() {
+        parts.push(format!("{} kept (your local changes)", r.kept.len()));
+    }
+    if !r.clashes.is_empty() {
+        parts.push(format!(
+            "{} name clash(es), not overwritten",
+            r.clashes.len()
+        ));
+    }
+    if !r.failed.is_empty() {
+        parts.push(format!("{} failed", r.failed.len()));
+    }
+    if parts.is_empty() {
+        format!("{head}.")
+    } else {
+        format!("{head}. {}.", parts.join(", "))
+    }
+}
+
 /// The files of a `workset` answer: all, those of the root revision, the
 /// root's project group and the number of revisions.
 fn workset_files(set: &Value) -> (Vec<ServerFile>, Vec<ServerFile>, Option<String>, usize) {
@@ -728,6 +874,10 @@ pub struct Status {
     /// last checked out (the server's `released`: `by_name`, `at`, `reason`,
     /// `message`): local changes stay, but need a new check-out.
     pub released: Option<Value>,
+    /// The server knows a structure file of the revision (`bom_structure` of
+    /// `file-status`, false from older servers): *Check in…* offers *Update
+    /// the BOM from the CAD file* (#407).
+    pub bom_structure: bool,
 }
 
 /// A local file of a revision: where it is and what the state says.
@@ -840,6 +990,7 @@ pub fn inaccessible_status(root: &Path, project: Option<&str>, item: &str, code:
         locked_by_name: None,
         inaccessible: true,
         released: None,
+        bom_structure: false,
         files,
     }
 }
@@ -1016,6 +1167,7 @@ pub async fn status_with(
         locked_by_name: rev.locked_by_name,
         inaccessible: false,
         released: Some(server["released"].clone()).filter(Value::is_object),
+        bom_structure: server["bom_structure"].as_bool().unwrap_or(false),
         files: out,
     })
 }
@@ -1081,6 +1233,9 @@ pub async fn locate(
 /// [`crate::api::CHUNKED_ABOVE`] are sent before in resumable chunks (see
 /// [`Api::send_files`]), with progress and cancel through `transfer`.
 /// Afterwards the files are read-only again.
+/// With `bom_from_references` the server also updates the BOM of the
+/// revision from the CAD references of the checked-in version, in the same
+/// transaction (#407); the answer then carries `bom`.
 #[allow(clippy::too_many_arguments)]
 pub async fn check_in(
     api: &Api,
@@ -1090,6 +1245,7 @@ pub async fn check_in(
     code: &str,
     names: &[String],
     comment: &str,
+    bom_from_references: bool,
     transfer: &Transfer<'_>,
 ) -> Result<Value, ApiError> {
     send_local(
@@ -1099,7 +1255,9 @@ pub async fn check_in(
         names,
         comment,
         transfer,
-        SendMode::CheckIn,
+        SendMode::CheckIn {
+            bom_from_references,
+        },
     )
     .await
 }
@@ -1142,8 +1300,9 @@ pub async fn park(
 /// What [`send_local`] does with the lock.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum SendMode {
-    /// `…/checkin`: new versions and the lock released in one transaction.
-    CheckIn,
+    /// `…/checkin`: new versions and the lock released in one transaction
+    /// (with `bom_from_references`: the BOM updated from the CAD file, #407).
+    CheckIn { bom_from_references: bool },
     /// `…/files`: new versions, the lock stays.
     Park,
 }
@@ -1265,20 +1424,28 @@ async fn send_local(
     // Large files go first as resumable chunked uploads (with their base and
     // folder) and join this check-in by id – one transaction on the server.
     let endpoint = match send {
-        SendMode::CheckIn => "checkin",
+        SendMode::CheckIn { .. } => "checkin",
         SendMode::Park => "files",
     };
+    let mut fields = vec![
+        ("comment", comment.to_string()),
+        ("bases", Value::Object(bases).to_string()),
+        ("folders", Value::Object(folders).to_string()),
+    ];
+    // never on a park: the revision stays checked out, nothing is final yet
+    if let SendMode::CheckIn {
+        bom_from_references: true,
+    } = send
+    {
+        fields.push(("bom_from_references", "true".to_string()));
+    }
     let result = api
         .send_files(
             &format!("{}/{endpoint}", rev_path(item, code)),
             item,
             code,
             &files,
-            &[
-                ("comment", comment.to_string()),
-                ("bases", Value::Object(bases).to_string()),
-                ("folders", Value::Object(folders).to_string()),
-            ],
+            &fields,
             transfer,
         )
         .await?;
@@ -2185,6 +2352,40 @@ mod tests {
             checkout_summary(&Downloaded::default(), "PRT-000001", "A"),
             "Checked out PRT-000001/A."
         );
+    }
+
+    #[test]
+    fn checkout_many_summaries() {
+        let refused = CheckoutResult {
+            item: "PRT-000003".into(),
+            code: "A".into(),
+            reason: Some("released".into()),
+            message: Some("PRT-000003/A is Released: revise it first.".into()),
+            ..CheckoutResult::default()
+        };
+        assert_eq!(
+            checkout_many_summary(0, &[], &Downloaded::default()),
+            "Nothing was checked out."
+        );
+        let files = Downloaded {
+            downloaded: vec!["ROVER/hub.prt".into()],
+            up_to_date: 2,
+            kept: vec!["ROVER/axle.prt".into()],
+            ..Downloaded::default()
+        };
+        assert_eq!(
+            checkout_many_summary(3, std::slice::from_ref(&refused), &files),
+            "Checked out 3 revisions; 1 refused. 1 file(s) downloaded, \
+             2 up to date and writable now, 1 kept (your local changes)."
+        );
+        assert_eq!(
+            checkout_many_summary(0, &[refused], &Downloaded::default()),
+            "Nothing was checked out; 1 refused."
+        );
+        // the server answer is read leniently (missing fields = defaults)
+        let r: CheckoutResult =
+            serde_json::from_value(json!({ "item": "PRT-1", "code": "A", "ok": true })).unwrap();
+        assert!(r.ok && !r.already && r.reason.is_none());
     }
 
     #[test]

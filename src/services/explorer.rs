@@ -11,7 +11,7 @@ use crate::{
     auth::Actor,
     domain,
     error::{AppError, AppResult},
-    services::access,
+    services::{access, thumbnails},
 };
 
 /// Rows shown at most in one folder (the search narrows larger folders).
@@ -34,6 +34,12 @@ pub struct Entry {
     pub checked_out_at: Option<DateTime<Utc>>,
     pub updated_at: DateTime<Utc>,
     pub file_count: i64,
+    /// Main thumbnail of the revision (`services::thumbnails`, #420): its
+    /// file and the content hash (image URL `?v=`); filled by [`list`].
+    #[sqlx(skip)]
+    pub thumbnail_file_id: Option<Uuid>,
+    #[sqlx(skip)]
+    pub thumbnail_sha256: Option<String>,
 }
 
 /// A folder of the tree: a project group with its item and lock counts.
@@ -155,10 +161,20 @@ pub async fn list(
          ORDER BY i.number LIMIT {LIMIT}",
         access::item_visible("i", 3)
     );
-    Ok(sqlx::query_as::<_, Entry>(&sql)
+    let mut entries = sqlx::query_as::<_, Entry>(&sql)
         .bind(id)
         .bind(&pattern)
         .bind(&actor.hidden_projects)
         .fetch_all(pool)
-        .await?)
+        .await?;
+    // the thumbnails of the whole listing in one query (#420)
+    let ids: Vec<Uuid> = entries.iter().map(|e| e.revision_id).collect();
+    let thumbs = thumbnails::main_for_revisions(pool, &ids).await?;
+    for entry in &mut entries {
+        if let Some(thumb) = thumbs.get(&entry.revision_id) {
+            entry.thumbnail_file_id = Some(thumb.file_id);
+            entry.thumbnail_sha256 = Some(thumb.sha256.clone());
+        }
+    }
+    Ok(entries)
 }

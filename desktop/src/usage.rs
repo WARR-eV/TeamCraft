@@ -270,6 +270,45 @@ mod tests {
     }
 
     #[test]
+    fn every_action_is_counted_and_unknown_names_are_dropped() {
+        let mut u = Usage::default();
+        u.roll("2026-11-21", "deb", None);
+        for a in ACTIONS {
+            u.count(a);
+        }
+        for unknown in ["", "Checkout", "export", "search terms", "checkout "] {
+            u.count(unknown);
+        }
+        assert_eq!(u.actions.len(), ACTIONS.len());
+        assert!(ACTIONS.iter().all(|a| u.actions.get(*a) == Some(&1)));
+        let r = report(&u, "deb", None);
+        assert_eq!(r["actions"].as_object().unwrap().len(), ACTIONS.len());
+    }
+
+    /// Every action of [`ACTIONS`] has a place in the app that counts it:
+    /// `u.count("…")` in the commands or `usage_count` with `action: "…"`
+    /// in the UI – a listed action nobody counts would always report zero.
+    #[test]
+    fn every_action_has_a_count_site() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut sources = vec![std::fs::read_to_string(dir.join("src/commands.rs")).unwrap()];
+        for entry in std::fs::read_dir(dir.join("ui/js")).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().and_then(|e| e.to_str()) == Some("js") {
+                sources.push(std::fs::read_to_string(path).unwrap());
+            }
+        }
+        for a in ACTIONS {
+            let rust = format!("u.count(\"{a}\")");
+            let js = format!("call(\"usage_count\", {{ action: \"{a}\" }})");
+            assert!(
+                sources.iter().any(|s| s.contains(&rust) || s.contains(&js)),
+                "nothing counts the usage action {a}"
+            );
+        }
+    }
+
+    #[test]
     fn minutes_stop_at_a_day() {
         let mut u = Usage {
             active_minutes: 1440,

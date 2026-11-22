@@ -31,7 +31,7 @@
 //     favourite* ends it, *No, thanks* stops the suggestion; a folder's star
 //     makes it the favourite (issue #352);
 //   * a server without the file browser gets the items by name (All items);
-//   * an empty group says so;
+//   * an empty group says so and offers its next steps (#423);
 //   * New item starts with the active group and the folder last opened; the
 //     + of a folder row (New item here) fills in that folder;
 //   * the All items and Structure modes are still there;
@@ -382,7 +382,11 @@ async function check(browserType, name) {
   await page.locator(".rail button[data-view='projects']").click();
   await page.locator("#navigator .node.group", { hasText: "ROCKET" }).click();
   await home("ROCKET");
-  same("an empty group", await page.locator(top).allTextContents(), ["No files yet."]);
+  // an empty group names the next step (#423): a CAD editor and member gets
+  // Import CAD folder… and New item
+  same("an empty group", await page.locator(top + " .empty").allTextContents(),
+    ["This project group has no items yet. Import an existing CAD folder or create a new item."]);
+  same("the next steps of an empty group", await page.locator(top + " .empty-hint button").allTextContents(), ["Import CAD folder…", "New item"]);
 
   // New item starts with the active group, not with the first one of the list
   await page.locator(".rail button[data-view='projects']").click();

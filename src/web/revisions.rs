@@ -26,7 +26,7 @@ use crate::{
     preview::PreviewFormat,
     services::{
         access_log::{self, AccessCtx},
-        as_built, attributes, audit, bom, changes,
+        as_built, attributes, audit, bom, bom_references, changes,
         file_check::ClashGuard,
         files, impacts, interchange, items, notifications, ownership, projects, references,
         requests, result_proposals, revisions, similar, simulations, uploads,
@@ -143,22 +143,9 @@ fn preview_of(file: &FileRecord) -> Option<PreviewFormat> {
 /// a preview image (stored in the file or rendered from its 3D preview) –
 /// the assembly before the part before a model file before the drawing, the
 /// same order as the desktop app's main CAD file; the first by name on a tie.
+/// The rule lives in `services::thumbnails` (also used by the lists, #420).
 fn main_thumbnail(files: &[FileRecord]) -> Option<&FileRecord> {
-    files
-        .iter()
-        .filter_map(|f| {
-            let info = f.format_info.filter(|i| i.thumbnail)?;
-            let rank = match info.kind {
-                FormatKind::Assembly => 0,
-                FormatKind::Part => 1,
-                FormatKind::Model => 2,
-                FormatKind::Drawing => 3,
-                _ => return None,
-            };
-            Some((rank, f.filename.to_lowercase(), f))
-        })
-        .min_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)))
-        .map(|(_, _, f)| f)
+    crate::services::thumbnails::pick_main_file(files)
 }
 
 /// Uses listed in the "Where used" card; a standard part can have tens of
@@ -314,6 +301,8 @@ pub async fn show(
             .collect(),
     )
     .to_string();
+    // Design properties (SolidCraft) that differ from this revision (#367).
+    let property_mismatches = files::property_mismatches(&rev, &file_list);
     // "Fill with AI…": report files to choose from, and whether the button
     // is offered (assistant configured, editor of the group, group has not
     // switched the assistant off).
@@ -405,17 +394,22 @@ pub async fn show(
         "add_to_change": can_work && open_change.is_none(),
         "acknowledge": me.can_edit() && me.can_edit_project(item.project_id),
     });
-    // CAD files of this revision that lead to other items (assemblies and
-    // NX models): offers "Create BOM from CAD references"
+    // CAD files of this revision that lead to other items (assemblies, NX
+    // models, STEP assemblies with external parts): offers "Create BOM from
+    // CAD references"
     let cad_structure = file_refs.iter().any(|f| {
         matches!(
             f.format_kind,
-            Some(crate::cadformat::FormatKind::Assembly | crate::cadformat::FormatKind::Model)
+            Some(FormatKind::Assembly | FormatKind::Model | FormatKind::Exchange)
         ) && f
             .references
             .iter()
             .any(|r| r.matches.iter().any(|m| !m.same_revision))
     });
+    // the check-in box (#407): also a structure file by the rule of the
+    // check-in step (e.g. an assembly whose parts are not in TeamCraft yet)
+    let bom_structure =
+        rev.checked_out_by == Some(me.id) && bom_references::has_structure(&st.db, rev.id).await?;
     let files_hint = domain::files_hint(
         state,
         rev.checked_out_by,
@@ -522,11 +516,13 @@ pub async fn show(
             "file_groups": super::file_groups(&me.preferred_cad, &attachments),
             "files": attachments,
             "file_bases": file_bases,
+            "property_mismatches": property_mismatches,
             "native_without_preview": native_without_preview,
             "main_thumbnail": main_thumbnail,
             "similar": similar_parts,
             "lines": lines,
             "cad_structure": cad_structure,
+            "bom_structure": bom_structure,
             "where_used": where_used,
             "interchange": interchange,
             "hidden": {
@@ -723,8 +719,21 @@ pub async fn checkin(
         // Large files sent before in chunks by app.js (field `uploads`).
         let sessions =
             take_session_uploads(&st, &ctx.me, uploads::Scope::Revision(id), &mut received).await?;
-        let result =
-            files::check_in(&st.db, &ctx.me, id, &received.uploads, &received.comment).await;
+        let options = files::CheckInOptions::from_field(
+            received
+                .fields
+                .get("bom_from_references")
+                .map(String::as_str),
+        );
+        let result = files::check_in_with(
+            &st.db,
+            &ctx.me,
+            id,
+            &received.uploads,
+            &received.comment,
+            options,
+        )
+        .await;
         if result.is_ok() {
             uploads::forget(&st.db, &st.vault, &sessions).await;
             warm_previews(&st, &received.uploads);
@@ -732,7 +741,7 @@ pub async fn checkin(
         result
     }
     .await;
-    finish(&st, result, &back, |(rev, stored)| {
+    finish(&st, result, &back, |(rev, stored, bom)| {
         let changed: Vec<String> = stored
             .iter()
             .filter(|s| s.changed)
@@ -746,6 +755,11 @@ pub async fn checkin(
                 revisions::label(&rev),
                 changed.join(", ")
             )
+        };
+        // what the BOM step changed (#407); nothing changed: no line
+        let message = match bom.as_ref().and_then(|b| b.summary()) {
+            Some(summary) => format!("{message} · {summary}"),
+            None => message,
         };
         (back.clone(), message)
     })
@@ -1249,16 +1263,44 @@ async fn rendered_thumbnail(
 /// assemblies and drawings) or rendered from the 3D preview (NX parts,
 /// SOLIDWORKS parts and assemblies).
 /// Shared with the REST API.
+/// An `If-None-Match` with the image's ETag (`"<sha256>-thumb"`) answers
+/// 304 without reading or rendering the image again – except for formats
+/// whose picture may be composed from component parts (assemblies).
 pub(crate) async fn thumbnail_response(
     st: &AppState,
     me: &Actor,
     file_id: Uuid,
+    request: &HeaderMap,
 ) -> AppResult<Response> {
     let f = files::get(&st.db, me, file_id).await?;
     if !thumbnail::supports(&f.format) {
         return Err(AppError::not_found(
             "Files of this type have no embedded preview image.",
         ));
+    }
+    let etag = format!("\"{}-thumb\"", f.sha256);
+    // An assembly's picture may be put together from its parts' previews
+    // (`services::assemblies`): it changes with a component while the
+    // assembly file – and so its ETag – stays the same. Only a picture that
+    // depends on the file alone answers 304.
+    let composed = thumbnail::rendered(&f.format)
+        && crate::preview::PreviewFormat::of_format(&f.format).is_some_and(|p| p.may_be_assembly());
+    let not_modified = !composed
+        && request
+            .get(header::IF_NONE_MATCH)
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|v| v.split(',').any(|t| t.trim() == etag));
+    if not_modified {
+        return Response::builder()
+            .status(StatusCode::NOT_MODIFIED)
+            .header(header::CACHE_CONTROL, "private, no-cache")
+            .header(header::ETAG, etag)
+            .body(Body::empty())
+            .map_err(|e| {
+                AppError::Other(anyhow::anyhow!(
+                    "building the thumbnail response failed: {e}"
+                ))
+            });
     }
     let blob = st.vault.object_path(&f.sha256)?;
     let cache = st.vault.root().join("previews");
@@ -1280,7 +1322,7 @@ pub(crate) async fn thumbnail_response(
     Response::builder()
         .header(header::CONTENT_TYPE, image.content_type)
         .header(header::CACHE_CONTROL, "private, no-cache")
-        .header(header::ETAG, format!("\"{}-thumb\"", f.sha256))
+        .header(header::ETAG, etag)
         .body(Body::from(image.bytes))
         .map_err(|e| {
             AppError::Other(anyhow::anyhow!(
@@ -1293,8 +1335,36 @@ pub async fn thumbnail(
     State(st): State<AppState>,
     WebUser(me): WebUser,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
 ) -> AppResult<Response> {
-    thumbnail_response(&st, &me, id).await
+    thumbnail_response(&st, &me, id, &headers).await
+}
+
+/// The main thumbnail of a revision (#420): the picture of its main CAD
+/// file (see `services::thumbnails`), 404 when no file has one. Reading the
+/// revision checks the actor's rights (a hidden project group answers 404).
+/// Shared with the REST API.
+pub(crate) async fn revision_thumbnail_response(
+    st: &AppState,
+    me: &Actor,
+    revision_id: Uuid,
+    request: &HeaderMap,
+) -> AppResult<Response> {
+    let rev = revisions::get(&st.db, me, revision_id).await?;
+    let file_list = files::list(&st.db, me, rev.id).await?;
+    let Some(main) = main_thumbnail(&file_list) else {
+        return Err(AppError::not_found("This revision has no preview image."));
+    };
+    thumbnail_response(st, me, main.id, request).await
+}
+
+pub async fn revision_thumbnail(
+    State(st): State<AppState>,
+    WebUser(me): WebUser,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+) -> AppResult<Response> {
+    revision_thumbnail_response(&st, &me, id, &headers).await
 }
 
 pub async fn download_version(
@@ -1659,6 +1729,8 @@ mod tests {
             retention: "all".into(),
             solver_summary: None,
             solver_line: None,
+            properties: None,
+            properties_line: None,
             format_info: crate::cadformat::info(format),
         }
     }

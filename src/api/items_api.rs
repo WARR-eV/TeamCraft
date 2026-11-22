@@ -462,6 +462,25 @@ pub(super) async fn item_duplicates(
     Ok(Json(json!(found)))
 }
 
+#[derive(Deserialize)]
+pub(super) struct SuggestQuery {
+    #[serde(default)]
+    q: String,
+    limit: Option<i64>,
+}
+
+/// `GET /api/v1/items/suggest?q=&limit=`: the component picker of the BOM
+/// (desktop *Add line*, #419) – readable items matching number, name or file
+/// name, with the latest revision and a file with a preview image.
+pub(super) async fn item_suggest(
+    State(st): State<AppState>,
+    ApiUser(me): ApiUser,
+    Query(q): Query<SuggestQuery>,
+) -> AppResult<Json<Value>> {
+    let found = items::suggest(&st.db, &me, &q.q, q.limit).await?;
+    Ok(Json(json!({ "items": found })))
+}
+
 pub(super) async fn get_item(
     State(st): State<AppState>,
     ApiUser(me): ApiUser,
@@ -550,10 +569,13 @@ pub(super) async fn get_revision(
     let lines = bom::lines(&st.db, &me, rev.id).await?;
     let (rev_changes, hidden_changes) = changes::for_revision(&st.db, &me, rev.id).await?;
     let open_requests = requests::open_for_item(&st.db, &me, rev.item_id).await?;
+    // design properties that differ from the revision (#367), as on the web page
+    let property_mismatches = files::property_mismatches(&rev, &attachments);
     Ok(Json(json!({
         "revision": rev, "files": attachments, "bom": lines, "changes": rev_changes,
         "hidden_changes": hidden_changes,
         "open_requests": open_requests,
+        "property_mismatches": property_mismatches,
     })))
 }
 
@@ -607,7 +629,9 @@ pub(super) async fn checkout(
 
 /// Check-in. Without a body it just releases the lock; with a
 /// `multipart/form-data` body (fields `file` and optional `comment`) the files
-/// become new versions and the lock is released in the same transaction.
+/// become new versions and the lock is released in the same transaction; the
+/// field `bom_from_references=true` also updates the BOM from the CAD file
+/// there (#407, answered as `bom`).
 pub(super) async fn checkin(
     State(st): State<AppState>,
     ApiUser(me): ApiUser,
@@ -642,15 +666,30 @@ pub(super) async fn checkin(
         &mut received,
     )
     .await?;
-    let (rev, stored) =
-        files::check_in(&st.db, &me, rev.id, &received.uploads, &received.comment).await?;
+    let options = files::CheckInOptions::from_field(
+        received
+            .fields
+            .get("bom_from_references")
+            .map(String::as_str),
+    );
+    let (rev, stored, bom) = files::check_in_with(
+        &st.db,
+        &me,
+        rev.id,
+        &received.uploads,
+        &received.comment,
+        options,
+    )
+    .await?;
     uploads::forget(&st.db, &st.vault, &sessions).await;
     web::warm_previews(&st, &received.uploads);
     let changed: Vec<Value> = stored
         .iter()
         .map(|s| json!({ "file_id": s.file_id, "filename": s.filename, "version": s.version, "changed": s.changed }))
         .collect();
-    Ok(Json(json!({ "revision": rev, "files": changed })))
+    Ok(Json(
+        json!({ "revision": rev, "files": changed, "bom": bom }),
+    ))
 }
 
 #[derive(Deserialize)]
