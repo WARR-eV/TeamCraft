@@ -705,7 +705,7 @@ real files and belong to section 3 once such files are at hand.
 - [ ] Desktop: STEP export through `solidcraft-cli` at check-in, all OSes (#368)
 - [ ] Desktop: item number and revision written into the design properties (#369)
 - [ ] Desktop: designs open in SolidCraft (lock file) shown, warning at check-in (#370)
-- [ ] (research first) 3D preview from the `.sc` file alone (#371)
+- [x] (research first) 3D preview from the `.sc` file alone (#371): research page *3D preview of SolidCraft designs without an export*; left: read `cache/preview.bin` when present, an SCBREP05 reader later
 
 ### 5. Feature demand (backlog)
 
