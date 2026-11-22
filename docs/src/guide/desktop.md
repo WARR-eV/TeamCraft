@@ -672,3 +672,13 @@ for the next start. *Don't ask again* (or *Settings → Crash reports*) stops
 the question; the reports then stay on the computer only. Background and the
 alternatives that were considered: [Crash reports from the desktop
 app](../research/crash-reporting.md).
+
+## Managed computers
+
+On a computer your IT department manages, some settings can be fixed by
+*policies* (see [Deploying the desktop app](../admin/desktop-deployment.md)):
+the server, the update check, the question after a crash and the default
+working folder. *Settings* then shows *Managed by …* at the top, and a fixed
+setting is marked **Set by your organization** and cannot be changed. With a
+fixed server, the connect screen shows that server only, *Switch server…* is
+hidden and saved connections to other servers cannot be switched to.
