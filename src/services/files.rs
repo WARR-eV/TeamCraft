@@ -34,7 +34,9 @@ const FILE_SELECT: &str = "
            f.uploaded_by, u.display_name AS uploaded_by_name, f.uploaded_at,
            f.current_version AS version, COALESCE(f.format, '') AS format, f.folder, f.retention,
            (SELECT cv.solver_summary FROM file_versions cv
-            WHERE cv.file_id = f.id AND cv.version = f.current_version) AS solver_summary
+            WHERE cv.file_id = f.id AND cv.version = f.current_version) AS solver_summary,
+           (SELECT NULLIF(cv.properties, '{}'::jsonb) FROM file_versions cv
+            WHERE cv.file_id = f.id AND cv.version = f.current_version) AS properties
     FROM files f JOIN users u ON u.id = f.uploaded_by";
 
 const VERSION_SELECT: &str = "
@@ -75,6 +77,9 @@ pub struct Upload {
     /// Solver summary (`solversummary`) computed from the head and tail
     /// read for the result scan; `None` for other files.
     pub solver_summary: Option<serde_json::Value>,
+    /// Design properties read from the file (SolidCraft designs, see
+    /// `scdesign::properties`); `None` for other files.
+    pub properties: Option<crate::scdesign::DesignProperties>,
     /// The duplicate guard the client asked for (issue #359, see
     /// `services::file_check`): off by default.
     pub guard: ClashGuard,
@@ -181,7 +186,7 @@ impl Upload {
         let mut sum_head = Vec::new();
         let mut sum_tail = Vec::new();
         let mut export_name = None;
-        let (format, content_text, references) = match vault.object_path(&blob.sha256) {
+        let (format, content_text, references, properties) = match vault.object_path(&blob.sha256) {
             Ok(path) => {
                 let html = crate::htmltext::is_html(&filename);
                 if crate::resultscan::scannable(&filename) && !html {
@@ -211,15 +216,35 @@ impl Upload {
                 if format.is_some_and(|f| f.id == "step") {
                     export_name = cadrefs::scan_export_name(&path, &filename).await;
                 }
-                let text = crate::textindex::extract_file(&path, &filename).await;
+                let mut text = crate::textindex::extract_file(&path, &filename).await;
+                let properties = match format {
+                    Some(f) if f.id == "solidcraft-design" => design_properties(&path).await,
+                    _ => None,
+                };
+                if let Some(extra) = properties
+                    .as_ref()
+                    .map(crate::scdesign::DesignProperties::search_text)
+                    .filter(|t| !t.is_empty())
+                {
+                    // found by the full-text search like the rest of the file
+                    if !text.is_empty() {
+                        text.push('\n');
+                    }
+                    text.push_str(&extra);
+                }
                 if html && crate::resultscan::scannable(&filename) {
                     // templates see the text extracted in the isolated child,
                     // never the markup
                     scan_head = head_of(&text, crate::resultscan::SCAN_MAX_BYTES);
                 }
-                (format, text, references)
+                (format, text, references, properties)
             }
-            Err(_) => (cadformat::detect(&filename, &[]), String::new(), Vec::new()),
+            Err(_) => (
+                cadformat::detect(&filename, &[]),
+                String::new(),
+                Vec::new(),
+                None,
+            ),
         };
         let (sh, st) = if scan_head.is_empty() {
             (&sum_head, &sum_tail)
@@ -238,11 +263,28 @@ impl Upload {
             base: None,
             folder: None,
             solver_summary,
+            properties,
             scan_head,
             scan_tail,
             guard: ClashGuard::default(),
         }
     }
+}
+
+/// The design properties of a SolidCraft design (`scdesign::properties`):
+/// its document read within `scdesign::MAX_DOCUMENT`, off the async worker
+/// threads. Anything unreadable is `None`, never an error – an upload never
+/// fails over its properties.
+async fn design_properties(path: &std::path::Path) -> Option<crate::scdesign::DesignProperties> {
+    let path = path.to_path_buf();
+    tokio::task::spawn_blocking(move || {
+        let mut file = std::fs::File::open(path).ok()?;
+        let document = crate::scdesign::document(&mut file)?;
+        crate::scdesign::properties(&document)
+    })
+    .await
+    .ok()
+    .flatten()
 }
 
 /// The solver summary of a file from the head and tail of the result scan
@@ -439,6 +481,11 @@ fn with_format(mut file: FileRecord) -> FileRecord {
         .as_ref()
         .and_then(crate::solversummary::Summary::from_json)
         .map(|s| s.line());
+    file.properties_line = file
+        .properties
+        .as_ref()
+        .and_then(crate::scdesign::DesignProperties::from_json)
+        .map(|p| p.line());
     file
 }
 
@@ -452,6 +499,27 @@ pub(crate) async fn list_unchecked(pool: &PgPool, revision_id: Uuid) -> AppResul
     .into_iter()
     .map(with_format)
     .collect())
+}
+
+/// Design properties (SolidCraft) of the files that differ from their
+/// revision: one entry `{id, filename, mismatches}` per file with a
+/// difference. A hint computed on every view, so it goes away as soon as the
+/// item or the file is changed – nothing is changed automatically (#367).
+/// Shared by the web revision page and `GET /api/v1/items/{n}/revisions/{c}`
+/// (the desktop revision view).
+pub fn property_mismatches(rev: &Revision, files: &[FileRecord]) -> Vec<serde_json::Value> {
+    files
+        .iter()
+        .filter_map(|f| {
+            let props = f
+                .properties
+                .as_ref()
+                .and_then(crate::scdesign::DesignProperties::from_json)?;
+            let found = props.mismatches(&rev.item_number, &rev.code, &rev.name, &rev.description);
+            (!found.is_empty())
+                .then(|| json!({ "id": f.id, "filename": f.filename, "mismatches": found }))
+        })
+        .collect()
 }
 
 /// The files of several revisions in one query, ordered by revision, folder
@@ -1005,8 +1073,8 @@ pub(crate) async fn store_uploads(
             sqlx::query(
                 "INSERT INTO file_versions (id, file_id, version, sha256, size_bytes, content_type, comment,
                                             uploaded_by, content_text, export_name, export_name_scanned,
-                                            solver_summary)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, $11)",
+                                            solver_summary, properties)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, $11, $12)",
             )
             .bind(version_id)
             .bind(file_id)
@@ -1019,6 +1087,12 @@ pub(crate) async fn store_uploads(
             .bind(&upload.content_text)
             .bind(&upload.export_name)
             .bind(&upload.solver_summary)
+            .bind(
+                upload
+                    .properties
+                    .as_ref()
+                    .map_or_else(|| json!({}), crate::scdesign::DesignProperties::to_json),
+            )
             .execute(&mut *conn)
             .await?;
             references::store_file_references(conn, version_id, &upload.references).await?;
@@ -1405,9 +1479,9 @@ pub async fn restore_version(
     sqlx::query(
         "INSERT INTO file_versions (id, file_id, version, sha256, size_bytes, content_type, comment,
                                     uploaded_by, content_text, references_scanned, export_name,
-                                    export_name_scanned, solver_summary)
+                                    export_name_scanned, solver_summary, properties)
          SELECT $1, file_id, $2, sha256, size_bytes, content_type, $3, $4, content_text, references_scanned,
-                export_name, export_name_scanned, solver_summary
+                export_name, export_name_scanned, solver_summary, properties
          FROM file_versions WHERE id = $5",
     )
     .bind(new_version_id)

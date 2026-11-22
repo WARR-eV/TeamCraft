@@ -363,6 +363,7 @@ pub fn router(state: &AppState) -> Router<AppState> {
         )
         .route("/files/{id}/content", get(download))
         .route("/files/{id}/thumbnail", get(file_thumbnail))
+        .route("/revisions/{id}/thumbnail", get(revision_thumbnail))
         .route("/files/{id}/versions", get(file_versions))
         .route("/files/{id}/restore", post(restore_file))
         .route("/file-versions/{id}/content", get(download_version))
@@ -658,6 +659,7 @@ async fn index() -> Json<Value> {
             "PATCH  /api/v1/files/{id}                                {folder?, retention?} – its place in the working folder; retention all | latest (old versions of a latest file are removed after a grace period) – revision checked out by you",
             "GET    /api/v1/files/{id}/content                   resumable: Range: bytes=N- with If-Range: \"<sha256>\" (ETag) → 206",
             "GET    /api/v1/files/{id}/thumbnail                      preview image stored in Inventor, Solid Edge and SolidWorks files (PNG or BMP, 404 if none)",
+            "GET    /api/v1/revisions/{id}/thumbnail                  main thumbnail of a revision: the preview image of its main CAD file (assembly > part > model > drawing > JT; ETag, If-None-Match → 304; 404 if none or not readable)",
             "GET    /api/v1/files/{id}/versions",
             "POST   /api/v1/files/{id}/restore                        {version}",
             "GET    /api/v1/file-versions/{id}/content           resumable like /files/{id}/content",

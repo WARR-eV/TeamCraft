@@ -7,7 +7,7 @@ import { label } from "/static/shared/js/format.js";
 import { canEdit, canEditProject, freshProjects, refreshWorklistCount, rescanNewFiles } from "./shell.js";
 import { activeProject, selectView } from "./navigator.js";
 import { newItemFolder } from "./files-view.js";
-import { formatKinds } from "./folder-import.js";
+import { describeFromDesign, formatKinds } from "./folder-import.js";
 import { newItemFindings, newItemKeyText, newItemPlacement, newItemSummary } from "./new-files.js";
 import { openRevision } from "./revision.js";
 
@@ -85,7 +85,8 @@ export function checkNewItemFiles(project, places, targets) {
  *
  * `spec`: {body (POST /items fields), project, folder, places, targets, main,
  * allowSameName}. Resolves with the new revision; an upload failure rejects
- * with `err.createdRevision` set.
+ * with `err.createdRevision` set. An empty description is filled from a
+ * SolidCraft design among the files (#367).
  */
 export function createItemFromFiles(spec) {
   var places = spec.places || [];
@@ -104,13 +105,17 @@ export function createItemFromFiles(spec) {
     if (hex) body.idempotency_key = "new-item:" + hex;
     return api("POST", "/items", body);
   }).then(function (rev) {
+    call("usage_count", { action: "new_item" }).catch(function () {});
     if (!places.length) return rev;
     var folders = {};
     places.forEach(function (p, i) { folders[p.name] = spec.targets[i] != null ? spec.targets[i] : spec.folder; });
     return call("upload_files", {
       item: rev.item_number, code: rev.code, paths: paths, comment: null, folders: folders,
       project: spec.project, track: true, refuseClash: true, refuseSameName: !spec.allowSameName
-    }).then(function () { return rev; }, function (err) {
+    }).then(function (records) {
+      // an empty description from a SolidCraft design's properties (#367) – best effort
+      return describeFromDesign(rev, records).then(function () { return rev; });
+    }, function (err) {
       var e = new Error(errorText(err));
       e.createdRevision = rev;
       throw e;

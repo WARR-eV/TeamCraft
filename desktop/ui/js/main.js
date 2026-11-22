@@ -152,8 +152,10 @@ export function boot() {
     call("workspace_cancel").catch(function () {});
   });
   // translated UI (#379): the saved choice, else the system's language
-  loadLanguage(preferredLanguage()).catch(function () {});
-  call("session").then(function (s) {
+  // – loaded before the first view draws, so the texts of the catalogs (the
+  // empty states of #423) never show their IDs; a failure leaves English
+  var languageReady = loadLanguage(preferredLanguage()).catch(function () {});
+  languageReady.then(function () { return call("session"); }).then(function (s) {
     state.session = s;
     showAppVersion(s.version);
     state.zoom = s.zoom || 1;

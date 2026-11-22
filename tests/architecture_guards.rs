@@ -11,7 +11,10 @@
 //! * every template file is in `TEMPLATES` and rendered by the
 //!   `every_template_renders` test (or extended/imported by one that is);
 //! * every `TEAMCRAFT_*` variable the code reads is documented in
-//!   `docs/src/admin/configuration.md`.
+//!   `docs/src/admin/configuration.md`;
+//! * every language file of the desktop Group Policy template
+//!   (`deploy/desktop-policies/windows/*/TeamCraft.adml`) defines the string and
+//!   presentation IDs of en-US and every one the ADMX references.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -740,4 +743,106 @@ fn the_documentation_scanner_understands_the_shorthands() {
         wildcards.iter().any(|w| w == "TEAMCRAFT_OIDC_"),
         "{wildcards:?}"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Desktop policy templates (#378): every language file of the Group Policy
+// template defines exactly the string and presentation IDs of en-US, and
+// every `$(string.X)` / `$(presentation.X)` the ADMX references. A policy
+// added to the ADMX and en-US but not to de-DE would make the Group Policy
+// editor refuse the whole template on German systems.
+
+/// The `<string id>` and `<presentation id>` sets of an ADML file.
+fn adml_ids(text: &str) -> (BTreeSet<String>, BTreeSet<String>) {
+    let collect = |re: &str| -> BTreeSet<String> {
+        Regex::new(re)
+            .expect("regex")
+            .captures_iter(text)
+            .map(|c| c[1].to_string())
+            .collect()
+    };
+    (
+        collect(r#"<string\s+id="([^"]+)""#),
+        collect(r#"<presentation\s+id="([^"]+)""#),
+    )
+}
+
+/// The `$(string.X)` and `$(presentation.X)` references of the ADMX file.
+fn admx_refs(text: &str) -> (BTreeSet<String>, BTreeSet<String>) {
+    let mut strings = BTreeSet::new();
+    let mut presentations = BTreeSet::new();
+    let re = Regex::new(r"\$\((string|presentation)\.([A-Za-z0-9_]+)\)").expect("regex");
+    for c in re.captures_iter(text) {
+        if &c[1] == "string" {
+            strings.insert(c[2].to_string());
+        } else {
+            presentations.insert(c[2].to_string());
+        }
+    }
+    (strings, presentations)
+}
+
+#[test]
+fn every_policy_language_file_matches_the_admx() {
+    let dir = root().join("deploy/desktop-policies/windows");
+    let (refs_strings, refs_presentations) = admx_refs(&read(&dir.join("TeamCraft.admx")));
+    assert!(!refs_strings.is_empty(), "no $(string.X) in TeamCraft.admx");
+    let (en_strings, en_presentations) = adml_ids(&read(&dir.join("en-US/TeamCraft.adml")));
+    let mut languages = Vec::new();
+    for entry in fs::read_dir(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display())) {
+        let path = entry.expect("entry").path().join("TeamCraft.adml");
+        if path.is_file() {
+            languages.push(path);
+        }
+    }
+    assert!(
+        languages.len() >= 2,
+        "en-US and de-DE expected: {languages:?}"
+    );
+    let mut problems = Vec::new();
+    for path in &languages {
+        let (strings, presentations) = adml_ids(&read(path));
+        let name = relative(path);
+        for missing in refs_strings.difference(&strings) {
+            problems.push(format!(
+                "{name}: string `{missing}` referenced by the ADMX is missing"
+            ));
+        }
+        for missing in refs_presentations.difference(&presentations) {
+            problems.push(format!(
+                "{name}: presentation `{missing}` referenced by the ADMX is missing"
+            ));
+        }
+        if strings != en_strings {
+            problems.push(format!(
+                "{name}: string IDs differ from en-US: {:?}",
+                strings
+                    .symmetric_difference(&en_strings)
+                    .collect::<Vec<_>>()
+            ));
+        }
+        if presentations != en_presentations {
+            problems.push(format!(
+                "{name}: presentation IDs differ from en-US: {:?}",
+                presentations
+                    .symmetric_difference(&en_presentations)
+                    .collect::<Vec<_>>()
+            ));
+        }
+    }
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
+#[test]
+fn the_policy_template_scanner_sees_ids_and_references() {
+    let (strings, presentations) = adml_ids(
+        r#"<string id="A">x</string><string  id="B_Explain">y</string><presentation id="A"><textBox refId="A"/></presentation>"#,
+    );
+    assert_eq!(strings.into_iter().collect::<Vec<_>>(), ["A", "B_Explain"]);
+    assert_eq!(presentations.into_iter().collect::<Vec<_>>(), ["A"]);
+    let (strings, presentations) = admx_refs(
+        r#"displayName="$(string.A)" explainText="$(string.A_Explain)" presentation="$(presentation.A)""#,
+    );
+    assert_eq!(strings.into_iter().collect::<Vec<_>>(), ["A", "A_Explain"]);
+    assert_eq!(presentations.into_iter().collect::<Vec<_>>(), ["A"]);
 }

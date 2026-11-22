@@ -26,6 +26,38 @@ see the notices in the README.
   `GET /api/v1/items/suggest`; both use the item search with the user's read
   rights, so items of restricted groups the user is not in never appear (at
   most 10 rows, nothing for fewer than 2 characters).
+- SolidCraft design properties (#367): part number, revision, description, project, author, organisation and licence are read from `.sc` designs at upload and check-in (bounded, text values only, migration `0078_file_properties`), listed under the file on the revision page and in the desktop app, returned as `properties`/`properties_line` with the file in the REST API (and `design_properties` in the MCP file briefs), and found by the full-text search. The revision page – web and desktop – shows a notice when they differ from the item number, revision code or name (`property_mismatches` of `GET /api/v1/items/{n}/revisions/{c}`) – worked out on every view, nothing is changed automatically. A new item created in the web UI with a design and no name takes the design's description; the desktop's *New item* (and *Create items…* of the worklist) and *Import a CAD folder* fill an empty description from it.
+- **Thumbnails in lists** (#420): the picture of a revision's main model (the
+  rule of the revision page, now in `services::thumbnails`; a stand-alone JT
+  file after the native files) heads every row of the web item list and its
+  search results, the vault explorer, and the desktop app's Home *Files*,
+  *All items*, *Structure* and the search. The list answers carry
+  `thumbnail_file_id` / `thumbnail_sha256` (`GET /items`, `/favorites`, the
+  structure levels) or per file `thumbnail` / `sha256` (`GET
+  /projects/{code}/files`), filled for the whole page in one query; the
+  images load lazily (web `loading="lazy"`, desktop only for rows in view)
+  and are cached by content hash. New: `GET /revisions/{id}/thumbnail` on
+  web and REST API (404 without a picture or read access); thumbnail
+  responses answer `If-None-Match` with 304 (not for assemblies composed from
+  their parts' previews, whose picture changes with a component). Similar-part hits use the same
+  picture rule.
+
+### Changed
+
+- **Usage statistics: the desktop app counts every listed action** (#383).
+  Besides check-out, check-in, park, get files, open in CAD, 3D preview and
+  STEP exports, the daily report now also counts BOM imports (not the
+  preview), folder imports that created items, new items, releases (a change
+  created from *Release…*), cancelled check-outs, submitted searches and
+  answered assistant questions – still only counts, never names, numbers or
+  search terms. A test checks that every name of the fixed list has a place
+  in the app that counts it.
+
+### Fixed
+
+- CI on `main` is green again: the comment of the shared text-selection rule
+  (#436) quoted two hex colours, which the no-literal-colours guard of
+  `shared/css/` counts as colours in the stylesheet.
 
 ## [0.2.12] - 2026-11-22
 
@@ -40,6 +72,24 @@ see the notices in the README.
 
 ### Added
 
+- **Empty states that name the next step** (#423, part of #408): no project
+  group → *Create a project group* for CAD editors, "ask a manager of a group
+  to add you" for viewers (vault, *Projects*, desktop *Home* and *Projects*);
+  an empty project group → *New item* / *Import BOM* in the vault and
+  *Import CAD folder…* / *New item* on desktop *Home* for those who may create
+  items in it (CAD editors outside the group are asked to have a manager add
+  them); *New on this computer* without suggestions → *Get…* with the active
+  group ticked; the empty review, check-out and change lists of the dashboard,
+  the desktop *Home* tab and the desktop worklist say how work arrives there;
+  an empty working folder of a revision names the next step by check-out.
+  Viewer accounts see a note on the dashboard, the desktop *Home* tab and atop
+  the desktop worklist
+  that editing needs the CAD editor role and that a server administrator
+  grants it. The texts are in the i18n catalogs (`empty.*`, English and
+  German); the desktop app loads its catalog before the first view draws.
+  Tests: `every_template_renders` renders the dashboard and the vault as
+  editor and viewer, `scripts/desktop-empty-rules.test.mjs` checks the
+  desktop rules (`ui/js/empty-rules.js`).
 - **Check-outs of a project group as a graph** (#428): administrators and
   the group's managers see who has what checked out right now – *Check-outs*
   on the group page (`/projects/{id}/checkouts`) and a lock button next to
@@ -195,6 +245,10 @@ see the notices in the README.
   organization*, and *Managed by …* appears in Settings and About. The
   templates ship with each release as
   `teamcraft-desktop-policies-<version>.zip`.
+- **German Group Policy texts** (#378): `deploy/desktop-policies/windows/de-DE/TeamCraft.adml`
+  shows the TeamCraft Desktop policies in German in the Group Policy editor
+  (same string and presentation IDs as `en-US`, checked by
+  `tests/architecture_guards.rs`); it ships in the policy zip.
 
 ### Fixed
 
@@ -274,6 +328,19 @@ see the notices in the README.
   in the *Files* view and the *Structure* tree gets one marker in the lock
   colour – a bar at its left edge and a light tint of the row – whoever holds
   the lock; the text colour is unchanged.
+
+### Documentation
+
+- **Research page *CAD add-ins: Inventor and Siemens NX first*** (#425):
+  extension mechanism and runtime (Inventor 2025–2026 on .NET 8, 2027 on
+  .NET 10 templates; NX Open journals vs signed startup applications and the
+  author licence), events, UI, licences (vendor assemblies referenced, never
+  redistributed), build and tests (a CAD-independent core with a fake host,
+  FreeCAD as the reference add-in for CI), install and update (*Settings →
+  CAD add-ins*, a `CadAddins` policy). Decision: an Inventor MVP, an NX MVP
+  after the licence check, both talking to the desktop app over per-user
+  local IPC (protocol `teamcraft.cad` v1, no token in the add-in, requests are
+  untrusted intents). Nothing of it is built yet.
 
 ## [0.2.11] - 2026-11-21
 

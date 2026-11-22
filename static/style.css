@@ -917,6 +917,8 @@ details.menu > summary.button::marker { content: ""; }
 .notice > :last-child { margin-bottom: 0; }
 .notice.state-review { box-shadow: inset 3px 0 0 var(--st-review-fg); }
 .notice.state-danger { box-shadow: inset 3px 0 0 var(--st-danger-fg); }
+/* why a viewer account sees no editing buttons (#423) */
+.viewer-note { margin-bottom: var(--space-4); box-shadow: inset 3px 0 0 var(--link); }
 @keyframes flash-in {
   from { opacity: 0; transform: translateY(-4px); }
 }
@@ -1055,6 +1057,7 @@ canvas.viewer-measuring { cursor: crosshair; }
 .explorer-tree a.active { background: var(--selected); font-weight: 600; box-shadow: inset 2px 0 0 var(--focus); }
 .explorer-tree .tree-head { margin: var(--space-3) 8px 4px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
 .explorer-tree .empty { padding: 0 8px; }
+.empty-actions { margin-top: var(--space-3); }
 .explorer-list .card-head { margin-bottom: var(--space-3); }
 .explorer-list .card-head input[type=search] { width: 16rem; }
 .explorer-detail { position: sticky; top: calc(var(--topbar-h) + 16px); }
@@ -1244,6 +1247,14 @@ ul.file-refs { margin-bottom: var(--space-3); }
   border: 1px solid var(--border); border-radius: 4px; background: #fff;
 }
 .similar-main { min-width: 0; overflow-wrap: anywhere; }
+/* main thumbnail of a revision in the item list, search and explorer (#420):
+   a fixed column, so a row without a picture (or a missing one) keeps its place */
+th.thumb-col, td.thumb-col { width: 2.5rem; padding-top: 0.15rem; padding-bottom: 0.15rem; }
+.list-thumb {
+  width: 2.5rem; height: 2.5rem; object-fit: contain; display: block;
+  border: 1px solid var(--border); border-radius: 4px; background: #fff;
+}
+td.thumb-col .thumb-link { margin: 0; display: block; }
 .similar-why { display: block; color: var(--text-dim); font-size: 0.8rem; margin-top: 0.15rem; }
 .similar-score { display: flex; align-items: center; gap: var(--space-2); font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; }
 .similar-score meter {

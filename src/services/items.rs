@@ -11,7 +11,8 @@ use crate::{
     error::{AppError, AppResult},
     models::{Item, ItemSummary, Revision, WhereUsed, WhereUsedLevel},
     services::{
-        access, attributes, audit, files, notifications, projects, revisions, simulations, Page,
+        access, attributes, audit, files, notifications, projects, revisions, simulations,
+        thumbnails, Page,
     },
 };
 
@@ -346,7 +347,23 @@ pub async fn search(
             .await?
         }
     };
-    Ok((rows.into_iter().map(|r| r.item).collect(), total))
+    let mut items: Vec<ItemSummary> = rows.into_iter().map(|r| r.item).collect();
+    with_thumbnails(pool, &mut items).await?;
+    Ok((items, total))
+}
+
+/// Fills the main thumbnail of each row's latest revision, in one query for
+/// the whole page (#420).
+async fn with_thumbnails(pool: &PgPool, items: &mut [ItemSummary]) -> AppResult<()> {
+    let ids: Vec<Uuid> = items.iter().map(|i| i.latest_revision_id).collect();
+    let thumbs = thumbnails::main_for_revisions(pool, &ids).await?;
+    for item in items.iter_mut() {
+        if let Some(thumb) = thumbs.get(&item.latest_revision_id) {
+            item.thumbnail_file_id = Some(thumb.file_id);
+            item.thumbnail_sha256 = Some(thumb.sha256.clone());
+        }
+    }
+    Ok(())
 }
 
 /// Most suggestions the component picker shows (#419).

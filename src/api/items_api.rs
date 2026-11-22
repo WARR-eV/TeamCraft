@@ -569,10 +569,13 @@ pub(super) async fn get_revision(
     let lines = bom::lines(&st.db, &me, rev.id).await?;
     let (rev_changes, hidden_changes) = changes::for_revision(&st.db, &me, rev.id).await?;
     let open_requests = requests::open_for_item(&st.db, &me, rev.item_id).await?;
+    // design properties that differ from the revision (#367), as on the web page
+    let property_mismatches = files::property_mismatches(&rev, &attachments);
     Ok(Json(json!({
         "revision": rev, "files": attachments, "bom": lines, "changes": rev_changes,
         "hidden_changes": hidden_changes,
         "open_requests": open_requests,
+        "property_mismatches": property_mismatches,
     })))
 }
 

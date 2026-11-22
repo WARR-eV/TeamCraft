@@ -41,6 +41,11 @@
   <li><a href="/vault"><span class="value">{{ stats.stored_bytes|filesize }}</span><span class="label">{{ stats.files }} files in the vault</span></a></li>
 </ul>
 
+{% if not me.can_edit %}
+{#- why the editing buttons are missing (#423) -#}
+<div class="notice viewer-note" role="note"><strong>{{ t("empty.viewer_note.title") }}</strong> – {{ t("empty.viewer_note") }}</div>
+{% endif %}
+
 <section class="card" id="reviews">
   <div class="card-head"><h2>Waiting for my review <span class="count">{{ reviews|length }}</span></h2></div>
   {% if reviews %}
@@ -60,7 +65,7 @@
     </tbody>
   </table>
   </div>
-  {% else %}<p class="empty">Nothing to review.</p>{% endif %}
+  {% else %}<p class="empty">{{ t("empty.nothing_to_review") }}</p>{% endif %}
 </section>
 
 {% if attention_simulations %}
@@ -124,7 +129,7 @@
       </tbody>
     </table>
     </div>
-    {% else %}<p class="empty">No check-outs.</p>{% endif %}
+    {% else %}<p class="empty">{% if me.can_edit %}{{ t("empty.no_checkouts") }} <a href="/vault">{{ t("nav.vault") }}</a>{% else %}{{ t("empty.no_checkouts.viewer") }}{% endif %}</p>{% endif %}
   </section>
 
   <section class="card">
@@ -146,7 +151,7 @@
       </tbody>
     </table>
     </div>
-    {% else %}<p class="empty">No open changes.</p>{% endif %}
+    {% else %}<p class="empty">{% if me.can_edit %}{{ t("empty.no_open_changes") }} <a href="/changes/new">{{ t("empty.action.new_change") }}</a>{% else %}{{ t("empty.no_open_changes.viewer") }} <a href="/requests/new">{{ t("empty.action.request_change") }}</a>{% endif %}</p>{% endif %}
   </section>
 
   <section class="card">
