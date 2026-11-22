@@ -149,6 +149,12 @@ feature milestone – the features in *What works* are enough; what is missing i
   (no code signing or notarisation): the checksums
   in `SHA256SUMS.txt` and the build provenance are the verification, and the docs explain the first start past
   SmartScreen and Gatekeeper
+- [x] Usage statistics (#383): desktop → own server always (anonymous daily report, fixed fields, *Show what is
+  sent*), *Admin → Usage statistics*, sharing an aggregate with the developers off by default
+  (`TEAMCRAFT_USAGE_STATISTICS[_URL]`, `DO_NOT_TRACK`, `TEAMCRAFT_NO_TELEMETRY`). Left: a collection service run
+  by the project (where, who operates it, retention) and its published results; counting `new_item`, `release`,
+  `search`, `assistant`, `import_*`, `cancel_checkout` in the desktop UI (the names are accepted already); the
+  desktop policy `UsageStatistics` (#378) once the developers' share is decided per desktop
 - [ ] Desktop app run and tested on Windows x64/ARM64, macOS and Linux for each RC (a short manual test script in
   `docs/src/dev/release-checklist.md`)
 - [x] One download to try TeamCraft on a laptop: desktop installers *with local server* (Windows x64, macOS Apple

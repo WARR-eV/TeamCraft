@@ -110,6 +110,7 @@ src/services/      business logic – the only code that writes to the database
                     file_check.rs: duplicates of new files – read-only check per group and the upload guard (#359);
                     attributes.rs: custom attribute definitions (admins), values per revision in revisions.attributes;
                     mass_properties.rs: material library, mass settings of revisions/files, mass/CG/inertia roll-up;
+                    usage.rs: usage statistics – desktop reports, admin overview, sharing with the developers (#383);
                     offboarding (#173): offboarding.rs = holdings report per user + idle SSO users, checkouts.rs =
                     check in all / release_held, deactivation.rs = *Offboard and deactivate* (hand-over, token
                     revocation, releases), ownership.rs = item owner + hand_over, manager_gaps.rs = groups without an

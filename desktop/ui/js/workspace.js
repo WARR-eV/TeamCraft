@@ -28,6 +28,7 @@ export function disposeViewer() {
 
 export function revViewer(tab, el) {
   var files = tab.data.files.filter(function (f) { return previewFormat(f); });
+  if (files.length) call("usage_count", { action: "open_3d_preview" }).catch(function () {});
   if (!files.length) {
     el.appendChild(h("p.empty", { text: "No 3D files (STEP, STL, OBJ, 3MF, glTF, PLY, point clouds, simulation results, …) – native CAD files (SolidWorks, NX, Creo, CATIA, …) are shown in 3D through a STEP export next to them." }));
     return;

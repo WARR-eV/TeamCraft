@@ -1299,3 +1299,9 @@ ul.file-picks li .mono { overflow: hidden; text-overflow: ellipsis; white-space:
   font-family: var(--mono); font-size: 12px; line-height: 1.45; white-space: pre;
   overflow: auto;
 }
+
+/* Settings → Privacy → Show what is sent (#383): the report as JSON. */
+pre.usage-json {
+  max-height: 14rem; overflow: auto; margin: 0; padding: 8px 10px; white-space: pre-wrap;
+  font-size: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}

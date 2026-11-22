@@ -390,6 +390,10 @@ there is no separate enterprise edition.
 - **Configuration** – everything through environment variables, each also as
   `*_FILE` for Docker or Kubernetes secrets; see the
   [configuration reference](https://warr-ev.github.io/TeamCraft/admin/configuration.html).
+- **Privacy** – nothing leaves your servers by itself without your choice: usage
+  statistics stay on your own server, sharing a summary with the developers is
+  off by default and shown byte for byte before it is sent; see
+  [Privacy: what TeamCraft sends](https://warr-ev.github.io/TeamCraft/admin/privacy.html).
 
 **Planned** – what is left of the issues above (all their steps are built):
 

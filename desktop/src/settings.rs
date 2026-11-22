@@ -198,6 +198,9 @@ pub struct Settings {
     pub update_latest: Option<String>,
     /// The release version whose notice the user closed.
     pub update_dismissed: Option<String>,
+    /// Anonymous usage counts for the own server (#383, src/usage.rs).
+    #[serde(default)]
+    pub usage: crate::usage::Usage,
     /// After a crash, ask at the next start whether to share the crash report
     /// (src/crash.rs); `None` = ask. Reports are never sent without asking.
     pub crash_prompt: Option<bool>,

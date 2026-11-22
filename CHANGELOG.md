@@ -57,6 +57,16 @@ see the notices in the README.
   the lines – part properties, placement counts, purchased/standard parts not
   expanded, phantoms passed through, reference components left out
   (`src/scbom.rs`, fuzzed by the `scdesign` target).
+- **Usage statistics** (#383). The desktop apps send their own TeamCraft
+  server one anonymous report per day of use (`POST /api/v1/usage`: a random
+  installation id, versions, system, package, active minutes, counts of fixed
+  actions and STEP exports – never content; *Settings → Privacy → Show what is
+  sent*). *Admin → Usage statistics* shows installations and action counts
+  and can share an aggregate (sizes in classes, features on/off) with the
+  TeamCraft developers once a day – **off by default**, sent only to
+  `TEAMCRAFT_USAGE_STATISTICS_URL`; `TEAMCRAFT_USAGE_STATISTICS`,
+  `DO_NOT_TRACK` and `TEAMCRAFT_NO_TELEMETRY` fix it, `teamcraft local` and
+  live demos never send. New page *Privacy: what TeamCraft sends*.
 
 ## [0.2.11] - 2026-11-21
 

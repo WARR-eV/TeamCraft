@@ -70,6 +70,7 @@ pub fn router(state: &AppState) -> Router<AppState> {
     Router::new()
         .route("/", get(index))
         .route("/me", get(me))
+        .route("/usage", post(usage_report))
         .route("/me/password", post(change_password))
         .route("/audit", get(audit_export))
         .route("/desktop/token", post(desktop_token))
@@ -1004,4 +1005,18 @@ async fn branding_logo(
     headers: axum::http::HeaderMap,
 ) -> AppResult<axum::response::Response> {
     web::branding_image(&st, &kind, &headers, false).await
+}
+
+/// `POST /api/v1/usage` – a desktop app's anonymous daily report (#383):
+/// exactly the documented fields, unknown action names dropped; nothing in
+/// it names the user. 204 when stored.
+async fn usage_report(
+    State(st): State<AppState>,
+    ApiUser(_me): ApiUser,
+    Json(report): Json<Value>,
+) -> AppResult<StatusCode> {
+    let today = chrono::Utc::now().date_naive();
+    let report = crate::services::usage::check_report(&report, today)?;
+    crate::services::usage::record(&st.db, &report).await?;
+    Ok(StatusCode::NO_CONTENT)
 }

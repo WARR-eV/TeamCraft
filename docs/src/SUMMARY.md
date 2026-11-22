@@ -31,6 +31,7 @@
 - [Operations](admin/operations.md)
 - [Live demo](admin/live-demo.md)
 - [Support policy](admin/support-policy.md)
+- [Privacy: what TeamCraft sends](admin/privacy.md)
 
 # Reference
 

@@ -71,6 +71,9 @@ export function openSettings() {
     h("h3", { text: "Updates" }),
     h("label.check", null, [updateCheck, "Tell me when a new version is out"]),
     h("p.hint", { text: "Asks GitHub for the latest TeamCraft release at most once a day and shows a link in the status bar. Nothing is downloaded or installed by the app." }),
+    h("h3", { text: "Privacy" }),
+    h("p.hint", { text: "TeamCraft Desktop sends your TeamCraft server one anonymous report per day of use: a random id of this installation, the app version, operating system, package type, active minutes and counts of fixed actions (check-outs, check-ins, 3D previews …) – never names, numbers, paths, search terms or anything you type. Your administrator decides whether the server shares a summary with the TeamCraft developers (off unless they turn it on)." }),
+    h("div.row", null, [h("button", { type: "button", on: { click: function () { showUsage(); } } }, "Show what is sent")]),
     h("h3", { text: "Crash reports" }),
     h("label.check", null, [crashPrompt, "After a crash, ask at the next start whether to share the report"]),
     h("p.hint", { text: "Crashes and uncaught errors are written to a report on this computer (in the app's settings folder, without your home folder, server addresses or tokens). It is only shared when you open the GitHub issue yourself. Switched off, the reports stay on this computer and are never shown." }),
@@ -316,4 +319,18 @@ export function openAbout() {
     h("p.small.muted", { text: "TeamCraft is open source under the Mozilla Public License 2.0. Font: Montserrat (SIL Open Font License 1.1), text in the system UI face." }),
     h("p.small.muted", { text: "Server: " + (state.session.server_url || "—") })
   ]), [{ label: "Close", primary: true, onClick: function (d) { d.close(); } }]);
+}
+
+/** *Settings → Privacy → Show what is sent* (#383): the exact report being
+ *  counted today, a finished one waiting to be sent, and the one sent last. */
+function showUsage() {
+  call("usage_show").then(function (r) {
+    function block(title, value) {
+      return value ? [h("strong", { text: title }), h("pre.usage-json", { text: JSON.stringify(value, null, 2) })] : [];
+    }
+    dialog("What is sent", h("div.stack", null, [
+      h("p.hint", { text: "Sent to " + (state.session.server_url || "your TeamCraft server") + " once a day, for the day before." }),
+    ].concat(block("Today, so far", r.today), block("Waiting to be sent", r.pending), block("Sent last", r.last_sent))),
+    [{ label: "Close", primary: true, onClick: function (d) { d.close(); } }], { wide: true });
+  }, function (e) { toast(errorText(e), "error"); });
 }

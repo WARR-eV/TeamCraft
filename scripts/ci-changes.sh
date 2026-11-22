@@ -30,11 +30,12 @@ set -euo pipefail
 # assets, logos and icons (src/assets.rs), the vendored crates, the fuzz seeds
 # (tests/parser_corpus.rs), the build configuration – and the files of the
 # desktop app that server tests compare with their own (src/assets.rs,
-# src/domain/mod.rs, tests/branding_names.rs, tests/desktop_compat.rs).
+# src/domain/mod.rs, tests/branding_names.rs, tests/desktop_compat.rs,
+# src/services/usage.rs).
 SERVER='^(src|tests|migrations|templates|static|shared|vendor|media/logos|media/icons|fuzz/seeds)/'
 SERVER+='|^(Cargo\.toml|Cargo\.lock|build\.rs|clippy\.toml|rustfmt\.toml|\.rustfmt\.toml|rust-toolchain|rust-toolchain\.toml)$'
 SERVER+='|^\.cargo/config(\.toml)?$|^\.config/nextest\.toml$|^\.github/coverage-floor$|^\.github/workflows/ci\.yml$'
-SERVER+='|^desktop/ui/(app\.css|index\.html)$|^desktop/ui/js/(core|settings|shell)\.js$|^desktop/src/compat\.rs$'
+SERVER+='|^desktop/ui/(app\.css|index\.html)$|^desktop/ui/js/(core|settings|shell)\.js$|^desktop/src/(compat|usage)\.rs$'
 
 # guards – ci.yml, without a database: config::tests and
 # tests/architecture_guards.rs, for the files outside the server area they
@@ -173,6 +174,7 @@ self_test() {
     # desktop Rust code
     check desktop/src/workspace.rs server=false desktop_rust=true desktop_ui=false 'codeql=["rust"]' 'deny=[]'
     check desktop/src/compat.rs server=true desktop_rust=true
+    check desktop/src/usage.rs server=true desktop_rust=true
     check desktop/Cargo.lock server=false desktop_rust=true 'deny=["desktop/Cargo.toml"]' 'codeql=["rust"]'
     check desktop/tauri.conf.json server=false desktop_rust=true desktop_ui=false 'codeql=[]'
     check desktop/README.md server=false desktop_rust=false desktop_ui=false

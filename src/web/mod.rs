@@ -17,6 +17,7 @@ mod attributes;
 mod auth_pages;
 mod bom;
 mod branding;
+mod usage;
 mod changes;
 mod dashboard;
 mod desktop;
@@ -448,6 +449,8 @@ pub fn router(state: &AppState) -> Router<AppState> {
         .route("/admin/audit", get(admin::audit))
         .route("/admin/audit/export", get(admin::audit_export))
         .route("/admin/ai", get(admin::ai))
+        .route("/admin/usage", get(usage::page))
+        .route("/admin/usage/sharing", post(usage::set_share))
         .route("/admin/branding", get(branding::page))
         .route("/admin/branding/name", post(branding::set_name))
         .route(
