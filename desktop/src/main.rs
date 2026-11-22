@@ -246,6 +246,7 @@ fn main() {
             commands::session,
             commands::set_server,
             commands::server_notice,
+            commands::server_version,
             commands::server_url_insecure,
             commands::local_server_start,
             commands::sign_in_browser,

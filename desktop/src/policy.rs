@@ -11,6 +11,7 @@
 //! | `WorkspaceRoot`      | default working-folder root (an absolute path)               |
 //! | `OrganizationName`   | shown as *Managed by …* (one line, at most 64 characters)     |
 //! | `UsageStatistics`    | 0: never sent, kept or asked; 1: sent, cannot be turned off (#383) |
+//! | `ReportUrl`          | where *Report a problem* sends reports: the organisation's tracker (`https://…`) |
 //!
 //! Where they come from:
 //!
@@ -55,6 +56,7 @@ pub struct Policies {
     pub workspace_root: Option<PathBuf>,
     pub organization_name: Option<String>,
     pub usage_statistics: Option<bool>,
+    pub report_url: Option<String>,
 }
 
 /// One raw value as a source stores it.
@@ -92,6 +94,12 @@ fn organization(raw: Option<&Raw>) -> Option<String> {
     fits.then(|| name.to_string())
 }
 
+/// `ReportUrl`: an http(s) address the report form accepts (`report::form_url`).
+fn report_url(raw: Option<&Raw>) -> Option<String> {
+    let url = text(raw)?.trim();
+    (url.len() <= 1024 && crate::report::form_url(url, "", "").is_ok()).then(|| url.to_string())
+}
+
 /// `WorkspaceRoot`: an absolute path (Windows: with a drive or a UNC share).
 fn workspace_root(raw: Option<&Raw>) -> Option<PathBuf> {
     let path = text(raw)?.trim();
@@ -116,6 +124,7 @@ impl Policies {
             workspace_root: workspace_root(get("WorkspaceRoot").as_ref()),
             organization_name: organization(get("OrganizationName").as_ref()),
             usage_statistics: switch(get("UsageStatistics").as_ref()),
+            report_url: report_url(get("ReportUrl").as_ref()),
         }
     }
 
@@ -140,6 +149,7 @@ impl Policies {
             workspace_root: self.workspace_root.or(other.workspace_root),
             organization_name: self.organization_name.or(other.organization_name),
             usage_statistics: self.usage_statistics.or(other.usage_statistics),
+            report_url: self.report_url.or(other.report_url),
         }
     }
 
@@ -168,6 +178,12 @@ impl Policies {
         self.check_for_updates.unwrap_or(user != Some(false))
     }
 
+    /// Where problem reports go: the policy, else the user's tracker (`None` =
+    /// the TeamCraft issue form on GitHub).
+    pub fn report_target(&self, user: Option<String>) -> Option<String> {
+        self.report_url.clone().or(user)
+    }
+
     /// The question after a crash: the policy, else the user's choice.
     pub fn crash_prompt(&self, user: Option<bool>) -> bool {
         self.crash_report_prompt.unwrap_or(user != Some(false))
@@ -187,6 +203,9 @@ impl Policies {
         }
         if self.usage_statistics.is_some() {
             managed.push("usage_statistics");
+        }
+        if self.report_url.is_some() {
+            managed.push("report_url");
         }
         PolicyView {
             managed: self.any(),
@@ -427,6 +446,37 @@ mod tests {
         let off = Policies::from_json(r#"{"CheckForUpdates": 0, "CrashReportPrompt": 0}"#);
         assert!(!off.update_check(Some(true)) && !off.crash_prompt(None));
         assert_eq!(off.view().fixed, vec!["update_check", "crash_prompt"]);
+    }
+
+    #[test]
+    fn the_report_tracker_is_an_http_address_and_wins_over_the_user() {
+        let p = Policies::from_json(r#"{"ReportUrl": " https://tracker.example.org/new "}"#);
+        assert_eq!(
+            p.report_url.as_deref(),
+            Some("https://tracker.example.org/new")
+        );
+        assert_eq!(
+            p.report_target(Some("https://mine.example.org".into()))
+                .as_deref(),
+            Some("https://tracker.example.org/new")
+        );
+        assert_eq!(p.view().fixed, vec!["report_url"]);
+        for bad in [
+            r#""javascript:alert(1)""#,
+            r#""file:///etc/passwd""#,
+            r#""tracker""#,
+            "1",
+        ] {
+            let p = Policies::from_json(&format!(r#"{{"ReportUrl": {bad}}}"#));
+            assert_eq!(p.report_url, None, "{bad}");
+        }
+        let none = Policies::default();
+        assert_eq!(none.report_target(None), None, "GitHub");
+        assert_eq!(
+            none.report_target(Some("https://mine.example.org".into()))
+                .as_deref(),
+            Some("https://mine.example.org")
+        );
     }
 
     #[test]

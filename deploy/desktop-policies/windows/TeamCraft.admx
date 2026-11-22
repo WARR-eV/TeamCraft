@@ -57,6 +57,13 @@
         <text id="WorkspaceRoot" valueName="WorkspaceRoot" maxLength="1024" required="true" />
       </elements>
     </policy>
+    <policy name="ReportUrl" class="Both" displayName="$(string.ReportUrl)" explainText="$(string.ReportUrl_Explain)" presentation="$(presentation.ReportUrl)" key="Software\Policies\TeamCraft">
+      <parentCategory ref="TeamCraft" />
+      <supportedOn ref="SUPPORTED_TeamCraft_0_2_12" />
+      <elements>
+        <text id="ReportUrl" valueName="ReportUrl" maxLength="1024" required="true" />
+      </elements>
+    </policy>
     <policy name="OrganizationName" class="Both" displayName="$(string.OrganizationName)" explainText="$(string.OrganizationName_Explain)" presentation="$(presentation.OrganizationName)" key="Software\Policies\TeamCraft">
       <parentCategory ref="TeamCraft" />
       <supportedOn ref="SUPPORTED_TeamCraft_0_2_12" />

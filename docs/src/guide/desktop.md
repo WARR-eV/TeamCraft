@@ -695,7 +695,8 @@ messages of this session. Your home folder, server addresses and tokens are
 removed. Edit the text as you like, then:
 
 * *Open issue form* opens a new issue at the TeamCraft repository on GitHub –
-  or your help desk's form, if *Settings → Report problems to* names one. A
+  or your help desk's form, if *Settings → Report problems to* names one (or
+  your organization set one with the `ReportUrl` policy). A
   long report is cut in the link and copied to the clipboard in full;
 * *Copy report* puts it on the clipboard;
 * *Save report…* writes it to a file (both work without a network).

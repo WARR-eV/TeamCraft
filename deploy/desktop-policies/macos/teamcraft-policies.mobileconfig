@@ -29,6 +29,8 @@
       <integer>0</integer>
       <key>WorkspaceRoot</key>
       <string>/Users/Shared/CAD</string>
+      <key>ReportUrl</key>
+      <string>https://helpdesk.example.org/issues/new</string>
       <key>OrganizationName</key>
       <string>Example Lab</string>
       <key>UsageStatistics</key>

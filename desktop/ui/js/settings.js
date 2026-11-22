@@ -85,7 +85,7 @@ export function openSettings() {
       function (e) { crashPrompt.checked = !on; toast(errorText(e), "error"); });
   } } });
   // *Report a problem* (#381): the operator's own tracker instead of GitHub
-  var reportUrl = h("input", { type: "url", value: state.session.report_url || "", spellcheck: "false", placeholder: "https://github.com/WARR-eV/TeamCraft/issues/new", on: { change: function () {
+  var reportUrl = h("input", { type: "url", value: state.session.report_url || "", spellcheck: "false", disabled: fixedByPolicy("report_url"), placeholder: "https://github.com/WARR-eV/TeamCraft/issues/new", on: { change: function () {
     var url = reportUrl.value.trim();
     call("set_report_url", { url: url }).then(function () { state.session.report_url = url || null; toast("Problem reports go to " + (url || "GitHub")); },
       function (e) { toast(errorText(e), "error"); });
@@ -141,6 +141,7 @@ export function openSettings() {
     managedNote("crash_prompt"),
     h("p.hint", { text: "Crashes and uncaught errors are written to a report on this computer (in the app's settings folder, without your home folder, server addresses or tokens). It is only shared when you open the GitHub issue yourself. Switched off, the reports stay on this computer and are never shown." }),
     field("Report problems to", reportUrl, "empty = the TeamCraft issue form on GitHub; your help desk's form address, which gets title and body"),
+    managedNote("report_url"),
     h("h3", { text: t("settings.account") }),
     h("p", null, ["Signed in to ", h("strong", { text: state.session.server_url }), " as ", h("strong", { text: state.me.display_name }), " (" + label(state.me.role) + ") on ", h("span", { text: state.session.device })]),
     state.session.token_storage === "file"

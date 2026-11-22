@@ -4,6 +4,7 @@
   "CheckForUpdates": 1,
   "CrashReportPrompt": 0,
   "WorkspaceRoot": "/srv/cad",
+  "ReportUrl": "https://helpdesk.example.org/issues/new",
   "OrganizationName": "Example Lab",
   "UsageStatistics": 0
 }

@@ -129,7 +129,7 @@ pub fn session(app: AppHandle, state: State<'_, AppState>) -> Session {
         token_storage: s.token.as_ref().and(s.token_storage),
         update_check: policy::current().update_check(s.update_check),
         checkout_parts: s.checkout_parts != Some(false),
-        report_url: s.report_url.clone(),
+        report_url: policy::current().report_target(s.report_url.clone()),
         crash_prompt: policy::current().crash_prompt(s.crash_prompt),
         server_url: s.server_url.clone(),
         signed_in: s.token.is_some(),
@@ -349,6 +349,24 @@ pub async fn server_notice(state: State<'_, AppState>) -> CmdResult<Option<Strin
     Ok(index["version"]
         .as_str()
         .and_then(|server| crate::compat::notice(env!("CARGO_PKG_VERSION"), server)))
+}
+
+/// The version the server says it runs (`GET /api/v1`), for problem reports
+/// (#381); `null` when it does not answer. Needs no sign-in.
+#[tauri::command]
+pub async fn server_version(state: State<'_, AppState>) -> CmdResult<Option<String>> {
+    let api = api_of(&state)?;
+    let Ok(index) = api.json(Method::GET, "", None).await else {
+        return Ok(None);
+    };
+    Ok(index["version"]
+        .as_str()
+        .filter(|v| {
+            v.len() <= 32
+                && v.bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b".-+".contains(&b))
+        })
+        .map(str::to_string))
 }
 
 fn store_token(state: &State<'_, AppState>, token: String) -> CmdResult<()> {
@@ -2626,8 +2644,8 @@ pub fn problem_report_open(
     title: String,
     body: String,
 ) -> CmdResult<bool> {
-    let base = snapshot(&state)
-        .report_url
+    let base = policy::current()
+        .report_target(snapshot(&state).report_url)
         .unwrap_or_else(|| crate::crash::ISSUE_URL.to_string());
     let (url, cut) = crate::report::form_url(&base, &title, &body).map_err(ApiError::local)?;
     app.opener()
@@ -2658,6 +2676,9 @@ pub async fn problem_report_save(app: AppHandle, text: String) -> CmdResult<Opti
 /// TeamCraft issue form on GitHub.
 #[tauri::command]
 pub fn set_report_url(state: State<'_, AppState>, url: String) -> CmdResult<()> {
+    if policy::current().report_url.is_some() {
+        return Err(ApiError::local(MANAGED));
+    }
     let url = url.trim();
     let value = if url.is_empty() {
         None
