@@ -126,6 +126,21 @@ async fn design_properties_are_listed_found_and_compared_with_the_item() {
         !html.contains("≠ item number"),
         "the part number agrees with the item number"
     );
+    // the same hint in the REST API (the desktop revision view)
+    let r = app
+        .api(
+            Method::GET,
+            &format!("/api/v1/items/{number}/revisions/A"),
+            &erika,
+            None,
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let found = r.json()["property_mismatches"].clone();
+    assert_eq!(found.as_array().map(Vec::len), Some(1), "{found}");
+    assert_eq!(found[0]["filename"], "bracket.sc");
+    assert_eq!(found[0]["mismatches"][0]["key"], "description");
+    assert_eq!(found[0]["mismatches"][0]["file"], "Zylonwerk bracket");
 
     // renaming the item makes the hint go away – nothing was changed for it
     let rev_url = format!("/api/v1/items/{number}/revisions/A");
@@ -147,6 +162,8 @@ async fn design_properties_are_listed_found_and_compared_with_the_item() {
         !html.contains("Design properties differ from this revision"),
         "case does not count"
     );
+    let r = app.api(Method::GET, &rev_url, &erika, None).await;
+    assert_eq!(r.json()["property_mismatches"], json!([]), "{}", r.text());
 
     // a new version of the design with another revision: the hint is back
     let v2 = design(json!({

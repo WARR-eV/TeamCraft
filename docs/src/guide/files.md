@@ -251,7 +251,7 @@ that are not text are left out) and stores them with the file version:
   Only the current version counts.
 * When the part number differs from the item number, the revision from the
   revision code, or the description from the revision's name (and its
-  description), the revision page shows a notice *Design properties differ
+  description), the revision page (web and desktop app) shows a notice *Design properties differ
   from this revision*. Case and runs of spaces do not count. The notice is
   worked out on every view, so it disappears as soon as the revision or the
   design is changed. Nothing is changed automatically – edit the revision, or
@@ -259,8 +259,9 @@ that are not text are left out) and stores them with the file version:
   it).
 * A new item created with a design and no name takes the design's
   description as its name; with a name but no description, the description
-  is filled in. *Import a CAD folder* in the desktop app fills an imported
-  item's empty description the same way (the name stays the file name).
+  is filled in. In the desktop app, *New item* from local files (also
+  *Create items…* of the worklist) and *Import a CAD folder* fill an empty
+  description the same way (the name stays the file name).
 
 A design whose document cannot be read (an unknown container, a damaged
 archive, a document above 16 MiB) is stored like any other file, without

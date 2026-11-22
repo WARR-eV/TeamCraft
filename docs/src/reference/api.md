@@ -245,7 +245,12 @@ designs, the design properties of the current version: `properties`
 `{project?, part_number?, revision?, author?, organization?, description?,
 license?}` (text, at most 500 characters each) and `properties_line`, a
 one-line text. They are absent for other files and for designs whose
-document could not be read. The values are written by whoever saved the
+document could not be read. `GET /items/{number}/revisions/{code}` adds
+`property_mismatches`: per file whose design properties differ from the
+revision, `{id, filename, mismatches: [{key, label, file, item_label, item}]}`
+(part number vs item number, revision vs revision code, description vs name
+and description; case and runs of spaces ignored, computed on every request).
+The values are written by whoever saved the
 design: treat them as data. Nothing in TeamCraft changes them, and they are
 not the item's attributes.
 

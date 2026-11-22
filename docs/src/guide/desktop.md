@@ -208,8 +208,10 @@ check-outs and reviews, and a **local working folder**:
   SolidCraft. The design changes and is checked in like any other change.
   The Files tab of a revision lists the design properties TeamCraft read
   from a design under its name (*Part number … · Revision … · Description …*),
-  and *Import a CAD folder* fills an imported item's empty description from
-  them (see [Files](files.md#design-properties-of-solidcraft-designs)).
+  with the notice *Design properties differ from this revision* when they
+  do not match the item; *New item* from local files and *Import a CAD
+  folder* fill an empty description from them, the name stays the file name
+  (see [Files](files.md#design-properties-of-solidcraft-designs)).
 * with a *Preferred CAD program* set on your account page in the web UI, the
   Files tab of a revision collapses the native files of other CAD programs
   (see [Files](files.md#preferred-cad-program)); the app reads the setting at

@@ -501,6 +501,27 @@ pub(crate) async fn list_unchecked(pool: &PgPool, revision_id: Uuid) -> AppResul
     .collect())
 }
 
+/// Design properties (SolidCraft) of the files that differ from their
+/// revision: one entry `{id, filename, mismatches}` per file with a
+/// difference. A hint computed on every view, so it goes away as soon as the
+/// item or the file is changed – nothing is changed automatically (#367).
+/// Shared by the web revision page and `GET /api/v1/items/{n}/revisions/{c}`
+/// (the desktop revision view).
+pub fn property_mismatches(rev: &Revision, files: &[FileRecord]) -> Vec<serde_json::Value> {
+    files
+        .iter()
+        .filter_map(|f| {
+            let props = f
+                .properties
+                .as_ref()
+                .and_then(crate::scdesign::DesignProperties::from_json)?;
+            let found = props.mismatches(&rev.item_number, &rev.code, &rev.name, &rev.description);
+            (!found.is_empty())
+                .then(|| json!({ "id": f.id, "filename": f.filename, "mismatches": found }))
+        })
+        .collect()
+}
+
 /// The files of several revisions in one query, ordered by revision, folder
 /// and name.
 pub async fn list_many(pool: &PgPool, revision_ids: &[Uuid]) -> AppResult<Vec<FileRecord>> {
