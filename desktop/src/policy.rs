@@ -335,14 +335,16 @@ mod tests {
         let p = Policies::from_json(
             r#"{"ServerUrl": "https://plm.example.org/", "AllowOtherServers": 0,
                 "CheckForUpdates": 1, "CrashReportPrompt": false,
-                "WorkspaceRoot": "/srv/cad", "OrganizationName": "  Example Lab  ",
+                "WorkspaceRoot": "D:\\CAD", "OrganizationName": "  Example Lab  ",
                 "UsageStatistics": 0}"#,
         );
         assert_eq!(p.server_url.as_deref(), Some("https://plm.example.org"));
         assert_eq!(p.allow_other_servers, Some(false));
         assert_eq!(p.check_for_updates, Some(true));
         assert_eq!(p.crash_report_prompt, Some(false));
-        assert_eq!(p.workspace_root, Some(PathBuf::from("/srv/cad")));
+        // a drive path counts as absolute on every system (the policy file
+        // may be written for Windows computers)
+        assert_eq!(p.workspace_root, Some(PathBuf::from(r"D:\CAD")));
         assert_eq!(p.organization_name.as_deref(), Some("Example Lab"));
         assert_eq!(p.usage_statistics, Some(false));
         assert!(p.any() && p.server_locked());
