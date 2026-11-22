@@ -198,6 +198,10 @@ pub struct Settings {
     pub update_latest: Option<String>,
     /// The release version whose notice the user closed.
     pub update_dismissed: Option<String>,
+    /// *Settings → Report problems to*: the operator's own tracker (#381);
+    /// `None` = TeamCraft's GitHub issue form.
+    #[serde(default)]
+    pub report_url: Option<String>,
     /// After a crash, ask at the next start whether to share the crash report
     /// (src/crash.rs); `None` = ask. Reports are never sent without asking.
     pub crash_prompt: Option<bool>,

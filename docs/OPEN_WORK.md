@@ -149,6 +149,11 @@ feature milestone – the features in *What works* are enough; what is missing i
   (no code signing or notarisation): the checksums
   in `SHA256SUMS.txt` and the build provenance are the verification, and the docs explain the first start past
   SmartScreen and Gatekeeper
+- [ ] Desktop: report a problem from any error (#381). Done: *Report…* on every toast and dialog error, *Help → Report a
+  Problem…*, redacted prefilled report (`desktop/src/report.rs`), *Open issue form* / *Copy* / *Save*, own tracker
+  setting, *Copy details* on web error pages. Left: screenshot and affected-file attachments, the key inputs of
+  each action (most messages name only the action), the server version in the report, a request id on web errors,
+  the tracker as a desktop policy (#378)
 - [ ] Desktop app run and tested on Windows x64/ARM64, macOS and Linux for each RC (a short manual test script in
   `docs/src/dev/release-checklist.md`)
 - [x] One download to try TeamCraft on a laptop: desktop installers *with local server* (Windows x64, macOS Apple

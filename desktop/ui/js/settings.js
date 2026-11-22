@@ -32,6 +32,12 @@ export function openSettings() {
     call("set_crash_prompt", { enabled: on }).then(function () { state.session.crash_prompt = on; },
       function (e) { crashPrompt.checked = !on; toast(errorText(e), "error"); });
   } } });
+  // *Report a problem* (#381): the operator's own tracker instead of GitHub
+  var reportUrl = h("input", { type: "url", value: state.session.report_url || "", spellcheck: "false", placeholder: "https://github.com/WARR-eV/TeamCraft/issues/new", on: { change: function () {
+    var url = reportUrl.value.trim();
+    call("set_report_url", { url: url }).then(function () { state.session.report_url = url || null; toast("Problem reports go to " + (url || "GitHub")); },
+      function (e) { toast(errorText(e), "error"); });
+  } } });
   var serverInsecure = h("p.notice.warn.small.hidden", { text: "This server is reached over plain http:// – the token and all data cross the network unencrypted. Ask your administrator for the https:// address." });
   checkServerUrl(state.session.server_url || "", serverInsecure);
   var skins = h("div.skin-grid", null, SKINS.map(function (s) {
@@ -74,6 +80,7 @@ export function openSettings() {
     h("h3", { text: "Crash reports" }),
     h("label.check", null, [crashPrompt, "After a crash, ask at the next start whether to share the report"]),
     h("p.hint", { text: "Crashes and uncaught errors are written to a report on this computer (in the app's settings folder, without your home folder, server addresses or tokens). It is only shared when you open the GitHub issue yourself. Switched off, the reports stay on this computer and are never shown." }),
+    field("Report problems to", reportUrl, "empty = the TeamCraft issue form on GitHub; your help desk's form address, which gets title and body"),
     h("h3", { text: "Account" }),
     h("p", null, ["Signed in to ", h("strong", { text: state.session.server_url }), " as ", h("strong", { text: state.me.display_name }), " (" + label(state.me.role) + ") on ", h("span", { text: state.session.device })]),
     state.session.token_storage === "file"
