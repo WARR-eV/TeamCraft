@@ -590,7 +590,11 @@ mod tests {
     #[test]
     fn modified_without_checkout_from_the_local_pass() {
         let e = entry("PRT-1", "A", "bracket.prt", false);
-        let out = run(&[e.clone()], &[(&e, disk(true, true, true))], &[]);
+        let out = run(
+            std::slice::from_ref(&e),
+            &[(&e, disk(true, true, true))],
+            &[],
+        );
         assert_eq!(out.len(), 1);
         let f = &out[0].files[0];
         assert_eq!(f.state, "modified");
@@ -602,7 +606,11 @@ mod tests {
     #[test]
     fn modified_in_my_checkout_needs_no_checkout() {
         let e = entry("PRT-1", "A", "bracket.prt", true);
-        let out = run(&[e.clone()], &[(&e, disk(true, true, true))], &[]);
+        let out = run(
+            std::slice::from_ref(&e),
+            &[(&e, disk(true, true, true))],
+            &[],
+        );
         assert!(!out[0].files[0].without_checkout);
         assert!(out[0].checked_out);
     }
@@ -664,7 +672,11 @@ mod tests {
                 server_file(&a, "clash", None),
             ],
         };
-        let out = run(&[a.clone()], &[(&a, disk(true, false, true))], &[(&a, s)]);
+        let out = run(
+            std::slice::from_ref(&a),
+            &[(&a, disk(true, false, true))],
+            &[(&a, s)],
+        );
         assert!(out.is_empty());
     }
 
@@ -726,8 +738,11 @@ mod tests {
         let d: HashMap<String, Disk> = [(layout::key_of(&e.path), unknown.clone())]
             .into_iter()
             .collect();
-        assert_eq!(server_order(&[e.clone()], &d), vec![(key(&e), 0)]);
-        let out = run(&[e.clone()], &[(&e, unknown)], &[]);
+        assert_eq!(
+            server_order(std::slice::from_ref(&e), &d),
+            vec![(key(&e), 0)]
+        );
+        let out = run(std::slice::from_ref(&e), &[(&e, unknown)], &[]);
         assert!(out.is_empty(), "not modified, no check-out offered");
     }
 

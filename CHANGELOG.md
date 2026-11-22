@@ -21,6 +21,9 @@ see the notices in the README.
   (`desktop/ui/js/local-changes.js`, #416) to skip the desktop Rust jobs,
   but the table now runs them for every desktop UI script (#448); the
   `changes` job of every workflow failed on `main`.
+- CI: the desktop tests of *Local changes* (#416) built one-element slices
+  with `&[x.clone()]`, which clippy 1.100 refuses
+  (`cloned_ref_to_slice_refs`); they use `std::slice::from_ref` now.
 
 ### Added
 
