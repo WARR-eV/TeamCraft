@@ -2,6 +2,15 @@
 /* Small components of both apps (shared/README.md, rule 10): a class styled
  * here is styled nowhere else. Tokens only – the colours come from skins.css. */
 
+/* Selected text, in both apps and every skin: the primary colour with its
+ * text colour, as the OS shows a selection. --selected (the background of a
+ * selected row) was used before, but in the dark skins it is barely lighter
+ * than --input-bg (CachyOS: #003b33 on #000e0e), so text selected in a field
+ * – Ctrl+A in the server address – looked unselected. The contrast test
+ * (src/domain/mod.rs, skins_meet_contrast) checks --on-primary on --primary
+ * in every skin. */
+::selection { background: var(--primary); color: var(--on-primary); }
+
 /* "?" next to a term (issue 414) – web: templates/macros.html `help`, desktop:
  * js/revision.js `helpTip`. The text is the accessible name and the tooltip,
  * shown on hover and on keyboard focus. */

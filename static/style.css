@@ -81,7 +81,6 @@ a.mono, td.mono > a, .id {
 /* inside containers that clip (scrolling nav, ellipsis cells) the ring sits inside */
 .nav a:focus-visible, .nav-admin > summary:focus-visible, .titleblock dd a:focus-visible,
 .impact-source a:focus-visible, td.ellipsis a:focus-visible, .explorer-tree a:focus-visible { outline-offset: -2px; }
-::selection { background: var(--selected); color: var(--text); }
 
 kbd {
   display: inline-flex;

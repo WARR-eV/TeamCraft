@@ -182,6 +182,12 @@ see the notices in the README.
 
 ### Fixed
 
+- **Selected text is visible in every skin**, in the desktop app and on the
+  web: a selection now takes the skin's primary colour with its text colour.
+  It used the background of selected rows before, which in the dark skins is
+  barely lighter than a text field – in the CachyOS skin, Ctrl+A in the
+  server address of *Switch server…* selected the text but showed nothing.
+  One rule in `shared/css/components.css` instead of one per app.
 - **`url` 2.5.9 (RUSTSEC-2026-0592)**: `url` 2.5.8 overflowed the stack in
   `Url::origin()` on nested `blob:` URLs; `cargo deny` refuses it. Server and
   desktop lockfiles now take `url` 2.5.9 and the `form_urlencoded` 1.2.3 it
