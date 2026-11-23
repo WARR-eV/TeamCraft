@@ -31,6 +31,19 @@ see the notices in the README.
 
 ### Changed
 
+- `CONTRIBUTING.md` is short now: ways to contribute, bug reports, the
+  screenshots, the main code conventions, dependencies and branding, *Your own
+  work only*, pull requests and the licence. New pull request policy: every
+  pull request is squash-merged into one commit, its size is up to the
+  contributor, CI does not have to be green for a merge but must be before a
+  release, and contributions from outside the maintainers get a strict
+  security review – one that tries to sneak in a vulnerability is closed
+  without discussion. The development setup moved into the README's new
+  *Development* section, below the features and screenshots; the checks, the
+  CI table, the guard tests, the scale check and merging into the new book
+  page *Checks, CI and merging* (`docs/src/dev/ci.md`); how releases are built
+  into the *Release checklist*; the design rules and the translated UI into
+  *Shared UI*.
 - Desktop: the *Support us on Ko-fi* tag and the update notice in the status
   bar are pills now – one rounded shape around the label and its *×*, orange
   for Ko-fi, green for a new version. They sit side by side and never

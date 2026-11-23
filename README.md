@@ -36,6 +36,7 @@
   <a href="#planned">Planned</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="#download">Download</a> ·
+  <a href="#development">Development</a> ·
   <a href="#documentation">Documentation</a> ·
   <a href="#contributing">Contributing</a>
 </p>
@@ -453,22 +454,14 @@ teamcraft local
 The desktop download *with local server*, which did this in one installer,
 is paused ([Download](#download)).
 
-**From source** (development, macOS, Windows):
+**From source** (macOS, Windows, development) – build and start the server
+as described under [Development](#development).
 
-```sh
-git clone https://github.com/WARR-eV/TeamCraft.git && cd TeamCraft
-docker compose up -d db     # PostgreSQL on 127.0.0.1, no password needed
-cargo run --release         # applies the migrations, serves http://localhost:8080
-```
-
-Open the setup link the server prints when it starts (`no administrator yet: open http://localhost:8080/login?setup=…`)
-and create the administrator – offered once, while the server listens on
-localhost. Then *Projects → New project group*, *Items → New item* with a
-STEP file, and open it in 3D.
-
-No configuration is needed for a local test. Step-by-step guides, including
-native PostgreSQL and the desktop app:
-**[Linux](platforms/linux.md)** · **[macOS](platforms/macos.md)** · **[Windows](platforms/windows.md)**.
+On the first start, open the setup link the server prints
+(`no administrator yet: open http://localhost:8080/login?setup=…`) and create
+the administrator – offered once, while the server listens on localhost.
+Then *Projects → New project group*, *Items → New item* with a STEP file,
+and open it in 3D.
 
 ## Download
 
@@ -530,20 +523,6 @@ database in one command.
 
 </details>
 
-## How it fits together
-
-| Layer                |                                                                                                                    |
-|----------------------|--------------------------------------------------------------------------------------------------------------------|
-| `teamcraft` binary   | web interface, REST API (`/api/v1`) and CLI in one process; templates, migrations and assets are embedded          |
-| `domain`, `services` | the rules and the business logic – permissions, row locks, lifecycle checks and the audit entry in one transaction |
-| `vault`              | content-addressed file storage on disk, plus the cached 3D previews                                                |
-| `mesh`, `preview`    | pure-Rust readers for meshes, point clouds, STEP and (`simmesh`) VTK/VTU/FRD simulation results                    |
-| PostgreSQL 16+       | the only external service                                                                                          |
-
-Everything is built by `cargo` – no Node.js, no downloaded browser engines,
-no C++ CAD kernel. Details:
-[Architecture](https://warr-ev.github.io/TeamCraft/reference/architecture.html).
-
 ## Command line and API
 
 The REST API, with a token from *Account → API tokens*:
@@ -567,6 +546,56 @@ Both need the PostgreSQL client tools (`pg_dump`, `pg_restore`); empty target
 directory, `--force`, a stopped server and what a backup leaves out
 (configuration and secrets): [Operations](https://warr-ev.github.io/TeamCraft/admin/operations.html).
 
+## Development
+
+**You need** Rust stable (1.82 or newer, through [rustup](https://rustup.rs)),
+PostgreSQL 16 or newer – the dev database of `docker-compose.yml` is the
+easiest – and, for the desktop app, the
+[Tauri prerequisites](https://tauri.app/start/prerequisites/) of your platform
+(on Linux the WebKitGTK development packages). Step-by-step guides, including
+native PostgreSQL: **[Linux](platforms/linux.md)** ·
+**[macOS](platforms/macos.md)** · **[Windows](platforms/windows.md)**.
+
+```sh
+git clone https://github.com/WARR-eV/TeamCraft.git && cd TeamCraft
+docker compose up -d db     # PostgreSQL on 127.0.0.1:5432, no password needed
+cargo run                   # the server: applies the migrations, serves http://localhost:8080
+cd desktop && cargo run     # the desktop app, in a second terminal
+```
+
+No configuration is needed locally; every setting is optional
+([configuration](https://warr-ev.github.io/TeamCraft/admin/configuration.html)).
+Local settings go into `secrets/.env` – the whole `secrets/` folder is
+git-ignored and never committed.
+
+**Before a pull request:**
+
+```sh
+cargo fmt --all
+cargo clippy --all-targets -- -D warnings
+cargo test                  # unit tests, and end-to-end tests on temporary databases of the dev PostgreSQL
+```
+
+`cargo test --lib` runs only the unit tests and needs no database; for the
+desktop app, run the same commands in `desktop/`. What CI runs for which
+files, the guard tests, the scale check and how pull requests are merged:
+[Checks, CI and merging](https://warr-ev.github.io/TeamCraft/dev/ci.html).
+
+**How it fits together:**
+
+| Layer                |                                                                                                                    |
+|----------------------|--------------------------------------------------------------------------------------------------------------------|
+| `teamcraft` binary   | web interface, REST API (`/api/v1`) and CLI in one process; templates, migrations and assets are embedded          |
+| `domain`, `services` | the rules and the business logic – permissions, row locks, lifecycle checks and the audit entry in one transaction |
+| `vault`              | content-addressed file storage on disk, plus the cached 3D previews                                                |
+| `mesh`, `preview`    | pure-Rust readers for meshes, point clouds, STEP and (`simmesh`) VTK/VTU/FRD simulation results                    |
+| PostgreSQL 16+       | the only external service                                                                                          |
+| `desktop/`           | TeamCraft Desktop (Tauri 2), a separate Cargo project that talks to the server over the REST API                   |
+
+Everything is built by `cargo` – no Node.js, no downloaded browser engines,
+no C++ CAD kernel. Details:
+[Architecture](https://warr-ev.github.io/TeamCraft/reference/architecture.html).
+
 ## Documentation
 
 Published at **<https://warr-ev.github.io/TeamCraft/>**, built from
@@ -585,9 +614,10 @@ A running server lists its API at `GET /api/v1` and its formats at `/formats`.
 ## Contributing
 
 Contributions are welcome: bug reports, tests with real files from your CAD
-programs, documentation and code. Please read **[CONTRIBUTING.md](CONTRIBUTING.md)** first – it covers the development
-setup, the checks CI runs, the code conventions and the licence of
-contributions. Report security problems privately, as described in
+programs, documentation and code. Please read **[CONTRIBUTING.md](CONTRIBUTING.md)** first – it is short: ways to
+contribute, the code conventions, how pull requests are reviewed and merged,
+and the licence of contributions. Building from source:
+[Development](#development). Report security problems privately, as described in
 [SECURITY.md](SECURITY.md). Open work and known gaps are listed in
 [docs/OPEN_WORK.md](docs/OPEN_WORK.md).
 

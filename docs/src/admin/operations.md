@@ -268,7 +268,8 @@ or `gh workflow run scale.yml --ref <branch>`) and weekly, never on pull
 requests – and uploads the report as the artifact `scale-report`:
 `report.md` (the timing table: queries per request, slowest statement,
 sequential scans on big tables), `plans.md` (every plan) and `results.json`.
-How to run it locally is described in `CONTRIBUTING.md`.
+How to run it locally is described in
+[Checks, CI and merging](../dev/ci.md#scale-check).
 
 ## Exporting and protecting the audit log
 

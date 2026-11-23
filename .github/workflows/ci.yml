@@ -6,7 +6,7 @@
 # Runner time is free for this public repository; what is scarce is the
 # number of concurrent jobs (20, of them 5 macOS). Each job therefore runs
 # only when a file it compiles, tests or reads changed: the changes job asks
-# scripts/ci-changes.sh, the one table from files to jobs (CONTRIBUTING.md,
+# scripts/ci-changes.sh, the one table from files to jobs (docs/src/dev/ci.md,
 # "What CI runs for a change"). The weekly run and "Run workflow" run
 # everything.
 name: CI
@@ -331,7 +331,7 @@ jobs:
           manifest-path: ${{ matrix.manifest }}
 
   # The one check that branch protection or the merge queue requires (see
-  # CONTRIBUTING.md, "Merging"): green when every job above passed or was
+  # docs/src/dev/ci.md, "Merging"): green when every job above passed or was
   # skipped on purpose, red when one failed or was cancelled. One name instead
   # of the job list keeps the rule valid when a job or a matrix entry changes,
   # and a skipped matrix job reports under its unexpanded name, which a

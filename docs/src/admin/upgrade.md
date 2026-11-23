@@ -5,8 +5,8 @@ migration when it starts** (`teamcraft migrate` does the same without
 starting the server; `teamcraft serve --no-migrate` skips it). There is no
 downgrade migration. The way back is a **restore of a backup taken before the
 upgrade**. Take that backup every time – while TeamCraft is 0.x any release
-may contain breaking changes ([Contributing → Releases and
-versions](https://github.com/WARR-eV/TeamCraft/blob/main/CONTRIBUTING.md)).
+may contain breaking changes ([How releases are
+built](../dev/release-checklist.md#how-releases-are-built)).
 
 ## Before the upgrade
 
