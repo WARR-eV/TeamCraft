@@ -15,6 +15,9 @@ see the notices in the README.
 
 ### Changed
 
+- README: seven more screenshots (revision page, STEP in 3D, change request,
+  FEA result, notifications, review policy, desktop worklist) in a collapsed
+  *More screenshots* block at the end of *Features*.
 - README: fresh screenshots of the web UI and the desktop app at 0.2.13
   (all but the desktop change order, which follows with the script fix
   below).

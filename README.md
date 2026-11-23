@@ -291,6 +291,30 @@ backups are described under [Enterprise management](#enterprise-management).
   </tr>
 </table>
 
+<details>
+<summary><b>More screenshots</b> – revision page, STEP in 3D, change request, FEA result, notifications, review policy, desktop worklist</summary>
+
+<table>
+  <tr>
+    <td width="50%"><a href="media/screenshots/revision.png"><img src="media/screenshots/revision.png" alt="Revision page of the mounting bracket: type, state, lock owner and preview picture at the top, attributes, item master data and the lifecycle with the next step" /></a><br /><sub><b>Revision page</b> – state, lock owner, attributes and the next lifecycle step</sub></td>
+    <td width="50%"><a href="media/screenshots/viewer-3d.png"><img src="media/screenshots/viewer-3d.png" alt="3D viewer in the browser showing the STEP file of the mounting bracket, with section, measure and note controls" /></a><br /><sub><b>STEP in 3D</b> – section, measure and notes in the browser</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><a href="media/screenshots/change-request.png"><img src="media/screenshots/change-request.png" alt="Change request about a too rough sealing face in triage: the decision form with accept, defer and reject, the problem and proposed solution, and the affected item" /></a><br /><sub><b>Change request</b> – problem, affected items and accept, defer or reject</sub></td>
+    <td width="50%"><a href="media/screenshots/simulation-result-3d.png"><img src="media/screenshots/simulation-result-3d.png" alt="Static analysis result of the mast arm in the 3D viewer, coloured by von Mises stress with a colour legend and field selector" /></a><br /><sub><b>FEA result in 3D</b> – coloured by von Mises stress</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><a href="media/screenshots/notifications.png"><img src="media/screenshots/notifications.png" alt="Notifications page: an approval, two review requests and a release, and below them the watched sensor mast assembly" /></a><br /><sub><b>Notifications</b> – reviews, approvals, releases and what you watch</sub></td>
+    <td width="50%"><a href="media/screenshots/project-restricted.png"><img src="media/screenshots/project-restricted.png" alt="Settings of a restricted project group: the review policy with minimum approvals, required reviewers and approval from another group, and the need-to-know settings for administrator access" /></a><br /><sub><b>Review policy</b> – per project group, with need-to-know administrator access</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><a href="media/screenshots/desktop-worklist.png"><img src="media/screenshots/desktop-worklist.png" alt="TeamCraft Desktop worklist: the revision checked out by me, local changes, new files on this computer, the change waiting for my review and the dependents to check" /></a><br /><sub><b>Desktop worklist</b> – check-outs, local changes, reviews and dependents to check</sub></td>
+    <td width="50%"></td>
+  </tr>
+</table>
+
+</details>
+
 ## Enterprise management
 
 The features an IT department or a team lead asks about before rolling a
