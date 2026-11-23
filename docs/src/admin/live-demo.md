@@ -191,8 +191,9 @@ the cached previews stay warm). Every night at 03:15, in
 
 ## 7. Link it
 
-Add the address to the top of `README.md` (next to *Download* in the badge
-row, and *Try the live demo* in the first paragraph) and to the table of
+Add the address to the top of `README.md` (the *Live demo* badge in the
+badge row, and the *Try the live demo* line with the sign-in under the
+dashboard screenshot) and to the table of
 `docs/src/index.md`; move the entry in `docs/OPEN_WORK.md` to done. The
 hosted TeamCraft demo is linked this way:
 <https://teamcraft-demo.tailc7ef5b.ts.net> (account `demo`, password

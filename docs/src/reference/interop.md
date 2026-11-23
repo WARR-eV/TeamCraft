@@ -50,6 +50,12 @@ only – with the TeamCraft object the desktop app's *Item data* writes
   item data from inside SolidCraft, for designs edited without the desktop
   app.
 
+With the desktop app running, the plugin also shows the design's live state
+and sends requests to check it out, check it in or open it, through a folder
+shared with the app – see
+*TeamCraft inside SolidCraft* in the desktop guide
+([How files appear on your computer](../guide/desktop.md#how-files-appear-on-your-computer)).
+
 Install: copy the package folder `teamcraft` into SolidCraft's plugins folder
 (*Preferences › Plugins › Show in folder*) and enable it. The plugin is
 TeamCraft's own code (MPL-2.0); it contains SolidCraft's interface definition

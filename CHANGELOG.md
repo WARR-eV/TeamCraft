@@ -13,7 +13,33 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Changed
+
+- README: seven more screenshots (revision page, STEP in 3D, change request,
+  FEA result, notifications, review policy, desktop worklist) in a collapsed
+  *More screenshots* block at the end of *Features*.
+- README: fresh screenshots of the web UI and the desktop app at 0.2.13
+  (the desktop change order after the script fix below).
+- README: restructured in place. *Who it is for* comes first, the screenshots
+  sit beside the feature groups they show instead of in one gallery at the
+  end, single sign-on, offboarding, audit log, branding, monitoring, webhooks
+  and backups are described once under *Enterprise management*, *Planned* is
+  a section of its own, *Quick start* and *Download* no longer lead with the
+  paused *with local server* installer, and the download details and the
+  third-party licence table fold into collapsible blocks. No feature text
+  moved out of the README.
+
 ### Fixed
+
+- Screenshots: `scripts/screenshots.sh` clicked the old places in the desktop
+  app. The worklist gained the sections *Local changes* and *New on this
+  computer* and the action bar of a revision wraps to two rows at 1440 px, so
+  the change order and the Graph tab were never opened and `desktop-change`,
+  `desktop-graph` and `desktop-graph-nav` showed the revision tab. The click
+  positions follow the new layout; the change order and the Graph tab open
+  again. Still open: `desktop-graph` – the graph of the mounting bracket shows
+  no card of the assembly above it to click, so it repeats `desktop-graph-nav`
+  (neither image is used in the README).
 
 - CI: the import check of the desktop modules (`scripts/check-desktop-modules.mjs`)
   reported uses that are none – a `$` inside a regular expression (`/^\d+$/`)
