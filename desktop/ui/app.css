@@ -406,8 +406,8 @@ tr.row-conflict td:first-child, tr.row-clash td:first-child { box-shadow: inset 
 }
 .status-msg { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); }
 /* the workspace path gives way first when the bar gets tight: it shrinks
-   faster than the pills and ends in an ellipsis */
-.status-ws { flex: 0 4 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+   much faster than the pills and ends in an ellipsis */
+.status-ws { flex: 0 12 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .status-get { display: inline-flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
 .status-get progress { width: 8rem; height: 6px; accent-color: var(--primary); }
 .status-get-text { overflow: hidden; text-overflow: ellipsis; max-width: 34rem; }
