@@ -15,6 +15,12 @@ see the notices in the README.
 
 ### Changed
 
+- Desktop: the *Support us on Ko-fi* tag and the update notice in the status
+  bar are pills now – one rounded shape around the label and its *×*, orange
+  for Ko-fi, green for a new version. They sit side by side and never
+  overlap; in a narrow window the workspace path shortens first, then the
+  pill labels end in an ellipsis. The update pill says *TeamCraft x.y.z is
+  available*; the installed version moved into its tooltip.
 - README: seven more screenshots (revision page, STEP in 3D, change request,
   FEA result, notifications, review policy, desktop worklist) in a collapsed
   *More screenshots* block at the end of *Features*.

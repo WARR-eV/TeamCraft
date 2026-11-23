@@ -170,7 +170,12 @@ export function checkUpdate() {
 export function showUpdate(notice) {
   state.update = notice || null;
   $("status-update").classList.toggle("hidden", !notice);
-  if (notice) $("status-update-open").textContent = "TeamCraft " + notice.version + " is available (you have " + notice.current + ")";
+  if (notice) {
+    // short in the pill; the installed version is in the tooltip
+    var open = $("status-update-open");
+    open.textContent = "TeamCraft " + notice.version + " is available";
+    open.title = "You have " + notice.current + ". Opens the update window: what is new, and a download of the new version checked against the release checksums";
+  }
 }
 
 export function initUpdateNotice() {

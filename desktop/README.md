@@ -150,7 +150,7 @@ loopback addresses are fine).
 
 Update notice: at most once a day the app asks the GitHub releases API
 (`api.github.com/repos/WARR-eV/TeamCraft/releases/latest`, no redirects, 10 s timeout) for the latest
-release. A newer version shows a notice in the status bar; it opens the **update window** (#377): the
+release. A newer version shows a green pill in the status bar (`.status-pill` in `ui/app.css`, next to the orange Ko-fi pill; both shrink in the bar's flex row after the workspace path, never overlap); it opens the **update window** (#377): the
 release notes (`releases/tags/v<version>`), *Update now* / *Download*, *Skip this version* (= *×*),
 *Remind me later* (three days) and *Release page*. *Update now* picks this installation's file
 (`update::install_kind`, `update::pick_asset`: MSI under *Program Files*, `-setup.exe` under
