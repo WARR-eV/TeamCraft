@@ -2,12 +2,15 @@
 
 Thank you for your interest in TeamCraft! TeamCraft is an open-source product
 lifecycle management (PLM) system written in pure Rust. It is a **work in
-progress** with **no official release yet**, so it helps a lot when people
+progress** with **no stable release yet**, so it helps a lot when people
 try it out and say what works and what doesn't.
 
 Everyone who takes part is expected to treat others with respect. Be kind,
 assume good intent and criticise the work, not the person. Harassment of any
 kind is not tolerated.
+
+How to build, run and test TeamCraft from source is in the README under
+[Development](README.md#development).
 
 ## Ways to contribute
 
@@ -49,351 +52,57 @@ A good bug report contains:
 client secrets, webhook URLs
 and private keys.
 
-## Development setup
-
-You need:
-
-* Rust stable, installed with [rustup](https://rustup.rs). The minimum
-  supported version is 1.82.
-* PostgreSQL 16 or newer. The easiest option is the dev database from
-  `docker-compose.yml`, which needs Docker with Compose v2.
-* For the desktop app only: the
-  [Tauri prerequisites](https://tauri.app/start/prerequisites/) of your
-  platform. On Linux these are the WebKitGTK development packages.
-
-```sh
-git clone https://github.com/WARR-eV/TeamCraft.git && cd TeamCraft
-docker compose up -d db     # PostgreSQL on 127.0.0.1:5432, no password needed
-cargo run                   # applies the migrations, serves http://localhost:8080
-```
-
-You don't need any configuration to work locally. Every setting is optional
-and documented in
-[docs/src/admin/configuration.md](docs/src/admin/configuration.md). Put local
-settings into `secrets/.env`. The whole `secrets/` folder is git-ignored and
-must never be committed.
-
-## Checks before a pull request
-
-CI runs these checks on pull requests: the tests against PostgreSQL 16
-and 18 on Linux (with coverage on one leg), the server build on Windows, the
-desktop app on Linux, macOS and Windows; `main` adds more desktop runners, and the
-weekly run adds the macOS server build (`.github/workflows/`) – each only when a file it checks
-changed (see [What CI runs for a change](#what-ci-runs-for-a-change)). A pull request that changes a
-pure module also gets a mutation-testing report for the changed lines (report-only for now, see
-[mutation testing](docs/src/dev/mutation-testing.md)).
-Run them locally first:
-
-```sh
-cargo fmt --all
-cargo clippy --all-targets -- -D warnings
-cargo test                  # unit tests and end-to-end tests
-```
-
-The end-to-end tests in `tests/` create and drop their own temporary
-`teamcraft_test_*` databases. They use the configured database server, or
-`TEAMCRAFT_TEST_DATABASE_URL` if it is set. When no database is reachable,
-they are skipped; with `TEAMCRAFT_REQUIRE_DB_TESTS=1` set, that counts as a
-failure instead. `cargo test --lib` runs only the unit tests and needs no
-database. CI runs the tests with `cargo nextest run` (`cargo install
-cargo-nextest`), which enforces the limits in `.config/nextest.toml`: a unit
-test fails after **1 second**, so hangs show up at once; tests that are slow on
-purpose (fuzzing, hashing, large meshes) are listed there with a reason, and
-the database tests get a minute each. A failed unit test is retried twice: a
-hang fails every attempt, while a test caught by a stalled CI runner passes
-on the next one and shows up as `FLAKY` in the summary. `tests/backup_restore.rs` additionally runs `pg_dump` and
-`pg_restore` from `PATH` (major version at least the server's); without them
-it is skipped, with `TEAMCRAFT_REQUIRE_PG_TOOLS=1` (CI) that fails.
-
-Each test binary keeps at most 6 test databases open at a time, with 5
-connections each (`TEAMCRAFT_TEST_DB_SLOTS` changes the 6). Running several
-test binaries or checkouts against one server at the same time can still
-exceed PostgreSQL's `max_connections` (100); the harness then waits for
-connections instead of failing. On a server whose `lc_messages` is not English (the
-Windows installer takes the system language), PostgreSQL sends that refusal
-in a non-UTF-8 encoding that sqlx cannot read – `lc_messages = 'C'` in
-`postgresql.conf` gives readable errors. A failing test prints the server's
-warnings and errors (`RUST_LOG` selects more), so a `500` shows its cause.
-
-| If you changed …                       | also run                                                                                                                                          |
-|----------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
-| the desktop app                        | `cargo fmt/clippy/test --manifest-path desktop/Cargo.toml`                                                                                        |
-| the documentation                      | `mdbook build docs` (mdBook 0.5) and `scripts/check-doc-links.sh`                                                                                 |
-| the web UI                             | check the changed pages in a browser (no CSP errors in the console)                                                                               |
-| a pure module in `.cargo/mutants.toml` | `cargo mutants -F '^src/<module>\.rs:'` – every missed mutant gets a unit test or a reason ([mutation testing](docs/src/dev/mutation-testing.md)) |
-
-### What CI runs for a change
-
-A job runs only when a file it compiles, tests or reads changed. One table
-decides it for the workflows CI, Desktop app, CodeQL and Docs:
-[`scripts/ci-changes.sh`](scripts/ci-changes.sh). Each workflow's `changes`
-job runs its self-test first, then compares the pull request with its base
-(a push to `main` with the previous `main`, a merge-queue entry with its
-base) and starts only the jobs that need it.
-
-| Changed files                                                                                                                                                                                               | Jobs that run                                                                                    |
-|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
-| server: `src/`, `tests/`, `migrations/`, `templates/`, `static/`, `shared/`, `vendor/`, `media/logos/`, `media/icons/`, `fuzz/seeds/`, `Cargo.toml`/`Cargo.lock`, `build.rs`, lint and nextest configuration | CI: fmt and clippy, tests on PostgreSQL 16 and 18, Windows build (weekly: also macOS)            |
-| the desktop files server tests compare with: `desktop/ui/app.css`, `desktop/ui/index.html`, `desktop/ui/js/{core,settings,shell}.js`, `desktop/src/compat.rs`                                               | the server jobs as well                                                                          |
-| `docs/src/`, `deploy/teamcraft.env.example`, `deploy/docker-compose.yml`, `deploy/desktop-policies/windows/`, `packaging/linux/teamcraft.env`                                                               | CI: *docs and config guards* – `config::tests` and `tests/architecture_guards.rs`, no database   |
-| `Cargo.toml`/`Cargo.lock`, `desktop/Cargo.*`, `deny.toml`, `vendor/`                                                                                                                                        | CI: `cargo deny` for the lock file concerned                                                     |
-| the desktop app's Rust code and configuration, `shared/`, `media/logos/`, `media/icons/`, `tests/fixtures/cad/nist/`                                                                                        | Desktop app: fmt, clippy, tests, build and start-up test on every platform                      |
-| `desktop/ui/`, `static/`, `shared/`, `scripts/*.mjs`                                                                                                                                                        | Desktop app: *desktop UI* (syntax, imports, the Node tests)                                      |
-| `*.rs` and Cargo files / `*.js`, `*.mjs`, `*.html` / workflows                                                                                                                                              | CodeQL: the Rust / JavaScript / Actions analysis                                                 |
-| `docs/`, `src/`, the Cargo files                                                                                                                                                                            | Docs: build of the book and the API reference (on `main`: deploy); the links check runs always   |
-
-A change of a workflow runs its own jobs; a change of `scripts/ci-changes.sh`
-runs everything. Scheduled runs (CI and Desktop app weekly, CodeQL weekly)
-and *Run workflow* run everything, so a file the table misses is caught
-within a week. **When a test starts to read a file outside its area, add the
-file to the table** (and a line to the self-test). To see what a branch
-would run:
-
-```sh
-git diff --name-only origin/main... | bash scripts/ci-changes.sh --files
-bash scripts/ci-changes.sh --self-test
-```
-
-Mutation testing, the release builds and the screenshots keep their own
-path filters (`.github/workflows/mutants.yml`, `release.yml`,
-`screenshots.yml`); fuzzing and the scale check run on a schedule only.
-
-### Scale check
-
-If you change queries, indexes or pages that list many rows, run the scale
-check: an ignored test that seeds a large synthetic vault (~100k items, ~1M
-BOM lines, 2M audit rows; see
-[Operations → Scale check](docs/src/admin/operations.md#scale-check)) and
-times the hot paths through the router.
-
-```sh
-docker compose up -d db
-cargo test --release --test scale -- --ignored --nocapture
-```
-
-The seed (a few minutes, ~1.6 GB) goes into the database `teamcraft_scale` on
-the test server and is kept, so the next run only applies new migrations and
-measures; `DROP DATABASE teamcraft_scale` starts over. The report lands in
-`target/scale-report/` (`report.md`, `plans.md` with the
-`EXPLAIN (ANALYZE, BUFFERS)` plan of every statement, `results.json`). Set
-`TEAMCRAFT_SCALE_BASELINE=<an earlier results.json>` for a before/after
-column and `TEAMCRAFT_SCALE_RUNS` for more timed calls per step. The plans
-need a superuser (as in the dev container), because they come from
-`auto_explain`. On GitHub, run the **Scale check** workflow by hand (`gh workflow run scale.yml --ref <branch>`) and
-download the `scale-report`
-artifact; it is not part of the pull request checks.
-
 ## Updating the README screenshots
 
 The screenshots in `media/screenshots/` are made by
-[`scripts/screenshots.sh`](scripts/screenshots.sh), never by hand, so that they
-always show the same demo data. The script needs a running TeamCraft with an **empty** database that listens on
-localhost. It creates the administrator
-through the first-start page (with the one-time code of the setup link in the
-server log, `SETUP_CODE`) and two editors, the project group ROVER, parts
-and assemblies with the NIST files from `tests/fixtures/cad`, a multi-level
-BOM, a released and a pending change order, check-outs and notifications,
-and after the main pages a change request, two simulations with results, an
-NX model of the enclosure (the assembly with its eight part files in one
-revision), an as-built unit of the sensor mast with two deviations and a
-restricted project group. It then drives headless Chrome through
-chromedriver's WebDriver API (with `curl` and `jq`, no Node or Python) and
-saves the pages as PNGs: 1440 × 900 for the desktop and 390 pixels wide for
-the phone, each in the light scheme (`NAME.png`, the names the README uses)
-and again in the dark scheme (`NAME-dark.png`; Chrome emulates
-`prefers-color-scheme`, the demo user keeps the System skin). The passwords
-and API tokens are generated for each run and never printed.
+[`scripts/screenshots.sh`](scripts/screenshots.sh) from the same demo data,
+never by hand:
 
-With `DESKTOP_APP` set to a built TeamCraft Desktop binary (Linux), the script
-also captures the desktop app, once with *TeamCraft Light* (`desktop-*.png`)
-and once with *TeamCraft Dark* (`desktop-*-dark.png`): it pre-seeds a fresh profile
-in a temporary `XDG_CONFIG_HOME` (server address and a personal access token
-of the demo administrator, see `desktop/src/settings.rs`), starts the app on
-an Xvfb display of 1440 × 900 without a window manager and captures the
-screen with ImageMagick. The app has no deep links, so `xdotool` drives it like
-a user: the Ctrl+2 shortcut (worklist) and clicks on navigator rows at fixed
-screen positions (the ROVER group, the checked-out bracket, the change order
-waiting for review), then Ctrl+PageUp back to the bracket, its *Graph*
-sub-tab and the sensor mast assembly above it in the graph (`desktop-graph.png`; `desktop-graph-nav.png` shows the
-bracket's graph the
-click aims at). When the desktop layout or the demo data changes, check
-that the `desktop-*.png` images still show what their names say and adjust the
-coordinates in `desktop_run`.
+1. Run the **Screenshots** workflow (*Actions → Screenshots → Run workflow*);
+   a pull request that changes the script or the workflow runs it too.
+2. Download its `screenshots` artifact, look at every image and copy the ones
+   the README uses into `media/screenshots/`. The workflow never commits
+   anything itself.
+3. Commit the images in the same pull request as the README lines that show
+   them.
 
-1. Run the **Screenshots** workflow (`.github/workflows/screenshots.yml`):
-   *Actions → Screenshots → Run workflow*, or open a pull request that changes
-   the script or the workflow. It builds the release binary and the desktop
-   app, starts the server against an empty PostgreSQL 17 and runs the script.
-2. Download the `screenshots` artifact of the run (kept for 30 days), for
-   example with `gh run download <run-id> -n screenshots -D <scratch folder>`.
-   It holds more images than the README shows (the `-dark` variants and
-   extra images for checking); copy only the ones the README uses into
-   `media/screenshots/`.
-3. Look at every image, then commit the PNGs in `media/screenshots/`. The
-   workflow never commits anything itself.
-4. Commit the images **in the same pull request** as the README lines that
-   show them. The **Docs** workflow (`.github/workflows/docs.yml`) runs
-   [`scripts/check-doc-links.sh`](scripts/check-doc-links.sh) for every pull
-   request that touches Markdown or `media/`: it fails and lists every local
-   image or link target in `README.md`, the other top-level Markdown files,
-   `platforms/`, `desktop/README.md` and `docs/src/` that does not exist. Run it
-   locally with `scripts/check-doc-links.sh` before you push.
-
-At the end of a run, `scripts/screenshots.sh` compares its PNGs with the
-`media/screenshots/*.png` names in the README and prints a warning (a
-workflow annotation on GitHub) for every image the README shows that the run
-did not make – the run itself does not fail. Without `DESKTOP_APP` the
-`desktop-*.png` images are among them.
-
-The data loading lives in the script's `seed` and `seed_*` functions, apart
-from the captures: `scripts/seed-demo.sh` sources the script (it captures
-nothing when sourced) to load the same data into the hosted live demo ([Live demo](docs/src/admin/live-demo.md)). Keep
-new demo data in a `seed_*`
-function, so the screenshots and the demo stay alike.
-
-To run it locally against a throw-away database and vault (Chrome and a
-matching chromedriver installed):
-
-```sh
-docker compose exec db createdb -U teamcraft teamcraft_shots
-TEAMCRAFT_DATABASE_URL=postgres://teamcraft@localhost:5432/teamcraft_shots \
-TEAMCRAFT_VAULT_DIR=/tmp/teamcraft-shots ./target/release/teamcraft serve &
-BASE_URL=http://127.0.0.1:8080 OUT_DIR=/tmp/shots scripts/screenshots.sh
-```
-
-New pages for the README are added as a `shot` line in the `capture`
-function of the script and as an image in the *Screenshots* section of the
-README, with alt text that describes what the image shows.
+A new page for the README is a `shot` line in the script's `capture` function
+plus an image in the README with alt text that says what it shows. New demo
+data goes into a `seed_*` function of the script, which
+`scripts/seed-demo.sh` shares with the [live demo](docs/src/admin/live-demo.md).
 
 ## Code conventions
 
 [Architecture](docs/src/reference/architecture.md) gives an overview of the
-code base. These are the most important rules:
+code base. The rules that matter most – guard tests catch most of the others
+and say what to change
+([what they check](docs/src/dev/ci.md#what-the-guard-tests-check)):
 
-* **All writes go through `src/services/`.** A service function does four
-  things, all in one transaction:
-    * checks permissions (`Actor::require`, `revisions::ensure_editable`);
-    * locks the rows it changes (`SELECT … FOR UPDATE`);
-    * validates lifecycle transitions (`LifecycleState::can_transition_to`);
-    * writes the audit entry (`audit::record`).
-
-  The web handlers (`src/web/`), API handlers (`src/api/`) and MCP tools (`src/mcp/`) stay thin and call the same
-  service functions.
+* **All writes go through `src/services/`.** A service function checks the
+  permissions, locks the rows it changes (`SELECT … FOR UPDATE`), validates
+  lifecycle transitions and writes the audit entry (`audit::record`) – all in
+  one transaction. The web (`src/web/`), API (`src/api/`) and MCP (`src/mcp/`)
+  handlers stay thin and call the same service functions.
 * **Reads take the actor.** [Restricted project groups](docs/src/admin/permissions.md)
-  hide their data from non-members, so every read service takes `&Actor`
-  and answers "not found" for hidden objects. Only `services::access` writes
-  the SQL guards (`access::item_visible` and friends); lists put the guard
-  into the query that the `COUNT(*)` shares. The `*_unchecked` getters are
-  for background and system code – `tests/no_unchecked_in_handlers.rs` fails
-  if one is called from `src/web`, `src/api` or `src/mcp`.
-* **New routes and MCP tools** are exercised by the leak test (`tests/read_permissions.rs`), which reads the router
-  sources: a route with
-  a new kind of path parameter needs a placeholder rule in its `fill()`.
+  hide their data from non-members, so every read service takes `&Actor` and
+  answers "not found" for hidden objects; the SQL guards come from
+  `services::access`.
 * **SQL** uses runtime queries (`sqlx::query_as::<_, T>` with `FromRow`), not
-  the `query!` macros, so building needs no database.
-* **Architecture guards** (`tests/architecture_guards.rs`, no database) read
-  the sources and fail when a rule is broken: `sqlx` in `src/web`, `src/api`
-  or `src/mcp`; a public service function that writes without an audit entry (itself or through the services it calls –
-  personal data, caches and
-  housekeeping go on its `NOT_AUDITED` list with a reason); a service function
-  that takes an actor and queries items, revisions or files without a
-  visibility guard in its body (an `access::*` fragment, `ensure_visible`,
-  `ensure_editable` or a guarded getter such as `revisions::get` – the
-  reviewed exceptions are on `NOT_GUARDED` with a reason); a template that
-  is not in `TEMPLATES` or not rendered by `every_template_renders`; a
-  `TEAMCRAFT_*` variable missing from `docs/src/admin/configuration.md`; a
-  language file of the desktop Group Policy template whose string or
-  presentation IDs differ from `en-US` or miss one the ADMX references.
-* **Multi-row mutations** run in one transaction. `tests/atomic_processes.rs`
-  shows how to prove it: `inject` puts a trigger on a table that makes one
-  step fail (an error or a lost connection), and the `snapshot` before and
-  after must be equal; add a case there for a new multi-step mutation.
-* **Schema changes** go into a new numbered file in `migrations/`. Never edit
-  a migration that is already on `main`, because existing databases have
-  applied it. `tests/migrations.rs` upgrades a v0.1.0 database with data (`tests/fixtures/migrations/v0.1.0-seed.sql`)
-  and fails when a migration
-  loses rows, changes old values or narrows a `CHECK` list that old rows
-  still use – a new enum value is fine, removing one needs a data migration.
-* **Enums** are `TEXT` columns with `CHECK` constraints. The Rust enums in
-  `src/domain.rs` provide `as_str()` and `parse()`.
-* **Errors** use `AppError` (`src/error.rs`). User errors are shown to the
-  user; internal errors are logged.
-* **Web UI:**
-    * Forms follow POST → redirect → GET, with a flash message.
-    * Register every new template in `TEMPLATES` (`src/templates.rs`) and in
-      the `every_template_renders` test.
-    * No inline JavaScript or styles: the Content Security Policy blocks them.
-    * Cancel buttons take effect immediately, without a confirmation.
-    * **Design tokens:** no literal colours outside `shared/css/skins.css`; every
-      component reads the tokens (`--surface`, `--text-muted`, `--primary`,
-      `--st-<state>-fg/-bg/-bd`, …). Tokens are opaque `#rrggbb`; the unit tests
-      `skins_meet_contrast` and `dark_token_blocks_identical` (`src/domain.rs`)
-      check the WCAG contrast and that the two dark blocks match.
-    * **Shared UI files** (`shared/`): what both the web UI and the desktop
-      app use – skins, fonts, the 3D viewer, the assistant, formatters. The server embeds the folder
-      without a hand-written list (`build.rs`), the desktop build copies it;
-      every `.css`/`.js`/`.svg` starts with
-      `/* SPDX-License-Identifier: MPL-2.0 */`. Rules in `shared/README.md`.
-      A rule or component both apps need lives there **once**: labels,
-      formats, state glyphs and markdown-lite in `shared/js/`, pinned to
-      `shared/test-vectors/` together with their Rust twins. CI fails when an
-      app re-declares a shared function or restyles a shared class, and when a
-      new class is styled in both app stylesheets. Workflow:
-      [Shared UI](https://warr-ev.github.io/TeamCraft/dev/shared-ui.html).
-    * **Density by tokens:** sizes of controls, rows and body text come from
-      `--ctl-h`, `--ctl-h-sm`, `--row-h`, `--fs-body`, `--lh-body`; the web UI
-      uses the defaults, the desktop app `data-density="compact"`. No
-      app-specific copies of these tokens.
-    * No gradients, glow, texture, glass or uppercase labels in components (`grep -n gradient static/style.css` stays
-      empty;
-      only the distro skins' `--glow` / `--pattern` behind the page use them).
-    * One filled (primary) button per view; the rest is secondary, ghost or in
-      a *More* menu.
-    * State is colour **and** a glyph (✓ released, ○ in review, ◐ in work,
-      × rejected, – obsolete, △ check needed), never colour alone.
-    * Check both schemes: the screenshot workflow captures every web page in
-      light (`NAME.png`) and dark (`NAME-dark.png`), the desktop app as well (`desktop-*.png`, `desktop-*-dark.png`).
-* **Pure Rust:** everything builds with `cargo` alone. No Node.js, no
-  downloaded engines and no C/C++ CAD kernels; 3D conversion stays in
-  `src/mesh.rs`.
+  the `query!` macros. Schema changes go into a new numbered file in
+  `migrations/`; never edit a migration that is already on `main`.
+* **Web UI:** forms follow POST → redirect → GET; new templates are registered
+  in `TEMPLATES` (`src/templates.rs`) and the `every_template_renders` test;
+  no inline JavaScript or styles (the Content Security Policy blocks them);
+  colours only as tokens from `shared/css/skins.css`. What both the web UI and
+  the desktop app use lives once in `shared/`
+  ([Shared UI](docs/src/dev/shared-ui.md)).
+* **Pure Rust:** everything builds with `cargo` alone – no Node.js, no
+  downloaded engines and no C/C++ CAD kernels.
 * **Configuration:** a new setting goes into `src/config.rs` and
-  `docs/src/admin/configuration.md`, and it must stay optional for a local
-  test.
-* **Tests:** new behaviour comes with tests. Put unit tests next to the code
-  and end-to-end tests in `tests/` (`api_flow.rs` for the REST API,
-  `web_ui.rs` for the web interface).
-* **Documentation:** every change updates the documentation in the same pull
-  request – a pull request without it is not finished. Check `CHANGELOG.md`
-  (an entry under *Unreleased*), `README.md` (features, licence table),
-  `docs/src/` (user and admin guide, `reference/api.md` for routes,
-  `admin/configuration.md` for settings, `dev/threat-model.md` for
-  security-relevant changes), `docs/OPEN_WORK.md`, `platforms/*.md` and, for
-  the desktop app, `desktop/README.md` and `docs/src/guide/desktop.md`.
-
-### Translated UI: adding a message or a language
-
-User-facing text of the web header and the desktop *Settings* dialog comes
-from the message catalogs in `shared/i18n/` (#379; more views follow):
-
-* **A message:** add an ID (`area.what`, e.g. `settings.updates`) with the
-  English sentence to `shared/i18n/en.json`, then the same ID to every other
-  catalog (a missing one falls back to English). Use whole sentences with
-  named placeholders – `"{count} files"` – never pieces glued together;
-  plural forms as `{ "one": "…", "other": "…" }`, chosen by `count`. In a
-  template: `{{ t("area.what", count=n) }}`; in desktop JavaScript:
-  `t("area.what", { count: n })` from `/static/shared/js/i18n.js`.
-* **A language:** copy `en.json` to `<code>.json` and translate the values
-  (keep IDs and placeholders); add the code to `LANGUAGES` in `src/i18n.rs`
-  and `shared/js/i18n.js`, its CLDR plural rule to `plural_category`, the
-  file to the `CATALOGS` table and `language.<code>` (its own name) to every
-  catalog.
-* User data (item names, comments, file names), audit records, API field
-  names and error codes are never translated.
-
-The guard tests `src/i18n.rs` (`catalogs_match_english`,
-`every_id_used_exists_in_english`) and `scripts/shared-i18n.test.mjs` fail
-for an ID that is not in `en.json`, a catalog with an unknown ID or other
-placeholders, and an unknown plural category. Tests render in English.
+  `docs/src/admin/configuration.md`, and it stays optional.
+* **Tests and documentation:** new behaviour comes with tests (unit tests next
+  to the code, end-to-end tests in `tests/`). The documentation and an entry
+  under *Unreleased* in `CHANGELOG.md` change in the same pull request.
 
 ## Dependencies, research and branding
 
@@ -496,44 +205,23 @@ described in [SECURITY.md](SECURITY.md).
 
 ## Commits and pull requests
 
-1. Fork the repository and create a branch from `main`.
-2. Keep each pull request to one topic, and keep refactoring separate from
-   behaviour changes.
-3. Write commit messages in English: a short summary line (at most 72
-   characters), a blank line, then what changed and why.
-4. Update the documentation. If you finish or add a work item, also update
-   [docs/OPEN_WORK.md](docs/OPEN_WORK.md).
-5. Open the pull request against `main`, describe what changed and how you
-   tested it, and link the issue. CI has to pass before the pull request is
-   merged (see below). The pull request template asks you to confirm that the
-   contribution is your own work and contains no decompiled code.
-
-### Merging
-
-Several pull requests land on `main` on a busy day, and one that was green
-against yesterday's `main` can break today's: a shared fixture, a test that
-another pull request changed, formatting after a conflict resolution.
-
-* Merge only with a green **CI result** against the *current* `main`. If
-  `main` moved since the last run, update the branch (merge `main` into it)
-  and wait for CI again – or let the merge queue do it, where it is enabled.
-* A red `main` comes first: fix it (or revert the commit that broke it)
-  before anything else is merged, so that every red ✗ on `main` points to
-  one real failure.
-* **CI result** is the one check that sums up the CI workflow: it is green
-  when every job passed or was skipped on purpose (a job runs only for the
-  files it checks, see [What CI runs for a change](#what-ci-runs-for-a-change)),
-  red when one failed or was cancelled. The macOS build (`build (macos-latest)`)
-  runs only in the weekly run and on *Run workflow*, and it is advisory, not
-  part of it: GitHub's hosted macOS runners are often unavailable, a job that
-  never got a runner is cancelled – no fault of the code – and a cancelled job
-  turns the whole run red. Per push it would mark commits on `main` red
-  (#358); the nightly Release run builds the server for macOS anyway, so a
-  real macOS compile failure still shows within a day. CI also runs on `merge_group`, so a merge
-  queue (Settings → Rules) tests each pull request against the `main` it
-  lands on.
-* Release builds do not run per push to `main` (see "Releases and
-  versions"), so a cancelled build no longer shows up as a failure there.
+1. Fork the repository, create a branch from `main` and open the pull request
+   against `main`. Describe what changed and how you tested it, and write
+   `Closes #N` for an issue it finishes. The pull request template asks you
+   to confirm that the contribution is your own work.
+2. **Every pull request is squash-merged:** it lands on `main` as one clean
+   commit with the pull request's title, so the history of your branch does
+   not matter – commit as often as you like.
+3. **Any size is fine:** a pull request can be a one-line fix, or a set of
+   features and fixes that work together or depend on one another.
+4. **CI does not have to be green for a merge.** A failing check can be fixed
+   later in its own commit. Before a release, though, CI on `main` must pass,
+   so many red commits delay the next release – if you want your change in
+   the next release quickly, make CI green.
+5. **Security is the strictest part.** Pull requests from people outside the
+   maintainers get a strict security and vulnerability review. A pull
+   request that tries to sneak a vulnerability into TeamCraft is closed
+   without discussion.
 
 **Never commit secrets:** no passwords, tokens, private keys, `.env` files,
 database dumps or vault data. If it happens anyway, tell the maintainers
@@ -549,70 +237,3 @@ disassembled or rewritten from proprietary software and no leaked or
 incompatibly licensed code (see [Your own work only](#your-own-work-only--no-decompiled-code)).
 You also agree that it is licensed under the [Mozilla Public License 2.0](LICENSE),
 like the rest of the project.
-
-## Releases and versions
-
-`main` is the development branch. Version numbers follow
-[Semantic Versioning](https://semver.org); while the version is `0.x`, any
-release may contain breaking changes.
-
-**Paused for the next releases** (since 2026-11-22, to make releases faster): the job
-`local-server` is switched off (`if: false && …`) and the `server` job builds only Linux – the
-Windows x64 server and the macOS sidecar were needed only by the installers *with local
-server*. To bring them back: drop `false &&`, uncomment the two server matrix rows and add
-`local-server` to the `needs` of `publish` (the top of `release.yml` says the same). The
-description below is the full build.
-
-**Build artifacts.** `.github/workflows/release.yml` builds the server
-binaries (Linux x86_64/ARM64, Windows x64) and the desktop installers (AppImage, `.deb`, `.rpm` and Flatpak bundles for
-x86_64/aarch64, `.dmg`,
-and for Windows x64 and ARM64 `.msi`, NSIS `-setup.exe` and a portable
-`.zip`), the desktop installers *with local server* (job `local-server`: the
-app plus the server as `teamcraft-server` and PostgreSQL's programs from
-theseus-rs/postgresql-binaries, checksum-checked, for Windows x64, macOS
-Apple silicon and Linux x86_64; each smoke-tested with its bundled server) –
-that job takes the server binaries of the `server` job instead of building them
-again (for macOS the `server` job builds an unreleased `sidecar-macos-aarch64`
-artifact, in parallel with the others), and the Tauri CLI comes
-prebuilt through `taiki-e/install-action`
-and keeps them as workflow artifacts for 14 days. It builds `main`
-every night (01:07 UTC) when `main` has changed outside the documentation
-since its last successful build, not on every push: with several merges a
-day, each push cancelled the build of the one before and left a red ✗ on
-that commit. *Run workflow* on the Actions page builds any branch at once
-the same way. A pull request that changes the workflow, `packaging/` or
-`desktop/tauri.conf.json` (or `desktop/tauri.local-server.conf.json`) builds
-everything before it is merged.
-
-**Container image.** The same workflow builds `ghcr.io/warr-ev/teamcraft`
-from the `Dockerfile` on an amd64 and an arm64 runner and publishes it:
-`:edge` from `main` (the nightly build, or *Run workflow* on `main` for a
-fresh one at once), `:<version>`, `:<major>.<minor>` and
-`:latest` for a tag (`latest` also for 0.x, but not for suffixed versions
-such as `-rc.1`). A pull request that changes the `Dockerfile` or `deploy/`
-builds the image without publishing it. Before anything is published, a
-smoke test runs `deploy/install.sh` with the freshly built image against
-PostgreSQL and checks `/readyz`, an administrator, the health check, an
-upgrade run and the uninstall. Images are built by CI only – please don't
-publish your own builds under the project's name. Check `deploy/install.sh`
-with `bash -n` and `shellcheck` (CI runs both).
-
-**Cutting a release** (maintainers):
-
-1. Set the same version in `Cargo.toml`, `desktop/Cargo.toml` and
-   `desktop/tauri.conf.json` (the workflow refuses a mismatch), run
-   `cargo check` and `cargo check --manifest-path desktop/Cargo.toml` so both
-   `Cargo.lock` files follow, and commit.
-2. Tag and push: `git tag -a v0.2.0 -m "TeamCraft 0.2.0" && git push origin v0.2.0`.
-3. The workflow builds everything again from the tag, writes
-   `SHA256SUMS.txt` and creates the GitHub Release with generated notes –
-   as a **pre-release** for `0.x` and suffixed versions (`1.0.0-rc.1`).
-   The desktop app's *Update now* (#377) picks its file by these names
-   (`TeamCraft_<version>_x64_en-US.msi`, `_x64-setup.exe`, `_x64_portable.zip`,
-   `_aarch64.dmg`, `_amd64.AppImage`, `TeamCraft-with-local-server_…`) and
-   checks it against `SHA256SUMS.txt` – rename an asset only together with
-   `desktop/src/update.rs` `pick_asset`.
-
-The installers are not code-signed yet (macOS: ad-hoc signature, Windows:
-unsigned); signing needs certificates as repository secrets and is a
-follow-up. Nothing else is published (no package registries).

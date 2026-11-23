@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Which CI jobs a change needs: the one table from changed files to the jobs
-# of ci.yml, desktop.yml, codeql.yml and docs.yml (CONTRIBUTING.md, "What CI
-# runs for a change"). A job runs only when a file it compiles, tests or reads
+# of ci.yml, desktop.yml, codeql.yml and docs.yml (docs/src/dev/ci.md, "What
+# CI runs for a change"). A job runs only when a file it compiles, tests or reads
 # changed.
 #
 # In a workflow, after actions/checkout with fetch-depth: 2:

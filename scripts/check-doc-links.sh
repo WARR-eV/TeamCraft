@@ -14,7 +14,7 @@
 #   scripts/check-doc-links.sh FILE...    # only these Markdown files
 #
 # Exits 1 and lists every missing target (file:line: target). Used by
-# .github/workflows/docs.yml; see CONTRIBUTING.md.
+# .github/workflows/docs.yml; see docs/src/dev/ci.md.
 #
 # Paths the documentation build creates and that therefore do not exist in
 # the tree (the rustdoc reference under docs/src/api/) are allowed below.

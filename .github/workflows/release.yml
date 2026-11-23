@@ -17,7 +17,8 @@
 # they needed – Windows x64 (also no longer a release download) and the
 # macOS sidecar – are not built. To bring them back: drop `false &&` from
 # the `if:` of local-server, uncomment the two server matrix rows and add
-# local-server to the `needs` of publish again (CONTRIBUTING.md, "Releases").
+# local-server to the `needs` of publish again (docs/src/dev/release-checklist.md,
+# "How releases are built").
 #
 # A push to main does not run this workflow. It used to, with a newer push
 # cancelling the running build: on a day with several merges about half of
@@ -38,7 +39,7 @@
 #
 # The tag must match the version in Cargo.toml, desktop/Cargo.toml and
 # desktop/tauri.conf.json. Installers are not code-signed yet (see
-# CONTRIBUTING.md, "Releases").
+# docs/src/dev/release-checklist.md, "How releases are built").
 name: Release
 
 on:

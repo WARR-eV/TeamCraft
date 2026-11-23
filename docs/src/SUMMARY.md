@@ -47,6 +47,7 @@
 
 # Development
 
+- [Checks, CI and merging](dev/ci.md)
 - [Test coverage map](dev/coverage.md)
 - [Mutation testing](dev/mutation-testing.md)
 - [Fuzzing the file readers](dev/fuzzing.md)

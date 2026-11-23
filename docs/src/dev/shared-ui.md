@@ -18,6 +18,52 @@ app](../research/shared-ui.md). This page covers the day-to-day work.
 | Page layout, forms, sign-in, admin pages                                            | web only: `templates/`, `static/`                                                                                                                                                       |
 | Shell, workspace, check-out, local files, Tauri commands                            | desktop only: `desktop/ui/`                                                                                                                                                             |
 
+## Design rules
+
+* **Tokens only:** no literal colours outside `shared/css/skins.css`; every
+  component reads the tokens (`--surface`, `--text-muted`, `--primary`,
+  `--st-<state>-fg/-bg/-bd`, …). Tokens are opaque `#rrggbb`; the unit tests
+  `skins_meet_contrast` and `dark_token_blocks_identical` check the WCAG
+  contrast and that the two dark blocks match.
+* **Density by tokens:** sizes of controls, rows and body text come from
+  `--ctl-h`, `--ctl-h-sm`, `--row-h`, `--fs-body` and `--lh-body`; the web UI
+  uses the defaults, the desktop app `data-density="compact"`. No
+  app-specific copies of these tokens.
+* No gradients, glow, texture, glass or uppercase labels in components; only
+  the distribution skins' `--glow` / `--pattern` behind the page use them.
+* One filled (primary) button per view; the rest is secondary, ghost or in a
+  *More* menu.
+* State is colour **and** a glyph (✓ released, ○ in review, ◐ in work,
+  × rejected, – obsolete, △ check needed), never colour alone.
+* Check both schemes: the screenshot workflow captures every web page in
+  light (`NAME.png`) and dark (`NAME-dark.png`), the desktop app as well
+  (`desktop-*.png`, `desktop-*-dark.png`).
+
+## Translated UI: adding a message or a language
+
+User-facing text of the web header and the desktop *Settings* dialog comes
+from the message catalogs in `shared/i18n/` (#379; more views follow):
+
+* **A message:** add an ID (`area.what`, e.g. `settings.updates`) with the
+  English sentence to `shared/i18n/en.json`, then the same ID to every other
+  catalog (a missing one falls back to English). Use whole sentences with
+  named placeholders – `"{count} files"` – never pieces glued together;
+  plural forms as `{ "one": "…", "other": "…" }`, chosen by `count`. In a
+  template: `{{ t("area.what", count=n) }}`; in desktop JavaScript:
+  `t("area.what", { count: n })` from `/static/shared/js/i18n.js`.
+* **A language:** copy `en.json` to `<code>.json` and translate the values
+  (keep IDs and placeholders); add the code to `LANGUAGES` in `src/i18n.rs`
+  and `shared/js/i18n.js`, its CLDR plural rule to `plural_category`, the
+  file to the `CATALOGS` table and `language.<code>` (its own name) to every
+  catalog.
+* User data (item names, comments, file names), audit records, API field
+  names and error codes are never translated.
+
+The guard tests `src/i18n.rs` (`catalogs_match_english`,
+`every_id_used_exists_in_english`) and `scripts/shared-i18n.test.mjs` fail
+for an ID that is not in `en.json`, a catalog with an unknown ID or other
+placeholders, and an unknown plural category. Tests render in English.
+
 ## What CI checks
 
 | Check                                                                                                               | Fails when                                                                                       |

@@ -34,7 +34,7 @@
   desktop installers as artifacts from `main` every night (when it changed) and on *Run workflow*, not per push,
   publishes the
   container image `ghcr.io/warr-ev/teamcraft` (`:edge` from `main`,
-  `:<version>`/`:latest` from tags) and a GitHub Release for a `v*` tag (CONTRIBUTING.md, "Releases and versions").
+  `:<version>`/`:latest` from tags) and a GitHub Release for a `v*` tag (docs/src/dev/release-checklist.md, "How releases are built").
   Never push a tag, bump the
   version or publish anything else (package registries) unless the user asks
   for that release.
@@ -254,14 +254,16 @@ plugins/solidcraft TeamCraft plugin for SolidCraft: WebAssembly component (craft
 * **Pure Rust:** no Node.js, no downloaded engines; 3D conversion stays in `mesh.rs`.
 * **Config:** a new variable goes into `config.rs` and `docs/src/admin/configuration.md`.
 * **Docs to keep in sync:** `README.md`, `docs/src/**`, `platforms/*.md`,
-  `desktop/README.md`, `docker-compose.yml`, `CONTRIBUTING.md` (repeats the
-  conventions and commands for outside contributors), `SECURITY.md`.
+  `desktop/README.md`, `docker-compose.yml`, `CONTRIBUTING.md` (the short
+  rules for outside contributors; setup and commands in the README's
+  *Development*, the detail in `docs/src/dev/ci.md`), `SECURITY.md`.
 * **Merging:** only with a green *CI result* against the current `main`; a red `main`
-  is fixed before anything else is merged (CONTRIBUTING.md, "Merging").
+  is fixed before anything else is merged. This rule for agents is stricter than the
+  contributor policy (docs/src/dev/ci.md, "Merging": squash merges, CI green before a release).
 * **Docs to keep in sync:** `README.md`, `CHANGELOG.md`, `docs/src/**`,
   `docs/OPEN_WORK.md`, `platforms/*.md`, `desktop/README.md`,
-  `docker-compose.yml`, `CONTRIBUTING.md` (repeats the conventions and
-  commands for outside contributors), `SECURITY.md` – with every task, see
+  `docker-compose.yml`, `CONTRIBUTING.md` (the short rules for outside
+  contributors), `SECURITY.md` – with every task, see
   the hard rule *ALWAYS UPDATE THE DOCUMENTATION* above.
 * **What to work on:** `docs/OPEN_WORK.md`, section *Direction* – proofing (tests,
   fuzzing, CI gates) and structure (module splits, guard tests) before new features;

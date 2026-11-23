@@ -1,11 +1,12 @@
 # Release checklist
 
-This is the list a maintainer follows to cut a release. The rules behind it are
-in [CONTRIBUTING.md](https://github.com/WARR-eV/TeamCraft/blob/main/CONTRIBUTING.md#releases-and-versions)
-(*Releases and versions*) and in the release rules of
+This is the list a maintainer follows to cut a release. How the workflow
+builds and publishes is described [below](#how-releases-are-built); the
+release rules for agents are in
 [CLAUDE.md](https://github.com/WARR-eV/TeamCraft/blob/main/CLAUDE.md). The
 workflow is `.github/workflows/release.yml`. Nothing is published before the
-maintainer pushes the tag.
+maintainer pushes the tag. CI on `main` must be green before a release
+([Merging](ci.md#merging)).
 
 Version numbers follow [Semantic Versioning](https://semver.org). While the
 version is `0.x`, a release may contain breaking changes. From `1.0` on, the
@@ -81,7 +82,8 @@ mismatch.
   Flatpak, `.dmg`, `.msi`, NSIS setup and portable `.zip`) and `SHA256SUMS.txt`.
   *Paused since 2026-11-22:* the Windows x64 server archive and the three
   installers *with local server* (`TeamCraft-with-local-server_…`) – when they
-  are switched on again (CONTRIBUTING.md, "Releases"), check them here too.
+  are switched on again ([How releases are built](#how-releases-are-built)),
+  check them here too.
 - [ ] Download `SHA256SUMS.txt` and at least one archive and check the hash
   with `sha256sum -c SHA256SUMS.txt --ignore-missing`. A mismatch means
   the release is withdrawn, not patched.
@@ -119,6 +121,70 @@ The image `ghcr.io/warr-ev/teamcraft` is published by CI only.
 
 - No package registries. Nothing is published to crates.io, npm or a similar
   registry.
-- No code signing yet. Installers are not signed (see *Releases and versions*
-  in CONTRIBUTING.md); the release notes say so.
+- No code signing yet. Installers are not signed (see
+  [below](#how-releases-are-built)); the release notes say so.
 - No backport branch unless the support policy requires one.
+
+## How releases are built
+
+`main` is the development branch. Version numbers follow
+[Semantic Versioning](https://semver.org); while the version is `0.x`, any
+release may contain breaking changes.
+
+**Paused for the next releases** (since 2026-11-22, to make releases faster):
+the job `local-server` is switched off (`if: false && …`) and the `server`
+job builds only Linux – the Windows x64 server and the macOS sidecar were
+needed only by the installers *with local server*. To bring them back: drop
+`false &&`, uncomment the two server matrix rows and add `local-server` to
+the `needs` of `publish` (the top of `release.yml` says the same). The
+description below is the full build.
+
+**Build artifacts.** `.github/workflows/release.yml` builds the server
+binaries (Linux x86_64/ARM64, Windows x64) and the desktop installers
+(AppImage, `.deb`, `.rpm` and Flatpak bundles for x86_64/aarch64, `.dmg`,
+and for Windows x64 and ARM64 `.msi`, NSIS `-setup.exe` and a portable
+`.zip`), and the desktop installers *with local server* (job `local-server`:
+the app plus the server as `teamcraft-server` and PostgreSQL's programs from
+theseus-rs/postgresql-binaries, checksum-checked, for Windows x64, macOS
+Apple silicon and Linux x86_64; each smoke-tested with its bundled server –
+it takes the server binaries of the `server` job, for macOS an unreleased
+`sidecar-macos-aarch64` artifact; the Tauri CLI comes prebuilt through
+`taiki-e/install-action`). The artifacts are kept for 14 days. The workflow
+builds `main` every night (01:07 UTC) when `main` has changed outside the
+documentation since its last successful build – not on every push, where
+each push cancelled the build of the one before. *Run workflow* builds any
+branch at once. A pull request that changes the workflow, `packaging/` or
+`desktop/tauri.conf.json` (or `desktop/tauri.local-server.conf.json`) builds
+everything before it is merged.
+
+**Container image.** The same workflow builds `ghcr.io/warr-ev/teamcraft`
+from the `Dockerfile` on an amd64 and an arm64 runner and publishes it:
+`:edge` from `main` (nightly, or *Run workflow* on `main`), `:<version>`,
+`:<major>.<minor>` and `:latest` for a tag (`latest` also for 0.x, not for
+suffixed versions such as `-rc.1`). A pull request that changes the
+`Dockerfile` or `deploy/` builds the image without publishing it. Before
+anything is published, a smoke test runs `deploy/install.sh` with the fresh
+image against PostgreSQL and checks `/readyz`, an administrator, the health
+check, an upgrade run and the uninstall. Images are built by CI only.
+`deploy/install.sh` is checked with `bash -n` and `shellcheck` in CI.
+
+**Cutting a release** (the short form of the list above):
+
+1. Set the same version in `Cargo.toml`, `desktop/Cargo.toml` and
+   `desktop/tauri.conf.json` (the workflow refuses a mismatch), run
+   `cargo check` and `cargo check --manifest-path desktop/Cargo.toml` so both
+   `Cargo.lock` files follow, and merge it.
+2. Tag the merge commit and push: `git tag -a v0.2.0 -m "TeamCraft 0.2.0"`
+   and `git push origin v0.2.0`.
+3. The workflow builds everything again from the tag, writes
+   `SHA256SUMS.txt` and creates the GitHub Release with generated notes – as a
+   **pre-release** for `0.x` and suffixed versions (`1.0.0-rc.1`). The desktop
+   app's *Update now* (#377) picks its file by these names
+   (`TeamCraft_<version>_x64_en-US.msi`, `_x64-setup.exe`, `_x64_portable.zip`,
+   `_aarch64.dmg`, `_amd64.AppImage`, `TeamCraft-with-local-server_…`) and
+   checks it against `SHA256SUMS.txt` – rename an asset only together with
+   `desktop/src/update.rs` `pick_asset`.
+
+The installers are not code-signed yet (macOS: ad-hoc signature, Windows:
+unsigned); signing needs certificates as repository secrets and is a
+follow-up. Nothing else is published (no package registries).
