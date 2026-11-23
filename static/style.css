@@ -496,7 +496,6 @@ h2 .count, .count { color: var(--text-dim); font-weight: 500; }
 .block { display: block; }
 .pre { white-space: pre-wrap; }
 .hidden { display: none !important; }
-.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* the first stop of every page; visible only while it has the focus */
 .skip-link {
   position: absolute; left: 8px; top: 8px; z-index: 1000;
@@ -1537,18 +1536,14 @@ pre.json { max-height: 24rem; overflow: auto; white-space: pre-wrap; overflow-wr
 .section-nav ~ * section.card[id], .section-nav ~ section.card[id] { scroll-margin-top: calc(var(--topbar-h) + 52px); }
 
 /* Component picker of the BOM (#419, static/app.js): suggestions under the
-   item field of *Add component*. */
+   item field of *Add component*. The list and its options are styled in
+   shared/css/components.css; here only the web's popup under the field. */
 .picker { position: relative; display: inline-flex; flex-direction: column; }
-.picker-list {
+.picker .picker-list {
   position: absolute; top: 100%; left: 0; z-index: 30;
-  min-width: 22rem; max-width: min(36rem, 90vw); max-height: 22rem; overflow-y: auto;
-  margin: 2px 0 0; padding: 4px 0; list-style: none;
-  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 6px;
+  min-width: 22rem; max-width: min(36rem, 90vw); max-height: 22rem;
+  margin: 2px 0 0; border-color: var(--border-strong); border-radius: 6px;
   box-shadow: var(--shadow-pop);
 }
-.picker-option { display: flex; gap: var(--space-2, 8px); align-items: center; padding: 4px 8px; cursor: pointer; }
-.picker-option:hover, .picker-option[aria-selected="true"] { background: var(--selected); }
-.picker-thumb { flex: none; width: 40px; height: 40px; object-fit: contain; border-radius: 4px; background: var(--surface-sunken); }
-.picker-main { display: flex; flex-direction: column; min-width: 0; }
-.picker-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker .picker-thumb { width: 40px; height: 40px; border-radius: 4px; }
 .picker-empty { padding: 6px 10px; color: var(--text-muted); }

@@ -19,7 +19,9 @@ vm.runInNewContext(fs.readFileSync(file, "utf8"), sandbox, { filename: file });
 const { dragAction, MOUSE_SCHEMES } = sandbox.window.TeamCraftViewer;
 
 const LEFT = 1, RIGHT = 2, MIDDLE = 4;
-const schemes = MOUSE_SCHEMES.map((s) => s.id);
+// Array.from: an array of this realm – the sandbox's arrays have another
+// Array.prototype, which assert.deepEqual (strict) tells apart
+const schemes = Array.from(MOUSE_SCHEMES, (s) => s.id);
 
 // four schemes with their own ids and labels; the default is the first
 assert.deepEqual(schemes, ["left-rotate", "right-rotate", "middle-rotate", "middle-pan"]);

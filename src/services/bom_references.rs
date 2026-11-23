@@ -42,7 +42,7 @@
 //! # At check-in (#407)
 //!
 //! A check-in with *Update the BOM from the CAD file*
-//! (`bom_from_references`) runs [`apply_on_checkin`] in the check-in's
+//! (`bom_from_references`) runs `apply_on_checkin` in the check-in's
 //! transaction, after the new versions and their references are stored:
 //! new children are added, CAD-counted quantities corrected, circular
 //! children refused, nothing removed (see its invariants).
