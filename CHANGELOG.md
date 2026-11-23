@@ -15,6 +15,9 @@ see the notices in the README.
 
 ### Fixed
 
+- CI: the comment of the shared component picker named its issue as
+  "#419", which the no-literal-colours guard of `shared/css/` reads as a
+  hex colour; it says "issue 419" now.
 - CI on `main` is green again (after #419, #420, #407, #459):
   - the BOM component picker (`.picker-*`) and `.visually-hidden` were styled
     in both app stylesheets; they are shared components now

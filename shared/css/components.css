@@ -14,7 +14,8 @@
 /* Hidden on screen, still read by screen readers (both apps). */
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-/* Component picker of the BOM (#419): suggestions to choose an item – web
+/* Component picker of the BOM (issue 419 – no "#" here: the colour guard
+ * reads comments too): suggestions to choose an item – web
  * static/app.js (*Add component*; the popup under the field is a context
  * rule in style.css, `.picker .picker-list`), desktop js/bom-lines.js
  * (*Add line…*). */
