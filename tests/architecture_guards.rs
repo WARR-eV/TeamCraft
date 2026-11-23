@@ -445,6 +445,11 @@ const NOT_GUARDED: &[(&str, &str)] = &[
         "writes the read log for revision ids its callers have already read through guarded queries",
     ),
     (
+        "bom_references::load_files",
+        "reads the files of one revision; both callers (the preview and the check-in step, #407) \
+         have checked that revision with access::ensure_visible first",
+    ),
+    (
         "changes::stands_in_for_author",
         "returns only whether the actor manages every group of a change the caller has loaded \
          visibly; nothing of the items leaves the function",

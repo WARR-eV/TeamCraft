@@ -109,7 +109,7 @@
     <tbody>
     {% for i in items %}
       <tr data-tc-row="{{ i.number }}">
-        <td class="thumb-col">{% if i.thumbnail_file_id %}<a class="thumb-link" href="/revisions/{{ i.latest_revision_id }}" tabindex="-1" aria-hidden="true"><img class="list-thumb" src="/files/{{ i.thumbnail_file_id }}/thumbnail?v={{ i.thumbnail_sha256 }}" alt="" loading="lazy" decoding="async" width="40" height="40" data-hide-broken></a>{% endif %}</td>
+        <td class="thumb-col">{% if i.thumbnail_file_id %}<a class="thumb-link" href="/revisions/{{ i.latest_revision_id }}" tabindex="-1" aria-hidden="true" aria-label="{{ i.number }}"><img class="list-thumb" src="/files/{{ i.thumbnail_file_id }}/thumbnail?v={{ i.thumbnail_sha256 }}" alt="" loading="lazy" decoding="async" width="40" height="40" data-hide-broken></a>{% endif %}</td>
         <td class="nowrap mono"><a href="/revisions/{{ i.latest_revision_id }}">{{ i.number }}</a>
           <button type="button" class="small copy-number" data-copy-text="{{ i.number }}" title="Copy {{ i.number }}" aria-label="Copy the item number {{ i.number }}">⧉</button></td>
         <td>{{ i.name }}{% if i.matched_file %} <span class="small muted" title="The search term was found in this file">· found in {{ i.matched_file }}</span>{% endif %}</td>

@@ -13,6 +13,19 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Fixed
+
+- CI on `main` is green again (after #419, #420, #407, #459):
+  - the BOM component picker (`.picker-*`) and `.visually-hidden` were styled
+    in both app stylesheets; they are shared components now
+    (`shared/css/components.css`), the web keeps its popup as a context rule;
+  - the thumbnail link of the item list has an accessible name;
+  - the module docs of `services::bom_references` linked a private function;
+  - `bom_references::load_files` is named in the visibility guard's
+    `NOT_GUARDED` list (both callers check the revision first);
+  - the viewer's mouse-scheme test compared an array of the sandbox with
+    `assert.deepEqual`.
+
 ### Changed
 
 - Desktop: the *Support us on Ko-fi* tag and the update notice in the status
