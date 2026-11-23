@@ -12,6 +12,7 @@
 //! | `OrganizationName`   | shown as *Managed by …* (one line, at most 64 characters)     |
 //! | `UsageStatistics`    | 0: never sent, kept or asked; 1: sent, cannot be turned off (#383) |
 //! | `ReportUrl`          | where *Report a problem* sends reports: the organisation's tracker (`https://…`) |
+//! | `ShowDonateTag`      | 0: the *Support us on Ko-fi* tag is never shown; 1: shown once per start, cannot be turned off (#403) |
 //!
 //! Where they come from:
 //!
@@ -57,6 +58,7 @@ pub struct Policies {
     pub organization_name: Option<String>,
     pub usage_statistics: Option<bool>,
     pub report_url: Option<String>,
+    pub show_donate_tag: Option<bool>,
 }
 
 /// One raw value as a source stores it.
@@ -125,6 +127,7 @@ impl Policies {
             organization_name: organization(get("OrganizationName").as_ref()),
             usage_statistics: switch(get("UsageStatistics").as_ref()),
             report_url: report_url(get("ReportUrl").as_ref()),
+            show_donate_tag: switch(get("ShowDonateTag").as_ref()),
         }
     }
 
@@ -150,6 +153,7 @@ impl Policies {
             organization_name: self.organization_name.or(other.organization_name),
             usage_statistics: self.usage_statistics.or(other.usage_statistics),
             report_url: self.report_url.or(other.report_url),
+            show_donate_tag: self.show_donate_tag.or(other.show_donate_tag),
         }
     }
 
@@ -189,6 +193,12 @@ impl Policies {
         self.crash_report_prompt.unwrap_or(user != Some(false))
     }
 
+    /// The *Support us on Ko-fi* tag at start (#403): the policy, else the
+    /// user's choice (`None` = shown).
+    pub fn donate_tag(&self, user: Option<bool>) -> bool {
+        self.show_donate_tag.unwrap_or(user != Some(false))
+    }
+
     /// What the UI shows: the organisation and which settings are fixed.
     pub fn view(&self) -> PolicyView {
         let mut managed = Vec::new();
@@ -206,6 +216,9 @@ impl Policies {
         }
         if self.report_url.is_some() {
             managed.push("report_url");
+        }
+        if self.show_donate_tag.is_some() {
+            managed.push("donate_tag");
         }
         PolicyView {
             managed: self.any(),
@@ -477,6 +490,47 @@ mod tests {
                 .as_deref(),
             Some("https://mine.example.org")
         );
+    }
+
+    #[test]
+    fn the_donate_tag_policy_wins_over_the_user() {
+        let none = Policies::default();
+        assert!(none.donate_tag(None), "shown unless switched off");
+        assert!(none.donate_tag(Some(true)));
+        assert!(!none.donate_tag(Some(false)));
+        assert!(!none.view().fixed.contains(&"donate_tag"));
+
+        let off = Policies::from_json(r#"{"ShowDonateTag": 0}"#);
+        assert_eq!(off.show_donate_tag, Some(false));
+        assert!(!off.donate_tag(None) && !off.donate_tag(Some(true)));
+        assert_eq!(off.view().fixed, vec!["donate_tag"]);
+        assert!(off.any());
+
+        let on = Policies::from_json(r#"{"ShowDonateTag": true}"#);
+        assert!(on.donate_tag(Some(false)));
+        assert_eq!(on.view().fixed, vec!["donate_tag"]);
+
+        for bad in [r#""0""#, "2", "-1", "0.5", "null"] {
+            let p = Policies::from_json(&format!(r#"{{"ShowDonateTag": {bad}}}"#));
+            assert_eq!(p.show_donate_tag, None, "{bad}");
+            assert!(!p.view().fixed.contains(&"donate_tag"), "{bad}");
+        }
+
+        // the registry: a REG_DWORD switch, not REG_SZ
+        let out = "\r\nHKEY_LOCAL_MACHINE\\Software\\Policies\\TeamCraft\r\n    ShowDonateTag    REG_DWORD    0x0\r\n\r\n";
+        assert_eq!(
+            from_pairs(parse_reg_query(out)).show_donate_tag,
+            Some(false)
+        );
+        let text = "\r\n    ShowDonateTag    REG_SZ    0\r\n";
+        assert_eq!(from_pairs(parse_reg_query(text)).show_donate_tag, None);
+
+        // the computer wins over the user, value by value
+        let machine = Policies::from_json(r#"{"ShowDonateTag": 0}"#);
+        let user = Policies::from_json(r#"{"ShowDonateTag": 1}"#);
+        assert_eq!(machine.or(user).show_donate_tag, Some(false));
+        let user_only = Policies::default().or(Policies::from_json(r#"{"ShowDonateTag": 1}"#));
+        assert_eq!(user_only.show_donate_tag, Some(true));
     }
 
     #[test]

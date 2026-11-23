@@ -1,3 +1,4 @@
+| `ShowDonateTag`     | switch | `0`: the *Support us on Ko-fi* tag is never shown and users cannot turn it on; `1`: it shows once per start of the app and users cannot turn it off; not set: it shows once per start and each user can switch it off in *Settings → Support TeamCraft*. The link (`https://ko-fi.com/warr_ev`) is fixed in the app and cannot be changed (#403) |
 # Deploying the desktop app
 
 An IT department that rolls TeamCraft Desktop out to many computers can preset

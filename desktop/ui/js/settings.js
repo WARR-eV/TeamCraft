@@ -7,7 +7,7 @@ import { label } from "/static/shared/js/format.js";
 import { LANGUAGES, negotiate, t } from "/static/shared/js/i18n.js";
 import { applySkin } from "./skins.js";
 import { checkServerUrl, showConnect } from "./connect.js";
-import { atRisk, checkUpdate, checkoutsWithChanges, localChangesList, refreshWorklistCount, sendLocalChanges } from "./shell.js";
+import { atRisk, checkUpdate, checkoutsWithChanges, localChangesList, refreshWorklistCount, sendLocalChanges, showDonateTag } from "./shell.js";
 import { resetCompanyAi } from "./assistant.js";
 import { agent, agentSettingsDialog, endAgentPermissions, localAgentsAllowed, localAgentsOffText } from "./agent.js";
 
@@ -43,8 +43,9 @@ function languageSelector() {
 }
 
 /** Managed deployment policies (#378): is this setting (`server`,
- *  `update_check`, `crash_prompt`, `usage_statistics`) fixed by the
- *  organisation? Such a setting is shown disabled. */
+ *  `update_check`, `crash_prompt`, `usage_statistics`, `report_url`,
+ *  `donate_tag`) fixed by the organisation? Such a setting is shown
+ *  disabled. */
 export function fixedByPolicy(key) {
   var p = state.session && state.session.policy;
   return !!(p && p.fixed && p.fixed.indexOf(key) !== -1);
@@ -83,6 +84,14 @@ export function openSettings() {
     var on = crashPrompt.checked;
     call("set_crash_prompt", { enabled: on }).then(function () { state.session.crash_prompt = on; },
       function (e) { crashPrompt.checked = !on; toast(errorText(e), "error"); });
+  } } });
+  // the Ko-fi tag at start (#403); switched off, a tag shown now goes too
+  var donateTag = h("input", { type: "checkbox", checked: state.session.donate_tag !== false, disabled: fixedByPolicy("donate_tag"), on: { change: function () {
+    var on = donateTag.checked;
+    call("set_donate_tag", { enabled: on }).then(function () {
+      state.session.donate_tag = on;
+      if (!on) showDonateTag(false);
+    }, function (e) { donateTag.checked = !on; toast(errorText(e), "error"); });
   } } });
   // *Report a problem* (#381): the operator's own tracker instead of GitHub
   var reportUrl = h("input", { type: "url", value: state.session.report_url || "", spellcheck: "false", disabled: fixedByPolicy("report_url"), placeholder: "https://github.com/WARR-eV/TeamCraft/issues/new", on: { change: function () {
@@ -142,6 +151,10 @@ export function openSettings() {
     h("p.hint", { text: "Crashes and uncaught errors are written to a report on this computer (in the app's settings folder, without your home folder, server addresses or tokens). It is only shared when you open the GitHub issue yourself. Switched off, the reports stay on this computer and are never shown." }),
     field("Report problems to", reportUrl, "empty = the TeamCraft issue form on GitHub; your help desk's form address, which gets title and body"),
     managedNote("report_url"),
+    h("h3", { text: t("settings.support") }),
+    h("label.check", null, [donateTag, t("settings.donate_tag")]),
+    managedNote("donate_tag"),
+    h("p.hint", { text: t("settings.donate_tag.hint") }),
     h("h3", { text: t("settings.account") }),
     h("p", null, ["Signed in to ", h("strong", { text: state.session.server_url }), " as ", h("strong", { text: state.me.display_name }), " (" + label(state.me.role) + ") on ", h("span", { text: state.session.device })]),
     state.session.token_storage === "file"

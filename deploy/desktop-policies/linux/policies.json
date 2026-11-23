@@ -6,5 +6,6 @@
   "WorkspaceRoot": "/srv/cad",
   "ReportUrl": "https://helpdesk.example.org/issues/new",
   "OrganizationName": "Example Lab",
-  "UsageStatistics": 0
+  "UsageStatistics": 0,
+  "ShowDonateTag": 0
 }

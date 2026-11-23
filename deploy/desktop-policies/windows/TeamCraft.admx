@@ -51,6 +51,12 @@
       <enabledValue><decimal value="1" /></enabledValue>
       <disabledValue><decimal value="0" /></disabledValue>
     </policy>
+    <policy name="ShowDonateTag" class="Both" displayName="$(string.ShowDonateTag)" explainText="$(string.ShowDonateTag_Explain)" key="Software\Policies\TeamCraft" valueName="ShowDonateTag">
+      <parentCategory ref="TeamCraft" />
+      <supportedOn ref="SUPPORTED_TeamCraft_0_2_12" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
     <policy name="WorkspaceRoot" class="Both" displayName="$(string.WorkspaceRoot)" explainText="$(string.WorkspaceRoot_Explain)" presentation="$(presentation.WorkspaceRoot)" key="Software\Policies\TeamCraft">
       <parentCategory ref="TeamCraft" />
       <supportedOn ref="SUPPORTED_TeamCraft_0_2_12" />

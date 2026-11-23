@@ -109,6 +109,9 @@ pub struct Session {
     pub checkout_parts: bool,
     /// After a crash, ask at the next start whether to share the report.
     pub crash_prompt: bool,
+    /// Show the *Support us on Ko-fi* tag once at this start (#403): the
+    /// policy, else the user's choice.
+    pub donate_tag: bool,
     /// *Settings → Report problems to* (#381); `None` = GitHub.
     pub report_url: Option<String>,
     /// A *with local server* installation: the connect screen offers *Try
@@ -133,6 +136,7 @@ pub fn session(app: AppHandle, state: State<'_, AppState>) -> Session {
         checkout_parts: s.checkout_parts != Some(false),
         report_url: policy::current().report_target(s.report_url.clone()),
         crash_prompt: policy::current().crash_prompt(s.crash_prompt),
+        donate_tag: policy::current().donate_tag(s.donate_tag),
         server_url: s.server_url.clone(),
         signed_in: s.token.is_some(),
         skin: s.skin.clone().unwrap_or_else(|| "teamcraft".into()),
@@ -1380,6 +1384,52 @@ pub fn open_release_page(app: AppHandle) -> CmdResult<()> {
         .map_err(|e| ApiError::local(format!("The browser could not be opened: {e}")))
 }
 
+// ------------------------------------------------------------ Ko-fi tag (#403)
+
+/// The Ko-fi page of the association that develops TeamCraft. Fixed in the
+/// app, not configurable: a policy can only switch the tag off.
+pub const DONATE_URL: &str = "https://ko-fi.com/warr_ev";
+
+/// The *Support us on Ko-fi* tag: opens [`DONATE_URL`] in the default
+/// browser. The web view cannot pass another address; nothing is sent before
+/// the click and nothing is counted.
+#[tauri::command]
+pub fn open_donate_page(app: AppHandle) -> CmdResult<()> {
+    app.opener()
+        .open_url(DONATE_URL, None::<&str>)
+        .map_err(|e| ApiError::local(format!("The browser could not be opened: {e}")))
+}
+
+/// Whether the tag was shown in this run of the app – held in memory only,
+/// so reconnecting, switching server or reloading the window does not show
+/// it again, and the next start does.
+static DONATE_TAG_SHOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Show the tag now? Only when it is on (the policy, else the setting) and
+/// not yet shown in this run; a `true` answer marks it shown.
+fn donate_tag_due_once(enabled: bool, shown: &std::sync::atomic::AtomicBool) -> bool {
+    enabled && !shown.swap(true, std::sync::atomic::Ordering::SeqCst)
+}
+
+/// Asked by the main window when it opens (ui/js/shell.js): `true` once per
+/// start of the app while the tag is on.
+#[tauri::command]
+pub fn donate_tag_due(state: State<'_, AppState>) -> bool {
+    let enabled = policy::current().donate_tag(snapshot(&state).donate_tag);
+    donate_tag_due_once(enabled, &DONATE_TAG_SHOWN)
+}
+
+/// *Settings → Show the "Support us on Ko-fi" tag at start*; refused while a
+/// policy (`ShowDonateTag`) fixes it.
+#[tauri::command]
+pub fn set_donate_tag(state: State<'_, AppState>, enabled: bool) -> CmdResult<()> {
+    if policy::current().show_donate_tag.is_some() {
+        return Err(ApiError::local(MANAGED));
+    }
+    update_settings(&state, |s| s.donate_tag = Some(enabled))?;
+    Ok(())
+}
+
 /// Smallest and largest zoom factor of the user interface.
 pub const ZOOM_RANGE: (f64, f64) = (0.5, 2.5);
 
@@ -1415,6 +1465,29 @@ mod tests {
         assert_eq!(clamp_zoom(0.1), ZOOM_RANGE.0);
         assert_eq!(clamp_zoom(9.0), ZOOM_RANGE.1);
         assert_eq!(clamp_zoom(f64::NAN), 1.0);
+    }
+
+    /// The Ko-fi tag (#403) opens one fixed https address of ko-fi.com, and
+    /// the web view's content security policy does not let ko-fi.com in:
+    /// nothing is loaded from there inside the app.
+    #[test]
+    fn the_donate_link_is_fixed_and_not_in_the_csp() {
+        assert_eq!(DONATE_URL, "https://ko-fi.com/warr_ev");
+        let conf = include_str!("../tauri.conf.json");
+        assert!(conf.contains("\"csp\""), "tauri.conf.json has a CSP");
+        assert!(!conf.contains("ko-fi.com"), "ko-fi.com is not in the CSP");
+    }
+
+    /// Once per start: the first question while it is on says yes, every
+    /// later one no; switched off it never shows and is not used up.
+    #[test]
+    fn the_donate_tag_is_due_once_per_start() {
+        use std::sync::atomic::AtomicBool;
+        let shown = AtomicBool::new(false);
+        assert!(!donate_tag_due_once(false, &shown), "off: not shown");
+        assert!(donate_tag_due_once(true, &shown), "first time");
+        assert!(!donate_tag_due_once(true, &shown), "not a second time");
+        assert!(!donate_tag_due_once(false, &shown));
     }
 
     #[test]
