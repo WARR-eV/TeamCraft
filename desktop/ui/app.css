@@ -404,21 +404,39 @@ tr.row-conflict td:first-child, tr.row-clash td:first-child { box-shadow: inset 
   border-top: 1px solid var(--border);
   white-space: nowrap; overflow: hidden;
 }
-.status-msg { flex: 1; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); }
+.status-msg { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); }
+/* the workspace path gives way first when the bar gets tight: it shrinks
+   much faster than the pills and ends in an ellipsis */
+.status-ws { flex: 0 12 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .status-get { display: inline-flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
 .status-get progress { width: 8rem; height: 6px; accent-color: var(--primary); }
 .status-get-text { overflow: hidden; text-overflow: ellipsis; max-width: 34rem; }
 .status-get button { height: 18px; font-size: 12px; padding: 0 6px; }
 .status-server::before { content: '●'; color: var(--st-ok-fg); margin-right: 6px; }
-/* the update notice: a link to the release page and a close button, never a download */
-.status-update { display: inline-flex; align-items: center; gap: 2px; }
-.status-update button { height: 18px; font-size: 12px; padding: 0 6px; }
-#status-update-open { color: var(--link); }
-/* the Ko-fi tag (#403): once per start, a small chip that opens ko-fi.com in the
+/* Notices in the status bar as pills: one rounded shape around the label and
+   its ×. They sit in the bar's flex row with its gap, so they never overlap –
+   when both show they line up side by side, and in a narrow window they
+   shrink (the label ends in an ellipsis) after the workspace path has. */
+.status-pill {
+  display: inline-flex; align-items: center; flex: 0 1 auto; min-width: 5rem;
+  height: 18px; border: 1px solid; border-radius: 999px; overflow: hidden;
+}
+.status-pill button {
+  height: 16px; font-size: 12px; line-height: 16px; padding: 0 4px 0 9px;
+  border: none; border-radius: 0; background: none; color: inherit;
+}
+.status-pill button:first-child { flex: 0 1 auto; min-width: 0; display: block; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.status-pill button:last-child { flex: none; padding: 0 7px 0 3px; opacity: 0.75; }
+@media (hover: hover) {
+  .status-pill button:where(:enabled):hover { background: none; border-color: transparent; text-decoration: underline; }
+  .status-pill button:last-child:where(:enabled):hover { text-decoration: none; opacity: 1; }
+}
+.status-pill button:focus-visible { outline-offset: -2px; border-radius: 999px; }
+/* the update notice (green): opens the update window, never a download by itself */
+.status-update { color: var(--st-ok-fg); background: var(--st-ok-bg); border-color: var(--st-ok-bd); }
+/* the Ko-fi tag (#403, orange): once per start, opens ko-fi.com in the
    browser – static text, nothing loaded from there */
-.status-donate { display: inline-flex; align-items: center; gap: 2px; }
-.status-donate button { height: 18px; font-size: 12px; padding: 0 6px; }
-#status-donate-open { color: var(--link); border-radius: 9px; }
+.status-donate { color: var(--st-impact-fg); background: var(--st-impact-bg); border-color: var(--st-impact-edge); }
 
 /* ---------------------------------------------------------------- navigator */
 

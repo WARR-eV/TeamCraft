@@ -879,8 +879,9 @@ regular installers do not show the button.
 ## Update notice
 
 Once a day at most, the app asks GitHub for the latest TeamCraft release. If
-it is newer than your version, the status bar shows *TeamCraft x.y.z is
-available*. A click opens the **update window** with the release notes and:
+it is newer than your version, the status bar shows a green pill *TeamCraft
+x.y.z is available* (the tooltip names the version you have). A click opens
+the **update window** with the release notes and:
 
 * **Update now** (Windows installers, macOS) or **Download** (portable zip,
   AppImage): downloads the file for your installation into your Downloads
@@ -904,9 +905,12 @@ check off (for example on computers without internet access).
 ## Support us on Ko-fi
 
 TeamCraft is free software, developed by a non-profit association. Once per
-start of the app, the status bar shows a small **Support us on Ko-fi** tag.
+start of the app, the status bar shows a small orange **Support us on Ko-fi**
+pill. When the update notice shows too, the two pills sit side by side; in a
+narrow window the workspace path shortens first, then the pill labels end in
+an ellipsis – they never overlap.
 A click opens the association's Ko-fi page (`https://ko-fi.com/warr_ev`) in
-your browser and hides the tag; *×* only hides it. It does not come back
+your browser and hides the pill; *×* only hides it. It does not come back
 until the app starts again – reconnecting or switching server does not show
 it again. Nothing is loaded from ko-fi.com inside the app and nothing is
 sent or counted; only your click opens the page.
