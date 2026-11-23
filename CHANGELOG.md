@@ -13,6 +13,17 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Changed
+
+- README: restructured in place. *Who it is for* comes first, the screenshots
+  sit beside the feature groups they show instead of in one gallery at the
+  end, single sign-on, offboarding, audit log, branding, monitoring, webhooks
+  and backups are described once under *Enterprise management*, *Planned* is
+  a section of its own, *Quick start* and *Download* no longer lead with the
+  paused *with local server* installer, and the download details and the
+  third-party licence table fold into collapsible blocks. No feature text
+  moved out of the README.
+
 ### Fixed
 
 - CI: the import check of the desktop modules (`scripts/check-desktop-modules.mjs`)
