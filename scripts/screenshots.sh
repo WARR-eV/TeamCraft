@@ -943,7 +943,7 @@ desktop_run() {
     desktop_click 217 145 # "Checked out by me": the mounting bracket
     settle 2 "the revision tab"
     desktop_snap "desktop-revision$suffix"
-    desktop_click 210 203 # "Waiting for my review": the enclosure change
+    desktop_click 210 451 # "Waiting for my review": the enclosure change
     settle 2 "the change order tab"
     desktop_snap "desktop-change$suffix"
     desktop_graph "$suffix"
@@ -969,10 +969,10 @@ desktop_graph() {
     local suffix=$1
     desktop_key ctrl+Page_Up
     settle 2 "the bracket tab"
-    desktop_click 838 248 # sub-tab "Graph" of the mounting bracket
+    desktop_click 838 278 # sub-tab "Graph" of the mounting bracket
     settle 3 "the graph of the mounting bracket"
     desktop_snap "desktop-graph-nav$suffix"
-    desktop_click 898 528 # the card above the bracket: the sensor mast assembly
+    desktop_click 898 543 # the card above the bracket: the sensor mast assembly
     settle 4 "the graph of the sensor mast assembly"
     desktop_snap "desktop-graph$suffix"
     desktop_key ctrl+Page_Down
