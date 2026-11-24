@@ -906,8 +906,12 @@ the **update window** with the release notes and:
   (`SHA256SUMS.txt`). A file that does not match is deleted and nothing
   changes. A Windows installer then starts after you confirm – TeamCraft
   closes, your working folder, sign-in and settings stay; on macOS the disk
-  image opens and you drag TeamCraft to *Applications*; a zip or AppImage is
-  shown in its folder to replace your copy. Installed with Flatpak or a
+  image opens and you drag TeamCraft to *Applications*. The Windows portable
+  zip and the AppImage replace your copy in place after you confirm
+  (*Replace and restart*): the new version goes into the app's folder, the
+  old files are removed at the next start, and TeamCraft restarts (#466). A
+  folder the app may not write into, or any other failure, changes nothing –
+  the window says why and *Show the file* shows the verified download. Installed with Flatpak or a
   `.deb`/`.rpm` package, the window names the package-manager way instead.
   Not while a check-in or Get runs.
 * **Skip this version** (or *×* in the status bar): no notice until a newer

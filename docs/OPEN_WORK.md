@@ -169,7 +169,7 @@ feature milestone – the features in *What works* are enough; what is missing i
   the new-item file check, the BOM preview, the 3D viewer's overlay, *Check in all* problems)
 - [ ] Desktop: one-click update (#377). Done: update window (release notes, *Skip this version*, *Remind me later*),
   *Help → Check for Updates…*, download of this installation's file verified against `SHA256SUMS.txt`, Windows
-  installers started, `.dmg` opened. Left: swapping a portable zip or AppImage in place with *Restart now*, a
+  installers started, `.dmg` opened, a portable zip or AppImage swapped in place with *Restart now* (#466). Left: a
   signature on the checksum list (release key built into the app). Done since: the update window and the connect
   notice name the desktop version the connected server needs (#468); the manual test script per install type for each
   RC (docs/src/dev/release-checklist.md, *Desktop update test*, #469)

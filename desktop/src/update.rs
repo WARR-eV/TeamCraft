@@ -458,6 +458,164 @@ fn verify_digest(actual: &str, expected: &str, name: &str) -> Result<(), String>
     }
 }
 
+// ------------------------------------------- swap in place (#466)
+
+/// The files of the Windows portable zip that an update replaces, by name
+/// (the release workflow packs them into one folder `TeamCraft_<v>_<arch>_portable`).
+pub const PORTABLE_FILES: [&str; 3] = ["TeamCraft.exe", "LICENSE.txt", "README.txt"];
+/// The suffix of a file the swap moved aside; removed at the next start.
+pub const OLD_SUFFIX: &str = ".old";
+/// The folder next to the app where the zip is unpacked first.
+pub const STAGING_DIR: &str = ".teamcraft-update";
+
+/// The file of the portable folder an entry of the unpacked zip replaces:
+/// `TeamCraft_0.3.0_x64_portable/TeamCraft.exe` → `TeamCraft.exe`. Only
+/// [`PORTABLE_FILES`] one folder deep; anything else (other names, deeper or
+/// shallower paths, `..`) is never copied.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn portable_target(entry: &str) -> Option<&'static str> {
+    let parts: Vec<&str> = entry.split(['/', '\\']).filter(|p| !p.is_empty()).collect();
+    match parts.as_slice() {
+        [folder, name] if !folder.starts_with('.') && *folder != ".." => PORTABLE_FILES
+            .iter()
+            .copied()
+            .find(|f| f.eq_ignore_ascii_case(name)),
+        _ => None,
+    }
+}
+
+/// The name a replaced file is moved to: `TeamCraft.exe` → `TeamCraft.exe.old`.
+pub fn old_name(name: &str) -> String {
+    format!("{name}{OLD_SUFFIX}")
+}
+
+/// What the start after a swap removes from the app's folder: the files the
+/// swap moved aside (only those of [`PORTABLE_FILES`]) and a staging folder
+/// left by an interrupted update.
+pub fn leftovers(names: &[String]) -> Vec<String> {
+    names
+        .iter()
+        .filter(|n| {
+            n.as_str() == STAGING_DIR
+                || PORTABLE_FILES
+                    .iter()
+                    .any(|f| n.eq_ignore_ascii_case(&old_name(f)))
+        })
+        .cloned()
+        .collect()
+}
+
+/// One step of a swap: move `from` to `to` (both in the app's folder).
+#[cfg_attr(not(windows), allow(dead_code))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Move {
+    pub from: std::path::PathBuf,
+    pub to: std::path::PathBuf,
+}
+
+/// The moves that put the unpacked files `found` (name → path in the
+/// staging folder) into the app folder `dir`: each existing file aside to
+/// `.old` first, then the new one in place. A file the zip does not have is
+/// kept. Without `TeamCraft.exe` in the zip there is nothing to do.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn swap_moves(
+    dir: &std::path::Path,
+    found: &[(&'static str, std::path::PathBuf)],
+    exists: impl Fn(&std::path::Path) -> bool,
+) -> Vec<Move> {
+    if !found.iter().any(|(n, _)| *n == "TeamCraft.exe") {
+        return Vec::new();
+    }
+    let mut moves = Vec::new();
+    for (name, new) in found {
+        let target = dir.join(name);
+        if exists(&target) {
+            moves.push(Move {
+                from: target.clone(),
+                to: dir.join(old_name(name)),
+            });
+        }
+        moves.push(Move {
+            from: new.clone(),
+            to: target,
+        });
+    }
+    moves
+}
+
+/// Runs `moves` in order; when one fails, the ones done are undone in
+/// reverse order and the error names the file.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn run_moves(moves: &[Move]) -> Result<(), String> {
+    for (i, m) in moves.iter().enumerate() {
+        if let Err(e) = std::fs::rename(&m.from, &m.to) {
+            for done in moves[..i].iter().rev() {
+                let _ = std::fs::rename(&done.to, &done.from);
+            }
+            return Err(format!("{} could not be replaced: {e}", m.to.display()));
+        }
+    }
+    Ok(())
+}
+
+/// Removes [`leftovers`] from the app folder `dir` (at start; failures are
+/// ignored – the file may still be in use, the next start tries again).
+pub fn remove_leftovers(dir: &std::path::Path) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let names: Vec<String> = entries
+        .flatten()
+        .filter_map(|e| e.file_name().into_string().ok())
+        .collect();
+    for name in leftovers(&names) {
+        let path = dir.join(&name);
+        if path.is_dir() {
+            let _ = std::fs::remove_dir_all(&path);
+        } else {
+            let _ = std::fs::remove_file(&path);
+        }
+    }
+}
+
+/// Whether the app may write into `dir` (a test file is created and removed).
+pub fn writable(dir: &std::path::Path) -> bool {
+    let probe = dir.join(".teamcraft-write-test");
+    let ok = std::fs::write(&probe, b"").is_ok();
+    let _ = std::fs::remove_file(&probe);
+    ok
+}
+
+/// The AppImage swap: the verified download is copied next to the running
+/// AppImage `target` (`<name>.new`, same file system), made executable and
+/// renamed over it – a running AppImage keeps its mounted image.
+pub fn swap_appimage(download: &std::path::Path, target: &std::path::Path) -> Result<(), String> {
+    let dir = target
+        .parent()
+        .ok_or_else(|| "The AppImage has no folder.".to_string())?;
+    if !writable(dir) {
+        return Err(format!("{} is not writable.", dir.display()));
+    }
+    let staged = target.with_extension("new");
+    std::fs::copy(download, &staged)
+        .map_err(|e| format!("{} could not be written: {e}", staged.display()))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Err(e) = std::fs::set_permissions(&staged, std::fs::Permissions::from_mode(0o755)) {
+            let _ = std::fs::remove_file(&staged);
+            return Err(format!(
+                "{} could not be made executable: {e}",
+                staged.display()
+            ));
+        }
+    }
+    std::fs::rename(&staged, target).map_err(|e| {
+        let _ = std::fs::remove_file(&staged);
+        format!("{} could not be replaced: {e}", target.display())
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -501,6 +659,156 @@ mod tests {
         assert_eq!(
             release_page("0.2.13"),
             "https://github.com/WARR-eV/TeamCraft/releases/tag/v0.2.13"
+        );
+    }
+
+    #[test]
+    fn only_the_portable_files_one_folder_deep_are_swapped() {
+        // #466: the release workflow's zip layout
+        assert_eq!(
+            portable_target("TeamCraft_0.3.0_x64_portable/TeamCraft.exe"),
+            Some("TeamCraft.exe")
+        );
+        assert_eq!(
+            portable_target(r"TeamCraft_0.3.0_x64_portable\README.txt"),
+            Some("README.txt")
+        );
+        assert_eq!(
+            portable_target("TeamCraft_0.3.0_x64_portable/teamcraft.EXE"),
+            Some("TeamCraft.exe")
+        );
+        // anything else never
+        assert_eq!(portable_target("TeamCraft.exe"), None, "not in the folder");
+        assert_eq!(portable_target("a/b/TeamCraft.exe"), None, "too deep");
+        assert_eq!(portable_target("../TeamCraft.exe"), None);
+        assert_eq!(portable_target(".hidden/TeamCraft.exe"), None);
+        assert_eq!(
+            portable_target("TeamCraft_0.3.0_x64_portable/evil.dll"),
+            None
+        );
+    }
+
+    #[test]
+    fn a_swap_moves_the_old_files_aside_first() {
+        let dir = std::path::Path::new("/app");
+        let staged = |n: &str| std::path::PathBuf::from(format!("/app/.teamcraft-update/T/{n}"));
+        let found = vec![
+            ("TeamCraft.exe", staged("TeamCraft.exe")),
+            ("README.txt", staged("README.txt")),
+        ];
+        // README.txt was deleted by the user: it just comes back
+        let moves = swap_moves(dir, &found, |p| p.ends_with("TeamCraft.exe"));
+        let pairs: Vec<(String, String)> = moves
+            .iter()
+            .map(|m| {
+                (
+                    m.from.to_string_lossy().into_owned(),
+                    m.to.to_string_lossy().into_owned(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            pairs,
+            vec![
+                ("/app/TeamCraft.exe".into(), "/app/TeamCraft.exe.old".into()),
+                (
+                    "/app/.teamcraft-update/T/TeamCraft.exe".into(),
+                    "/app/TeamCraft.exe".into()
+                ),
+                (
+                    "/app/.teamcraft-update/T/README.txt".into(),
+                    "/app/README.txt".into()
+                ),
+            ]
+        );
+        // a zip without the app: nothing at all
+        assert!(swap_moves(dir, &[("README.txt", staged("README.txt"))], |_| true).is_empty());
+    }
+
+    #[test]
+    fn a_failed_move_undoes_the_ones_before() {
+        let dir = tempfile::tempdir().unwrap();
+        let app = dir.path().join("TeamCraft.exe");
+        let new = dir.path().join("new.exe");
+        std::fs::write(&app, b"old").unwrap();
+        std::fs::write(&new, b"new").unwrap();
+        let moves = vec![
+            Move {
+                from: app.clone(),
+                to: dir.path().join("TeamCraft.exe.old"),
+            },
+            Move {
+                from: new.clone(),
+                to: app.clone(),
+            },
+            Move {
+                from: dir.path().join("missing"),
+                to: dir.path().join("README.txt"),
+            },
+        ];
+        assert!(run_moves(&moves).unwrap_err().contains("README.txt"));
+        assert_eq!(std::fs::read(&app).unwrap(), b"old", "the old app is back");
+        assert_eq!(std::fs::read(&new).unwrap(), b"new");
+        assert!(!dir.path().join("TeamCraft.exe.old").exists());
+        // the same moves without the broken one go through
+        run_moves(&moves[..2]).unwrap();
+        assert_eq!(std::fs::read(&app).unwrap(), b"new");
+        assert_eq!(
+            std::fs::read(dir.path().join("TeamCraft.exe.old")).unwrap(),
+            b"old"
+        );
+    }
+
+    #[test]
+    fn the_next_start_removes_only_the_swap_leftovers() {
+        let names: Vec<String> = [
+            "TeamCraft.exe",
+            "TeamCraft.exe.old",
+            "README.txt.OLD",
+            ".teamcraft-update",
+            "notes.old",
+            "data",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        assert_eq!(
+            leftovers(&names),
+            vec!["TeamCraft.exe.old", "README.txt.OLD", ".teamcraft-update"]
+        );
+        let dir = tempfile::tempdir().unwrap();
+        for n in &names[..5] {
+            std::fs::write(dir.path().join(n), b"x").unwrap();
+        }
+        remove_leftovers(dir.path());
+        assert!(dir.path().join("TeamCraft.exe").exists());
+        assert!(dir.path().join("notes.old").exists(), "not ours");
+        assert!(!dir.path().join("TeamCraft.exe.old").exists());
+    }
+
+    #[test]
+    fn an_appimage_is_replaced_by_a_rename() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("TeamCraft.AppImage");
+        let download = dir.path().join("download.AppImage");
+        std::fs::write(&target, b"old").unwrap();
+        std::fs::write(&download, b"new").unwrap();
+        swap_appimage(&download, &target).unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), b"new");
+        assert!(!target.with_extension("new").exists());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                std::fs::metadata(&target).unwrap().permissions().mode() & 0o777,
+                0o755
+            );
+        }
+        assert!(swap_appimage(&dir.path().join("gone"), &target).is_err());
+        assert_eq!(
+            std::fs::read(&target).unwrap(),
+            b"new",
+            "a failed swap keeps the app"
         );
     }
 
