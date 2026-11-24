@@ -242,7 +242,9 @@ Requested by the user as the current top priority (before sections 1 and 2).
   of a second instance (#350, COM through Windows PowerShell); no opening after a cancelled or failed Get (#348); the
   worklist navigator follows actions in the tabs (#347).
 - [ ] Left: try the reuse of a running Inventor (#350) with real Inventor installations – `InstallPath`,
-  `ActiveDesignProject`, `Documents.Open` and bringing the window to the front are untested here.
+  `ActiveDesignProject`, `Documents.VisibleDocuments`, `Documents.Open` and bringing the window to the front are
+  untested here, and so are the session/window check of an Inventor missing from the ROT and the `failed` report
+  after `opening` (#483, #508).
 - [ ] Left: try it on Windows with real installations (Inventor 2025/2026 side by side, SOLIDWORKS – the registry
   keys, Solid Edge, NX, Creo, CATIA) and on macOS; the install folders and the SOLIDWORKS registry keys are the
   installers' usual defaults, untested here. Versions of other programs than Inventor are not read from the files

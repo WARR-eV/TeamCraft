@@ -99,7 +99,7 @@ export function openSettings() {
   var usageReport = h("input", { type: "checkbox", checked: state.session.usage_report !== false, disabled: fixedByPolicy("usage_statistics"), on: { change: function () {
     var on = usageReport.checked;
     call("set_usage_report", { enabled: on }).then(function () { state.session.usage_report = on; },
-      function (e) { usageReport.checked = !on; toast(errorText(e), "error"); });
+      function (e) { usageReport.checked = !on; toast(errorText(e), "error", "Saving a setting", settingInputs("usage report", on)); });
   } } });
   // *Report a problem* (#381): the operator's own tracker instead of GitHub
   var reportUrl = h("input", { type: "url", value: state.session.report_url || "", spellcheck: "false", disabled: fixedByPolicy("report_url"), placeholder: "https://github.com/WARR-eV/TeamCraft/issues/new", on: { change: function () {
@@ -414,15 +414,18 @@ export function openAbout() {
 }
 
 /** *Settings → Privacy → Show what is sent* (#383): the exact report being
- *  counted today, a finished one waiting to be sent, and the one sent last. */
+ *  counted today, a finished one waiting to be sent, and the one sent last;
+ *  switched off (#473), only that – nothing is counted. */
 function showUsage() {
   call("usage_show").then(function (r) {
     function block(title, value) {
       return value ? [h("strong", { text: title }), h("pre.usage-json", { text: JSON.stringify(value, null, 2) })] : [];
     }
-    dialog("What is sent", h("div.stack", null, [
-      h("p.hint", { text: "Sent to " + (state.session.server_url || "your TeamCraft server") + " once a day, for the day before." }),
-    ].concat(block("Today, so far", r.today), block("Waiting to be sent", r.pending), block("Sent last", r.last_sent))),
+    var body = r.enabled === false
+      ? [h("p.hint", { text: "The usage report is switched off (by you or by your organization's policy) – nothing is counted, kept or sent." })]
+      : [h("p.hint", { text: "Sent to " + (state.session.server_url || "your TeamCraft server") + " once a day, for the day before." })]
+        .concat(block("Today, so far", r.today), block("Waiting to be sent", r.pending), block("Sent last", r.last_sent));
+    dialog("What is sent", h("div.stack", null, body),
     [{ label: "Close", primary: true, onClick: function (d) { d.close(); } }], { wide: true });
   }, function (e) { toast(errorText(e), "error", "Showing the usage statistics"); });
 }

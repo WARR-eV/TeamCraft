@@ -137,13 +137,75 @@ fn the_update_window_says_what_the_server_needs() {
         fits,
         "Your server runs 0.3.0 and needs TeamCraft Desktop 0.3.x – this update fits it."
     );
-    // the update does not fit the server: it says so and names the version
+    // the update does not fit the server, this app does: keep it – no
+    // advice to install the version the user already has
     let newer = compat::update_note("0.2.0", "0.4.0", "0.2.3").unwrap();
-    assert!(newer.starts_with("Your server runs 0.2.3 and needs TeamCraft Desktop 0.2.x"));
+    assert_eq!(
+        newer,
+        "Your server runs 0.2.3; version 0.4.0 may not work with it – keep this version until the administrator upgrades the server."
+    );
     assert!(
-        newer.contains("version 0.4.0 may not work with it"),
+        !newer.contains("Install") && !newer.contains("needs"),
         "{newer}"
     );
+    // neither fits: it names the version the server needs
+    let neither = compat::update_note("0.1.0", "0.3.0", "0.2.3").unwrap();
+    assert!(
+        neither.starts_with("Your server runs 0.2.3 and needs TeamCraft Desktop 0.2.x"),
+        "{neither}"
+    );
+    assert!(neither.contains("version 0.3.0 may not work with it"));
+    assert!(neither.contains("Install 0.2.x from the release page"));
     // a server that hides its version: nothing
     assert_eq!(compat::update_note("0.2.0", "0.4.0", "unknown"), None);
+}
+
+#[test]
+fn the_update_window_follows_the_rules_from_1_0() {
+    // an older minor of the same major fits: nothing to say
+    assert_eq!(compat::update_note("1.2.0", "1.5.1", "1.5.0"), None);
+    // the update is newer than the server, this app fits: no "needs 1.5.x"
+    let newer = compat::update_note("1.2.0", "1.6.0", "1.5.0").unwrap();
+    assert!(
+        newer.contains("version 1.6.0 may not work with it"),
+        "{newer}"
+    );
+    assert!(
+        !newer.contains("needs 1.5.x") && !newer.contains("Install"),
+        "{newer}"
+    );
+    // from a 0.x app to the first stable release of the server
+    assert_eq!(
+        compat::update_note("0.9.0", "1.0.0", "1.0.2").as_deref(),
+        Some("Your server runs 1.0.2 and needs TeamCraft Desktop 1.0.x – this update fits it.")
+    );
+}
+
+#[test]
+fn pre_release_and_tag_versions_are_read() {
+    // a release candidate on the server needs its major.minor
+    assert_eq!(compat::needs("0.3.0-rc.1").as_deref(), Some("0.3"));
+    assert_eq!(
+        compat::update_note("0.2.9", "0.3.0", "0.3.0-rc.1").as_deref(),
+        Some(
+            "Your server runs 0.3.0-rc.1 and needs TeamCraft Desktop 0.3.x – this update fits it."
+        )
+    );
+    // an offered tag with a leading v
+    assert!(compat::fits("v0.3.0", "0.3.1"));
+    assert_eq!(compat::update_note("0.3.0", "v0.3.0", "0.3.1"), None);
+    assert!(compat::update_note("0.2.0", "v0.3.0", "0.3.1")
+        .unwrap()
+        .ends_with("this update fits it."));
+}
+
+#[test]
+fn the_notice_for_unreadable_and_newer_apps() {
+    // an unreadable app version (a development build) is not blocked
+    assert_eq!(compat::notice("", "0.2.0"), None);
+    assert_eq!(compat::notice("dev", "0.2.0"), None);
+    // from 1.0, an app newer than the server: upgrade it, or the server's minor
+    let newer = compat::notice("1.6.0", "1.5.0").expect("notice");
+    assert!(newer.contains("upgrade the server"), "{newer}");
+    assert!(newer.contains("install TeamCraft Desktop 1.5.x"), "{newer}");
 }

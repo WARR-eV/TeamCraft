@@ -199,6 +199,106 @@ pub fn report(u: &Usage, package: &str, server_version: Option<&str>) -> Value {
     })
 }
 
+/// After the report `sent` reached the server (#473): it is the one sent
+/// last and no longer pending. The send is not under the settings lock, so
+/// meanwhile the report may have been switched off (`still_on` false: its
+/// counts were cleared and nothing is written back), switched off and on
+/// again (another installation id: nothing either), or a newer day may have
+/// become pending (it stays). Returns whether `u` changed.
+pub fn after_sent(u: &mut Usage, sent: Value, still_on: bool) -> bool {
+    if !still_on || u.install_id.as_deref() != sent.get("install_id").and_then(Value::as_str) {
+        return false;
+    }
+    if u.pending.as_ref() == Some(&sent) {
+        u.pending = None;
+    }
+    u.last_sent = Some(sent);
+    true
+}
+
+/// *Settings → Privacy → Show what is sent*: the report being counted today,
+/// a finished one waiting to be sent and the one sent last – nothing at all
+/// while the report is switched off (#473), when nothing is counted.
+pub fn show(u: &Usage, enabled: bool, package: &str) -> Value {
+    if !enabled {
+        return json!({ "enabled": false, "today": null, "pending": null, "last_sent": null });
+    }
+    json!({
+        "enabled": true,
+        "today": report(u, package, None),
+        "pending": u.pending,
+        "last_sent": u.last_sent,
+    })
+}
+
+#[cfg(test)]
+mod sent_tests {
+    use super::*;
+
+    fn day(u: &mut Usage, today: &str) {
+        u.roll(today, "msi", None);
+        u.tick();
+    }
+
+    #[test]
+    fn a_sent_report_becomes_the_last_sent() {
+        let mut u = Usage::default();
+        day(&mut u, "2026-11-20");
+        u.roll("2026-11-21", "msi", None);
+        let sent = u.pending.clone().unwrap();
+        assert!(after_sent(&mut u, sent.clone(), true));
+        assert_eq!(u.pending, None);
+        assert_eq!(u.last_sent, Some(sent));
+    }
+
+    #[test]
+    fn a_newer_pending_report_is_kept() {
+        let mut u = Usage::default();
+        day(&mut u, "2026-11-20");
+        u.roll("2026-11-21", "msi", None);
+        let sent = u.pending.clone().unwrap();
+        // the day rolls again while the report is on its way
+        u.tick();
+        u.roll("2026-11-22", "msi", None);
+        let newer = u.pending.clone().unwrap();
+        assert_ne!(newer, sent);
+        assert!(after_sent(&mut u, sent.clone(), true));
+        assert_eq!(u.pending, Some(newer));
+        assert_eq!(u.last_sent, Some(sent));
+    }
+
+    #[test]
+    fn nothing_is_written_back_after_the_report_was_switched_off() {
+        let mut u = Usage::default();
+        day(&mut u, "2026-11-20");
+        u.roll("2026-11-21", "msi", None);
+        let sent = u.pending.clone().unwrap();
+        // switched off during the send: the counts are cleared
+        let mut off = Usage::default();
+        assert!(!after_sent(&mut off, sent.clone(), false));
+        assert_eq!(off, Usage::default());
+        // … and on again: a new installation id, the old report stays out
+        let mut again = Usage::default();
+        again.roll("2026-11-21", "msi", None);
+        let before = again.clone();
+        assert!(!after_sent(&mut again, sent, true));
+        assert_eq!(again, before);
+    }
+
+    #[test]
+    fn nothing_is_shown_while_the_report_is_off() {
+        let mut u = Usage::default();
+        day(&mut u, "2026-11-20");
+        let off = show(&u, false, "msi");
+        assert_eq!(off["enabled"], false);
+        assert!(off["today"].is_null() && off["pending"].is_null() && off["last_sent"].is_null());
+        let on = show(&u, true, "msi");
+        assert_eq!(on["enabled"], true);
+        assert_eq!(on["today"]["day"], "2026-11-20");
+        assert_eq!(on["today"]["active_minutes"], 1);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

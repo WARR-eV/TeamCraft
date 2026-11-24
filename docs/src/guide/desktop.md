@@ -610,11 +610,17 @@ setting in the web UI.
   project it has – a new instance would start with that same, last active
   project anyway (#483). A new instance starts when no Inventor runs, when
   another version runs, when the running one has another project active, or
-  when it does not answer (started as administrator, or busy with a dialog
-  for more than about 10 seconds); the message after opening says which
+  when it does not answer (started as administrator, or busy with a dialog –
+  the app waits at most 20 seconds); the message after opening says which
   (*Inventor is running with the project Default, not Graksler 4.3 – opened
-  in a new instance*). Inventor is asked through its COM interface by a short
-  Windows PowerShell script, as for the STEP export.
+  in a new instance*). Only a visible Inventor in your own Windows session
+  counts: another user's on the same computer (remote desktop, fast user
+  switching) or a hidden one of a STEP export is not asked. Inventor is
+  asked through its COM interface by a short Windows PowerShell script, as
+  for the STEP export. The app does not wait for a large assembly to load:
+  if the running Inventor then cannot open the file (locked or broken file,
+  Inventor busy), an error with the reason appears (#508). A part already
+  loaded as a hidden reference of an open assembly opens in its own window.
 * **Only a complete Get opens:** if you press *Cancel* next to the progress
   bar while the files are copied, or files could not be copied, the file is
   not opened – an assembly would open without the parts that were still to
@@ -907,7 +913,9 @@ the **update window** with the release notes and:
   fit the server you are connected to (before 1.0 app and server must share
   the first two numbers of the version, 0.3.x with 0.3.x), the window names
   the desktop version the server needs – *Your server runs 0.3.0 and needs
-  TeamCraft Desktop 0.3.x* – and whether the update is it. The same version
+  TeamCraft Desktop 0.3.x* – and whether the update is it. When this app
+  fits the server and the update does not, it says so and to keep this
+  version until the administrator upgrades the server. The same version
   is named in the notice after connecting to a server that does not fit.
 
 * **Update now** (Windows installers, macOS) or **Download** (portable zip,
@@ -1001,7 +1009,8 @@ assistant questions, STEP exports per CAD program) – never names,
 numbers, paths, search terms or anything you type, and not who you are.
 *Settings → Privacy → Show what is sent* shows the exact report, and *Send an
 anonymous usage report* switches it off: nothing is then counted, kept or
-sent, and the counts not sent yet are deleted (#473). If your organisation
+sent, the counts not sent yet are deleted, and *Show what is sent* says that
+the report is switched off (#473). If your organisation
 set the `UsageStatistics` policy, the switch shows *Set by your organization*.
 The report stays with your organisation; your administrator decides whether the server
 shares a summary with the TeamCraft developers (off unless they turn it on) –

@@ -85,10 +85,24 @@ fn update_settings(
     change: impl FnOnce(&mut Settings),
 ) -> CmdResult<Settings> {
     let mut s = state.settings.lock().expect("settings lock");
-    change(&mut s);
-    s.save(&state.config_dir)
+    change_saved(&mut s, change, |next| next.save(&state.config_dir))
         .map_err(|e| ApiError::local(format!("Settings could not be saved: {e}")))?;
     Ok(s.clone())
+}
+
+/// Applies `change` to a copy of the settings and keeps it only when `save`
+/// stored it: a failed save leaves the settings in memory as they were – as
+/// the UI shows them after the error (it puts the control back).
+fn change_saved<E>(
+    s: &mut Settings,
+    change: impl FnOnce(&mut Settings),
+    save: impl FnOnce(&Settings) -> Result<(), E>,
+) -> Result<(), E> {
+    let mut next = s.clone();
+    change(&mut next);
+    save(&next)?;
+    *s = next;
+    Ok(())
 }
 
 #[derive(Serialize)]
@@ -1605,16 +1619,27 @@ pub fn donate_tag_due(state: State<'_, AppState>) -> bool {
 /// on this computer that were not sent yet.
 #[tauri::command]
 pub fn set_usage_report(state: State<'_, AppState>, enabled: bool) -> CmdResult<()> {
-    if policy::current().usage_statistics.is_some() {
+    usage_report_settable(policy::current())?;
+    update_settings(&state, |s| apply_usage_report(s, enabled))?;
+    Ok(())
+}
+
+/// The user may set the usage report unless the policy `UsageStatistics`
+/// fixes it.
+fn usage_report_settable(policies: &policy::Policies) -> CmdResult<()> {
+    if policies.usage_statistics.is_some() {
         return Err(ApiError::local(MANAGED));
     }
-    update_settings(&state, |s| {
-        s.usage_report = Some(enabled);
-        if !enabled {
-            s.usage = crate::usage::Usage::default();
-        }
-    })?;
     Ok(())
+}
+
+/// The user's choice of the usage report; off clears the counts kept on this
+/// computer (the installation id, a pending and the last sent report too).
+fn apply_usage_report(s: &mut Settings, enabled: bool) {
+    s.usage_report = Some(enabled);
+    if !enabled {
+        s.usage = crate::usage::Usage::default();
+    }
 }
 
 /// *Settings → Show the "Support us on Ko-fi" tag at start*; refused while a
@@ -1656,6 +1681,113 @@ pub fn set_zoom(app: AppHandle, state: State<'_, AppState>, level: f64) -> CmdRe
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A setting that could not be saved stays as it was in memory too
+    /// (the UI puts its control back): no report counted or sent while the
+    /// box shows it off.
+    #[test]
+    fn a_failed_save_leaves_the_settings_as_they_were() {
+        let mut s = Settings {
+            usage_report: Some(false),
+            ..Settings::default()
+        };
+        let failed = change_saved(
+            &mut s,
+            |s| apply_usage_report(s, true),
+            |_| Err("disk full"),
+        );
+        assert_eq!(failed, Err("disk full"));
+        assert_eq!(s.usage_report, Some(false));
+        let saved = change_saved(
+            &mut s,
+            |s| apply_usage_report(s, true),
+            |next| {
+                assert_eq!(
+                    next.usage_report,
+                    Some(true),
+                    "the changed settings are saved"
+                );
+                Ok::<(), ()>(())
+            },
+        );
+        assert_eq!(saved, Ok(()));
+        assert_eq!(s.usage_report, Some(true));
+    }
+
+    #[test]
+    fn switching_the_usage_report_off_clears_the_counts() {
+        let mut s = Settings::default();
+        assert!(gate_usage(
+            &mut s,
+            &policy::Policies::default(),
+            "2026-11-20",
+            |u| u.tick()
+        ));
+        s.usage.pending = Some(json!({ "day": "2026-11-19" }));
+        s.usage.last_sent = Some(json!({ "day": "2026-11-18" }));
+        let counted = s.usage.clone();
+        // on keeps what is counted
+        apply_usage_report(&mut s, true);
+        assert_eq!((s.usage_report, &s.usage), (Some(true), &counted));
+        // off: the installation id, pending and last sent report go too
+        apply_usage_report(&mut s, false);
+        assert_eq!(s.usage_report, Some(false));
+        assert_eq!(s.usage, crate::usage::Usage::default());
+        // the policy UsageStatistics fixes it either way
+        assert!(usage_report_settable(&policy::Policies::default()).is_ok());
+        for fixed in [Some(false), Some(true)] {
+            let p = policy::Policies {
+                usage_statistics: fixed,
+                ..policy::Policies::default()
+            };
+            assert!(usage_report_settable(&p).is_err());
+        }
+    }
+
+    #[test]
+    fn usage_is_counted_only_while_the_report_is_on() {
+        let none = policy::Policies::default();
+        // the user's choice: None and on count
+        for choice in [None, Some(true)] {
+            let mut s = Settings {
+                usage_report: choice,
+                ..Settings::default()
+            };
+            assert!(gate_usage(&mut s, &none, "2026-11-20", |u| u.tick()));
+            assert_eq!(s.usage.active_minutes, 1);
+            assert!(s.usage.install_id.is_some());
+        }
+        // off by the user: not counted, and older counts are cleared
+        let mut s = Settings {
+            usage_report: Some(false),
+            ..Settings::default()
+        };
+        s.usage.active_minutes = 7;
+        let mut applied = false;
+        assert!(gate_usage(&mut s, &none, "2026-11-20", |_| applied = true));
+        assert!(!applied);
+        assert_eq!(s.usage, crate::usage::Usage::default());
+        // nothing to clear: nothing to save
+        assert!(!gate_usage(&mut s, &none, "2026-11-20", |u| u.tick()));
+        // the policy UsageStatistics = 1 counts despite the user's off …
+        let on = policy::Policies {
+            usage_statistics: Some(true),
+            ..policy::Policies::default()
+        };
+        assert!(gate_usage(&mut s, &on, "2026-11-20", |u| u.tick()));
+        assert_eq!(s.usage.active_minutes, 1);
+        // … and the session's checkbox follows it (session())
+        assert!(on.usage_report(s.usage_report));
+        // = 0 counts nothing despite the user's on
+        let off = policy::Policies {
+            usage_statistics: Some(false),
+            ..policy::Policies::default()
+        };
+        s.usage_report = Some(true);
+        assert!(gate_usage(&mut s, &off, "2026-11-20", |u| u.tick()));
+        assert_eq!(s.usage, crate::usage::Usage::default());
+        assert!(!off.usage_report(s.usage_report));
+    }
 
     #[test]
     fn zoom_is_clamped() {
@@ -2270,8 +2402,17 @@ pub async fn workspace_open_cad(
         // an Inventor that already runs with this working folder's project
         // opens the file as a new window instead of a second instance (#350)
         let (asked, file_path) = (program.clone(), path.clone());
+        // the running instance answers before it opens the file: a failure
+        // after that comes later, as an event the UI shows (#483)
+        let (events, name, label) = (app.clone(), file.clone(), program.label.clone());
+        let failed = move |reason: String| {
+            let _ = events.emit(
+                "cad-open-failed",
+                json!({ "file": name, "program": label, "reason": reason }),
+            );
+        };
         let reuse = tokio::task::spawn_blocking(move || {
-            cadlaunch::open_in_running(&asked, &file_path, &root)
+            cadlaunch::open_in_running(&asked, &file_path, &root, failed)
         })
         .await
         .unwrap_or(cadlaunch::Reuse::NewInstance(String::new()));
@@ -2912,19 +3053,32 @@ pub async fn workspace_add_files(
 /// never gets in the way.
 pub(crate) fn usage(state: &State<'_, AppState>, change: impl FnOnce(&mut crate::usage::Usage)) {
     let mut s = state.settings.lock().expect("settings lock");
-    // switched off – by the user or the policy UsageStatistics = 0 (#378,
-    // #473): nothing is counted, kept or sent
-    if !policy::current().usage_report(s.usage_report) {
+    let today = crate::usage::today_utc();
+    if gate_usage(&mut s, policy::current(), &today, change) {
+        let _ = s.save(&state.config_dir);
+    }
+}
+
+/// [`usage`] without the app state: switched off – by the user or the
+/// policy UsageStatistics = 0 (#378, #473) – nothing is counted, kept or
+/// sent (counts still kept are cleared); else the day rolls to `today` and
+/// `change` counts. Returns whether the settings changed (to be saved).
+fn gate_usage(
+    s: &mut Settings,
+    policies: &policy::Policies,
+    today: &str,
+    change: impl FnOnce(&mut crate::usage::Usage),
+) -> bool {
+    if !policies.usage_report(s.usage_report) {
         if s.usage != crate::usage::Usage::default() {
             s.usage = crate::usage::Usage::default();
-            let _ = s.save(&state.config_dir);
+            return true;
         }
-        return;
+        return false;
     }
-    let today = crate::usage::today_utc();
-    s.usage.roll(&today, crate::usage::package(), None);
+    s.usage.roll(today, crate::usage::package(), None);
     change(&mut s.usage);
-    let _ = s.save(&state.config_dir);
+    true
 }
 
 /// Counts one of the fixed actions the UI performs (unknown names are
@@ -2958,25 +3112,26 @@ pub async fn usage_flush(state: State<'_, AppState>) -> CmdResult<()> {
         .await
         .is_ok()
     {
+        // the lock was not held during the send: the report may have been
+        // switched off, or a newer day become pending, meanwhile
         let mut s = state.settings.lock().expect("settings lock");
-        s.usage.pending = None;
-        s.usage.last_sent = Some(pending);
-        let _ = s.save(&state.config_dir);
+        let on = policy::current().usage_report(s.usage_report);
+        if crate::usage::after_sent(&mut s.usage, pending, on) {
+            let _ = s.save(&state.config_dir);
+        }
     }
     Ok(())
 }
 
 /// *Settings → Privacy → Show what is sent*: the report being counted
-/// today, a finished one waiting to be sent, and the one sent last.
+/// today, a finished one waiting to be sent, and the one sent last – only
+/// `enabled: false` while the report is switched off.
 #[tauri::command]
 pub fn usage_show(state: State<'_, AppState>) -> Value {
     usage(&state, |_| {});
     let s = snapshot(&state);
-    json!({
-        "today": crate::usage::report(&s.usage, crate::usage::package(), None),
-        "pending": s.usage.pending,
-        "last_sent": s.usage.last_sent,
-    })
+    let on = policy::current().usage_report(s.usage_report);
+    crate::usage::show(&s.usage, on, crate::usage::package())
 }
 // ------------------------------------------------------ report a problem (#381)
 

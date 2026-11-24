@@ -68,15 +68,20 @@ pub fn notice(app: &str, server: &str) -> Option<String> {
 /// The update window's line about the connected server (#468) when it offers
 /// release `offered` to app version `app`: `None` when both fit the server
 /// (nothing to say); else which desktop version the server needs and whether
-/// the offered one is it.
+/// the offered one is it. When only this app fits, it says to keep it – not to
+/// install a version the user already has.
 pub fn update_note(app: &str, offered: &str, server: &str) -> Option<String> {
     let needed = needs(server)?;
-    let head = format!("Your server runs {server} and needs TeamCraft Desktop {needed}.x");
+    let head = || format!("Your server runs {server} and needs TeamCraft Desktop {needed}.x");
     match (fits(offered, server), fits(app, server)) {
         (true, true) => None,
-        (true, false) => Some(format!("{head} – this update fits it.")),
-        (false, _) => Some(format!(
-            "{head} – version {offered} may not work with it. Install {needed}.x from the release page, or ask the administrator to upgrade the server first."
+        (true, false) => Some(format!("{} – this update fits it.", head())),
+        (false, true) => Some(format!(
+            "Your server runs {server}; version {offered} may not work with it – keep this version until the administrator upgrades the server."
+        )),
+        (false, false) => Some(format!(
+            "{} – version {offered} may not work with it. Install {needed}.x from the release page, or ask the administrator to upgrade the server first.",
+            head()
         )),
     }
 }

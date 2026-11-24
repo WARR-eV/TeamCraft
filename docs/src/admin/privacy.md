@@ -42,7 +42,8 @@ refuses any other field and drops unknown names. Never content: no user,
 item, file, group or server names, numbers, paths, search terms, assistant
 text or anything typed – the report does not even say which user sent it.
 *Settings → Privacy → Show what is sent* shows today's report so far, a
-finished one waiting to be sent and the one sent last.
+finished one waiting to be sent and the one sent last – while the report is
+switched off, only that it is off.
 
 The server keeps the reports for 400 days (`usage_reports`); *Admin → Usage
 statistics* shows installations per version, system and package and the
