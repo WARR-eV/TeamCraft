@@ -148,7 +148,7 @@ and in *Settings*: the token and all data would cross the network unencrypted (`
 loopback addresses are fine).
 
 Update notice: at most once a day the app asks the GitHub releases API
-(`api.github.com/repos/WARR-eV/TeamCraft/releases/latest`, no redirects, 10 s timeout) for the latest
+(`api.github.com/repos/WARR-eV/TeamCraft/releases?per_page=30`, no redirects, 10 s timeout; not `releases/latest`, which leaves out the pre-releases every 0.x release is – `update::pick_release`, #493) for the latest
 release. A newer version shows a green pill in the status bar (`.status-pill` in `ui/app.css`, next to the orange Ko-fi pill; both shrink in the bar's flex row after the workspace path, never overlap); it opens the **update window** (#377): the
 release notes (`releases/tags/v<version>`), *Update now* / *Download*, *Skip this version* (= *×*),
 *Remind me later* (three days) and *Release page*; above the notes, when this app or the offered version does not fit the connected server, which desktop version the server needs (#468: `server_compat` in `src/commands.rs`, the rule and the text in `src/compat.rs` `needs`, `fits`, `update_note` – compiled into the server's `tests/desktop_compat.rs`; the connect notice names it too). *Update now* picks this installation's file

@@ -1412,12 +1412,20 @@ pub fn record_ui_error(message: String, stack: Option<String>, source: Option<St
     })
 }
 
-/// Opens the release page in the default browser (a fixed address – the app
-/// itself never downloads or installs anything).
+/// Opens the page of the release of `version` in the default browser, or the
+/// list of releases without a (plain) version – addresses of this repository
+/// only (#493).
 #[tauri::command]
-pub fn open_release_page(app: AppHandle) -> CmdResult<()> {
+pub fn open_release_page(app: AppHandle, version: Option<String>) -> CmdResult<()> {
+    let url = version
+        .as_deref()
+        .and_then(update::tag_version)
+        .map_or_else(
+            || update::RELEASES_PAGE.to_string(),
+            |v| update::release_page(&v),
+        );
     app.opener()
-        .open_url(update::RELEASES_PAGE, None::<&str>)
+        .open_url(url, None::<&str>)
         .map_err(|e| ApiError::local(format!("The browser could not be opened: {e}")))
 }
 

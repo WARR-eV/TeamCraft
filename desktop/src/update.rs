@@ -7,10 +7,18 @@
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-/// The latest published release (drafts and pre-releases are never "latest").
-const LATEST_RELEASE_API: &str = "https://api.github.com/repos/WARR-eV/TeamCraft/releases/latest";
-/// What the notice links to.
-pub const RELEASES_PAGE: &str = "https://github.com/WARR-eV/TeamCraft/releases/latest";
+/// The releases, newest first. Not `releases/latest`: GitHub leaves
+/// pre-releases out of it, and every 0.x release is published as one, so it
+/// never had an answer (#493). The first page is enough – a release with 30
+/// newer ones is never the one to offer.
+const RELEASES_API: &str = "https://api.github.com/repos/WARR-eV/TeamCraft/releases?per_page=30";
+/// The list of releases, for *Release page* without a known version.
+pub const RELEASES_PAGE: &str = "https://github.com/WARR-eV/TeamCraft/releases";
+
+/// The page of the release of `version` (a version from [`tag_version`]).
+pub fn release_page(version: &str) -> String {
+    format!("https://github.com/WARR-eV/TeamCraft/releases/tag/v{version}")
+}
 /// Time between two checks.
 pub const CHECK_INTERVAL_SECS: u64 = 24 * 60 * 60;
 const TIMEOUT: Duration = Duration::from_secs(10);
@@ -74,8 +82,39 @@ pub fn is_newer(latest: &str, current: &str) -> bool {
     }
 }
 
-/// Asks GitHub for the latest release version; `Ok(None)` when there is no
-/// (readable) release yet.
+/// The release to offer to app version `current` from GitHub's list of
+/// releases (#493): the newest that is not a draft. GitHub's `prerelease`
+/// flag is not looked at – every 0.x release carries it. A version with a
+/// suffix (`0.3.0-rc.1`, a release candidate) is offered only to an app that
+/// is such a version itself (a tester); among equal versions the first in
+/// the list (the newest) wins.
+pub fn pick_release(releases: &serde_json::Value, current: &str) -> Option<String> {
+    let tester = parse(current).is_some_and(|(_, pre)| pre);
+    let mut best: Option<(([u64; 3], bool), String)> = None;
+    for release in releases.as_array()? {
+        if release["draft"] == true {
+            continue;
+        }
+        let Some(version) = release["tag_name"].as_str().and_then(tag_version) else {
+            continue;
+        };
+        let Some((numbers, pre)) = parse(&version) else {
+            continue;
+        };
+        if pre && !tester {
+            continue;
+        }
+        // a release is newer than its own candidates
+        let key = (numbers, !pre);
+        if best.as_ref().is_none_or(|(b, _)| key > *b) {
+            best = Some((key, version));
+        }
+    }
+    best.map(|(_, v)| v)
+}
+
+/// Asks GitHub for the release to offer ([`pick_release`]); `Ok(None)` when
+/// there is no (readable) release yet.
 pub async fn latest_release() -> Result<Option<String>, String> {
     // its own client: a short timeout and no redirects (a moved repository
     // shows no notice rather than following an answer to another host)
@@ -86,7 +125,7 @@ pub async fn latest_release() -> Result<Option<String>, String> {
         .build()
         .map_err(|e| e.to_string())?;
     let response = client
-        .get(LATEST_RELEASE_API)
+        .get(RELEASES_API)
         .header("Accept", "application/vnd.github+json")
         .send()
         .await
@@ -97,11 +136,8 @@ pub async fn latest_release() -> Result<Option<String>, String> {
     if !response.status().is_success() {
         return Err(format!("GitHub answered {}", response.status()));
     }
-    let release: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
-    if release["draft"] == true || release["prerelease"] == true {
-        return Ok(None);
-    }
-    Ok(release["tag_name"].as_str().and_then(tag_version))
+    let releases: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
+    Ok(pick_release(&releases, env!("CARGO_PKG_VERSION")))
 }
 
 // ------------------------------------------------- update window (#377)
@@ -425,6 +461,48 @@ fn verify_digest(actual: &str, expected: &str, name: &str) -> Result<(), String>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_release_to_offer_is_picked_from_the_list() {
+        use serde_json::json;
+        let rel = |tag: &str, draft: bool, pre: bool| json!({ "tag_name": tag, "draft": draft, "prerelease": pre });
+        // #493: every 0.x release is a GitHub pre-release – it still counts
+        let list = json!([
+            rel("v0.3.0-rc.1", false, true),
+            rel("v0.2.13", false, true),
+            rel("v0.2.12", false, true)
+        ]);
+        assert_eq!(pick_release(&list, "0.2.12").as_deref(), Some("0.2.13"));
+        // a release candidate only for a tester
+        assert_eq!(
+            pick_release(&list, "0.2.13-rc.1").as_deref(),
+            Some("0.3.0-rc.1")
+        );
+        // drafts and unreadable tags never
+        let odd = json!([
+            rel("v0.4.0", true, false),
+            rel("nightly", false, true),
+            rel("v0.2.13", false, false)
+        ]);
+        assert_eq!(pick_release(&odd, "0.2.12").as_deref(), Some("0.2.13"));
+        // the list need not be sorted; a release beats its own candidate
+        let mixed = json!([
+            rel("v0.2.9", false, true),
+            rel("v0.3.0-rc.2", false, true),
+            rel("v0.3.0", false, true)
+        ]);
+        assert_eq!(pick_release(&mixed, "0.3.0-rc.1").as_deref(), Some("0.3.0"));
+        // nothing usable
+        assert_eq!(pick_release(&json!([]), "0.2.12"), None);
+        assert_eq!(
+            pick_release(&json!({"message": "Not Found"}), "0.2.12"),
+            None
+        );
+        assert_eq!(
+            release_page("0.2.13"),
+            "https://github.com/WARR-eV/TeamCraft/releases/tag/v0.2.13"
+        );
+    }
 
     #[test]
     fn newer_versions() {
