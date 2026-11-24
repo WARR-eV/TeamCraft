@@ -22,6 +22,12 @@ see the notices in the README.
 
 ### Fixed
 
+- Desktop: a check-out or check-in from Home marks the row (lock colour and
+  icon) at once instead of after leaving Home and coming back; the
+  *Check-outs* tab of a group is loaded again each time it comes to the
+  front and, while in front, every 30 seconds and when the window gets the
+  focus back, so it shows the current state and other people's check-outs
+  without *Refresh* (#451).
 - CI: the comment of the shared component picker named its issue as
   "#419", which the no-literal-colours guard of `shared/css/` reads as a
   hex colour; it says "issue 419" now.

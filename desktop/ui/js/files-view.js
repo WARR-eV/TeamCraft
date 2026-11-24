@@ -182,3 +182,24 @@ export function favouriteSuggestions(level, favourite, declined) {
   });
   return out;
 }
+
+/**
+ * The revisions whose lock the user took or gave up between two worklists
+ * (GET /worklist, `checkouts`): `{ taken: [{item, code}], released: [...] }`.
+ * Home marks those rows again in place (#451): a check-out from Home shows
+ * its colour at once, not only after leaving Home. Without an earlier
+ * worklist nothing is known to have changed.
+ */
+export function lockChanges(before, after) {
+  var out = { taken: [], released: [] };
+  if (!before || !after) return out;
+  function keyed(w) {
+    var m = {};
+    (w.checkouts || []).forEach(function (r) { m[r.item_number + "/" + r.code] = { item: r.item_number, code: r.code }; });
+    return m;
+  }
+  var was = keyed(before), now = keyed(after);
+  Object.keys(now).forEach(function (k) { if (!was[k]) out.taken.push(now[k]); });
+  Object.keys(was).forEach(function (k) { if (!now[k]) out.released.push(was[k]); });
+  return out;
+}

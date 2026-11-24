@@ -15,7 +15,7 @@ const source = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../de
 const {
   checkedOutClass, compareNames, countText, entryIconType, entryName, entryRevision, entryTitle, folderKey,
   favouriteKey, favouritePath, favouriteSuggestions, groupTotal, mergeEntries, newItemFolder, normalizeFavourite,
-  parentFolder, remaining, rowThumb, sortEntries, sortFolders, suggestionKey
+  lockChanges, parentFolder, remaining, rowThumb, sortEntries, sortFolders, suggestionKey
 } = await import("data:text/javascript;base64," + Buffer.from(fs.readFileSync(source, "utf8")).toString("base64"));
 
 let passed = 0;
@@ -202,6 +202,18 @@ test("a row names its preview image when the server gave one (#420)", () => {
   assert.equal(rowThumb({ number: "PRT-000003" }), null);
   assert.equal(rowThumb({ restricted: true }), null);
   assert.equal(rowThumb(null), null);
+});
+
+test("the own check-outs that changed between two worklists (#451)", () => {
+  const wl = (...refs) => ({ checkouts: refs.map((r) => ({ item_number: r.split("/")[0], code: r.split("/")[1], name: "x" })) });
+  assert.deepEqual(lockChanges(wl("PRT-1/A"), wl("PRT-1/A", "PRT-2/B")), { taken: [{ item: "PRT-2", code: "B" }], released: [] });
+  assert.deepEqual(lockChanges(wl("PRT-1/A", "PRT-2/B"), wl("PRT-2/B")), { taken: [], released: [{ item: "PRT-1", code: "A" }] });
+  // a new revision of the same item is another lock
+  assert.deepEqual(lockChanges(wl("PRT-1/A"), wl("PRT-1/B")), { taken: [{ item: "PRT-1", code: "B" }], released: [{ item: "PRT-1", code: "A" }] });
+  assert.deepEqual(lockChanges(wl("PRT-1/A"), wl("PRT-1/A")), { taken: [], released: [] });
+  // the first worklist of a session changes nothing; a missing list is empty
+  assert.deepEqual(lockChanges(null, wl("PRT-1/A")), { taken: [], released: [] });
+  assert.deepEqual(lockChanges({}, wl("PRT-1/A")), { taken: [{ item: "PRT-1", code: "A" }], released: [] });
 });
 
 console.log(passed + " tests passed");

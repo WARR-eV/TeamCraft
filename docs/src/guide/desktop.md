@@ -464,7 +464,10 @@ Administrators and the managers of a group see a lock button next to it:
 group – the people on the left, their revisions on the right, the line
 coloured by how long the lock is held – and a list per person; a click on a
 revision opens it (#428, the same overview as on the group page in the web
-UI, *Open in browser*).
+UI, *Open in browser*). The tab is loaded again each time it comes to the
+front, and while it is in front it looks again every 30 seconds and when the
+window gets the focus back, so a check-out by someone else shows up without
+*Refresh*.
 CAD editors create a new group there (*New* – you become its manager; tick *Restricted* to keep it to its members), and
 the page offers *Get…* (copy
 groups into your workspace) and *Import CAD folder…*. The choice is kept on
@@ -478,7 +481,8 @@ this computer.
   before `Part10`), each with the state and the lock of its item. A checked-out file is marked
   with a bar in the lock colour at the left edge of its row and a light tint
   of the row (the same for your check-outs and other people's; also in
-  *Structure*). The file
+  *Structure*). Your own check-out or check-in shows at once, in place; other
+  people's locks show the next time the list is loaded (*Refresh*). The file
   name comes first and the number and revision after it, so a narrow navigator
   cuts the number, not the name. A folder opens its own level – a large group
   is never loaded as a whole, and a folder with more than 500 files offers *show … more*. The files are those of the

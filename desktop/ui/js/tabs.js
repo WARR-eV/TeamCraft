@@ -66,6 +66,8 @@ export function activate(key) {
   state.active = key;
   var t = findTab(key);
   if (t && (t.kind === "revision" || t.kind === "change" || t.kind === "request")) agent.contextKey = key;
+  // a Check-outs tab shows the current state each time it comes to the front (#451)
+  if (t && t.kind === "locks") t.data = null;
   if (state.view === "agent") schedulePaint(true);
   renderTabs();
   renderActive();
