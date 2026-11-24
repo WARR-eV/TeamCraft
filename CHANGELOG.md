@@ -13,6 +13,13 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Security
+
+- Desktop: `cookie` 0.18.2 → 0.18.3 (RUSTSEC-2026-0594, private-cookie
+  nonces can repeat after `fork()`; pulled in by Tauri). The app does not
+  fork or use private cookies, but the advisory turned the weekly
+  `cargo deny` check of `main` red.
+
 ### Fixed
 
 - CI: the comment of the shared component picker named its issue as
