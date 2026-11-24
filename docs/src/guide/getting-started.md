@@ -70,9 +70,9 @@ installations and the desktop app:
 TeamCraft Desktop opens *Getting started* – at most three read-only steps:
 where your files go (the working folder and the CAD programs found on the
 computer), your project group (only when you have several, or none yet) and
-your first assembly – up to five of the group's assemblies, each with
-**Show**, which opens its revision tab with *Check out and open* as the next
-step. The wizard creates no file or folder and works the same for every CAD
+your first assembly – up to five of the group's assemblies in work, each
+with **Show**, which opens its revision tab with *Check out and open* as the
+next step (viewers see the group's assemblies without a check-out). The wizard creates no file or folder and works the same for every CAD
 program; it is remembered per server and account, and *Help → Getting
 Started…* opens it again. See [Desktop app](desktop.md#getting-started).
 How a group's manager sets up the CAD programs to find the parts of its

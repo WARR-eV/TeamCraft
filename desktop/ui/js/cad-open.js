@@ -80,6 +80,12 @@ export function openPlan(rev, file) {
   return call("cad_open_plan", { wish: cadWish(rev, file) });
 }
 
+/** How a file of a group's default program would be opened – the same
+ *  rule as the chip (Getting started names the program with it, #422). */
+export function groupOpenPlan(family, version) {
+  return call("cad_open_plan", { wish: { file_family: family, group_family: family, group_version: version || "" } });
+}
+
 /** Opens a file of the working folder with the chosen program (an Inventor
  * that already runs with the working folder's project, #350) and says with which. */
 export function openWithCad(rev, file) {

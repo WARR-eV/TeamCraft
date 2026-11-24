@@ -778,6 +778,11 @@ async fn lifecycle_transitions_respect_roles_and_project_groups() {
     assert_eq!(r.json()["checkouts"][0]["item_number"], "PRT-000001");
     assert!(r.json()["reviews"].as_array().unwrap().is_empty());
     assert_eq!(r.json()["stats"]["items"], 1);
+    assert_eq!(
+        r.json()["has_checked_in"],
+        false,
+        "no file version of anna's yet (Getting started, #422)"
+    );
 
     // WIP → In Review: only through a change of a project member
     let r = app
@@ -997,6 +1002,9 @@ async fn checkout_checkin_file_versions_and_rollback() {
     assert_eq!(r.status, StatusCode::CREATED, "{}", r.text());
     let file_id = r.json()[0]["id"].as_str().unwrap().to_string();
     assert_eq!(r.json()[0]["version"], 1);
+    // a stored file version: the desktop app no longer offers Getting started (#422)
+    let r = app.api(Method::GET, "/api/v1/worklist", &eng, None).await;
+    assert_eq!(r.json()["has_checked_in"], true, "{}", r.text());
 
     // check-in with a new version: stored and lock released together
     let r = app

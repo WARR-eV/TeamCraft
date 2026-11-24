@@ -811,7 +811,9 @@ most three steps:
    each project group in its own folder
    (`<working folder>/<group>/<folder>/<file>`). *Change…* picks another
    folder (the same setting as *Settings → Workspace*), *Open folder* shows
-   it in the file manager. Below, one line names the CAD programs found on
+   it in the file manager – only once the folder exists; before that the
+   button is off and a line says that the first *Get* or check-out creates
+   it. Below, one line names the CAD programs found on
    this computer – or says that none was found and you can still open files
    yourself from the working folder. Skipped when your organization set
    where working folders go ([Managed computers](#managed-computers)) or a
@@ -824,18 +826,23 @@ most three steps:
    *Copy user name* to send to a group manager who adds them.
 3. **Your first assembly** – what *Check out and open* will do: lock the
    assembly, copy it with its parts into `<working folder>/<group>/` and
-   open it in the group's CAD program (named; *not installed on this
-   computer* when it is missing). Below, up to five assemblies of the group –
-   top-level ones, in work first, the largest first, none locked by somebody
-   else – with their picture and **Show** *number*. An empty group shows
-   *Import CAD folder…* and *New item* (see [Empty views](#empty-views)); a
-   viewer reads that *Get…* copies an item with its parts. A link leads to
+   open it in the group's CAD program – named by the same rule as the chip
+   next to *Check out and open*: the group's version when it is installed,
+   else the newest installed version (the line then says that the group's
+   version is missing), else *not installed on this computer*. Below, up
+   to five assemblies of the group – top-level ones that are **in work** and
+   free or checked out by you, the largest first – with their picture and
+   **Show** *number*. A released or in-review assembly is not offered: it
+   cannot be checked out. An empty group shows *Import CAD folder…* and
+   *New item* (see [Empty views](#empty-views)); a viewer reads that
+   *Get…* copies an item with its parts and gets the group's assemblies in
+   any state, with no check-out promise. A link leads to
    how a group sets up its CAD programs
    ([Set up CAD programs](../admin/cad-setup.md)).
 
 **Show** *number* makes that group your active one, closes the wizard and
-opens the revision tab of the assembly, where **Check out and open** is the
-highlighted next step – your next click is real work. *Finish and show
+opens the revision tab of the assembly, where – for a CAD editor – **Check
+out and open** is the highlighted next step: your next click is real work. *Finish and show
 <group> in Home* instead makes the group active and shows its files in the
 navigator and *Home*. The group you pick in step 2 only counts with one of
 these clicks: *Back* and *Don't show again* change nothing.
@@ -844,10 +851,12 @@ The wizard **creates no file or folder**, gets and checks out nothing and
 writes nothing to the server; it is the same whichever CAD program you use.
 It stores only that you finished it (or chose *Don't show again*) – **per
 saved connection**, so a second server or account offers it once more – the
-working folder if you pick one with *Change…*, and the active group. It
-does not open by itself for an app that starts already signed in (an
-update, a reload), nor for an account that already has check-outs or open
-changes on that server (a new computer, an expired sign-in). The update
+working folder if you pick one with *Change…*, and the active group. Other
+preferences stay as they are: *Finish and show <group> in Home* switches the
+navigator to *Files* for this run only. It does not open by itself for an
+app that starts already signed in (an update, a reload), nor for an account
+that already has check-outs or has checked in (or uploaded) a file on that
+server before (a new computer, an expired sign-in). The update
 notice, the *Support us* tag and the keychain warning wait until it is
 closed; the question to move a workspace of the old layout comes first.
 

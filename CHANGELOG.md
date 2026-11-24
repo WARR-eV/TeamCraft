@@ -202,24 +202,33 @@ see the notices in the README.
   first-start wizard has one job now – bring you to a real assembly of your
   project group with *Check out and open* in front of you. At most three
   read-only steps: *Where your files go* (working folder, *Change…*, *Open
-  folder*, the CAD programs found on this computer), *Your project group*
-  (only with several groups; without one it says how to get one – *Create a
-  project group* for CAD editors, *Copy user name* for viewers) and *Your
-  first assembly* (up to five assemblies of the group with their picture and
-  **Show** *number*, which makes the group active and opens the revision tab
-  with *Check out and open* highlighted; *Finish and show <group> in Home*).
-  The server, sign-in, CAD setup and daily-loop pages are gone: the
-  connection is one header line, the daily loop a one-time tip on the
-  revision tab until your first check-in or cancelled check-out. The wizard
-  creates no file or folder, gets and checks out nothing, writes nothing to
-  the server and has no step for any one CAD program; how a group sets up
-  its CAD programs is the new admin page *Set up CAD programs for a project
-  group*. It is remembered **per saved connection** (the old app-wide value
-  moves onto the connection that was active), does not open for accounts
-  that already have check-outs or open changes, and the update notice,
+  folder* – only for a folder that exists –, the CAD programs found on this
+  computer), *Your project group* (only with several groups; without one it
+  says how to get one – *Create a project group* for CAD editors, *Copy user
+  name* for viewers) and *Your first assembly* (what *Check out and open*
+  does, naming the program by the same rule as the chip next to the button;
+  up to five assemblies of the group with their picture and **Show**
+  *number* – for CAD editors only assemblies in work, free or checked out by
+  you, so the revision tab opens with *Check out and open* highlighted;
+  viewers get the group's assemblies in any state and no check-out promise;
+  *Finish and show <group> in Home*). The server, sign-in, CAD setup and
+  daily-loop pages are gone: the connection is one header line, the daily
+  loop a one-time tip on the revision tab until your first check-in or
+  cancelled check-out. The wizard creates no file or folder, gets and checks
+  out nothing, writes nothing to the server, changes no other preference
+  (the navigator shows *Files* for this run only) and has no step for any
+  one CAD program; how a group sets up its CAD programs is the new admin
+  page *Set up CAD programs for a project group*. It is remembered **per
+  saved connection** (the old app-wide value moves onto the connection that
+  was active), does not open for accounts that already have check-outs or
+  have checked in before on that server (`has_checked_in`, new in
+  `GET /api/v1/worklist`: a file version of theirs is stored), and the update notice,
   *Support us* tag and keychain warning wait until it is closed. Texts in
   the shared catalogs (English, German). Research page *The first start of
   the desktop app*. Rules tested by `scripts/desktop-onboarding-rules.test.mjs`.
+  The nodes of `GET /projects/{code}/structure` and `…/revisions/{code}/structure`
+  carry the lock holder's user id (`checked_out_by`) next to the name, so
+  clients decide "checked out by me" by id, not by the display name.
 - `CONTRIBUTING.md` is short now: ways to contribute, bug reports, the
   screenshots, the main code conventions, dependencies and branding, *Your own
   work only*, pull requests and the licence. New pull request policy: every

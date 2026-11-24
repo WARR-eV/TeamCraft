@@ -499,6 +499,10 @@ dependent revision (`impact_groups`): each group has the dependent (`item_number
 `impacts`, ordered by source item number. Groups are ordered by their newest
 impact.
 
+`GET /worklist` also says whether the caller has ever stored a file version
+on this server (`has_checked_in`: a check-in or an upload) – the desktop app
+does not offer *Getting started* to a user who already worked here.
+
 `POST /impacts/{id}/acknowledge` (`{"note": "…"}`) resolves one impact;
 `POST /items/{number}/revisions/{code}/impacts/acknowledge`
 (`{"note": "…", "impacts": [id, …]}`) resolves all open impacts on that
