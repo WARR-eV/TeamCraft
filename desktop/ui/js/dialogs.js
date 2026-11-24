@@ -95,7 +95,8 @@ export function createItemFromFiles(spec) {
   var outside = [];
   places.forEach(function (p, i) { if (!p.inside) outside.push(i); });
   var copied = outside.length
-    ? call("new_item_copy", { project: spec.project, folder: spec.folder, paths: outside.map(function (i) { return places[i].path; }) })
+    // a counted transfer: no update swap or installer start meanwhile (#531)
+    ? transfer(function () { return call("new_item_copy", { project: spec.project, folder: spec.folder, paths: outside.map(function (i) { return places[i].path; }) }); })
       .then(function (copies) { copies.forEach(function (c, j) { paths[outside[j]] = c; }); })
     : Promise.resolve();
   var main = places[spec.main >= 0 ? spec.main : 0];
