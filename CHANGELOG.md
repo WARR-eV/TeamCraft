@@ -121,10 +121,11 @@ see the notices in the README.
   (nothing changed yet) is *Open in CAD*, no longer *Release…*. Local
   changes, versions parked since the check-out or an unreadable working
   folder highlight *Check in…*; *Release…* is highlighted only when the
-  revision is checked in, can be released and your own check-in was the last
-  one. The rule is a pure module (`desktop/ui/js/next-step.js`) tested by
-  `scripts/desktop-next-step.test.mjs` in the CI job `ui` (#536, UI review
-  #513 T2).
+  revision is checked in, can be released and the newest upload made in this
+  revision is your own – files *Revise* carried over from the previous
+  revision and a cancelled check-out do not count. The rule is a pure module
+  (`desktop/ui/js/next-step.js`) tested by `scripts/desktop-next-step.test.mjs`
+  in the CI job `ui` (#536, UI review #513 T2).
 - Desktop: a check-out or check-in from Home marks the row (lock colour and
   icon) at once instead of after leaving Home and coming back; the
   *Check-outs* tab of a group is loaded again each time it comes to the
