@@ -13,6 +13,8 @@ see the notices in the README.
 
 ## [Unreleased]
 
+## [0.2.14] - 2026-11-24
+
 ### Security
 
 - Desktop: `cookie` 0.18.2 → 0.18.3 (RUSTSEC-2026-0594, private-cookie
@@ -2046,7 +2048,8 @@ Changes since the `v0.2.0` tag.
   app keeps the private file and shows a warning. Server addresses with plain
   `http://` to another computer get a warning.
 
-[Unreleased]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.13...HEAD
+[Unreleased]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.14...HEAD
+[0.2.14]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.13...v0.2.14
 [0.2.13]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.12...v0.2.13
 [0.2.12]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.11...v0.2.12
 [0.2.11]: https://github.com/WARR-eV/TeamCraft/compare/v0.2.10...v0.2.11

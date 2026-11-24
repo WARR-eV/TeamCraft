@@ -3544,7 +3544,7 @@ dependencies = [
 
 [[package]]
 name = "teamcraft"
-version = "0.2.13"
+version = "0.2.14"
 dependencies = [
  "anyhow",
  "argon2",

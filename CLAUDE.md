@@ -269,7 +269,7 @@ plugins/solidcraft TeamCraft plugin for SolidCraft: WebAssembly component (craft
 * **What to work on:** `docs/OPEN_WORK.md`, section *Direction* – proofing (tests,
   fuzzing, CI gates) and structure (module splits, guard tests) before new features;
   without a request from the user, pick the next task from its sections 1 and 2.
-* **Project status:** no stable release yet – only `0.x` pre-releases (`Cargo.toml` is at `0.2.13`). Keep the
+* **Project status:** no stable release yet – only `0.x` pre-releases (`Cargo.toml` is at `0.2.14`). Keep the
   work-in-progress / no-warranty notices
   in the README, `docs/src/index.md`, the web footer and the desktop *About*
   dialog until the user asks for a stable release.
