@@ -426,9 +426,19 @@
   // <time data-date>: the date alone, for narrow columns (the title keeps the time).
   var dateFmt = null;
   try { dateFmt = new Intl.DateTimeFormat(undefined, { year: "numeric", month: "2-digit", day: "2-digit" }); } catch (e) { dateFmt = null; }
+  // <time data-day>: a calendar date without a time (Built on, #527). It parses
+  // as midnight UTC, so it is formatted in UTC – the same day in every zone.
+  var dayFmt = null;
+  try {
+    dayFmt = new Intl.DateTimeFormat(undefined, { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "UTC" });
+  } catch (e) { dayFmt = null; }
   if (fmt) {
     document.querySelectorAll("time[datetime]").forEach(function (el) {
       var d = new Date(el.getAttribute("datetime"));
+      if (el.hasAttribute("data-day")) {
+        if (dayFmt && !isNaN(d.getTime())) el.textContent = dayFmt.format(d);
+        return;
+      }
       if (!isNaN(d.getTime())) {
         el.title = fmt.format(d);
         el.textContent = el.hasAttribute("data-date") && dateFmt ? dateFmt.format(d) : fmt.format(d);
@@ -872,7 +882,19 @@
   // simply jump.
   (function () {
     var nav = document.querySelector("[data-section-nav]");
-    if (!nav || !("IntersectionObserver" in window)) return;
+    if (!nav) return;
+    // Anchors clear the nav by --section-nav-h (#523). The stylesheet's value
+    // is a fallback; the nav's real height differs with fonts, zoom and a
+    // classic scrollbar under its overflowing list, so it is measured here.
+    var root = document.documentElement;
+    var measure = function () {
+      var h = nav.getBoundingClientRect().height;
+      if (h > 0) root.style.setProperty("--section-nav-h", Math.ceil(h) + "px");
+    };
+    measure();
+    if ("ResizeObserver" in window) new ResizeObserver(measure).observe(nav);
+    else window.addEventListener("resize", measure);
+    if (!("IntersectionObserver" in window)) return;
     var links = Array.prototype.slice.call(nav.querySelectorAll('a[href^="#"]'));
     var inView = {};
     var observer = new IntersectionObserver(function (entries) {

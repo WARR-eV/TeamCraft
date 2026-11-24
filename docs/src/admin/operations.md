@@ -427,9 +427,12 @@ large check-ins, Pack and Go and backups.
 
 Every answer carries an `x-request-id` header, and the server writes the same
 id as `request_id` into the log line of the request (with
-`TEAMCRAFT_LOG_FORMAT=json` as a field of the `http` span). The web UI's error
-pages show it under *Details for a bug report*, so a user's report leads to
-the matching log lines. A reverse proxy that sets its own `x-request-id`
+`TEAMCRAFT_LOG_FORMAT=json` as a field of the `http` span). The web UI's
+pages for server errors (5xx) show it under *Details for a bug report*, so a
+user's report leads to the matching log lines. Pages for client errors (a
+404 *Not Found* – also an object hidden by need-to-know – or a 403) offer no
+bug report: they are no bugs. A signed-in user sees them inside the app,
+with the top bar, *Back* and *Dashboard* (#524). A reverse proxy that sets its own `x-request-id`
 keeps its id, as long as it is 1–64 characters of `A–Z`, `a–z`, `0–9` and
 `-`; anything else is replaced by a new UUID (#381).
 

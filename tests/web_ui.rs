@@ -1934,6 +1934,47 @@ fn logo_variants_are_switched_by_skins_css_only() {
     }
 }
 
+/// Layout guards of the UI review (#513): anchors clear the sticky top bar on
+/// every page and the section nav by its one height variable (#523); the
+/// vault explorer's Items table fits its card (#521).
+#[test]
+fn anchor_offsets_and_explorer_table_fit() {
+    let css =
+        std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/static/style.css")).unwrap();
+    let rule = |selector: &str| {
+        let start = css
+            .find(&format!("\n{selector} {{"))
+            .unwrap_or_else(|| panic!("no rule `{selector}`"));
+        let body = &css[start..];
+        body[..body.find('}').unwrap()].to_string()
+    };
+    let root = rule(":root");
+    assert!(root.contains("--section-nav-h:"), "{root}");
+    assert!(
+        root.contains("scroll-padding-top: calc(var(--topbar-h)"),
+        "anchors clear the top bar on every page: {root}"
+    );
+    assert!(rule(".section-nav ~ * [id], .section-nav ~ [id]")
+        .contains("scroll-margin-top: var(--section-nav-h)"));
+    // the fallback is replaced by the nav's measured height; a min-height of
+    // the variable would keep the nav from shrinking back
+    assert!(!rule(".section-nav").contains("min-height"));
+    let js =
+        std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/static/app.js")).unwrap();
+    assert!(
+        js.contains("root.style.setProperty(\"--section-nav-h\""),
+        "app.js measures the section nav"
+    );
+    assert!(!css.contains("+ 52px"), "no second copy of the nav height");
+    assert!(rule(".explorer-list td.ellipsis").contains("max-width: 0"));
+    assert!(
+        css.contains(
+            ".table-wrap:not(.rail .table-wrap, .explorer-list .table-wrap) { overflow: visible; }"
+        ),
+        "the explorer table may scroll inside its card"
+    );
+}
+
 #[tokio::test]
 async fn material_field_suggests_the_library() {
     use teamcraft::services::mass_properties::{self as mass, MaterialInput};

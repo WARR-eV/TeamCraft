@@ -22,6 +22,23 @@ see the notices in the README.
 
 ### Fixed
 
+- Web: the *Items* table of the vault explorer fits its card at 1280 and
+  1440 px – the name column takes the room that is left and ends in an
+  ellipsis, and the table scrolls inside the card instead of running past
+  its edge (#521).
+- Web: a section link (revision page, simulation results, as-built) lands
+  below the sticky top bar and section nav. Anchors clear the top bar on every
+  page and, below a section nav, also the nav by its measured height (app.js
+  sets `--section-nav-h`, so a taller nav – larger fonts, zoom, a classic
+  scrollbar under its list – is cleared too); the screenshot script scrolls
+  with `scrollIntoView` and so the same way (#523).
+- Web: error pages offer *Details for a bug report* only for server errors
+  (5xx); a 404 – also an object hidden by need-to-know – is no bug. A
+  signed-in user's 404 or 403 is shown inside the app with the top bar,
+  *Back* and *Dashboard* (#524).
+- Web: *Built on* of an as-built unit (card and *Built units* list) is shown
+  in the viewer's date format like the other dates of the card, the same day
+  in every time zone, instead of as an ISO date (#527).
 - Desktop: a check-out or check-in from Home marks the row (lock colour and
   icon) at once instead of after leaving Home and coming back; the
   *Check-outs* tab of a group is loaded again each time it comes to the
