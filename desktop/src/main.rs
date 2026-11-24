@@ -184,13 +184,11 @@ fn main() {
             // the whole output of failed STEP exports (#342)
             cadexport::set_log_dir(&config_dir);
             // a portable copy updated in place (#466): the old files go now
-            if update::this_install() == update::InstallKind::WindowsPortable {
-                if let Some(dir) = std::env::current_exe()
-                    .ok()
-                    .and_then(|e| e.parent().map(std::path::Path::to_path_buf))
-                {
-                    update::remove_leftovers(&dir);
-                }
+            if let Some(dir) = std::env::current_exe()
+                .ok()
+                .and_then(|exe| update::leftover_dir(update::this_install(), &exe))
+            {
+                update::remove_leftovers(&dir, std::time::SystemTime::now());
             }
             let handle = app.handle().clone();
             crash::start_session(&crash_dir, move || {
@@ -312,6 +310,7 @@ fn main() {
             commands::update_install,
             commands::update_swap,
             commands::update_restart,
+            commands::quit_app,
             commands::set_update_check,
             commands::set_checkout_parts,
             commands::open_release_page,

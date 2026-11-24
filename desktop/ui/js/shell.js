@@ -2,8 +2,9 @@
 // TeamCraft Desktop – The main window: rail, navigator, status bar, update notice, notifications, long operations.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, ICONS, api, badge, call, clear, dialog, enc, errorText, h, invoke, rememberError, reportLink, run, setStatus, state, svgIcon, toast, tool } from "./core.js";
+import { $, ICONS, api, badge, call, clear, confirmDialog, dialog, enc, errorText, h, invoke, rememberError, reportLink, run, setStatus, state, svgIcon, toast, tool, transfer } from "./core.js";
 import { checkInAllFailure } from "./report-inputs.js";
+import { installText, misfitQuestion, releasePageArgs, releasePageLabel, serverNote, transferBusy, updateAction } from "./update-rules.js";
 import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
 import { t } from "/static/shared/js/i18n.js";
 import { checkServerVersion, showConnect } from "./connect.js";
@@ -234,17 +235,6 @@ function initDonateTag() {
   $("status-donate-dismiss").addEventListener("click", function () { showDonateTag(false); });
 }
 
-/** What *Update now* does for each kind of installation (#377). */
-var INSTALL_TEXT = {
-  "windows-msi": "Downloads the installer, checks it against the release's checksums, then closes TeamCraft and starts it.",
-  "windows-setup": "Downloads the installer, checks it against the release's checksums, then closes TeamCraft and starts it.",
-  "windows-portable": "Downloads the portable zip, checks it against the release's checksums, replaces the files of your copy and restarts TeamCraft.",
-  "mac-dmg": "Downloads the disk image, checks it against the release's checksums and opens it – drag TeamCraft to Applications.",
-  "app-image": "Downloads the AppImage, checks it against the release's checksums, replaces your copy with it and restarts TeamCraft.",
-  package: "",
-  other: "Download the new version from the release page."
-};
-
 /** The update window (#377): the new version, its release notes and what to
  *  do – *Update now* (download, verify against SHA256SUMS.txt, start),
  *  *Skip this version*, *Remind me later* or the release page. Never while
@@ -259,11 +249,16 @@ export function openUpdateWindow(version) {
     h("p", { text: "TeamCraft " + version + " is available – you have " + state.session.version + "." }),
     server, notes, how, actions, progress
   ]);
-  // which desktop version the connected server needs (#468)
+  // which desktop version the connected server needs (#468); read at each
+  // click – the answer may come after the buttons are built (null until then)
+  var compat = null;
   call("server_compat", { offered: version }).then(function (c) {
-    if (!c || !c.note) return;
-    server.textContent = c.note;
-    server.className = "notice " + (c.offered_fits ? "info" : "warn");
+    compat = c || null;
+    var note = serverNote(c);
+    if (!note) return;
+    server.textContent = note.text;
+    server.className = note.cls;
+    pageBtn.textContent = releasePageLabel(compat);
   }, function () { /* no server: nothing to say */ });
   var dlg = dialog("Update TeamCraft", body, [
     { label: "Remind me later", onClick: function (d) {
@@ -277,35 +272,45 @@ export function openUpdateWindow(version) {
       d.close();
     } },
     { label: "Release page", onClick: function () {
-      call("open_release_page", { version: version }).catch(function (e) { toast(errorText(e), "error"); });
+      // a version that does not fit the server: the list of all releases,
+      // where the fitting one is – not the page of the one just warned of
+      call("open_release_page", releasePageArgs(compat, version)).catch(function (e) { toast(errorText(e), "error"); });
     } }
   ], { wide: true });
+  var pageBtn = dlg.form.querySelector(".dialog-actions button:last-child");
+  var BUSY = "A check-in or download is running – update when it has finished.";
   call("update_offer", { version: version }).then(function (offer) {
     notes.textContent = offer.notes || "No release notes.";
-    how.textContent = offer.package_hint || INSTALL_TEXT[offer.install] || "";
+    how.textContent = installText(offer);
     if (!offer.asset) return;
-    var installer = offer.install === "windows-msi" || offer.install === "windows-setup";
-    var swappable = offer.install === "windows-portable" || offer.install === "app-image";
+    var action = updateAction(offer.install);
     var btn = h("button.primary", { type: "button", on: { click: function () {
-      if (busyWithTransfer(progress)) { dlg.fail("A check-in or download is running – update when it has finished."); return; }
+      if (busyWithTransfer()) { dlg.fail(BUSY); return; }
       btn.disabled = true;
-      progress.textContent = "Downloading " + offer.asset + " and checking it …";
-      progress.classList.remove("hidden");
-      call("update_download", { version: version }).then(function (path) {
-        progress.textContent = "Verified: " + path;
-        // a portable zip or an AppImage is replaced in place (#466)
-        if (swappable) return swapAndRestart(dlg, btn, progress);
-        if (!installer) return call("update_install").then(function () { dlg.close(); });
-        return confirmQuit().then(function (ok) {
-          btn.disabled = false;
-          if (ok) return call("update_install");
+      // a version that does not fit the server (#468): asked first
+      confirmMisfit(compat, version).then(function (go) {
+        if (!go) { btn.disabled = false; return; }
+        if (busyWithTransfer()) { btn.disabled = false; dlg.fail(BUSY); return; }
+        progress.textContent = "Downloading " + offer.asset + " and checking it …";
+        progress.classList.remove("hidden");
+        return call("update_download", { version: version }).then(function (path) {
+          progress.textContent = "Verified: " + path;
+          // a portable zip or an AppImage is replaced in place (#466)
+          if (action.mode === "swap") return swapAndRestart(dlg, btn, progress, BUSY);
+          if (action.mode !== "installer") return call("update_install").then(function () { dlg.close(); });
+          return confirmQuit().then(function (ok) {
+            btn.disabled = false;
+            if (!ok) return;
+            if (busyWithTransfer()) { dlg.fail(BUSY); return; }
+            return call("update_install");
+          });
         });
       }).catch(function (e) {
         btn.disabled = false;
         progress.classList.add("hidden");
         dlg.fail(e);
       });
-    } } }, installer || swappable || offer.install === "mac-dmg" ? "Update now" : "Download");
+    } } }, action.label);
     actions.appendChild(btn);
   }, function (e) {
     notes.textContent = "The release notes could not be loaded: " + errorText(e);
@@ -318,16 +323,18 @@ export function openUpdateWindow(version) {
  * now* starts it. A folder the app may not write into, or any other failure,
  * changes nothing – the dialog says why and offers the verified file.
  */
-function swapAndRestart(dlg, btn, progress) {
+function swapAndRestart(dlg, btn, progress, busyText) {
   return confirmSwap().then(function (ok) {
     btn.disabled = false;
     if (!ok) return;
-    if (busyWithTransfer(progress)) { dlg.fail("A check-in or download is running – update when it has finished."); return; }
+    if (busyWithTransfer()) { dlg.fail(busyText); return; }
     btn.disabled = true;
     progress.textContent = "Replacing TeamCraft …";
     return call("update_swap").then(function () {
       progress.textContent = "TeamCraft is updated – it restarts now.";
-      return call("update_restart");
+      if (busyWithTransfer()) return restartFailed(dlg, btn, progress, busyText);
+      // the files are replaced: a failed start never offers *Update now* again
+      return call("update_restart").catch(function (e) { restartFailed(dlg, btn, progress, e); });
     }, function (e) {
       btn.disabled = false;
       progress.textContent = "Not replaced – the verified file is in your Downloads folder.";
@@ -339,30 +346,56 @@ function swapAndRestart(dlg, btn, progress) {
   });
 }
 
-function confirmSwap() {
+/** After the swap the new version could not be started (or a transfer
+ *  began meanwhile): the files are replaced, so the window offers to try
+ *  the restart again or to close TeamCraft – never a second download. */
+function restartFailed(dlg, btn, progress, err) {
+  progress.textContent = "TeamCraft is updated, but the new version was not started – restart it, or close TeamCraft and start it again.";
+  dlg.fail(err);
+  btn.replaceWith(h("span.row", null, [
+    h("button.primary", { type: "button", on: { click: function () {
+      if (busyWithTransfer()) { dlg.fail("A check-in or download is running – restart when it has finished."); return; }
+      call("update_restart").catch(function (e) { dlg.fail(e); });
+    } } }, "Restart now"),
+    h("button", { type: "button", on: { click: function () {
+      if (busyWithTransfer()) { dlg.fail("A check-in or download is running – close TeamCraft when it has finished."); return; }
+      call("quit_app").catch(function (e) { dlg.fail(e); });
+    } } }, "Close TeamCraft")
+  ]));
+}
+
+/** Asks before installing a version that does not fit the server (#468);
+ *  resolves true at once when there is nothing to ask. */
+function confirmMisfit(compat, version) {
+  var question = misfitQuestion(compat, version);
+  if (!question) return Promise.resolve(true);
+  return confirmDialog("Update anyway?", question, "Update anyway");
+}
+
+/** A yes/no question whose promise settles however the dialog closes – a
+ *  click beside it or Escape is a *Not now* (#466). */
+function askOnce(title, text, okLabel) {
   return new Promise(function (resolve) {
-    dialog("Replace TeamCraft and restart?", h("p", { text: "The new version replaces your copy of TeamCraft in its folder, and the app restarts. Your working folder, sign-in and settings stay. Check in or park unfinished work first if you want it on the server." }), [
-      { label: "Not now", onClick: function (d) { d.close(); resolve(false); } },
-      { label: "Replace and restart", primary: true, submit: true, onClick: function (d) { d.close(); resolve(true); } }
-    ]);
+    dialog(title, h("p", { text: text }), [
+      { label: "Not now", onClick: function (d) { resolve(false); d.close(); } },
+      { label: okLabel, primary: true, submit: true, onClick: function (d) { resolve(true); d.close(); } }
+    ], { onClose: function () { resolve(false); } });
   });
+}
+
+function confirmSwap() {
+  return askOnce("Replace TeamCraft and restart?", "The new version replaces your copy of TeamCraft in its folder, and the app restarts. Your working folder, sign-in and settings stay. Check in or park unfinished work first if you want it on the server.", "Replace and restart");
 }
 
 /** Unfinished work before the installer replaces the app. */
 function confirmQuit() {
-  return new Promise(function (resolve) {
-    dialog("Close TeamCraft and install?", h("p", { text: "The installer replaces TeamCraft – the app closes now. Your working folder, sign-in and settings stay. Check in or park unfinished work first if you want it on the server." }), [
-      { label: "Not now", onClick: function (d) { d.close(); resolve(false); } },
-      { label: "Close and install", primary: true, submit: true, onClick: function (d) { d.close(); resolve(true); } }
-    ]);
-  });
+  return askOnce("Close TeamCraft and install?", "The installer replaces TeamCraft – the app closes now. Your working folder, sign-in and settings stay. Check in or park unfinished work first if you want it on the server.", "Close and install");
 }
 
-/** A check-in, park or download is running (the status bar shows it);
- *  `own` is the asking dialog's own status line, which does not count. */
-function busyWithTransfer(own) {
-  var lines = Array.prototype.slice.call(document.querySelectorAll(".dialog [role=status]:not(.hidden)"));
-  return lines.some(function (el) { return el !== own; }) || !$("status-get").classList.contains("hidden");
+/** A check-in, park, upload or download is running: counted ones (core.js
+ *  beginTransfer), the Get bar of the status bar and Pack and Go. */
+function busyWithTransfer() {
+  return transferBusy({ transfers: state.transfers, getVisible: !$("status-get").classList.contains("hidden"), packing: !!packing });
 }
 
 /** *Help → Check for updates*: asks now, also when the daily check is off,
@@ -637,16 +670,19 @@ export function localChangesList(report) {
 export function sendLocalChanges(report, park, comment) {
   var out = { done: [], kept: [], failed: [] };
   report.unreadable.forEach(function (u) { out.kept.push(u[0].item + "/" + u[0].code + ": could not be compared – " + u[1]); });
-  return report.changed.reduce(function (chain, c) {
-    return chain.then(function () {
-      var name = c.item + "/" + c.code;
-      if (c.conflicts.length) { out.kept.push(name + ": conflict in " + c.conflicts.join(", ") + " – merge in its Workspace tab"); return; }
-      setStatus((park ? "Parking " : "Checking in ") + name + " …");
-      return call(park ? "workspace_park" : "workspace_checkin", { project: c.project, item: c.item, code: c.code, files: c.upload, comment: comment })
-        .then(function () { out.done.push(name + " (" + c.upload.join(", ") + ")"); },
-          function (err) { out.failed.push(name + ": " + errorText(err)); });
-    });
-  }, Promise.resolve()).then(function () { setStatus(""); return out; });
+  // a counted transfer: the update window does not replace the app meanwhile (#466)
+  return transfer(function () {
+    return report.changed.reduce(function (chain, c) {
+      return chain.then(function () {
+        var name = c.item + "/" + c.code;
+        if (c.conflicts.length) { out.kept.push(name + ": conflict in " + c.conflicts.join(", ") + " – merge in its Workspace tab"); return; }
+        setStatus((park ? "Parking " : "Checking in ") + name + " …");
+        return call(park ? "workspace_park" : "workspace_checkin", { project: c.project, item: c.item, code: c.code, files: c.upload, comment: comment })
+          .then(function () { out.done.push(name + " (" + c.upload.join(", ") + ")"); },
+            function (err) { out.failed.push(name + ": " + errorText(err)); });
+      });
+    }, Promise.resolve());
+  }).then(function () { setStatus(""); return out; }, function (err) { setStatus(""); throw err; });
 }
 
 function lines(title, list, cls) {
@@ -686,9 +722,12 @@ export function checkInAll() {
       { label: "Only the others", onClick: function (d) { d.close(); releaseClean(checkouts.length, report, null); } },
       { label: "Check them in first", primary: true, submit: true, onClick: function (d) {
         d.close();
-        sendLocalChanges(report, false, "Checked in with Check in all").then(function (sent) {
-          releaseClean(checkouts.length, report, sent);
-        });
+        // one transfer from the first upload to the last release (#466)
+        transfer(function () {
+          return sendLocalChanges(report, false, "Checked in with Check in all").then(function (sent) {
+            return releaseClean(checkouts.length, report, sent);
+          });
+        }).catch(function () {});
       } }
     ], { wide: true });
   }, function () {});
@@ -696,7 +735,20 @@ export function checkInAll() {
 
 /** Releases the check-outs without local changes and reports everything. */
 function releaseClean(total, report, sent) {
-  run("Checking in " + report.clean.length + " check-outs without local changes", function () {
+  // a counted transfer until the last revision's files are read-only again (#466)
+  return transfer(function () {
+    return run("Checking in " + report.clean.length + " check-outs without local changes", function () {
+      return releaseOnServer(report);
+    });
+  }).then(function (result) {
+    showReleased(total, report, sent, result);
+  }, function () {});
+}
+
+/** POST /worklist/checkin-all for the clean check-outs, then their files
+ *  read-only in the working folder again. */
+function releaseOnServer(report) {
+  return Promise.resolve().then(function () {
     if (!report.clean.length) return { revisions: [], checked_in: 0 };
     return api("POST", "/worklist/checkin-all", { revisions: report.clean.map(function (r) { return r.id; }) }).then(function (result) {
       // the released files become read-only in the working folder again
@@ -706,24 +758,27 @@ function releaseClean(total, report, sent) {
         });
       }, Promise.resolve()).then(function () { return result; });
     });
-  }).then(function (result) {
-    var failed = (result.revisions || []).filter(function (o) { return !o.ok; })
-      .map(function (o) { return o.item_number + "/" + o.code + ": " + o.error; });
-    var released = result.checked_in + (sent ? sent.done.length : 0);
-    var body = h("div.stack", null, [
-      h("p", { text: released + " of " + total + " check-outs checked in – their locks are released." }),
-      sent ? lines("Checked in with their local changes:", sent.done) : null,
-      sent ? lines("Kept checked out:", sent.kept) : null,
-      sent ? null : report.changed.length || report.unreadable.length ? h("div.stack", null, [
-        h("p", { text: atRisk(report) + " kept checked out because of local changes – check them in (or park them) one by one with their files:" }),
-        localChangesList(report)
-      ]) : null,
-      problems(failed.concat(sent ? sent.failed : []))
-    ]);
-    dialog("Check in all my check-outs", body, [{ label: "Close", primary: true, submit: true, onClick: function (d) { d.close(); } }]);
-    rescanLocalChanges();
-    refreshWorklistCount().then(function () { renderActive(); }, function () {});
-  }, function () {});
+  });
+}
+
+/** The result dialog of *Check in all*. */
+function showReleased(total, report, sent, result) {
+  var failed = (result.revisions || []).filter(function (o) { return !o.ok; })
+    .map(function (o) { return o.item_number + "/" + o.code + ": " + o.error; });
+  var released = result.checked_in + (sent ? sent.done.length : 0);
+  var body = h("div.stack", null, [
+    h("p", { text: released + " of " + total + " check-outs checked in – their locks are released." }),
+    sent ? lines("Checked in with their local changes:", sent.done) : null,
+    sent ? lines("Kept checked out:", sent.kept) : null,
+    sent ? null : report.changed.length || report.unreadable.length ? h("div.stack", null, [
+      h("p", { text: atRisk(report) + " kept checked out because of local changes – check them in (or park them) one by one with their files:" }),
+      localChangesList(report)
+    ]) : null,
+    problems(failed.concat(sent ? sent.failed : []))
+  ]);
+  dialog("Check in all my check-outs", body, [{ label: "Close", primary: true, submit: true, onClick: function (d) { d.close(); } }]);
+  rescanLocalChanges();
+  refreshWorklistCount().then(function () { renderActive(); }, function () {});
 }
 
 /** The requests of GET /worklist, numbered (lock-rules.js takeSeq): several

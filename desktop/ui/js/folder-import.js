@@ -2,7 +2,7 @@
 // TeamCraft Desktop – Import of a CAD folder tree.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, TAURI, api, append, call, dialog, enc, errorText, field, h, state, toast } from "./core.js";
+import { $, TAURI, api, append, beginTransfer, call, dialog, enc, errorText, field, h, state, toast } from "./core.js";
 import { label } from "/static/shared/js/format.js";
 import { canEdit, canEditProject, freshProjects, refreshWorklistCount } from "./shell.js";
 import { activeProject, selectView } from "./navigator.js";
@@ -400,6 +400,8 @@ export function openImportFolderDialog() {
     var todo = plan.items.filter(function (it) { return !importDone(log, it.key); });
     var created = [], failed = [], files = 0, checkedIn = 0;
     running = true; stop = false;
+    // a counted transfer: the update window does not replace the app meanwhile (#466)
+    var endTransfer = beginTransfer();
     var cadSet = null;
     todo.reduce(function (chain, it, i) {
       return chain.then(function () {
@@ -462,6 +464,7 @@ export function openImportFolderDialog() {
       return releaseImported(log, failed).then(function () { return lines; });
     }).then(function (lines) {
       running = false;
+      endTransfer();
       bar.classList.add("hidden");
       status.textContent = "";
       if (created.length) { delete state.expanded[group]; if (state.view === "home") selectView("home"); refreshWorklistCount(); }
@@ -473,7 +476,7 @@ export function openImportFolderDialog() {
         bom: bom.checked, lines: lines.lines, assumed: lines.assumed, checkedIn: checkedIn, failed: failed,
         folder: scanned.folder_name, project: group, cad: cadSet
       });
-    });
+    }).then(null, function (err) { running = false; endTransfer(); toast(errorText(err), "error"); });
   }
 
   dialog("Import a CAD folder", h("div.stack", null, [

@@ -83,6 +83,37 @@ see the notices in the README.
 - Desktop: worklist answers that arrive out of order no longer leave a
   stale worklist (rail count, *Check in all*, Home) or mark a released row
   as checked out (#505).
+- Desktop update check: versions compare by SemVer precedence, so a tester
+  on `0.3.0-rc.1` is told about `0.3.0-rc.2` (and `rc.10` beats `rc.9`,
+  whatever GitHub's order) instead of hearing "up to date" (#529); build
+  metadata with a hyphen (`0.3.0+build-1`) no longer makes a release a
+  pre-release (#530).
+- Desktop update window: when the offered version does not fit the
+  connected server, *Update now* asks first and the release button reads
+  *All releases* and opens the release list instead of the page of the
+  version just warned of (#468).
+- Desktop update window: *Update now* waits for every running transfer –
+  also the check-ins of *Local changes*, *Check in all* and sign-out, the
+  new-item upload, *Get project groups* and the folder import, counted
+  explicitly – and no longer refuses because a dialog shows an idle status
+  line; the check is repeated before the swap, the restart and the
+  installer start (#531, #532).
+- Desktop update window: closing *Replace TeamCraft and restart?* or *Close
+  TeamCraft and install?* with Esc or a click beside it counts as *Not now*
+  instead of leaving *Update now* disabled, and Esc closes only the dialog
+  on top (#534).
+- Desktop update window: when the files were replaced but the new version
+  does not start, the window says so and offers *Restart now* and *Close
+  TeamCraft* instead of a second *Update now* that cannot work (#466).
+- Desktop in-place update (#466): only a folder unpacked from the portable
+  zip (its `README.txt` or the new `.teamcraft-portable` marker) is updated
+  in place – an MSI installed into a folder of one's choice or a
+  `TeamCraft.exe` copied elsewhere gets the download instead (#533); a
+  `README.txt`/`LICENSE.txt` of the user's own next to the app is left
+  alone, an existing `*.old` is never renamed over, and the next start
+  removes only the files the swap listed; each instance unpacks into its own
+  staging folder, which a second instance's start no longer deletes; a
+  failed AppImage copy leaves no partial `<name>.new`.
 - Desktop: a check-out or check-in from Home marks the row (lock colour and
   icon) at once instead of after leaving Home and coming back; the
   *Check-outs* tab of a group is loaded again each time it comes to the

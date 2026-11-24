@@ -1172,17 +1172,14 @@ pub async fn check_update(state: State<'_, AppState>) -> CmdResult<Option<Update
         }
     }
     let current = env!("CARGO_PKG_VERSION");
-    Ok(latest
-        .filter(|v| {
-            update::notice_due(
-                v,
-                current,
-                s.update_dismissed.as_deref(),
-                s.update_remind_until,
-                now,
-            )
-        })
-        .map(|version| UpdateNotice { version, current }))
+    Ok(update::notice_for(
+        latest.as_deref(),
+        current,
+        s.update_dismissed.as_deref(),
+        s.update_remind_until,
+        now,
+    )
+    .map(|version| UpdateNotice { version, current }))
 }
 
 /// *Skip this version*: hides the notice of this release version (a newer
@@ -1370,6 +1367,13 @@ static RESTART_WITH: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(N
 /// calls it during a check-in or download.
 #[tauri::command]
 pub async fn update_swap() -> CmdResult<()> {
+    // swapped already (the restart failed): a second swap cannot work –
+    // Windows reports the moved-aside TeamCraft.exe.old as the running app
+    if RESTART_WITH.lock().expect("restart lock").is_some() {
+        return Err(ApiError::local(
+            "TeamCraft is updated already – close it and start it again.",
+        ));
+    }
     let file = VERIFIED_UPDATE
         .lock()
         .expect("update lock")
@@ -1427,7 +1431,8 @@ fn swap_portable(zip: &std::path::Path) -> Result<PathBuf, String> {
             zip.display()
         ));
     }
-    let staging = dir.join(update::STAGING_DIR);
+    // its own staging folder: another instance's start never removes it
+    let staging = dir.join(update::staging_name(std::process::id()));
     let _ = std::fs::remove_dir_all(&staging);
     let status = std::process::Command::new("powershell.exe")
         .args([
@@ -1445,26 +1450,18 @@ fn swap_portable(zip: &std::path::Path) -> Result<PathBuf, String> {
         let _ = std::fs::remove_dir_all(&staging);
         return Err("The update could not be unpacked.".into());
     }
-    let mut found = Vec::new();
-    for folder in std::fs::read_dir(&staging).into_iter().flatten().flatten() {
-        let folder_name = folder.file_name().to_string_lossy().into_owned();
-        for file in std::fs::read_dir(folder.path())
-            .into_iter()
-            .flatten()
-            .flatten()
-        {
-            let rel = format!("{folder_name}/{}", file.file_name().to_string_lossy());
-            if let Some(name) = update::portable_target(&rel) {
-                found.push((name, file.path()));
+    // a README.txt / LICENSE.txt that is not TeamCraft's stays; an old copy
+    // is never renamed over; the next start removes only what is listed
+    let result = update::found_in(&staging)
+        .and_then(|found| update::swap_moves(&dir, &found, update::existing, |p| p.exists()))
+        .and_then(|moves| {
+            if moves.is_empty() {
+                return Err("The update has no TeamCraft.exe.".to_string());
             }
-        }
-    }
-    let moves = update::swap_moves(&dir, &found, |p| p.exists());
-    let result = if moves.is_empty() {
-        Err("The update has no TeamCraft.exe.".to_string())
-    } else {
-        update::run_moves(&moves)
-    };
+            update::run_moves(&moves)?;
+            let _ = update::record_asides(&dir, &update::asides(&moves));
+            Ok(())
+        });
     let _ = std::fs::remove_dir_all(&staging);
     result.map(|()| app)
 }
@@ -1487,6 +1484,13 @@ pub fn update_restart(app: AppHandle) -> CmdResult<()> {
         .map_err(|e| ApiError::local(format!("{} could not be started: {e}", program.display())))?;
     app.exit(0);
     Ok(())
+}
+
+/// *Close TeamCraft* after a swap whose restart failed (#466): the files
+/// are replaced, the user starts the new version by hand.
+#[tauri::command]
+pub fn quit_app(app: AppHandle) {
+    app.exit(0);
 }
 
 /// *Settings → Workspace*: a check-out of an assembly gets its parts too.
@@ -1592,13 +1596,7 @@ pub fn record_ui_error(message: String, stack: Option<String>, source: Option<St
 /// only (#493).
 #[tauri::command]
 pub fn open_release_page(app: AppHandle, version: Option<String>) -> CmdResult<()> {
-    let url = version
-        .as_deref()
-        .and_then(update::tag_version)
-        .map_or_else(
-            || update::RELEASES_PAGE.to_string(),
-            |v| update::release_page(&v),
-        );
+    let url = update::release_url(version.as_deref());
     app.opener()
         .open_url(url, None::<&str>)
         .map_err(|e| ApiError::local(format!("The browser could not be opened: {e}")))
