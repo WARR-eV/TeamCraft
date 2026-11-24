@@ -306,6 +306,7 @@ fn main() {
             commands::open_release_page,
             commands::open_donate_page,
             commands::set_donate_tag,
+            commands::set_usage_report,
             commands::donate_tag_due,
             commands::save_package,
             commands::cancel_package,

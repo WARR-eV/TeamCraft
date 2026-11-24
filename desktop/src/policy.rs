@@ -193,6 +193,13 @@ impl Policies {
         self.crash_report_prompt.unwrap_or(user != Some(false))
     }
 
+    /// The daily usage report to the own server (#383, #473): the policy
+    /// `UsageStatistics`, else the user's choice (`None` = sent). Off means
+    /// nothing is counted, kept or sent.
+    pub fn usage_report(&self, user: Option<bool>) -> bool {
+        self.usage_statistics.unwrap_or(user != Some(false))
+    }
+
     /// The *Support us on Ko-fi* tag at start (#403): the policy, else the
     /// user's choice (`None` = shown).
     pub fn donate_tag(&self, user: Option<bool>) -> bool {
@@ -490,6 +497,24 @@ mod tests {
                 .as_deref(),
             Some("https://mine.example.org")
         );
+    }
+
+    #[test]
+    fn the_usage_statistics_policy_wins_over_the_user() {
+        // not set: each user chooses (#473), sent unless switched off
+        let none = Policies::default();
+        assert!(none.usage_report(None));
+        assert!(none.usage_report(Some(true)));
+        assert!(!none.usage_report(Some(false)));
+        assert!(!none.view().fixed.contains(&"usage_statistics"));
+        // 0: nothing sent or kept, users cannot turn it on
+        let off = Policies::from_json(r#"{"UsageStatistics": 0}"#);
+        assert!(!off.usage_report(None) && !off.usage_report(Some(true)));
+        assert_eq!(off.view().fixed, vec!["usage_statistics"]);
+        // 1: sent, users cannot turn it off
+        let on = Policies::from_json(r#"{"UsageStatistics": 1}"#);
+        assert!(on.usage_report(Some(false)) && on.usage_report(None));
+        assert_eq!(on.view().fixed, vec!["usage_statistics"]);
     }
 
     #[test]

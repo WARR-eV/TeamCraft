@@ -94,6 +94,13 @@ export function openSettings() {
       if (!on) showDonateTag(false);
     }, function (e) { donateTag.checked = !on; toast(errorText(e), "error", "Saving a setting", settingInputs("Ko-fi tag", on)); });
   } } });
+  // the daily usage report to the own server (#383, #473); the policy
+  // UsageStatistics fixes it either way
+  var usageReport = h("input", { type: "checkbox", checked: state.session.usage_report !== false, disabled: fixedByPolicy("usage_statistics"), on: { change: function () {
+    var on = usageReport.checked;
+    call("set_usage_report", { enabled: on }).then(function () { state.session.usage_report = on; },
+      function (e) { usageReport.checked = !on; toast(errorText(e), "error"); });
+  } } });
   // *Report a problem* (#381): the operator's own tracker instead of GitHub
   var reportUrl = h("input", { type: "url", value: state.session.report_url || "", spellcheck: "false", disabled: fixedByPolicy("report_url"), placeholder: "https://github.com/WARR-eV/TeamCraft/issues/new", on: { change: function () {
     var url = reportUrl.value.trim();
@@ -144,7 +151,9 @@ export function openSettings() {
     managedNote("update_check"),
     h("p.hint", { text: "Asks GitHub for the latest TeamCraft release at most once a day and shows a link in the status bar. Nothing is downloaded or installed by the app." }),
     h("h3", { text: "Privacy" }),
-    h("p.hint", { text: "TeamCraft Desktop sends your TeamCraft server one anonymous report per day of use: a random id of this installation, the app version, operating system, package type, active minutes and counts of fixed actions (check-outs, check-ins, 3D previews …) – never names, numbers, paths, search terms or anything you type. Your administrator decides whether the server shares a summary with the TeamCraft developers (off unless they turn it on)." }),
+    h("label.check", null, [usageReport, "Send an anonymous usage report to my TeamCraft server"]),
+    managedNote("usage_statistics"),
+    h("p.hint", { text: "One report per day of use: a random id of this installation, the app version, operating system, package type, active minutes and counts of fixed actions (check-outs, check-ins, 3D previews …) – never names, numbers, paths, search terms or anything you type. Switched off, nothing is counted, kept or sent, and the counts not sent yet are deleted. Your administrator decides whether the server shares a summary with the TeamCraft developers (off unless they turn it on)." }),
     h("div.row", null, [h("button", { type: "button", on: { click: function () { showUsage(); } } }, "Show what is sent")]),
     h("h3", { text: t("settings.crash_reports") }),
     h("label.check", null, [crashPrompt, "After a crash, ask at the next start whether to share the report"]),

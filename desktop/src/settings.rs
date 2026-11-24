@@ -215,6 +215,10 @@ pub struct Settings {
     /// `None` = shown once per start. Older settings files have no field.
     #[serde(default)]
     pub donate_tag: Option<bool>,
+    /// *Settings → Privacy → Send the anonymous usage report* (#473);
+    /// `None` = sent. Older settings files have no field.
+    #[serde(default)]
+    pub usage_report: Option<bool>,
     /// The port of the local test server (*Try TeamCraft on this computer*,
     /// src/localserver.rs). While `server_url` is `http://127.0.0.1:<this
     /// port>`, the app starts that server when it starts.
@@ -794,6 +798,18 @@ mod tests {
         );
         assert_eq!(loaded.onboarding, None);
         assert_eq!(loaded.donate_tag, None, "the Ko-fi tag stays on (#403)");
+    }
+
+    #[test]
+    fn the_usage_report_choice_is_saved_and_loaded() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = Settings {
+            usage_report: Some(false),
+            ..Settings::default()
+        };
+        s.save(dir.path()).unwrap();
+        let loaded = Settings::load_with(dir.path(), &FakeKeychain::new(true));
+        assert_eq!(loaded.usage_report, Some(false));
     }
 
     #[test]

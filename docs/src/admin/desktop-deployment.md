@@ -17,7 +17,7 @@ these *policies*, once at start; nothing about them is sent anywhere
 | `WorkspaceRoot`     | text   | The folder new working folders are created in (an absolute path); users can still choose another one   |
 | `ReportUrl`         | text   | Where *Report a problem* sends reports: your help desk's issue form (`https://…`), opened with the reviewed report as `title` and `body`; replaces *Settings → Report problems to*, which shows *Set by your organization* |
 | `OrganizationName`  | text   | Shown as *Managed by …* in *Settings* and *About* (one line, at most 64 characters)                     |
-| `UsageStatistics`   | switch | `0`: the app counts, keeps and sends no usage report to its server (#383); `1` or not set: it reports to its own server – whether the server shares a summary with the developers is its administrator's choice ([Privacy](privacy.md)) |
+| `UsageStatistics`   | switch | `0`: the app counts, keeps and sends no usage report to its server (#383); `1`: it reports to its own server and users cannot switch it off; not set: each user chooses (*Settings → Privacy*, on unless switched off, #473). Fixed either way, the switch shows *Set by your organization*. Whether the server shares a summary with the developers is its administrator's choice ([Privacy](privacy.md)) |
 
 A *switch* is the number `0` or `1` (`REG_DWORD` on Windows; an integer or a
 boolean in a profile or the JSON file). A value of the **wrong type or out of

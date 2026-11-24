@@ -137,6 +137,11 @@ see the notices in the README.
   like the toasts. Reports from change orders, change requests and settings
   name their key inputs (number and status, reviewer or decision, the
   setting and its new value).
+- **Desktop: switch off the usage report** (#473): *Settings → Privacy →
+  Send an anonymous usage report*. Off, nothing is counted, kept or sent and
+  the counts not sent yet are deleted. The desktop policy `UsageStatistics`
+  now fixes the switch either way (`0` off, `1` on, *Set by your
+  organization*); without it each user chooses.
 - **Panning in the 3D viewer** (#459), in the browser and the desktop app:
   every drag only rotated before. Right or middle drag, Shift or Ctrl + drag,
   a drag with both buttons, two fingers on a touch screen and Shift + arrow
