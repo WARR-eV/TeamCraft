@@ -778,7 +778,7 @@ pub fn swap_moves(
     }
     let mut moves = Vec::new();
     for (name, new) in found {
-        let name: &'static str = *name;
+        let name: &'static str = name;
         let target = dir.join(name);
         let app = name == "TeamCraft.exe";
         match existing(name, &target) {
