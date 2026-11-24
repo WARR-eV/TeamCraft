@@ -18,7 +18,7 @@
 
 import { $, TAURI, api, call, dialog, errorText, h, invoke, state, toast } from "./core.js";
 import { t } from "/static/shared/js/i18n.js";
-import { ONBOARDING_DISMISSED, ONBOARDING_DONE, ONBOARDING_STEPS, STEP_NAMES, cadLine, chosenGroup, finishLabel, groupCadText, groupList, isFinal, nextStep, onDisk, openLine, pickAssemblies, roleMessage, shouldShow, showTitle, skipReason, stepPosition, stepSummary } from "./onboarding-rules.js";
+import { ONBOARDING_DISMISSED, ONBOARDING_DONE, ONBOARDING_STEPS, STEP_NAMES, cadLine, chosenGroup, finishLabel, groupCadText, groupList, isFinal, nextStep, noAssemblyMessage, onDisk, openLine, pickAssemblies, roleMessage, shouldShow, showTitle, skipReason, stepPosition, stepSummary } from "./onboarding-rules.js";
 import { gotGroups } from "./group-sync.js";
 import { emptyHint, fetchStructureRoots, newProjectDialog, selectView, setActiveProject, setNavMode, typeIcon } from "./navigator.js";
 import { canEdit, canEditProject } from "./shell.js";
@@ -229,7 +229,7 @@ function openExtras(facts) {
     }
     var me = state.me || {};
     var picks = pickAssemblies(top.nodes, { me: { id: me.id, name: me.display_name }, editor: facts.editor });
-    if (!picks.length) { list.appendChild(h("p", { text: t("onboarding.open.none", { group: group.code }) })); return; }
+    if (!picks.length) { list.appendChild(h("p", { text: t(noAssemblyMessage(top.nodes, { editor: facts.editor }), { group: group.code }) })); return; }
     list.appendChild(h("ul.onboarding-rows", null, picks.map(function (n, i) {
       return h("li", null, [
         thumbIco(typeIcon(n.item_type), n),

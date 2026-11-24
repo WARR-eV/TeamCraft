@@ -19,7 +19,7 @@ const R = await import("data:text/javascript;base64," + Buffer.from(src).toStrin
 const {
   ONBOARDING_STEPS, ONBOARDING_DONE, ONBOARDING_DISMISSED, ONBOARDING_MESSAGE_IDS, STEP_NAMES, MAX_ASSEMBLIES,
   shouldShow, skipReason, visibleSteps, nextStep, isFinal, stepPosition, stepSummary, startGroup, chosenGroup,
-  groupList, groupFolder, pickAssemblies, lockedByMe, cadLine, groupCadText, openLine, showTitle, finishLabel, roleMessage, loopTip, loopTipAfter
+  groupList, groupFolder, pickAssemblies, noAssemblyMessage, lockedByMe, cadLine, groupCadText, openLine, showTitle, finishLabel, roleMessage, loopTip, loopTipAfter
 } = R;
 const catalog = (lang) => JSON.parse(fs.readFileSync(path.join(root, "shared/i18n", lang + ".json"), "utf8"));
 const placeholders = (text) => new Set([...String(text).matchAll(/\{([A-Za-z0-9_]+)\}/g)].map((m) => m[1]));
@@ -196,7 +196,18 @@ test("assemblies: parts, placeholders, no revision and locked by others are left
     node("ASM-O", { checked_out_by: "u-max", checked_out_by_name: "Max" }),
     node("ASM-M", { checked_out_by: "u-erika", checked_out_by_name: "Erika" })
   ], { me: ME, editor: true });
-  assert.deepEqual(picks.map((x) => x.item_number), ["ASM-M", "PRT-2"], "an item with BOM lines counts; my own lock does not hide it");
+  // one I hold already would offer Open in CAD / Check in…, not Check out and open
+  assert.deepEqual(picks.map((x) => x.item_number), ["PRT-2"], "an item with BOM lines counts; locked ones are left out, also my own");
+});
+
+test("no assembly to offer: the message says why", () => {
+  assert.equal(noAssemblyMessage([], { editor: true }), "onboarding.open.none");
+  assert.equal(noAssemblyMessage([node("PRT-1", { item_type: "part", bom_lines: 0 })], { editor: true }), "onboarding.open.none");
+  // assemblies exist, but none is free and in work
+  assert.equal(noAssemblyMessage([node("ASM-R", { state: "released" })], { editor: true }), "onboarding.open.none_free");
+  assert.equal(noAssemblyMessage([node("ASM-L", { checked_out_by: "u-max" })]), "onboarding.open.none_free", "editor is the default");
+  // a viewer sees every assembly: none at all is the only reason
+  assert.equal(noAssemblyMessage([node("ASM-R", { state: "released" })], { editor: false }), "onboarding.open.none");
 });
 
 test("mine is decided by user id; the display name only without one", () => {
