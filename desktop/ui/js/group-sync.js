@@ -108,7 +108,8 @@ export function openGetProjectsDialog(opts) {
     } },
     {
       label: "Get files", primary: true, submit: true, onClick: function (d) {
-        if (running) return;
+        // also a stopped Get of another dialog that is still ending (#498)
+        if (running || getRunning) return;
         // the result is shown: Enter closes the dialog
         if (finished) { d.close(); return; }
         var codes = boxes.filter(function (b) { return b.input.checked; }).map(function (b) { return b.code; });
@@ -143,8 +144,16 @@ export function openGetProjectsDialog(opts) {
           if (rememberGroups(done, stop, ruleValue)) rememberGotGroups(codes);
           var result = groupsGetResult(done, stop, codes);
           showResult(d, content, result);
-          toast(result.title, result.outcome === "done" ? null : "error");
-        }, function (err) { running = false; getRunning = false; dopts.modal = false; busy(d, false); d.fail(err); });
+          // closed meanwhile (Stop, then Close): the message carries the problems too
+          var shown = content.isConnected;
+          toast(shown || !result.problems.length ? result.title : result.title + " – " + result.problems.slice(0, 3).join("; ") +
+            (result.problems.length > 3 ? " (+" + (result.problems.length - 3) + " more)" : ""), result.outcome === "done" ? null : "error",
+            result.outcome === "done" ? undefined : "Getting project groups");
+        }, function (err) {
+          running = false; getRunning = false; dopts.modal = false; busy(d, false);
+          if (content.isConnected) d.fail(err);
+          else toast(errorText(err), "error", "Getting project groups");
+        });
       }
     }
   ], dopts);
