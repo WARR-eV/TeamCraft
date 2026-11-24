@@ -17,6 +17,7 @@
 // has no build step).
 
 import { api, enc, errorText, h, invoke, toast } from "./core.js";
+import { graphAloneText, graphSkippedText, neighbours } from "./graph-rules.js";
 import { label } from "/static/shared/js/format.js";
 import { typeIcon } from "./navigator.js";
 import { fetchRevision } from "./revision.js";
@@ -53,43 +54,9 @@ function svg(name, attrs) {
 function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
 
 // -------------------------------------------------------------------------
-// Data: the centre and its neighbours, normalised from a revision's payload.
+// Data: the centre and its neighbours, normalised from a revision's payload
+// and the item's where-used list (graph-rules.js neighbours).
 // -------------------------------------------------------------------------
-
-
-/** The neighbour nodes of a centre, deduplicated by item number. "down" =
- *  BOM children and references; "up" = items that use or reference this one. */
-function neighbours(d) {
-  var by = {}, order = [];
-  function add(n) {
-    if (!n.number || !n.code) return; // unresolved: nothing to open or draw
-    var k = n.number;
-    var ex = by[k];
-    if (!ex) { by[k] = n; order.push(k); return; }
-    // the same item on several BOM lines: its instances add up
-    if (ex.rel === "bom" && n.rel === "bom") { ex.qty = (ex.qty || 0) + (n.qty || 0); return; }
-    // keep a "down" (structural) relation over an "up" one, and fill blanks
-    if (ex.dir === "up" && n.dir === "down") { n.alsoUsedBy = true; by[k] = n; }
-    else { ex.type = ex.type || n.type; ex.name = ex.name || n.name; }
-  }
-  (d.bom || []).forEach(function (b) {
-    add({ number: b.child_number, code: b.child_latest_code, state: b.child_latest_state,
-      type: b.child_type, name: b.child_name, dir: "down", rel: "bom", qty: b.quantity });
-  });
-  (d.refs.outgoing || []).forEach(function (r) {
-    add({ number: r.to_number, code: r.to_latest_code, state: r.to_latest_state,
-      type: null, name: r.to_name, dir: "down", rel: "reference" });
-  });
-  (d.refs.incoming || []).forEach(function (r) {
-    add({ number: r.from_number, code: r.from_code, state: r.from_state,
-      type: null, name: r.from_name, dir: "up", rel: "used-by" });
-  });
-  (d.refs.file_referrers || []).forEach(function (f) {
-    add({ number: f.item_number, code: f.revision_code, state: f.revision_state,
-      type: null, name: f.item_name, dir: "up", rel: "used-by", via: f.filename });
-  });
-  return order.map(function (k) { return by[k]; });
-}
 
 /** Lazily fetches each neighbour's type, complexity (its own BOM child count)
  *  and a preview file, then calls back so the node can grow and show its image.
@@ -217,7 +184,8 @@ function nodeCard(n, isCenter, onOpen) {
   var badges = [];
   if (n.complexity) badges.push(h("span.g-badge", { title: n.complexity + " BOM children" }, "⚙ " + n.complexity));
   if (n.rel === "reference") badges.push(h("span.g-badge.g-ref", { title: "Reference, not a BOM child" }, "ref"));
-  if (n.dir === "up") badges.push(h("span.g-badge.g-up", { title: n.via ? "Its file references this (" + n.via + ")" : "Uses this item" }, "uses"));
+  if (n.dir === "up") badges.push(h("span.g-badge.g-up", { title: n.via ? "Its file references this (" + n.via + ")" :
+    n.inBom ? "Has this item in its BOM" : "Uses this item" }, "uses"));
   var card = h("div." + cls.split(" ").join("."), {
     role: "button", tabindex: "0",
     title: n.number + (n.code ? "/" + n.code : "") + " · " + (n.name || "") + "\n" +
@@ -489,47 +457,63 @@ export function revGraph(tab, el) {
   el.appendChild(legend());
   el.appendChild(pane);
 
-  var center = {
-    number: d.rev.item_number, code: d.rev.code, name: d.rev.name, type: d.rev.item_type,
-    state: d.rev.state, complexity: (d.bom || []).length, dir: "center", rel: "center"
-  };
-  var centerThumb = (d.files || []).filter(function (f) { return f.format_info && f.format_info.thumbnail; })[0];
-  if (centerThumb) { center.thumbId = centerThumb.id; center.thumbSha = centerThumb.sha256; center.fileName = centerThumb.filename; }
-  else if ((d.files || [])[0]) center.fileName = d.files[0].filename;
-  nodeInfo[key(center.number, center.code)] = { type: center.type, complexity: center.complexity,
-    fileName: center.fileName || null, thumbId: center.thumbId || null, thumbSha: center.thumbSha || null };
-  var nodes = neighbours(d);
-  center.size = nodeSize(center.complexity, true);
-  nodes.forEach(function (n) { n.size = nodeSize(n.complexity, false); });
+  // The assemblies whose BOM uses the item come from the where-used list
+  // (#518), which the revision payload does not carry: the overview's
+  // *At a glance* may have loaded it already, otherwise it is loaded here
+  // before the first paint. Without it (an older server, an error) the graph
+  // shows the rest.
+  if (d.whereUsed) { drawGraph(); return; }
+  api("GET", "/items/" + enc(d.rev.item_number) + "/where-used").then(function (list) {
+    d.whereUsed = list;
+  }, function () { /* drawn without the BOM parents */ }).then(function () {
+    if (live()) drawGraph();
+  });
 
-  if (!nodes.length) {
-    layout(center, nodes);
-    draw(pane, center, nodes, open);
-    pane.appendChild(h("div.g-empty", { text: center.number + " has no BOM children or references to show." }));
-    return;
+  /** A note above the canvas, where it is in view (#519). */
+  function note(text) {
+    if (text) el.insertBefore(h("p.graph-note", { text: text }), pane);
   }
 
-  // first paint with what we know; grow + fill previews as details arrive.
-  // Enrichment resolves many neighbours at once, so coalesce the re-layout
-  // into one frame instead of redrawing per result.
-  layout(center, nodes);
-  var view = draw(pane, center, nodes, open);
-  var pending = false;
-  var skipped = enrich(nodes, function () {
-    if (pending) return;
-    pending = true;
-    requestAnimationFrame(function () {
-      pending = false;
-      if (!live()) return;
-      nodes.forEach(function (n) { n.size = nodeSize(n.complexity, false); });
+  function drawGraph() {
+    var center = {
+      number: d.rev.item_number, code: d.rev.code, name: d.rev.name, type: d.rev.item_type,
+      state: d.rev.state, complexity: (d.bom || []).length, dir: "center", rel: "center"
+    };
+    var centerThumb = (d.files || []).filter(function (f) { return f.format_info && f.format_info.thumbnail; })[0];
+    if (centerThumb) { center.thumbId = centerThumb.id; center.thumbSha = centerThumb.sha256; center.fileName = centerThumb.filename; }
+    else if ((d.files || [])[0]) center.fileName = d.files[0].filename;
+    nodeInfo[key(center.number, center.code)] = { type: center.type, complexity: center.complexity,
+      fileName: center.fileName || null, thumbId: center.thumbId || null, thumbSha: center.thumbSha || null };
+    var nodes = neighbours(d);
+    center.size = nodeSize(center.complexity, true);
+    nodes.forEach(function (n) { n.size = nodeSize(n.complexity, false); });
+
+    if (!nodes.length) {
       layout(center, nodes);
-      redraw(center, nodes, open);
-      view.refit();
-    });
-  }, live);
-  if (skipped) {
-    pane.appendChild(h("div.g-empty", { text: skipped + " of " + nodes.length +
-      " neighbours shown without preview and complexity – open one to see its details." }));
+      draw(pane, center, nodes, open);
+      note(graphAloneText(center.number));
+      return;
+    }
+
+    // first paint with what we know; grow + fill previews as details arrive.
+    // Enrichment resolves many neighbours at once, so coalesce the re-layout
+    // into one frame instead of redrawing per result.
+    layout(center, nodes);
+    var view = draw(pane, center, nodes, open);
+    var pending = false;
+    var skipped = enrich(nodes, function () {
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(function () {
+        pending = false;
+        if (!live()) return;
+        nodes.forEach(function (n) { n.size = nodeSize(n.complexity, false); });
+        layout(center, nodes);
+        redraw(center, nodes, open);
+        view.refit();
+      });
+    }, live);
+    note(graphSkippedText(skipped, nodes.length));
   }
 }
 

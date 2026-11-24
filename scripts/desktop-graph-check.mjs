@@ -24,6 +24,8 @@
 //     the assembly one came from is the same step back; the clicked card
 //     shows that it is loading, the latest click wins, a failed load leaves
 //     the tab alone; Ctrl+click opens a tab of its own;
+//   * a part's graph draws the assembly whose BOM uses it (where-used, #518);
+//     a graph with only the centre shows its note above the canvas (#519);
 //   * no page errors.
 // Then desktop/ui/index.html is loaded with a stubbed window.__TAURI__ and
 // must load every module without an error.
@@ -112,7 +114,20 @@ export function centerData(number) {
     }
   };
 }
+// where-used: a child of ASM-000004 (ASM-1-nn, PRT-1-nn) is used by it, a
+// part PRT-nn-mm by ASM-1-nn (newest revision first, as the server orders)
+export function whereUsedOf(number) {
+  var parent = /^(ASM|PRT)-1-\\d\\d$/.test(number) ? "ASM-000004"
+    : /^PRT-\\d\\d-\\d\\d$/.test(number) ? "ASM-1-" + number.slice(4, 6) : null;
+  if (!parent) return [];
+  return ["A", "0"].map(function (code) {
+    return { parent_number: parent, parent_code: code, parent_name: parent + " assembly", parent_state: "in_work",
+             find_number: 10, quantity: 1 };
+  });
+}
 export function api(method, p) {
+  var w = p.match(/^\\/items\\/([^/]+)\\/where-used$/);
+  if (w) return Promise.resolve(whereUsedOf(decodeURIComponent(w[1])));
   var m = p.match(/^\\/items\\/([^/]+)(?:\\/revisions\\/([^/]+))?(\\/references)?$/);
   if (!m) return Promise.reject(new Error("unexpected " + p));
   var number = decodeURIComponent(m[1]);
@@ -457,6 +472,41 @@ async function checkGraph(browserType, name) {
     fail(`Ctrl+click opened ${JSON.stringify(opened)}`);
   }
   await expectTab("after Ctrl+click", { number: "ASM-000004", sub: "graph", trail: [] });
+  if (await page.locator(".graph-note").count()) fail("the assembly's graph shows a note although every neighbour is drawn");
+
+  // a part's graph draws the assembly whose BOM uses it (where-used, #518)
+  await node("PRT-1-01").click();
+  await arrived("PRT-1-01", "overview");
+  await page.evaluate(() => window.__show("graph"));
+  await arrived("PRT-1-01", "graph");
+  await page.waitForFunction(() => document.querySelectorAll(".g-card").length === 2, null, { timeout: 5000 })
+    .catch(() => fail("the part's graph does not draw the assembly that uses it"));
+  if (!(await node("ASM-000004").count())) fail("the BOM parent ASM-000004 is not on the part's graph");
+  if (await page.locator(".graph-note").count()) fail("the part's graph shows the empty-state note although it has a parent");
+  aligned(await geometry(page), "in the part's graph", fail);
+  // the parent card is the way back
+  await node("ASM-000004").click();
+  await arrived("ASM-000004", "graph");
+  await expectTab("back from the part's graph", { number: "ASM-000004", sub: "graph", trail: [] });
+
+  // a graph with only the centre: the note sits above the canvas, in view (#519)
+  await node("DOC-001").click();
+  await arrived("DOC-001", "overview");
+  await page.evaluate(() => window.__show("graph"));
+  await arrived("DOC-001", "graph");
+  const lone = await page.evaluate(() => {
+    const note = document.querySelector(".graph-note"), pane = document.querySelector(".graph-pane");
+    if (!note) return null;
+    const r = note.getBoundingClientRect();
+    return { text: note.textContent, bottom: r.bottom, height: r.height, paneTop: pane.getBoundingClientRect().top,
+             cards: document.querySelectorAll(".g-card").length };
+  });
+  if (!lone) fail("a graph with only the centre shows no note");
+  else {
+    if (lone.cards !== 1) fail(`the lone graph has ${lone.cards} cards`);
+    if (lone.text !== "DOC-001 has no BOM children, references or assemblies that use it.") fail(`the lone note says ${JSON.stringify(lone.text)}`);
+    if (!(lone.height > 0) || lone.bottom > lone.paneTop || lone.bottom > 980) fail("the lone note is not above the canvas in view");
+  }
 
   if (errors.length) fail("page errors: " + errors.join(" | "));
   await browser.close();

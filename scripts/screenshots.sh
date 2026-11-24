@@ -906,6 +906,10 @@ desktop_run() {
     local agent_script
     agent_script=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/demo-agent.sh
     [[ -f $agent_script ]] || die "scripts/demo-agent.sh is missing"
+    # The facts the demo agent talks about: the review ECO and the roughness
+    # ECR. The app hands its environment to the agent it starts, so they are
+    # exported before the app starts – later is too late (#528).
+    export DEMO_ECO=${ECO_REVIEW:-} DEMO_ECR=${ECR_NUM:-}
     jq -n --arg url "$BASE_URL" --arg skin "$skin" --arg agent "$agent_script" \
         '{server_url: $url, skin: $skin, agent: "Demo agent",
           agents: [{name: "Demo agent", command: "bash", args: [$agent]}]}' >"$settings"
@@ -988,8 +992,7 @@ desktop_graph() {
 # the start) is a calibration image for the click position, not in the README.
 desktop_agent() {
     local suffix=$1
-    # The facts the demo agent talks about: the review ECO and the roughness ECR.
-    export DEMO_ECO=${ECO_REVIEW:-} DEMO_ECR=${ECR_NUM:-}
+    # DEMO_ECO/DEMO_ECR: exported by desktop_run before the app starts
     desktop_key ctrl+4
     settle 2 "the agent view"
     desktop_snap "desktop-agent-nav$suffix"
