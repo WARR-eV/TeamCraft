@@ -170,8 +170,9 @@ feature milestone – the features in *What works* are enough; what is missing i
 - [ ] Desktop: one-click update (#377). Done: update window (release notes, *Skip this version*, *Remind me later*),
   *Help → Check for Updates…*, download of this installation's file verified against `SHA256SUMS.txt`, Windows
   installers started, `.dmg` opened. Left: swapping a portable zip or AppImage in place with *Restart now*, a
-  signature on the checksum list (release key built into the app), the *server needs desktop x.y* hint, a manual
-  test script per install type for each RC
+  signature on the checksum list (release key built into the app), a manual
+  test script per install type for each RC. Done since: the update window and the connect notice name the desktop
+  version the connected server needs (#468)
 - [x] Desktop: managed deployment policies (#378) – Windows registry with ADMX/ADML templates, macOS configuration
   profile, `/etc/teamcraft/policies.json`; fixed server, updates, crash prompts, working folder, organisation name,
   `UsageStatistics` (read for #383), `ReportUrl` (the problem-report tracker, #381), `ShowDonateTag` (the Ko-fi tag, #403), English and German ADML. Left: a manual test per OS (Group Policy, Intune, an MDM profile),

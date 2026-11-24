@@ -893,6 +893,13 @@ it is newer than your version, the status bar shows a green pill *TeamCraft
 x.y.z is available* (the tooltip names the version you have). A click opens
 the **update window** with the release notes and:
 
+* **What your server needs:** when this app or the offered version does not
+  fit the server you are connected to (before 1.0 app and server must share
+  the first two numbers of the version, 0.3.x with 0.3.x), the window names
+  the desktop version the server needs – *Your server runs 0.3.0 and needs
+  TeamCraft Desktop 0.3.x* – and whether the update is it. The same version
+  is named in the notice after connecting to a server that does not fit.
+
 * **Update now** (Windows installers, macOS) or **Download** (portable zip,
   AppImage): downloads the file for your installation into your Downloads
   folder and checks it against the release's published checksums

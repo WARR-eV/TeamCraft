@@ -358,6 +358,43 @@ pub async fn server_notice(state: State<'_, AppState>) -> CmdResult<Option<Strin
         .and_then(|server| crate::compat::notice(env!("CARGO_PKG_VERSION"), server)))
 }
 
+/// What the connected server needs of the desktop app (#468), for the update
+/// window: the server's version, the desktop `major.minor` it needs, whether
+/// the release the window offers fits it, and the line to show.
+#[derive(Serialize)]
+pub struct ServerCompat {
+    pub server: String,
+    pub needs: String,
+    pub offered_fits: bool,
+    /// The line for the update window (`compat::update_note`), or `null`.
+    pub note: Option<String>,
+}
+
+/// [`ServerCompat`] for the release `offered`; `null` when the
+/// server does not answer or hides its version. Needs no sign-in.
+#[tauri::command]
+pub async fn server_compat(
+    state: State<'_, AppState>,
+    offered: String,
+) -> CmdResult<Option<ServerCompat>> {
+    let api = api_of(&state)?;
+    let Ok(index) = api.json(Method::GET, "", None).await else {
+        return Ok(None);
+    };
+    let Some(server) = index["version"].as_str().filter(|v| v.len() <= 32) else {
+        return Ok(None);
+    };
+    let Some(needs) = crate::compat::needs(server) else {
+        return Ok(None);
+    };
+    Ok(Some(ServerCompat {
+        server: server.to_string(),
+        needs,
+        offered_fits: crate::compat::fits(&offered, server),
+        note: crate::compat::update_note(env!("CARGO_PKG_VERSION"), &offered, server),
+    }))
+}
+
 /// The version the server says it runs (`GET /api/v1`), for problem reports
 /// (#381); `null` when it does not answer. Needs no sign-in.
 #[tauri::command]

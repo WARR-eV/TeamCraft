@@ -119,6 +119,12 @@ see the notices in the README.
 
 ### Added
 
+- **Desktop: the version a server needs** (#468). When this app or the offered
+  update does not fit the connected server, the update window says which
+  desktop version the server needs (*Your server runs 0.3.0 and needs
+  TeamCraft Desktop 0.3.x*) and whether the update is it; the notice after
+  connecting to a server that does not fit names that version too, instead
+  of "the matching desktop app version".
 - **Panning in the 3D viewer** (#459), in the browser and the desktop app:
   every drag only rotated before. Right or middle drag, Shift or Ctrl + drag,
   a drag with both buttons, two fingers on a touch screen and Shift + arrow

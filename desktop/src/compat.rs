@@ -22,26 +22,63 @@ pub fn parse(version: &str) -> Option<(u64, u64)> {
     Some((major, digits.parse().ok()?))
 }
 
-/// A message for the user when app and server do not fit; `None` = fine.
-/// An unreadable server version is not an error (a proxy may hide it).
-pub fn notice(app: &str, server: &str) -> Option<String> {
-    let (a, s) = (parse(app)?, parse(server)?);
-    let fits = if a.0 == 0 || s.0 == 0 {
+/// Whether desktop app version `app` fits server version `server`. An
+/// unreadable version on either side fits (a proxy may hide the server's).
+pub fn fits(app: &str, server: &str) -> bool {
+    let (Some(a), Some(s)) = (parse(app), parse(server)) else {
+        return true;
+    };
+    if a.0 == 0 || s.0 == 0 {
         a == s
     } else {
         a.0 == s.0 && s.1 >= a.1
-    };
-    if fits {
+    }
+}
+
+/// The desktop version a server needs, as `major.minor` (`"0.3"`): any patch
+/// version of it fits. Before 1.0 only the server's own `major.minor` does;
+/// from 1.0 an older minor of the same major fits too, and the server's own
+/// is the newest that does – so it is the one to name (#468). `None` for an
+/// unreadable server version.
+pub fn needs(server: &str) -> Option<String> {
+    parse(server).map(|(major, minor)| format!("{major}.{minor}"))
+}
+
+/// A message for the user when app and server do not fit; `None` = fine.
+/// An unreadable server version is not an error (a proxy may hide it). It
+/// names the desktop version to install (#468).
+pub fn notice(app: &str, server: &str) -> Option<String> {
+    if fits(app, server) {
         return None;
     }
+    let (a, s) = (parse(app)?, parse(server)?);
+    let needed = needs(server)?;
     let advice = if s < a {
-        "Ask the administrator to upgrade the server, or install an older desktop app."
+        format!(
+            "Ask the administrator to upgrade the server, or install TeamCraft Desktop {needed}.x."
+        )
     } else {
-        "Install the matching desktop app version from the project's releases."
+        format!("Install TeamCraft Desktop {needed}.x from the project's releases.")
     };
     Some(format!(
         "This desktop app is version {app}, the server runs {server}. They may not work together. {advice}"
     ))
+}
+
+/// The update window's line about the connected server (#468) when it offers
+/// release `offered` to app version `app`: `None` when both fit the server
+/// (nothing to say); else which desktop version the server needs and whether
+/// the offered one is it.
+pub fn update_note(app: &str, offered: &str, server: &str) -> Option<String> {
+    let needed = needs(server)?;
+    let head = format!("Your server runs {server} and needs TeamCraft Desktop {needed}.x");
+    match (fits(offered, server), fits(app, server)) {
+        (true, true) => None,
+        (true, false) => Some(format!("{head} – this update fits it.")),
+        (false, _) => Some(format!(
+            "{head} – version {offered} may not work with it. Install {needed}.x from the release page, or ask the administrator to upgrade the server first."
+        )),
+    }
 }
 
 /// Header on the MCP connection the desktop hands to a local agent (ACP), so

@@ -250,10 +250,17 @@ export function openUpdateWindow(version) {
   var how = h("p.hint");
   var progress = h("p.small.muted.hidden", { role: "status" });
   var actions = h("div.row");
+  var server = h("p.notice.hidden", { role: "note" });
   var body = h("div.stack", null, [
     h("p", { text: "TeamCraft " + version + " is available – you have " + state.session.version + "." }),
-    notes, how, actions, progress
+    server, notes, how, actions, progress
   ]);
+  // which desktop version the connected server needs (#468)
+  call("server_compat", { offered: version }).then(function (c) {
+    if (!c || !c.note) return;
+    server.textContent = c.note;
+    server.className = "notice " + (c.offered_fits ? "info" : "warn");
+  }, function () { /* no server: nothing to say */ });
   var dlg = dialog("Update TeamCraft", body, [
     { label: "Remind me later", onClick: function (d) {
       showUpdate(null);
