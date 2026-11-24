@@ -1359,6 +1359,20 @@ pub fn update_install(app: AppHandle) -> CmdResult<()> {
 /// one) or the AppImage.
 static RESTART_WITH: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
 
+/// A swap runs ([`update_swap`]): set and cleared by it alone, so two
+/// overlapping calls never both pass the check of [`RESTART_WITH`].
+static SWAPPING: AtomicBool = AtomicBool::new(false);
+
+/// Clears [`SWAPPING`] however [`update_swap`] returns – after
+/// [`RESTART_WITH`] is set on success.
+struct SwapRunning;
+
+impl Drop for SwapRunning {
+    fn drop(&mut self) {
+        SWAPPING.store(false, Ordering::Release);
+    }
+}
+
 /// *Install* for a portable zip or an AppImage (#466): the verified download
 /// replaces this copy of the app in place – the portable folder's files are
 /// moved aside (`.old`, removed at the next start) and the new ones put in
@@ -1367,6 +1381,15 @@ static RESTART_WITH: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(N
 /// calls it during a check-in or download.
 #[tauri::command]
 pub async fn update_swap() -> CmdResult<()> {
+    // one swap at a time: a second call while one runs would share its
+    // per-process staging folder and remove the first one's unpack
+    if SWAPPING
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .is_err()
+    {
+        return Err(ApiError::local("TeamCraft is being updated already."));
+    }
+    let _running = SwapRunning;
     // swapped already (the restart failed): a second swap cannot work –
     // Windows reports the moved-aside TeamCraft.exe.old as the running app
     if RESTART_WITH.lock().expect("restart lock").is_some() {
