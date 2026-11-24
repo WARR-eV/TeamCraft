@@ -1327,7 +1327,9 @@ mod tests {
             found(11, 2, 1, "file", 11),
         ];
         let rows = nearest_per_item(walk, &std::collections::HashSet::new());
-        let shape: Vec<(u128, i32, Vec<(&str, u128)>)> = rows
+        // (item, level, [(relation, root)])
+        type Shape<'a> = (u128, i32, Vec<(&'a str, u128)>);
+        let shape: Vec<Shape> = rows
             .iter()
             .map(|r| {
                 (
