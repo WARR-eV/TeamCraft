@@ -900,7 +900,18 @@ capture_desktop() {
 # (home, worklist, revision, change order, graph, agent, Getting started) as
 # desktop-*SUFFIX.png and quits the app again.
 desktop_run() {
-    local suffix=$1 skin=$2 settings=$WORK/xdg-config/io.github.rudalabs.teamcraft/settings.json
+    local suffix=$1 skin=$2 config=$WORK/xdg-config$1
+    local settings=$config/io.github.rudalabs.teamcraft/settings.json
+    # Each run has its own profile (the token of desktop_profile copied into
+    # it): the run before is ended with kill, which the app reports at its
+    # next start as a session that ended unexpectedly – in a dialog that
+    # took the first click of the dark run (#424).
+    if [[ -n $suffix ]]; then
+        rm -rf "$config"
+        mkdir -p "$config/io.github.rudalabs.teamcraft"
+        chmod 700 "$config/io.github.rudalabs.teamcraft"
+        cp -p "$WORK/xdg-config/io.github.rudalabs.teamcraft/token" "$config/io.github.rudalabs.teamcraft/token"
+    fi
     log "capturing TeamCraft Desktop, skin $skin (1440x900, Xvfb)"
     # The scripted demo agent (scripts/demo-agent.sh, no AI) for the Agent view.
     local agent_script
@@ -921,7 +932,7 @@ desktop_run() {
     # Each run has its own web storage (XDG_DATA_HOME/XDG_CACHE_HOME): the
     # active project group the first run chose would otherwise make the dark
     # run start on Home with ROVER, and the clicks below would miss (#424).
-    XDG_CONFIG_HOME=$WORK/xdg-config XDG_DATA_HOME=$WORK/xdg-data$suffix XDG_CACHE_HOME=$WORK/xdg-cache$suffix \
+    XDG_CONFIG_HOME=$config XDG_DATA_HOME=$WORK/xdg-data$suffix XDG_CACHE_HOME=$WORK/xdg-cache$suffix \
         GDK_BACKEND=x11 NO_AT_BRIDGE=1 \
         WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 \
         env ${gtk_theme:+GTK_THEME=$gtk_theme} "$DESKTOP_APP" >"$WORK/desktop.log" 2>&1 &

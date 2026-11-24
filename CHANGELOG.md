@@ -22,6 +22,11 @@ see the notices in the README.
 
 ### Fixed
 
+- Screenshots: the dark desktop run has its own profile. The light run is
+  ended with kill, and the app reported that at its next start as a session
+  that ended unexpectedly – the dialog took the first click of the dark run,
+  so `desktop-home-dark.png` showed Home without a group (#424). The
+  *Unreleased* section of this changelog has one *Fixed* heading again.
 - Web: the *Items* table of the vault explorer fits its card at 1280 and
   1440 px – the name column takes the room that is left and ends in an
   ellipsis, and the table scrolls inside the card instead of running past
@@ -260,6 +265,28 @@ see the notices in the README.
     `NOT_GUARDED` list (both callers check the revision first);
   - the viewer's mouse-scheme test compared an array of the sandbox with
     `assert.deepEqual`.
+- Screenshots: `scripts/screenshots.sh` clicked the old places in the desktop
+  app. The worklist gained the sections *Local changes* and *New on this
+  computer* and the action bar of a revision wraps to two rows at 1440 px, so
+  the change order and the Graph tab were never opened and `desktop-change`,
+  `desktop-graph` and `desktop-graph-nav` showed the revision tab. The click
+  positions follow the new layout; the change order and the Graph tab open
+  again. Still open: `desktop-graph` – the graph of the mounting bracket shows
+  no card of the assembly above it to click, so it repeats `desktop-graph-nav`
+  (neither image is used in the README).
+
+- CI: the import check of the desktop modules (`scripts/check-desktop-modules.mjs`)
+  reported uses that are none – a `$` inside a regular expression (`/^\d+$/`)
+  as a use of `core.js`'s `$`, and the start of `else` as a use of
+  `shared/js/dom.js`'s `el` – and failed the *desktop UI* job. It now skips
+  regex contents and compares whole names.
+- Desktop: `desktop/ui/js/revision.js` started with three stray lines (a
+  copy of its data block, left by a merge), so the file did not parse – the
+  Revision tab could not load, and the *desktop UI* check failed on `main`.
+- CI: `tests/checkin_bom.rs` (#407) compared with one-element arrays built
+  by `[x.clone()]`, which clippy refuses (`cloned_ref_to_slice_refs`); it
+  uses `std::slice::from_ref` now. Server and desktop are clippy-clean on
+  all targets.
 
 ### Changed
 
@@ -327,31 +354,6 @@ see the notices in the README.
   paused *with local server* installer, and the download details and the
   third-party licence table fold into collapsible blocks. No feature text
   moved out of the README.
-
-### Fixed
-
-- Screenshots: `scripts/screenshots.sh` clicked the old places in the desktop
-  app. The worklist gained the sections *Local changes* and *New on this
-  computer* and the action bar of a revision wraps to two rows at 1440 px, so
-  the change order and the Graph tab were never opened and `desktop-change`,
-  `desktop-graph` and `desktop-graph-nav` showed the revision tab. The click
-  positions follow the new layout; the change order and the Graph tab open
-  again. Still open: `desktop-graph` – the graph of the mounting bracket shows
-  no card of the assembly above it to click, so it repeats `desktop-graph-nav`
-  (neither image is used in the README).
-
-- CI: the import check of the desktop modules (`scripts/check-desktop-modules.mjs`)
-  reported uses that are none – a `$` inside a regular expression (`/^\d+$/`)
-  as a use of `core.js`'s `$`, and the start of `else` as a use of
-  `shared/js/dom.js`'s `el` – and failed the *desktop UI* job. It now skips
-  regex contents and compares whole names.
-- Desktop: `desktop/ui/js/revision.js` started with three stray lines (a
-  copy of its data block, left by a merge), so the file did not parse – the
-  Revision tab could not load, and the *desktop UI* check failed on `main`.
-- CI: `tests/checkin_bom.rs` (#407) compared with one-element arrays built
-  by `[x.clone()]`, which clippy refuses (`cloned_ref_to_slice_refs`); it
-  uses `std::slice::from_ref` now. Server and desktop are clippy-clean on
-  all targets.
 
 ### Added
 
