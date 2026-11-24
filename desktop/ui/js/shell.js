@@ -273,7 +273,7 @@ export function openUpdateWindow(version) {
       d.close();
     } },
     { label: "Release page", onClick: function () {
-      call("open_release_page").catch(function (e) { toast(errorText(e), "error"); });
+      call("open_release_page", { version: version }).catch(function (e) { toast(errorText(e), "error"); });
     } }
   ], { wide: true });
   call("update_offer", { version: version }).then(function (offer) {

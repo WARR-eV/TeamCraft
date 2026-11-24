@@ -43,6 +43,11 @@ see the notices in the README.
   are retried for 10 seconds, and an Inventor that runs but cannot be asked
   (started as administrator) gives a note instead of silently starting a new
   instance (#483).
+- Desktop: the update check never found a release – it asked GitHub for
+  `releases/latest`, which leaves out pre-releases, and every 0.x release is
+  published as one. It reads the list of releases now and offers the newest
+  plain version (a release candidate only to an app that is one); *Release
+  page* opens the offered version's page (#493).
 - CI: the comment of the shared component picker named its issue as
   "#419", which the no-literal-colours guard of `shared/css/` reads as a
   hex colour; it says "issue 419" now.
