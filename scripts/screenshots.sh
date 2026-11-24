@@ -938,8 +938,10 @@ desktop_run() {
     settle 8 "the start screen"
     # The rows of the navigator sit at fixed places for the demo data
     # (1440x900, default zoom); check the images when the layout changes.
-    desktop_click 140 145 # project group ROVER: expand
-    settle 2 "the items of ROVER"
+    # the app starts on the Projects page (no active group yet): a click on
+    # ROVER makes it the active group and opens Home, its file browser (#424)
+    desktop_click 180 170 # project group ROVER on the Projects page
+    settle 3 "Home with the files of ROVER"
     desktop_snap "desktop-home$suffix"
     desktop_key ctrl+2
     settle 2 "the worklist"
