@@ -927,18 +927,40 @@ the **update window** with the release notes and:
   image opens and you drag TeamCraft to *Applications*. The Windows portable
   zip and the AppImage replace your copy in place after you confirm
   (*Replace and restart*): the new version goes into the app's folder, the
-  old files are removed at the next start, and TeamCraft restarts (#466). A
+  old files are removed at the next start, and TeamCraft restarts (#466).
+  Only a folder unpacked from the portable zip is updated in place (it holds
+  the zip's `README.txt` or `.teamcraft-portable`); a `TeamCraft.exe` copied
+  somewhere else, or an MSI installed into a folder of your choice, gets
+  *Download* and the release page instead. A `README.txt` or `LICENSE.txt`
+  of your own next to the app is left alone, and only the files the update
+  moved aside are removed at the next start. A
   folder the app may not write into, or any other failure, changes nothing –
-  the window says why and *Show the file* shows the verified download. Installed with Flatpak or a
+  the window says why and *Show the file* shows the verified download. If
+  the files were replaced but the new version does not start, the window
+  says so and offers *Restart now* and *Close TeamCraft* – never a second
+  download. Installed with Flatpak or a
   `.deb`/`.rpm` package, the window names the package-manager way instead.
-  Not while a check-in or Get runs.
+  Not while a check-in, park, upload, Get, *Get project groups*, folder
+  import or Pack and Go runs – also one started from *Local changes* or
+  *Check in all*.
+* When the offered version does not fit your server, *Update now* asks
+  first (*Update anyway?*), and the release button reads **All releases**:
+  it opens the list of releases, where you find the version your server
+  needs.
 * **Skip this version** (or *×* in the status bar): no notice until a newer
   version.
 * **Remind me later**: the notice comes back in three days.
 * **Release page**: the release on GitHub in your browser.
 
+Closing a confirmation (*Replace and restart?*, *Close TeamCraft and
+install?*) with *Esc* or a click beside it counts as *Not now*; *Esc* closes
+only the dialog on top.
+
 *Help → Check for Updates…* asks at once – also when the daily check is off –
-and says whether you are up to date. *Settings → Updates* switches the daily
+and says whether you are up to date. A tester's release candidate is told
+about the next candidate of the same version (0.3.0-rc.1 → 0.3.0-rc.2);
+versions are compared by Semantic Versioning, build metadata (`+…`) never
+counts. *Settings → Updates* switches the daily
 check off (for example on computers without internet access).
 
 ## Support us on Ko-fi

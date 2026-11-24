@@ -92,6 +92,10 @@ jobs:
       # the reviewers of the release dialog and when a draft can be submitted
       - name: Test the release rules
         run: node scripts/desktop-release-rules.test.mjs
+      # the update window: button per install kind, server line, release
+      # page, transfers that block the swap (#466, #468)
+      - name: Test the update window rules
+        run: node scripts/desktop-update-rules.test.mjs
       # the key inputs of a failed action in *Report…* (#381)
       - name: Test the report inputs
         run: node scripts/desktop-report-inputs.test.mjs

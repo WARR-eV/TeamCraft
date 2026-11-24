@@ -299,6 +299,10 @@ jobs:
             "Source code and documentation: https://github.com/WARR-eV/TeamCraft",
             "Licensed under the Mozilla Public License 2.0 (LICENSE.txt)."
           ) | Set-Content -Encoding utf8 "$dir\README.txt"
+          # the proof that this folder is a portable copy: only then does
+          # *Update now* replace its files in place (desktop/src/update.rs, #466)
+          "TeamCraft Desktop portable copy - the in-app update replaces the files of this folder." |
+            Set-Content -Encoding utf8 "$dir\.teamcraft-portable"
           Compress-Archive -Path $dir -DestinationPath "dist\$name.zip"
           Get-ChildItem dist
       - uses: actions/upload-artifact@v4

@@ -385,6 +385,29 @@ export function run(statusText, fn, inputs) {
   });
 }
 
+// ------------------------------------------------- running transfers (#466)
+
+/** Counts a check-in, park, upload or download from now until the returned
+ *  function is called (once; later calls do nothing). While one runs the
+ *  update window neither replaces nor closes the app (update-rules.js
+ *  transferBusy). */
+export function beginTransfer() {
+  state.transfers = (state.transfers || 0) + 1;
+  var ended = false;
+  return function endTransfer() {
+    if (ended) return;
+    ended = true;
+    state.transfers = Math.max(0, state.transfers - 1);
+  };
+}
+
+/** Runs `fn` (which returns a promise) as one counted transfer; the count
+ *  ends however the promise settles. */
+export function transfer(fn) {
+  var end = beginTransfer();
+  return Promise.resolve().then(fn).then(function (v) { end(); return v; }, function (err) { end(); throw err; });
+}
+
 // ---------------------------------------------------------------- dialogs
 
 export function dialog(title, body, actions, opts) {
@@ -408,9 +431,17 @@ export function dialog(title, body, actions, opts) {
     }
   }, [h("h2", { text: title }), body, errorEl, h("div.dialog-actions", null, buttons)]);
   var backdrop = h("div.dialog-backdrop", { on: { mousedown: function (e) { if (e.target === backdrop && !opts.modal) close(); } } }, form);
-  function close() { backdrop.remove(); document.removeEventListener("keydown", onKey); }
-  // only the dialog on top: Escape in a dialog opened from another one (the
-  // report from a Report… in place) must not close the one underneath too
+  var closed = false;
+  // opts.onClose: runs once however the dialog closes (an action, Escape,
+  // the backdrop) – a dialog that answers a promise settles it there
+  function close() {
+    backdrop.remove();
+    document.removeEventListener("keydown", onKey);
+    if (closed) return;
+    closed = true;
+    if (opts.onClose) opts.onClose();
+  }
+  // Escape closes the dialog on top only, never one under it
   function onKey(e) { if (e.key === "Escape" && !opts.modal && root.lastElementChild === backdrop) close(); }
   /** Hides an error shown by fail() (a new attempt of the dialog's action started). */
   function clearError() { errorEl.replaceChildren(); errorEl.classList.add("hidden"); }
@@ -438,8 +469,8 @@ export function confirmDialog(title, text, okLabel, danger) {
   return new Promise(function (resolve) {
     dialog(title, h("p", { text: text }), [
       { label: "Cancel", onClick: function (d) { d.close(); resolve(false); } },
-      { label: okLabel || "OK", primary: !danger, danger: danger, submit: true, onClick: function (d) { d.close(); resolve(true); } }
-    ]);
+      { label: okLabel || "OK", primary: !danger, danger: danger, submit: true, onClick: function (d) { resolve(true); d.close(); } }
+    ], { onClose: function () { resolve(false); } }); // Escape or a click beside it: Cancel
   });
 }
 

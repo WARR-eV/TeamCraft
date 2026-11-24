@@ -2,7 +2,7 @@
 // TeamCraft Desktop – 3D viewer, workspace, check-out/in, edit, release, revise.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, api, badge, call, clear, confirmDialog, dialog, enc, errorNotice, errorText, field, h, invoke, lockBadge, materialField, rememberError, reportLink, run, setStatus, state, toast, tool } from "./core.js";
+import { $, api, badge, beginTransfer, call, clear, confirmDialog, dialog, enc, errorNotice, errorText, field, h, invoke, lockBadge, materialField, rememberError, reportLink, run, setStatus, state, toast, tool } from "./core.js";
 import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
 import { canEdit, canEditProject, isCancelled, refreshWorklistCount, rescanLocalChanges, uploadLine } from "./shell.js";
 import { reloadActive, renderActive, table } from "./tabs.js";
@@ -709,6 +709,8 @@ export function checkinDialog(tab, park) {
       var files = boxes.filter(function (b) { return b.input.checked; }).map(function (b) { return b.name; });
       if (parking && !files.length) { d.fail("Tick the files to park – parking keeps the check-out and uploads only those."); return; }
       running = true; cancelled = false; skipping = false; opts.modal = true;
+      // a counted transfer: the update window does not replace the app meanwhile (#466)
+      var endTransfer = beginTransfer();
       var toExport = stepNote && withStep.checked ? files.filter(function (n) { return exportProgram(n, programs); }) : [];
       var ref = rev.item_number + "/" + rev.code;
       var args = { project: rev.project_code, item: rev.item_number, code: rev.code, comment: comment.value };
@@ -765,6 +767,7 @@ export function checkinDialog(tab, park) {
         });
       }
       done.then(function () {
+        endTransfer();
         running = false; uploadWatcher = null; phase = "";
         setStatus("");
         d.close();
@@ -779,6 +782,7 @@ export function checkinDialog(tab, park) {
         reloadActive();
         refreshWorklistCount(); rescanLocalChanges();
       }, function (err) {
+        endTransfer();
         running = false; uploadWatcher = null; opts.modal = false; phase = "";
         setStatus("");
         if (stored) {

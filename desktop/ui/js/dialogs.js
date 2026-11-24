@@ -2,7 +2,7 @@
 // TeamCraft Desktop – Dialogs: new item, settings, about.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, ITEM_TYPES, TAURI, api, call, dialog, enc, errorNotice, errorText, field, h, materialField, setStatus, state, toast } from "./core.js";
+import { $, ITEM_TYPES, TAURI, api, call, dialog, enc, errorNotice, errorText, field, h, materialField, setStatus, state, toast, transfer } from "./core.js";
 import { label } from "/static/shared/js/format.js";
 import { canEdit, canEditProject, freshProjects, refreshWorklistCount, rescanNewFiles } from "./shell.js";
 import { activeProject, selectView } from "./navigator.js";
@@ -110,9 +110,12 @@ export function createItemFromFiles(spec) {
     if (!places.length) return rev;
     var folders = {};
     places.forEach(function (p, i) { folders[p.name] = spec.targets[i] != null ? spec.targets[i] : spec.folder; });
-    return call("upload_files", {
-      item: rev.item_number, code: rev.code, paths: paths, comment: null, folders: folders,
-      project: spec.project, track: true, refuseClash: true, refuseSameName: !spec.allowSameName
+    // a counted transfer: the update window does not replace the app meanwhile (#466)
+    return transfer(function () {
+      return call("upload_files", {
+        item: rev.item_number, code: rev.code, paths: paths, comment: null, folders: folders,
+        project: spec.project, track: true, refuseClash: true, refuseSameName: !spec.allowSameName
+      });
     }).then(function (records) {
       // an empty description from a SolidCraft design's properties (#367) – best effort
       return describeFromDesign(rev, records).then(function () { return rev; });

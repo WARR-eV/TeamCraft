@@ -2,7 +2,7 @@
 // TeamCraft Desktop – Whole project groups locally.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { api, call, dialog, enc, errorText, field, h, state, toast } from "./core.js";
+import { api, beginTransfer, call, dialog, enc, errorText, field, h, state, toast } from "./core.js";
 import { label } from "/static/shared/js/format.js";
 import { addDownload, groupsGetResult, mergeGotGroups, rememberGroups } from "./get-rules.js";
 import { freshProjects } from "./shell.js";
@@ -121,6 +121,8 @@ export function openGetProjectsDialog(opts) {
         busy(d, true);
         var done = { items: 0, files: 0, kept: 0, skipped: 0, clashes: 0, errors: [] };
         report.textContent = "Listing the items …";
+        // a counted transfer: the update window does not replace the app meanwhile (#466)
+        var endTransfer = beginTransfer();
         Promise.all(codes.map(function (code) {
           return projectItems(code).then(function (items) { return items.map(function (it) { return { project: code, item: it }; }); });
         })).then(function (lists) {
@@ -139,6 +141,7 @@ export function openGetProjectsDialog(opts) {
             });
           }, Promise.resolve());
         }).then(function () {
+          endTransfer();
           running = false; getRunning = false; finished = true; dopts.modal = false;
           // only a complete copy: no problems, no clashes, the latest revision of every item
           if (rememberGroups(done, stop, ruleValue)) rememberGotGroups(codes);
@@ -150,7 +153,7 @@ export function openGetProjectsDialog(opts) {
             (result.problems.length > 3 ? " (+" + (result.problems.length - 3) + " more)" : ""), result.outcome === "done" ? null : "error",
             result.outcome === "done" ? undefined : "Getting project groups");
         }, function (err) {
-          running = false; getRunning = false; dopts.modal = false; busy(d, false);
+          endTransfer(); running = false; getRunning = false; dopts.modal = false; busy(d, false);
           if (content.isConnected) d.fail(err);
           else toast(errorText(err), "error", "Getting project groups");
         });
