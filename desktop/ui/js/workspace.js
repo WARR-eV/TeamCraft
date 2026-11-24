@@ -18,6 +18,7 @@ import { isNewModelOfItsOwn, workspacePath } from "./new-files.js";
 import { newItemDialog } from "./dialogs.js";
 import { offerBomUpdate, checkinBomText } from "./checkin-bom.js";
 import { revisionInputs } from "./report-inputs.js";
+import { planStepExports } from "./export-rules.js";
 import { t } from "/static/shared/js/i18n.js";
 import { markLock } from "./browser.js";
 import { locksChanged } from "./lock-overview.js";
@@ -643,20 +644,28 @@ export function checkinDialog(tab, park) {
     // anyway; a second model file is usually a new item of its own (#359)
     var boxes = candidates.map(function (f) {
       var ownItem = isNewModelOfItsOwn(f, ws.files, kinds);
-      return { name: f.name, path: f.path, ownItem: ownItem, input: h("input", { type: "checkbox", checked: f.state !== "conflict" && !ownItem }), state: f.state };
+      return { name: f.name, path: f.path, size: f.size, ownItem: ownItem, input: h("input", { type: "checkbox", checked: f.state !== "conflict" && !ownItem }), state: f.state };
     });
     var comment = h("input", { type: "text", maxlength: "2000", placeholder: "What changed, e.g. wall thickness 2 → 2.5 mm" });
     var progressLine = h("p.small.muted.hidden", { role: "status" });
     // Like the CAD add-ins of PDM systems: viewables at check-in.
     var exportable = boxes.filter(function (b) { return exportProgram(b.name, programs); });
+    // large assemblies are never exported at check-in (#342): parts only
+    function exportPlan(list) {
+      return planStepExports(list.map(function (b) { return { name: b.name, program: exportProgram(b.name, programs), size: b.size }; }));
+    }
+    var firstPlan = exportPlan(exportable), largeSkipped = firstPlan.skipped, exportCount = firstPlan.export.length;
     // off by default (#342): an export through the CAD program can take many
     // minutes for a large assembly; the files are uploaded before it runs
     var withStep = h("input", { type: "checkbox", checked: false });
-    var stepNote = exportable.length ? h("label.check", null, [withStep,
+    var stepNote = exportCount ? h("label.check", null, [withStep,
       "Create STEP exports with " + exportable.map(function (b) { return PROGRAM_LABEL[exportProgram(b.name, programs)]; })
         .filter(function (v, i, a) { return a.indexOf(v) === i; }).join(" / ") +
-      " for the 3D preview (" + exportable.length + (exportable.length === 1 ? " file" : " files") +
-      ") – your files are uploaded first, a slow export can be skipped"]) : null;
+      " for the 3D preview (" + exportCount + (exportCount === 1 ? " file" : " files") +
+      ") – your files are uploaded first, a slow export can be skipped" +
+      (largeSkipped.length ? "; not for " + largeSkipped.map(function (s) { return s.name; }).join(", ") + " (large assembly – its preview comes from the parts)" : "")])
+      : largeSkipped.length ? h("p.small.muted", { text: "No STEP export at check-in for " + largeSkipped.map(function (s) { return s.name; }).join(", ") +
+        " – large assemblies are not exported (their preview comes from the parts)." }) : null;
     // #407: on by default every time (the choice is not remembered); only on
     // a check-in – Park keeps the revision checked out, nothing is final yet
     var withBom = h("input", { type: "checkbox", checked: true });
@@ -730,7 +739,10 @@ export function checkinDialog(tab, park) {
       running = true; cancelled = false; skipping = false; opts.modal = true;
       // a counted transfer: the update window does not replace the app meanwhile (#466)
       var endTransfer = beginTransfer();
-      var toExport = stepNote && withStep.checked ? files.filter(function (n) { return exportProgram(n, programs); }) : [];
+      var plan = stepNote && withStep.checked
+        ? exportPlan(boxes.filter(function (b) { return files.indexOf(b.name) !== -1; }))
+        : { export: [], skipped: [] };
+      var toExport = plan.export;
       var ref = rev.item_number + "/" + rev.code;
       var args = { project: rev.project_code, item: rev.item_number, code: rev.code, comment: comment.value };
       function show(text) { if (!cancelled) { progressLine.textContent = text; progressLine.classList.remove("hidden"); } }
@@ -747,7 +759,9 @@ export function checkinDialog(tab, park) {
           return r;
         });
       }
-      var steps = [], exportFailures = [], stored = false;
+      var steps = [], stored = false;
+      // a large assembly skipped by the rule is named in the result (#342)
+      var exportFailures = plan.skipped.map(function (s) { return s.name + ": " + s.why; });
       // one export after the other: the CAD program handles one document at a
       // time. A failed or skipped export never stops the check-in (#342,
       // #368): the file goes without its STEP and the result says why.

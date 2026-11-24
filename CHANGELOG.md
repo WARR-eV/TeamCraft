@@ -22,6 +22,11 @@ see the notices in the README.
 
 ### Fixed
 
+- Desktop: the STEP export at check-in exports parts and small assemblies
+  only; an assembly file (`.iam`, Solid Edge `.asm`) larger than 5 MB is
+  skipped, named in the check-in dialog and the result, and its 3D preview
+  comes from the parts. An Inventor export of a 12 MB assembly had not
+  finished after nine minutes (#342).
 - Screenshots: the dark desktop run has its own profile. The light run is
   ended with kill, and the app reported that at its next start as a session
   that ended unexpectedly – the dialog took the first click of the dark run,
