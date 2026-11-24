@@ -33,6 +33,9 @@ see the notices in the README.
   *Finished with problems* / *Stopped* with every problem listed, *Open
   working folder* and *Close*; while it copies, *Get files* is disabled and
   *Close* reads *Stop* (#449).
+- `desktop/README.md`: the *Ko-fi tag* row stood above the title instead of
+  in the feature table, and *Revision tabs* was in the table twice with
+  different details; one merged row now (#486).
 - CI: the comment of the shared component picker named its issue as
   "#419", which the no-literal-colours guard of `shared/css/` reads as a
   hex colour; it says "issue 419" now.
