@@ -851,6 +851,13 @@ table.grid td.actions button { height: var(--ctl-h-sm); padding: 0 8px; font-siz
 /* a risk the user should know about: an unencrypted server address, the token
    outside the OS keychain */
 .notice.warn { box-shadow: inset 3px 0 0 var(--st-review-fg); background: var(--surface); border: 1px solid var(--border); }
+/* the end of *Get project groups* (#449): done, stopped or with problems */
+.get-result h3 { margin: 2px 0 6px; font-size: 15px; }
+.get-result ul { margin: 0; padding-left: 20px; }
+.notice.ok .get-result-mark { color: var(--st-ok-fg); }
+.notice.warn .get-result-mark { color: var(--st-review-fg); }
+.notice.error .get-result-mark { color: var(--st-danger-fg); }
+.get-problems { margin: 0; padding-left: 20px; max-height: 12rem; overflow: auto; }
 
 /* 3D viewer */
 .viewer-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 16px; }

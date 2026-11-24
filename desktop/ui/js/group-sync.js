@@ -4,6 +4,7 @@
 
 import { api, call, dialog, enc, errorText, field, h, state, toast } from "./core.js";
 import { label } from "/static/shared/js/format.js";
+import { groupsGetResult } from "./get-rules.js";
 import { freshProjects } from "./shell.js";
 
 // ------------------------------------------- whole project groups locally
@@ -71,8 +72,8 @@ export function openGetProjectsDialog(opts) {
   ]);
   var bar = h("progress.hidden", { max: "1", value: "0" });
   var report = h("p.small", { role: "status" });
-  var stop = false, running = false;
-  dialog("Get project groups", h("div.stack", null, [
+  var stop = false, running = false, finished = false;
+  var content = h("div.stack", null, [
     h("p", { text: "Copies the files of every item of the chosen project groups into your working folder – one folder per group with the folder structure of the files: " +
       state.session.workspace_dir + "/<group>/<folder>/<file>. Unchanged files are skipped, files you changed locally are kept, " +
       "two items with the same folder and file name are reported (never overwritten). Files you have not checked out are read-only." }),
@@ -80,14 +81,18 @@ export function openGetProjectsDialog(opts) {
       : h("p.empty", { text: "There are no project groups yet." }),
     field("Revision", rule),
     bar, report
-  ]), [
+  ]);
+  dialog("Get project groups", content, [
     { label: "Close", onClick: function (d) { stop = true; if (running) call("workspace_cancel").catch(function () {}); d.close(); } },
     {
       label: "Get files", primary: true, submit: true, onClick: function (d) {
         if (running) return;
+        // the result is shown: Enter closes the dialog
+        if (finished) { d.close(); return; }
         var codes = boxes.filter(function (b) { return b.input.checked; }).map(function (b) { return b.code; });
         if (!codes.length) { d.fail("Choose at least one project group."); return; }
         running = true; stop = false;
+        busy(d, true);
         var done = { items: 0, files: 0, kept: 0, skipped: 0, clashes: 0, errors: [] };
         report.textContent = "Listing the items …";
         Promise.all(codes.map(function (code) {
@@ -111,18 +116,55 @@ export function openGetProjectsDialog(opts) {
             });
           }, Promise.resolve());
         }).then(function () {
-          running = false;
+          running = false; finished = true;
           // only a complete copy: no problems, no clashes, the latest revision of every item
           if (!stop && !done.errors.length && rule.value === "latest") rememberGotGroups(codes);
-          var text = (stop ? "Stopped. " : "Done. ") + done.items + " items, " + done.files + " files copied" +
-            (done.kept ? ", " + done.kept + " locally modified files kept" : "") +
-            (done.skipped ? ", " + done.skipped + " items without a released revision skipped" : "") +
-            (done.clashes ? ", " + done.clashes + " name clashes (nothing overwritten)" : "") +
-            (done.errors.length ? ", " + done.errors.length + " problems: " + done.errors.slice(0, 5).join("; ") : "") + ".";
-          report.textContent = text;
-          toast(text, done.errors.length ? "error" : null);
-        }, function (err) { running = false; d.fail(err); });
+          var result = groupsGetResult(done, stop, codes);
+          showResult(d, content, result);
+          // the toast stays for whoever closed the dialog meanwhile
+          toast(result.title, result.outcome === "done" ? null : "error");
+        }, function (err) { running = false; busy(d, false); d.fail(err); });
       }
     }
   ], { wide: true });
+}
+
+/** The dialog's buttons: [Close, Get files]. */
+function buttons(d) { return d.form.querySelectorAll(".dialog-actions button"); }
+
+/** While the files are copied, *Get files* waits and *Close* stops. */
+function busy(d, on) {
+  var b = buttons(d);
+  b[0].textContent = on ? "Stop" : "Close";
+  b[1].disabled = on;
+  b[1].textContent = on ? "Getting files…" : "Get files";
+}
+
+/**
+ * The end of the Get as its own step of the dialog (#449): a heading that
+ * says whether it is done, the counts, every problem, and *Open working
+ * folder* / *Close* in place of *Get files* – a plain status line under the
+ * progress bar was easy to miss.
+ */
+function showResult(d, content, r) {
+  var ok = r.outcome === "done";
+  content.replaceChildren(
+    h("div.notice." + (ok ? "ok" : r.outcome === "stopped" ? "warn" : "error") + ".get-result", { role: "status" }, [
+      h("h3", null, [h("span.get-result-mark", { "aria-hidden": "true", text: ok ? "✓ " : "! " }), r.title]),
+      h("ul.small", null, r.lines.map(function (l) { return h("li", { text: l }); }))
+    ]),
+    r.problems.length ? h("div.stack", null, [
+      h("p.small", { text: r.problems.length === 1 ? "1 problem:" : r.problems.length + " problems:" }),
+      h("ul.small.get-problems", null, r.problems.map(function (p) { return h("li.mono", { text: p }); }))
+    ]) : null,
+    r.outcome === "stopped" ? h("p.small.muted", { text: "Get the groups again to copy the rest – files already copied are skipped." }) : null
+  );
+  var b = buttons(d);
+  var openFolder = h("button", { type: "button", on: { click: function () {
+    call("workspace_open", { project: null, item: null, code: null, file: null }).catch(function (e) { toast(errorText(e), "error"); });
+  } } }, "Open working folder");
+  b[1].replaceWith(openFolder);
+  b[0].textContent = "Close";
+  b[0].classList.add("primary");
+  b[0].focus();
 }
