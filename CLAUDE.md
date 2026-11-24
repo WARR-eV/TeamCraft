@@ -217,7 +217,8 @@ deploy/            production Docker install: docker-compose.yml (teamcraft + po
                    (self-test in every `changes` job) – a test that reads a new file outside its area adds it there
 desktop/           TeamCraft Desktop (Tauri 2, own Cargo project – never part of the server build); UI in desktop/ui/js
                    (plain ES modules, no build step): graph.js = the *Graph* tab (navigable BOM/reference graph, SVG +
-                   HTML card layer, checked by scripts/desktop-graph-check.mjs), files-view.js = Home *Files* view,
+                   HTML card layer, checked by scripts/desktop-graph-check.mjs; graph-rules.js = which neighbours it draws,
+                   scripts/desktop-graph-rules.test.mjs), files-view.js = Home *Files* view,
                    list-thumbs.js = row pictures of Home and the search (lazy, IntersectionObserver, #420),
                    crash.js = crash reports; desktop/src/workspace.rs + layout.rs = working folder, park, local changes;
                    new-files.js + desktop/src/newfiles.rs = new items from local files, worklist *New on this computer* (#359);

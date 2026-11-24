@@ -114,6 +114,10 @@ jobs:
       # may still be applied, which tabs load again (#451)
       - name: Test the lock refresh rules
         run: node scripts/desktop-lock-rules.test.mjs
+      # the neighbours of the Graph sub-tab – the assemblies whose BOM uses
+      # the item included (#518) – and its notes (#519)
+      - name: Test the Graph rules
+        run: node scripts/desktop-graph-rules.test.mjs
       # whether a Get left the working folder complete enough to open the
       # main CAD file (Check out and open after Cancel, #348)
       - name: Test the Get rules

@@ -156,6 +156,17 @@ see the notices in the README.
 - Web: the standalone assistant page (`/assistant`) no longer marks
   *Dashboard* as the current section, and the current entry of the main nav
   and the Admin menu carries `aria-current="page"` for screen readers (#522).
+- Desktop: the *Graph* tab draws the assemblies whose BOM uses the item
+  above it (the where-used parents that *At a glance* counts); before, only
+  items that reference it were drawn, so a part's graph showed the part
+  alone (#518).
+- Desktop: the note of a graph with nothing around the item (and the one
+  about neighbours shown without preview) sits above the canvas instead of
+  at its bottom edge, which was out of view on smaller windows (#519).
+- `scripts/screenshots.sh`: the demo agent quotes the change order and the
+  change request the run created – `DEMO_ECO`/`DEMO_ECR` are exported
+  before the desktop app starts, which hands them to the agent (#528).
+
 - Desktop: a check-out or check-in from Home marks the row (lock colour and
   icon) at once instead of after leaving Home and coming back; the
   *Check-outs* tab of a group is loaded again each time it comes to the

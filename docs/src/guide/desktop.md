@@ -105,7 +105,8 @@ check-outs and reviews, and a **local working folder**:
   the suggest route is searched through `GET /items?q=`;
 * the *Graph* tab draws a navigable reference and BOM graph around the
   revision: the focused item in the middle, its BOM children and references
-  below (*ref*), the assemblies that use it above (*uses*). Every node is a
+  below (*ref*), the assemblies whose BOM uses it and the items that reference
+  it above (*uses*). Every node is a
   card with the item's preview image, file name and number. Node colour is
   the lifecycle state (the legend names them),
   node size (and the ⚙ badge) the item's own BOM complexity; the small ×n in
@@ -124,7 +125,8 @@ check-outs and reviews, and a **local working folder**:
   only the first 48 neighbours get a preview and their complexity (one
   request each), the rest keep a basic card. The graph is drawn by the app
   itself (SVG with an HTML layer for the cards, no external engine), in the
-  colours of the chosen skin;
+  colours of the chosen skin. When nothing is around the item, a note above
+  the graph says so;
 * the *Workspace* tab shows per file where it is, whether it is up to date,
   modified, outdated, in conflict, new, missing or a name clash, whether it
   is read-only, and who holds the lock for how long; opening an outdated
