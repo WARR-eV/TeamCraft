@@ -125,8 +125,9 @@ check-outs and reviews, and a **local working folder**:
   only the first 48 neighbours get a preview and their complexity (one
   request each), the rest keep a basic card. The graph is drawn by the app
   itself (SVG with an HTML layer for the cards, no external engine), in the
-  colours of the chosen skin. When nothing is around the item, a note above
-  the graph says so;
+  colours of the chosen skin. While the assemblies that use the item are
+  still loading, a line above the graph says so; when nothing is around the
+  item, a note in the same place says that;
 * the *Workspace* tab shows per file where it is, whether it is up to date,
   modified, outdated, in conflict, new, missing or a name clash, whether it
   is read-only, and who holds the lock for how long; opening an outdated

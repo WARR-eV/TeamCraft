@@ -980,6 +980,11 @@ desktop_graph() {
     desktop_click 898 543 # the card above the bracket: the sensor mast assembly
     settle 4 "the graph of the sensor mast assembly"
     desktop_snap "desktop-graph$suffix"
+    # a missed click leaves the bracket's graph: the two images are the same
+    # (#528) – stop instead of publishing the bracket as the mast's graph
+    if cmp -s "$OUT_DIR/desktop-graph-nav$suffix.png" "$OUT_DIR/desktop-graph$suffix.png"; then
+        die "desktop-graph$suffix: the click at 898,543 missed the card above the bracket (same image as desktop-graph-nav$suffix)"
+    fi
     desktop_key ctrl+Page_Down
     settle 2 "the change order tab"
 }

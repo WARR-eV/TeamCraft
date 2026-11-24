@@ -165,6 +165,28 @@ jobs:
       - name: Test the translated UI catalogs
         run: node scripts/shared-i18n.test.mjs
 
+  # The Graph sub-tab in real browser engines (scripts/desktop-graph-check.mjs):
+  # WebKit (the engine of WKWebView/WebKitGTK) and Chromium (WebView2). Card
+  # positions, zoom and pan, navigation, the BOM parents of a part (#518),
+  # the notes above the canvas (#519), and a load of the whole desktop module
+  # graph. Playwright is installed here only, pinned; Node.js only checks, it
+  # never ships (ADR 0004).
+  graph:
+    name: desktop UI (Graph tab in WebKit and Chromium)
+    needs: changes
+    if: needs.changes.outputs.ui == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Playwright with WebKit and Chromium
+        run: |
+          set -e
+          npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.49.1
+          npx playwright install --with-deps webkit chromium
+      - name: Check the Graph tab
+        run: node scripts/desktop-graph-check.mjs "$RUNNER_TEMP/graph-webkit.png"
+
   test:
     name: desktop (${{ matrix.os }})
     needs: changes

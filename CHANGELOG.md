@@ -159,7 +159,15 @@ see the notices in the README.
 - Desktop: the *Graph* tab draws the assemblies whose BOM uses the item
   above it (the where-used parents that *At a glance* counts); before, only
   items that reference it were drawn, so a part's graph showed the part
-  alone (#518).
+  alone (#518). While that list loads, a loading line stands above the
+  canvas instead of an empty pane.
+- `scripts/desktop-graph-check.mjs` serves every module `graph.js` imports
+  (it served a fixed list, so `graph-rules.js` and
+  `/static/shared/js/format.js` were missing and the check failed at its
+  first wait), and a new CI job `graph` in `.github/workflows/desktop.yml`
+  runs it in WebKit and Chromium with a pinned Playwright.
+- `scripts/screenshots.sh` stops when the click into the mast's graph
+  missed (`desktop-graph` the same image as `desktop-graph-nav`, #528).
 - Desktop: the note of a graph with nothing around the item (and the one
   about neighbours shown without preview) sits above the canvas instead of
   at its bottom edge, which was out of view on smaller windows (#519).

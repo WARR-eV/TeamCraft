@@ -24,7 +24,8 @@
 //     the assembly one came from is the same step back; the clicked card
 //     shows that it is loading, the latest click wins, a failed load leaves
 //     the tab alone; Ctrl+click opens a tab of its own;
-//   * a part's graph draws the assembly whose BOM uses it (where-used, #518);
+//   * a part's graph draws the assembly whose BOM uses it (where-used, #518),
+//     with a loading line above the canvas until that list answers;
 //     a graph with only the centre shows its note above the canvas (#519);
 //   * no page errors.
 // Then desktop/ui/index.html is loaded with a stubbed window.__TAURI__ and
@@ -125,9 +126,16 @@ export function whereUsedOf(number) {
              find_number: 10, quantity: 1 };
   });
 }
+// __holdWhereUsed() keeps where-used answers waiting until __releaseWhereUsed()
+var wuGate = null;
+window.__holdWhereUsed = function () { wuGate = {}; wuGate.done = new Promise(function (r) { wuGate.release = r; }); };
+window.__releaseWhereUsed = function () { if (wuGate) { wuGate.release(); wuGate = null; } };
 export function api(method, p) {
   var w = p.match(/^\\/items\\/([^/]+)\\/where-used$/);
-  if (w) return Promise.resolve(whereUsedOf(decodeURIComponent(w[1])));
+  if (w) {
+    var list = whereUsedOf(decodeURIComponent(w[1]));
+    return wuGate ? wuGate.done.then(function () { return list; }) : Promise.resolve(list);
+  }
   var m = p.match(/^\\/items\\/([^/]+)(?:\\/revisions\\/([^/]+))?(\\/references)?$/);
   if (!m) return Promise.reject(new Error("unexpected " + p));
   var number = decodeURIComponent(m[1]);
@@ -240,7 +248,9 @@ function graphRoutes(url) {
     case "/js/navigator.js": return [JS, NAVIGATOR];
     case "/js/tabs.js": return [JS, TABS];
     case "/js/revision.js": return [JS, REVISION];
-    default: return null;
+    // every other module graph.js imports (graph-rules.js, /static/shared/…)
+    // is the real file, served like the whole desktop UI below
+    default: return desktopRoutes(url);
   }
 }
 
@@ -477,8 +487,13 @@ async function checkGraph(browserType, name) {
   // a part's graph draws the assembly whose BOM uses it (where-used, #518)
   await node("PRT-1-01").click();
   await arrived("PRT-1-01", "overview");
-  await page.evaluate(() => window.__show("graph"));
+  // while the where-used list loads, a loading line stands above the canvas
+  await page.evaluate(() => { window.__holdWhereUsed(); window.__show("graph"); });
+  await page.waitForSelector(".graph-loading", { timeout: 2000 })
+    .catch(() => fail("no loading line while the where-used list loads"));
+  await page.evaluate(() => window.__releaseWhereUsed());
   await arrived("PRT-1-01", "graph");
+  if (await page.locator(".graph-loading").count()) fail("the loading line stays after the graph is drawn");
   await page.waitForFunction(() => document.querySelectorAll(".g-card").length === 2, null, { timeout: 5000 })
     .catch(() => fail("the part's graph does not draw the assembly that uses it"));
   if (!(await node("ASM-000004").count())) fail("the BOM parent ASM-000004 is not on the part's graph");

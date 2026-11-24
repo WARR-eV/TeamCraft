@@ -24,7 +24,10 @@ app. Both have user interfaces in HTML, CSS and JavaScript, and both need a
 * **3D conversion stays in Rust** (`src/mesh.rs`); no downloaded engines.
 * **Node.js only checks, never ships.** The CI job `ui` in
   `.github/workflows/desktop.yml` runs `node --check` over the scripts (syntax
-  only); the product has no Node.js dependency.
+  only); the product has no Node.js dependency. The CI job `graph` in the
+  same workflow installs a pinned Playwright on the runner only, to drive
+  WebKit and Chromium through `scripts/desktop-graph-check.mjs`; nothing of
+  it reaches the repository or a release.
 
 ## Consequences
 
