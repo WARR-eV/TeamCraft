@@ -733,9 +733,8 @@ try {
     # without a project file in the working folder there is nothing to compare:
     # a new instance would start with the same (last active) project
     if ($Project) {
-        $active = ''
-        $current = Ask { $app.DesignProjectManager.ActiveDesignProject } $deadline
-        if ($null -ne $current) { $active = [string]$current.FullFileName }
+        # one question: no project gives $null, [string] makes it ''
+        $active = [string](Ask { $app.DesignProjectManager.ActiveDesignProject.FullFileName } $deadline)
         if (-not (Same $active $Project)) { Say "project $active"; exit 0 }
     }
 } catch { Say 'unreachable'; exit 0 }
@@ -749,8 +748,8 @@ try {
 # the app no longer waits: a failure is one more line. A document loaded only
 # as a reference of an open assembly has no window – Open shows it.
 try {
-    $doc = $null
-    foreach ($d in (Ask { $app.Documents.VisibleDocuments })) { if (Same $d.FullFileName $Path) { $doc = $d } }
+    # the whole lookup is one question: Inventor may reject any of its calls
+    $doc = Ask { $found = $null; foreach ($d in $app.Documents.VisibleDocuments) { if (Same $d.FullFileName $Path) { $found = $d } }; $found }
     if ($null -eq $doc) { [void](Ask { $app.Documents.Open($Path, $true) }) } else { [void](Ask { $doc.Activate() }) }
 } catch {
     $e = $_.Exception; while ($e.InnerException) { $e = $e.InnerException }
@@ -1335,17 +1334,34 @@ mod tests {
 
     /// Every question to Inventor goes through `Ask` (asked again while
     /// busy), and every one before the answer is inside the `try` that
-    /// answers `unreachable` and stops at the deadline.
+    /// answers `unreachable` and stops at the deadline. Inventor's objects
+    /// are held only in `$app`, `$d` and `$doc`: every member access on them
+    /// is inside an `Ask { … }` on its line.
     #[test]
     fn every_question_to_inventor_is_asked_again_and_answered() {
         let script = INVENTOR_OPEN_SCRIPT;
         let rot = script.find("GetActiveObject").unwrap();
         for line in script[rot..].lines() {
-            assert_eq!(
-                line.matches("$app.").count(),
-                line.matches("Ask { $app.").count(),
-                "a question outside Ask: {line}"
-            );
+            for object in ["$app.", "$d.", "$doc."] {
+                for (at, _) in line.match_indices(object) {
+                    let asked = line[..at].rfind("Ask {").is_some_and(|ask| {
+                        // the Ask's block is still open at the access
+                        let inside = &line[ask..at];
+                        inside.matches('{').count() > inside.matches('}').count()
+                    });
+                    assert!(asked, "a question outside Ask: {line}");
+                }
+            }
+        }
+        // no other variable keeps one of Inventor's objects
+        for line in script[rot..].lines() {
+            let held = line.trim_start().split_once(" = ").map(|(v, _)| v);
+            if let Some(var) = held.filter(|_| line.contains("Ask {")) {
+                assert!(
+                    ["$dir", "$active", "$doc"].contains(&var),
+                    "an object of Inventor kept in {var}: {line}"
+                );
+            }
         }
         let opening = script.find("Say 'opening'").unwrap();
         let guarded = script.find("$deadline =").unwrap();
