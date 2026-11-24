@@ -28,6 +28,11 @@ see the notices in the README.
   front and, while in front, every 30 seconds and when the window gets the
   focus back, so it shows the current state and other people's check-outs
   without *Refresh* (#451).
+- Desktop: *Get project groups* ends with a clear result instead of a status
+  line under the progress bar – *Done* with a tick and the counts, or
+  *Finished with problems* / *Stopped* with every problem listed, *Open
+  working folder* and *Close*; while it copies, *Get files* is disabled and
+  *Close* reads *Stop* (#449).
 - CI: the comment of the shared component picker named its issue as
   "#419", which the no-literal-colours guard of `shared/css/` reads as a
   hex colour; it says "issue 419" now.

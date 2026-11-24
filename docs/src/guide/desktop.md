@@ -470,8 +470,12 @@ window gets the focus back, so a check-out by someone else shows up without
 *Refresh*.
 CAD editors create a new group there (*New* – you become its manager; tick *Restricted* to keep it to its members), and
 the page offers *Get…* (copy
-groups into your workspace) and *Import CAD folder…*. The choice is kept on
-this computer.
+groups into your workspace) and *Import CAD folder…*. While *Get…* copies,
+its dialog shows the progress and *Close* stops it; at the end the dialog
+turns into a result: **Done** with a tick and the counts (items, files copied,
+local changes kept, items skipped), or *Finished with problems* / *Stopped*
+with every problem listed, and *Open working folder* next to *Close*. The
+choice of the group is kept on this computer.
 
 **Home** is a file browser of the active group, in three views:
 
