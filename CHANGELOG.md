@@ -126,6 +126,20 @@ see the notices in the README.
   revision and a cancelled check-out do not count. The rule is a pure module
   (`desktop/ui/js/next-step.js`) tested by `scripts/desktop-next-step.test.mjs`
   in the CI job `ui` (#536, UI review #513 T2).
+- Desktop: a disabled primary button (e.g. *Start* in the Agent navigator
+  while it starts) looked enabled – `button.primary` came after
+  `button:disabled`. Disabled primary and danger buttons, and primary ones
+  with `aria-disabled="true"`, are now greyed out in every skin (#516).
+- Desktop change tab: an administrator who is a reviewer but not the creator
+  saw *Withdraw* enabled next to *Approve change*. *Withdraw* is the
+  creator's action in the toolbar; the administrator's override is
+  *Withdraw (administrator)* in *More ▾* and asks for a confirmation first
+  (`withdrawAction` in `release-rules.js`, tested) (#517).
+- Desktop: the two *Check in all* buttons (Worklist navigator, Home card
+  *Checked out by me*) had contradicting tooltips; both now use one text
+  that says what the button does: check-outs without local changes are
+  checked in, the ones with modified or new files are listed first to check
+  them in with their files, conflicts stay checked out (#520).
 - Desktop: a check-out or check-in from Home marks the row (lock colour and
   icon) at once instead of after leaving Home and coming back; the
   *Check-outs* tab of a group is loaded again each time it comes to the

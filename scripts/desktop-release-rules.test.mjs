@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 // Unit tests of desktop/ui/js/release-rules.js (the reviewers of the release
-// dialog, and why a draft change cannot be submitted yet – #291).
+// dialog, why a draft change cannot be submitted yet – #291, and where
+// Withdraw goes – #517).
 // Plain Node.js, no packages; run by the CI job `ui`:
 //
 //   node scripts/desktop-release-rules.test.mjs
@@ -14,7 +15,7 @@ import { fileURLToPath } from "node:url";
 
 const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../desktop/ui/js/release-rules.js");
 const src = fs.readFileSync(file, "utf8");
-const { reviewerProblem, draftBlocker } = await import(
+const { reviewerProblem, draftBlocker, withdrawAction } = await import(
   "data:text/javascript;base64," + Buffer.from(src).toString("base64"));
 
 let n = 0;
@@ -50,6 +51,41 @@ test("a draft is submitted with a revision and a reviewer", () => {
   assert.match(draftBlocker(2, 0), /reviewer/);
   assert.match(draftBlocker(0, 0), /revisions/, "the revisions come first");
   assert.equal(draftBlocker(1, 1), null);
+});
+
+const inReview = { status: "in_review", created_by: 7, created_by_name: "Mia Chen" };
+
+test("the creator withdraws from the toolbar, at once, while in review (#517)", () => {
+  const w = withdrawAction(inReview, { id: 7, role: "editor" }, true, "In Review");
+  assert.deepEqual([w.place, w.enabled, w.label, w.confirm], ["toolbar", true, "Withdraw", false]);
+  const draft = withdrawAction({ ...inReview, status: "draft" }, { id: 7, role: "editor" }, true, "Draft");
+  assert.equal(draft.enabled, false);
+  assert.match(draft.title, /only a change in review/i);
+  assert.match(draft.title, /Draft$/);
+});
+
+test("an administrator who is the creator is the creator", () => {
+  const w = withdrawAction(inReview, { id: 7, role: "admin" }, true);
+  assert.deepEqual([w.place, w.confirm, w.label], ["toolbar", false, "Withdraw"]);
+});
+
+test("an administrator's override is in More, labelled and confirmed – never next to Approve (#517)", () => {
+  const w = withdrawAction(inReview, { id: 1, role: "admin" }, true, "In Review");
+  assert.deepEqual([w.place, w.enabled, w.confirm], ["more", true, true]);
+  assert.match(w.label, /\(administrator\)/);
+  assert.match(w.title, /Mia Chen/);
+  const closed = withdrawAction({ ...inReview, status: "released" }, { id: 1, role: "admin" }, true, "Released");
+  assert.deepEqual([closed.place, closed.enabled], ["more", false]);
+});
+
+test("everybody else sees it disabled with the reason", () => {
+  const reviewer = withdrawAction(inReview, { id: 3, role: "editor" }, true);
+  assert.deepEqual([reviewer.place, reviewer.enabled], ["toolbar", false]);
+  assert.match(reviewer.title, /Only Mia Chen \(who created it\) or an administrator/);
+  // without edit rights nobody withdraws
+  assert.equal(withdrawAction(inReview, { id: 7, role: "viewer" }, false).enabled, false);
+  assert.equal(withdrawAction(inReview, { id: 1, role: "admin" }, false).place, "toolbar");
+  assert.equal(withdrawAction(null, null, true).enabled, false);
 });
 
 console.log(n + " tests passed");

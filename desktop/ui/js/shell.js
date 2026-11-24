@@ -722,6 +722,11 @@ function problems(list) {
   return box;
 }
 
+/** The tooltip of every *Check in all* button (Worklist navigator head, Home
+ * card *Checked out by me*) – one text that says what checkInAll() does (#520). */
+export const CHECK_IN_ALL_TITLE = "Check in all your check-outs: the ones without local changes are checked in (their locks released); " +
+  "the ones with modified or new files are listed first, to check them in with their files. Check-outs with a conflict stay checked out.";
+
 /** "Check in all my check-outs": every revision without local changes in
  * the workspace is checked in on the server (lock released, one by one).
  * Revisions with modified or new files are listed first, with the offer to

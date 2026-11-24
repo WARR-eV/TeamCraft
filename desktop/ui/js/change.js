@@ -2,14 +2,14 @@
 // TeamCraft Desktop – Change tab.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { api, append, badge, call, clear, enc, errorNotice, errorText, h, lockBadge, moreMenu, priorityBadge, run, state, toast, tool, toolGroup } from "./core.js";
+import { api, append, badge, call, clear, confirmDialog, enc, errorNotice, errorText, h, lockBadge, moreMenu, priorityBadge, run, state, toast, tool, toolGroup } from "./core.js";
 import { fmtDate, label } from "/static/shared/js/format.js";
 import { canEdit, refreshWorklistCount, watchTool } from "./shell.js";
 import { openTab, recordLink, reloadActive, renderTabs, table } from "./tabs.js";
 import { agentButton } from "./agent.js";
 import { dd, dt, openRevision } from "./revision.js";
 import { relationText } from "./references.js";
-import { draftBlocker, reviewerProblem } from "./release-rules.js";
+import { draftBlocker, reviewerProblem, withdrawAction } from "./release-rules.js";
 import { changeInputs } from "./report-inputs.js";
 
 // ======================================================================
@@ -111,7 +111,17 @@ export function renderChange(tab, body, toolbar) {
   // a draft without revision or reviewer cannot be submitted: say why instead
   // of letting every click fail on the server (#291)
   var blocker = isDraft ? draftBlocker(tab.data.items.length, tab.data.reviews.length) : null;
-  var canSubmit = owner && isDraft && !blocker, canWithdraw = owner && c.status === "in_review";
+  var canSubmit = owner && isDraft && !blocker;
+  // Withdraw is the creator's action; an administrator's override sits in
+  // More ▾ with a confirmation, never next to Approve change (#517)
+  var withdraw = withdrawAction(c, me, canEdit(), label(c.status));
+  function doWithdraw() {
+    if (!withdraw.confirm) { action("withdraw", "Withdrawing " + c.number); return; }
+    confirmDialog("Withdraw " + c.number, "Withdraw " + c.number + " from review as an administrator? " + c.created_by_name +
+      " created it; the review ends and its revisions return to WIP.", "Withdraw", true).then(function (ok) {
+      if (ok) action("withdraw", "Withdrawing " + c.number);
+    });
+  }
   var canCancel = owner && (isDraft || c.status === "rejected");
   // The review decision lives in the toolbar – the comment field below goes with it.
   // A visible label and hint as in the web review form (a placeholder would vanish once you type).
@@ -139,10 +149,7 @@ export function renderChange(tab, body, toolbar) {
         primary: canSubmit, disabled: !canSubmit,
         title: canSubmit ? "Send it to the reviewers" : notOwner || blocker || "Only a draft is submitted – this one is " + label(c.status)
       }),
-      tool("Withdraw", "cancel", function () { action("withdraw", "Withdrawing " + c.number); }, {
-        disabled: !canWithdraw,
-        title: canWithdraw ? "Take it back from review – the revisions return to WIP" : notOwner || "Only a change in review can be withdrawn – this one is " + label(c.status)
-      }),
+      withdraw.place === "toolbar" ? tool(withdraw.label, "cancel", doWithdraw, { disabled: !withdraw.enabled, title: withdraw.title }) : null,
       // acts at once, like the web UI: cancelling one's own change needs no confirmation
       tool("Cancel change", "obsolete", function () { action("cancel", "Cancelling " + c.number); }, {
         danger: true, disabled: !canCancel,
@@ -155,7 +162,8 @@ export function renderChange(tab, body, toolbar) {
       agentButton(tab)
     ]),
     moreMenu([
-      { label: "Open in browser", icon: "web", run: function () { call("open_web", { path: "/changes/" + c.id }).catch(function (e) { toast(errorText(e), "error"); }); }, title: "Open this change in the web UI (items, reopen …)" },
+      withdraw.place === "more" ? { label: withdraw.label, icon: "cancel", danger: true, disabled: !withdraw.enabled, run: doWithdraw, title: withdraw.title } : null,
+      { label: "Open in browser", separated: withdraw.place === "more", icon: "web", run: function () { call("open_web", { path: "/changes/" + c.id }).catch(function (e) { toast(errorText(e), "error"); }); }, title: "Open this change in the web UI (items, reopen …)" },
       { label: "Refresh", icon: "refresh", run: reloadActive, shortcut: "F5", title: "Load this change again" }
     ])
   ]);

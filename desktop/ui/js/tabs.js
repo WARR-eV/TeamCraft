@@ -6,7 +6,7 @@ import { $, ICONS, append, clear, errorNotice, errorText, h, state, svgIcon, too
 import { tabInputs } from "./report-inputs.js";
 import { loadLocks, renderLocks } from "./lock-overview.js";
 import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
-import { canEdit, checkInAll, refreshWorklistCount } from "./shell.js";
+import { CHECK_IN_ALL_TITLE, canEdit, checkInAll, refreshWorklistCount } from "./shell.js";
 import { emptyHint, selectView } from "./navigator.js";
 import { worklistHint } from "./empty-rules.js";
 import { t } from "/static/shared/js/i18n.js";
@@ -447,7 +447,7 @@ export function renderWelcome(body, toolbar) {
       ].concat(groups.map(function (g) { return impactGroup(g, false); }))));
     }
     append(welcome, h("section.panel", null, [h("div.panel-head", null, [panelTitle("Checked out by me", wl.checkouts.length),
-      wl.checkouts.length ? h("button.small", { type: "button", title: "Check in every check-out without local changes (releases the locks)",
+      wl.checkouts.length ? h("button.small", { type: "button", title: CHECK_IN_ALL_TITLE,
         on: { click: function () { checkInAll(); } } }, [svgIcon(ICONS.checkin), " Check in all"]) : null]),
       wl.checkouts.length ? table(["Revision", "Name", "Since"], wl.checkouts.map(function (r) {
         var open = function () { openRevision(r.item_number, r.code); };
