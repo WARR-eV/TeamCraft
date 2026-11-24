@@ -682,16 +682,18 @@ function Same([string]$A, [string]$B) {
     if (-not $A -or -not $B) { return $false }
     return [IO.Path]::GetFullPath($A).TrimEnd('\') -ieq [IO.Path]::GetFullPath($B).TrimEnd('\')
 }
-# Inventor rejects calls while it is busy (RPC_E_CALL_REJECTED, 0x80010001): ask again for up to 10 s
+# Inventor rejects calls while it is busy (RPC_E_CALL_REJECTED 0x80010001,
+# RPC_E_SERVERCALL_RETRYLATER 0x8001010A): ask again for up to 10 s. PowerShell
+# wraps the COM error (MethodInvocationException …): the innermost one counts.
 function Ask([scriptblock]$Do) {
-    for ($i = 0; $i -lt 20; $i++) {
+    for ($i = 0; ; $i++) {
         try { return (& $Do) }
-        catch [Runtime.InteropServices.COMException] {
-            if ($_.Exception.ErrorCode -ne -2147418111) { throw }
+        catch {
+            $e = $_.Exception; while ($e.InnerException) { $e = $e.InnerException }
+            if ($i -ge 20 -or ($e.HResult -ne -2147418111 -and $e.HResult -ne -2147417846)) { throw }
             Start-Sleep -Milliseconds 500
         }
     }
-    return (& $Do)
 }
 try { $app = [Runtime.InteropServices.Marshal]::GetActiveObject('Inventor.Application') }
 catch { Say 'unreachable'; exit 0 }
