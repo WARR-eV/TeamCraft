@@ -103,3 +103,11 @@
 .lock-legend .lg-week::before { border-top-color: var(--warn); }
 .lock-legend .lg-old::before { border-top-color: var(--danger); }
 .lock-legend .lg-inactive::before { border-top: 2px dashed var(--danger); }
+
+/* The 3D viewer's up-axis toggle (issue 526): its state as a background, the
+   text stays the same weight so the buttons next to it do not move; a real
+   outline in forced colours, where backgrounds are dropped. */
+.viewer-up[aria-pressed="true"] { color: var(--text); background: var(--selected); }
+@media (forced-colors: active) {
+  .viewer-up[aria-pressed="true"] { outline: 2px solid Highlight; }
+}
