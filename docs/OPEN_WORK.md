@@ -723,9 +723,10 @@ real files and belong to section 3 once such files are at hand.
   2021 files. Inventor 2027 is registered for COM in the Windows 11 ARM64 test VM (`Inventor.Application`,
   `Inventor.exe /Automation`, found by the app's registry check); the export itself was not tried there yet
 - [x] Desktop: a slow or failed STEP export never costs the check-in (#342): files uploaded first, exports skippable
-  (the started Inventor is ended), busy COM calls retried, the whole error output in `export-logs/`. Left: STEP
-  export of large assemblies in the background after the check-in (a new version of the STEP later), parts-only
-  or size limits, `TranslatorAddIn.SaveCopyAs` with translator options; a manual test on Windows
+  (the started Inventor is ended), busy COM calls retried, the whole error output in `export-logs/`; at check-in
+  parts and small assemblies only, assemblies over 5 MB skipped with a note (`ui/js/export-rules.js`). Left
+  (enhancements): STEP of large assemblies in the background after the check-in, `TranslatorAddIn.SaveCopyAs`
+  with translator options; a manual test on Windows
 - [ ] Test the BOM import with real exports of the BOM editor (structured and parts only); *Phantom* components are
   imported as normal sub-assemblies today (*Reference* components are skipped)
 - [ ] Extend the Inventor part of the tutorial: Pack and Go, `.ipj`, Design Assistant for broken references

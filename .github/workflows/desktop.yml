@@ -122,6 +122,10 @@ jobs:
       # main CAD file (Check out and open after Cancel, #348)
       - name: Test the Get rules
         run: node scripts/desktop-get-rules.test.mjs
+      # which files the check-in exports to STEP: parts and small assemblies
+      # only, a large assembly is skipped with the reason (#342)
+      - name: Test the STEP export rules
+        run: node scripts/desktop-export-rules.test.mjs
       # the steps of the first-start wizard *Getting started* (#422): which
       # are skipped, when it shows by itself, the texts
       - name: Test the first-start wizard rules

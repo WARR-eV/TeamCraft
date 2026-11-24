@@ -253,7 +253,11 @@ check-outs and reviews, and a **local working folder**:
   worklist lists the requests assigned to you and your open ones;
 * on Windows with Inventor or Solid Edge installed, *STEP* (workspace) and
   the check-in option (off by default) create STEP exports for the 3D preview with that
-  program; the Files tab shows the preview image stored in native files.
+  program; the Files tab shows the preview image stored in native files. At
+  check-in only parts and small assemblies are exported: an assembly file
+  (`.iam`, Solid Edge `.asm`) larger than 5 MB is skipped and named in the
+  dialog and the result – its 3D preview is composed from the parts (#342).
+  The *STEP* button of the Workspace tab still exports any file on request.
 * on every system with SolidCraft installed, the same *STEP* button and
   check-in option export SolidCraft designs (`.sc`) through SolidCraft's
   command-line tool `solidcraft-cli` (set `SOLIDCRAFT_CLI` to its path if it
