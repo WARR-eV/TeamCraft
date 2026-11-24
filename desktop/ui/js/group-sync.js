@@ -50,7 +50,14 @@ export function rememberGotGroups(list) {
  * `opts.project` (a group code) ticks only that group – the *Get…* of an
  * empty state starts with the active group (#423); without it, the groups
  * the user is a member of are ticked. */
-export function getProjectsDialog(opts) { freshProjects().then(function () { openGetProjectsDialog(opts); }); }
+export function getProjectsDialog(opts) {
+  if (getRunning) { toast("The last Get project groups is still stopping – try again when it has ended.", "error"); return; }
+  freshProjects().then(function () { openGetProjectsDialog(opts); });
+}
+
+/** A Get still runs – also after its dialog was closed while *Stopping…*:
+ *  a second Get would race the download that is still ending. */
+var getRunning = false;
 
 export function openGetProjectsDialog(opts) {
   var preselect = opts && opts.project;
@@ -86,14 +93,15 @@ export function openGetProjectsDialog(opts) {
   var dopts = { wide: true };
   dialog("Get project groups", content, [
     { label: "Close", onClick: function (d) {
-      if (running) {
+      if (running && !stop) {
         // *Stop*: the dialog stays open and shows the "Stopped" step once the
-        // download under way has ended
+        // download under way has ended (after the piece of the file being
+        // copied); meanwhile *Close* may hide it – the result comes as a toast
         stop = true;
         call("workspace_cancel").catch(function () {});
-        var s = buttons(d)[0];
-        s.disabled = true;
-        s.textContent = "Stopping…";
+        dopts.modal = false;
+        buttons(d)[0].textContent = "Close";
+        report.textContent = "Stopping after the file being copied … – Close hides this dialog, the result comes as a message.";
         return;
       }
       d.close();
@@ -107,7 +115,7 @@ export function openGetProjectsDialog(opts) {
         if (!codes.length) { d.fail("Choose at least one project group."); return; }
         // the rule of the whole run: changing the select meanwhile changes nothing
         var ruleValue = rule.value;
-        running = true; stop = false; dopts.modal = true;
+        running = true; getRunning = true; stop = false; dopts.modal = true;
         d.clear();
         busy(d, true);
         var done = { items: 0, files: 0, kept: 0, skipped: 0, clashes: 0, errors: [] };
@@ -130,13 +138,13 @@ export function openGetProjectsDialog(opts) {
             });
           }, Promise.resolve());
         }).then(function () {
-          running = false; finished = true; dopts.modal = false;
+          running = false; getRunning = false; finished = true; dopts.modal = false;
           // only a complete copy: no problems, no clashes, the latest revision of every item
           if (rememberGroups(done, stop, ruleValue)) rememberGotGroups(codes);
           var result = groupsGetResult(done, stop, codes);
           showResult(d, content, result);
           toast(result.title, result.outcome === "done" ? null : "error");
-        }, function (err) { running = false; dopts.modal = false; busy(d, false); d.fail(err); });
+        }, function (err) { running = false; getRunning = false; dopts.modal = false; busy(d, false); d.fail(err); });
       }
     }
   ], dopts);
@@ -180,7 +188,6 @@ function showResult(d, content, r) {
     call("workspace_open", { project: null, item: null, code: null, file: null }).catch(function (e) { toast(errorText(e), "error"); });
   } } }, "Open working folder");
   b[1].replaceWith(openFolder);
-  b[0].disabled = false; // it was "Stopping…" after a Stop
   b[0].textContent = "Close";
   b[0].classList.add("primary");
   b[0].focus();
