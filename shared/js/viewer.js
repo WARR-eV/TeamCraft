@@ -108,13 +108,15 @@
   }
 
   /**
-   * Text, accessible name and aria-pressed of the up-axis toggle (#526): the
-   * button shows the current axis; to a screen reader it is the toggle
-   * "Z up", pressed while the model is shown Z-up (the default) – a fixed
-   * name, so the state is not announced twice or contradictorily.
+   * Text and aria-pressed of the up-axis toggle (#526): a toggle button
+   * "Z up", pressed while the model is shown Z-up (the default) and not
+   * pressed while it is shown Y-up. The visible text is the accessible name
+   * and stays the same – the state is aria-pressed (and its style), never a
+   * changed label, so a voice-control user can always say "click Z up"
+   * (WCAG 2.5.3 Label in Name).
    */
   function upToggle(zUp) {
-    return { text: zUp ? "Z up" : "Y up", label: "Z up", pressed: zUp ? "true" : "false" };
+    return { text: "Z up", pressed: zUp ? "true" : "false" };
   }
 
   /**
@@ -980,7 +982,6 @@
     function showUp() {
       var t = upToggle(view.zUp);
       upBtn.textContent = t.text;
-      upBtn.setAttribute("aria-label", t.label);
       upBtn.setAttribute("aria-pressed", t.pressed);
     }
     if (upBtn) {

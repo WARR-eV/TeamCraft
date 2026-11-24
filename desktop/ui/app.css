@@ -906,6 +906,7 @@ table.grid td.actions button { height: var(--ctl-h-sm); padding: 0 8px; font-siz
 .viewer-section { margin: 8px 0 0; }
 .viewer-section input[type="range"] { width: min(14rem, 30vw); }
 .viewer-section label.check { white-space: nowrap; } /* "flip" stays next to its box (#526) */
+.viewer-up[aria-pressed="true"] { color: var(--text); font-weight: 600; background: var(--selected); } /* the state of the toggle, its text stays (#526) */
 canvas.viewer-measuring { cursor: crosshair; }
 .viewer-notes { flex-basis: 100%; margin: 0; padding-left: 20px; }
 .viewer-notes li { margin: 2px 0; }
@@ -1262,7 +1263,7 @@ ul.file-picks li .mono { overflow: hidden; text-overflow: ellipsis; white-space:
    are dropped, so selection gets a real border. */
 @media (forced-colors: active) {
   table.grid tbody tr.selected > td:first-child, .node.selected { border-left: 3px solid Highlight; }
-  .skin-card.selected { outline: 2px solid Highlight; }
+  .skin-card.selected, .viewer-up[aria-pressed="true"] { outline: 2px solid Highlight; }
   .notice { border-left: 3px solid CanvasText; }
   .home-root.on { border: 1px solid Highlight; border-left-width: 4px; }
 }

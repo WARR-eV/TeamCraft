@@ -1641,7 +1641,7 @@ mod tests {
                                                             "manager of ROVER"] },
                                   { "user_id": ME, "username": "erika", "display_name": "Erika", "role": "editor",
                                     "score": 5, "cannot_review": true, "reasons": ["edited PRT-000001 once in the last 90 days"] }],
-                    "impact": [{ "root_item_id": ME, "level": 1, "item_id": OTHER, "item_number": "ASM-000001",
+                    "impact": [{ "root_item_id": ME, "root_item_ids": [ME], "level": 1, "item_id": OTHER, "item_number": "ASM-000001",
                                  "item_name": "Stage", "revision_id": OTHER, "revision_code": "A",
                                  "revision_state": "released", "relation": "bom", "via_number": "PRT-000001",
                                  "paths": [{ "via_number": "PRT-000001", "relation": "bom" }] }],

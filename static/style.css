@@ -1052,6 +1052,7 @@ details.payload pre {
 .viewer-section { margin: var(--space-2) 0 0; }
 .viewer-section input[type="range"] { width: min(14rem, 40vw); }
 .viewer-section label.check { white-space: nowrap; } /* "flip" stays next to its box (#526) */
+.viewer-up[aria-pressed="true"] { color: var(--text); font-weight: 600; background: var(--selected); } /* the state of the toggle, its text stays (#526) */
 canvas.viewer-measuring { cursor: crosshair; }
 .viewer-notes { flex-basis: 100%; margin: 0; padding-left: 1.4rem; }
 .viewer-notes li { margin: 0.15rem 0; }
@@ -1389,7 +1390,7 @@ ul.notification-list li.unread::before { content: ""; position: absolute; left: 
    are dropped, so selection and message kinds get real borders. */
 @media (forced-colors: active) {
   tbody tr:is(.selected, .current) > td:first-child, .explorer-tree a.active { border-left: 3px solid Highlight; }
-  .skin-card.selected, .menu-scheme button[aria-pressed="true"] { outline: 2px solid Highlight; }
+  .skin-card.selected, .menu-scheme button[aria-pressed="true"], .viewer-up[aria-pressed="true"] { outline: 2px solid Highlight; }
   .flash, .notice, .readiness, .impact-group { border-left: 3px solid CanvasText; }
   .nav a.active { outline: 1px solid CanvasText; }
   /* the unread dot survives: a system colour, not a dropped background */

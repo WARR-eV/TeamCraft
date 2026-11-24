@@ -809,8 +809,11 @@ pub(crate) async fn on_obsolete(
 /// still goes on through them).
 #[derive(Clone, Debug, Serialize)]
 pub struct Dependent {
-    /// The item of the change it depends on.
+    /// The first of `root_item_ids` (kept for clients before #525).
     pub root_item_id: Uuid,
+    /// Every item of the change it is reached from on its level, sorted
+    /// (at least one): a row can merge the walks from several of them.
+    pub root_item_ids: Vec<Uuid>,
     pub level: i32,
     pub item_id: Uuid,
     pub item_number: String,
@@ -848,10 +851,11 @@ struct Found {
 }
 
 /// One row of the impact analysis before the texts are added: a dependent on
-/// its lowest level with every `(relation, via)` link on that level.
+/// its lowest level with every item of the change it is reached from there
+/// (`roots`) and every `(relation, via)` link on that level.
 #[derive(Debug, PartialEq)]
 struct Nearest {
-    root: Uuid,
+    roots: Vec<Uuid>,
     item: Uuid,
     level: i32,
     links: Vec<(String, Uuid)>,
@@ -860,8 +864,8 @@ struct Nearest {
 /// One row per dependent: the walk reaches a dependent once per item of the
 /// change (and an item of the change through another one), so the same
 /// assembly could show up on several levels. Each dependent is kept on its
-/// lowest level, with all its links on that level (in the order found, each
-/// once); items in `in_change` are left out – they are reviewed in the
+/// lowest level, with all its roots and links on that level (in the order
+/// found, each once); items in `in_change` are left out – they are reviewed in the
 /// change, not flagged. Order: first seen.
 fn nearest_per_item(
     found: Vec<Found>,
@@ -877,21 +881,25 @@ fn nearest_per_item(
     let mut linked: HashSet<(Uuid, Uuid, String)> = HashSet::new();
     let mut out: Vec<Nearest> = Vec::new();
     for f in found {
-        if lowest.get(&f.item) != Some(&f.level)
-            || !linked.insert((f.item, f.via, f.relation.clone()))
-        {
+        if lowest.get(&f.item) != Some(&f.level) {
             continue;
         }
         let at = *index.entry(f.item).or_insert_with(|| {
             out.push(Nearest {
-                root: f.root,
+                roots: Vec::new(),
                 item: f.item,
                 level: f.level,
                 links: Vec::new(),
             });
             out.len() - 1
         });
-        out[at].links.push((f.relation, f.via));
+        let row = &mut out[at];
+        if !row.roots.contains(&f.root) {
+            row.roots.push(f.root);
+        }
+        if linked.insert((f.item, f.via, f.relation.clone())) {
+            row.links.push((f.relation, f.via));
+        }
     }
     out
 }
@@ -1146,8 +1154,11 @@ pub async fn analysis(
             paths.sort();
             paths.dedup();
             let first = paths.first()?.clone();
+            let mut roots = n.roots;
+            roots.sort();
             Some(Dependent {
-                root_item_id: n.root,
+                root_item_id: *roots.first()?,
+                root_item_ids: roots,
                 level: n.level,
                 item_id: n.item,
                 item_number: item.number.clone(),
@@ -1294,7 +1305,7 @@ mod tests {
         assert_eq!(
             nearest_per_item(walk, &in_change),
             vec![Nearest {
-                root: Uuid::from_u128(asm2),
+                roots: vec![Uuid::from_u128(asm2)],
                 item: Uuid::from_u128(asm1),
                 level: 1,
                 links: vec![("bom".into(), Uuid::from_u128(asm2))],
@@ -1303,7 +1314,8 @@ mod tests {
     }
 
     /// A dependent that uses several items of the change keeps every link
-    /// of its lowest level, each once; links on higher levels are dropped.
+    /// and every root of its lowest level, each once; links on higher levels
+    /// are dropped.
     #[test]
     fn keeps_all_links_of_the_lowest_level() {
         let walk = vec![
@@ -1335,6 +1347,11 @@ mod tests {
                 (2, 1, vec![("file", 10), ("file", 11)]),
             ]
         );
+        let roots: Vec<Vec<u128>> = rows
+            .iter()
+            .map(|r| r.roots.iter().map(|u| u.as_u128()).collect())
+            .collect();
+        assert_eq!(roots, vec![vec![10, 11], vec![10, 11]]);
         assert!(nearest_per_item(Vec::new(), &std::collections::HashSet::new()).is_empty());
     }
 }
