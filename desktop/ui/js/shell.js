@@ -141,13 +141,18 @@ export function enterShell() {
     }).then(function (s) {
       if (s && !agent.running) { agent.running = s; agent.busy = s.busy; updateAgentControls(); schedulePaint(true); }
     }, function () {});
-    checkWorkspaceLayout();
-    checkTokenStorage();
-    checkUpdate();
-    // the Ko-fi tag (#403): once per start of the app, unless switched off
-    checkDonateTag();
-    // the first start after the sign-in: *Getting started* (#422)
-    maybeStartOnboarding();
+    // After the shell has drawn, one thing at a time: the workspace
+    // migration question first, then – on the first start after the
+    // sign-in – *Getting started* (#422); the keychain warning, the update
+    // notice and the Ko-fi tag (#403, once per start unless switched off)
+    // wait until it is closed, so nothing talks over the wizard.
+    Promise.resolve(checkWorkspaceLayout()).then(function () {
+      return maybeStartOnboarding();
+    }).catch(function () {}).then(function () {
+      checkTokenStorage();
+      checkUpdate();
+      checkDonateTag();
+    });
   }).catch(function (err) {
     if (!(err && err.status === 401)) showConnect("signin", errorText(err));
   });

@@ -19,6 +19,24 @@ import { cadTargetChip, groupDefault, mainCadFile, openWithCad } from "./cad-ope
 import { incompleteGet, notOpenedText } from "./get-rules.js";
 import { revisionInputs } from "./report-inputs.js";
 import { revisionNextStep } from "./next-step.js";
+import { LOOP_TIP_KEY, loopTip, loopTipAfter } from "./onboarding-rules.js";
+import { t } from "/static/shared/js/i18n.js";
+
+function storedLoopTip() {
+  try { return localStorage.getItem(LOOP_TIP_KEY); } catch (e) { return null; }
+}
+
+function storeLoopTip(value) {
+  try { if (value) localStorage.setItem(LOOP_TIP_KEY, value); } catch (e) { /* storage off: the tip shows again */ }
+}
+
+/** A check-in or a cancelled check-out ran: the daily-loop tip of the
+ *  revision tab has done its job (onboarding-rules.js loopTipAfter). */
+export function noteLoopStep(action) {
+  var before = storedLoopTip();
+  var after = loopTipAfter(before, action);
+  if (after !== before) storeLoopTip(after);
+}
 
 /** Opens a revision tab; `viewerFile` (a file id) picks the file of its 3D viewer. */
 export function openRevision(number, code, sub, viewerFile) {
@@ -248,6 +266,11 @@ export function renderRevision(tab, body, toolbar) {
       ])
     ])
   ]));
+  // the daily loop, taught where it happens (Getting started, #422): a
+  // one-time tip until the first check-in or cancelled check-out
+  var tip = loopTip(storedLoopTip(), next);
+  if (tip.show) body.appendChild(h("p.hint.loop-tip", { text: t(tip.show) }));
+  storeLoopTip(tip.store);
   if (latest && latest.id !== rev.id) {
     body.appendChild(h("p.notice", null, ["This is an older revision. ",
       h("button.link", { type: "button", on: { click: function () { openRevision(rev.item_number, latest.code); } } }, "Open the latest revision " + latest.code)]));

@@ -950,7 +950,16 @@ canvas.viewer-measuring { cursor: crosshair; }
 .onboarding-body h3 { margin: 0; }
 .onboarding-body p { margin: 0; }
 .onboarding-path { display: block; padding: 6px 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); overflow-wrap: anywhere; }
-.onboarding-cad { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.onboarding-head { display: grid; gap: 2px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.onboarding-head p { margin: 0; }
+.onboarding-groups { display: grid; gap: 4px; }
+.onboarding-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; }
+.onboarding-group:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.onboarding-rows { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.onboarding-rows li { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.onboarding-rows .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the daily-loop tip on the revision tab (one time, #422) */
+.loop-tip { margin: 8px 0 0; }
 @media (max-width: 640px) {
   .onboarding { grid-template-columns: minmax(0, 1fr); }
 }

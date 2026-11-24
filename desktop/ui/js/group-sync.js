@@ -29,7 +29,8 @@ function gotGroupsKey() {
 
 /** Codes of the project groups a finished *Get project groups* copied into
  *  the current working folder on this computer – the first-start wizard
- *  (onboarding.js) skips its group step for them. Only a convenience: an
+ *  (onboarding.js) takes their working folder as chosen and starts with a
+ *  group already on disk. Only a convenience: an
  *  empty answer (private window, cleared storage) just shows the step. */
 export function gotGroups() {
   try {

@@ -6,7 +6,7 @@ import { $, api, badge, beginTransfer, call, clear, confirmDialog, dialog, enc, 
 import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
 import { canEdit, canEditProject, isCancelled, refreshWorklistCount, rescanLocalChanges, uploadLine } from "./shell.js";
 import { reloadActive, renderActive, table } from "./tabs.js";
-import { PROGRAM_LABEL, cadPrograms, dd, exportProgram, exportStep, openRevision, previewFormat, revisionAbilities } from "./revision.js";
+import { PROGRAM_LABEL, cadPrograms, dd, exportProgram, exportStep, noteLoopStep, openRevision, previewFormat, revisionAbilities } from "./revision.js";
 import { openChange } from "./change.js";
 import { reviewerProblem } from "./release-rules.js";
 import { requestChangeDialog } from "./requests.js";
@@ -337,14 +337,20 @@ export var SYNC_LABEL = {
 };
 
 /** Offers to move a workspace of the old layout <group>/<item>/<revision>/
- * into the working-folder layout (asked after the sign-in). */
+ * into the working-folder layout (asked after the sign-in). Resolves when
+ * the question is answered (at once without one) – Getting started waits
+ * for it (shell.js). */
 export function checkWorkspaceLayout() {
-  call("workspace_migration_plan").then(function (plan) {
-    if (plan.moves || plan.identical) migrationDialog(plan);
+  return call("workspace_migration_plan").then(function (plan) {
+    if (!(plan.moves || plan.identical)) return null;
+    return new Promise(function (resolve) { migrationDialog(plan, resolve); });
   }, function () { /* offline or no permission: asked again next time */ });
 }
 
-export function migrationDialog(plan) {
+/** The migration question; `answered` runs after *Later*, or once the move
+ *  has run (the dialog is modal: only its buttons close it). */
+export function migrationDialog(plan, answered) {
+  answered = answered || function () {};
   function describe(s) {
     if (s.action === "move") return s.from + " → " + s.to + (s.modified ? " (changed locally, moved along)" : "");
     if (s.action === "already_there") return s.from + " – the same file is already at " + s.to + " (old copy removed)";
@@ -359,7 +365,7 @@ export function migrationDialog(plan) {
     plan.steps.length > 200 ? h("p.small.dim", { text: "… and " + (plan.steps.length - 200) + " more" }) : null,
     h("p.small.muted", null, ["Every step is written to ", h("span.mono", { text: plan.log })])
   ]), [
-    { label: "Later", onClick: function (d) { d.close(); } },
+    { label: "Later", onClick: function (d) { d.close(); answered(); } },
     { label: "Move files", primary: true, submit: true, onClick: function (d) {
       d.close();
       run("Moving the workspace", function () { return transfer(function () { return call("workspace_migrate"); }); }).then(function (r) {
@@ -369,9 +375,10 @@ export function migrationDialog(plan) {
           kept.length ? h("ul.small", null, kept.slice(0, 200).map(function (s) { return h("li", { text: describe(s) }); })) : null,
           h("p.small.muted", null, ["Log: ", h("span.mono", { text: r.log })])
         ]), [{ label: "Close", primary: true, submit: true, onClick: function (dd) { dd.close(); renderActive(); } }], { wide: true });
-      }, function () {});
+        answered();
+      }, function () { answered(); });
     } }
-  ], { wide: true });
+  ], { wide: true, modal: true });
 }
 
 
@@ -601,6 +608,7 @@ export function doCancelCheckout(tab) {
       // someone else's lock: the own worklist does not change, so fetchWorklist
       // marks nothing – Home's row and the Check-outs tabs follow here (#451)
       if (other) { markLock(rev.item_number, rev.code, null, null); locksChanged(); }
+      if (!other) noteLoopStep("cancel");
       call("usage_count", { action: "cancel_checkout" }).catch(function () {});
       // the unchanged local files become read-only again
       call("workspace_status", { project: rev.project_code, item: rev.item_number, code: rev.code }).catch(function () {}).then(function () {
@@ -784,6 +792,7 @@ export function checkinDialog(tab, park) {
         d.close();
         var all = files.concat(steps);
         var bomLine = parking ? "" : checkinBomText(bomResult);
+        if (!parking) noteLoopStep("checkin");
         toast((parking ? "Parked " + all.join(", ") + " on the server – " + ref + " stays checked out to you"
           : "Checked in " + ref + (all.length ? " with " + all.join(", ") : "")) +
           (bomLine ? ". " + bomLine : "") +

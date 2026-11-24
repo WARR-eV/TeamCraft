@@ -201,6 +201,12 @@ fn main() {
             // is the one the app starts with (the connect screen is skipped)
             let policies = policy::load();
             let mut settings = settings::Settings::load(&config_dir);
+            // Getting started is kept per connection (#422): the app-wide
+            // value of older versions belongs to the connection active now
+            // – moved before a policy server can switch connections
+            if profiles::migrate_onboarding(&mut settings) {
+                let _ = settings.save(&config_dir);
+            }
             if let Some(server) = policies.server_url.as_deref() {
                 let other = settings.server_url.as_deref() != Some(server);
                 if settings.server_url.is_none() || (other && policies.server_locked()) {
@@ -303,6 +309,7 @@ fn main() {
             commands::check_update,
             commands::dismiss_update,
             commands::set_onboarding,
+            commands::open_guide,
             commands::update_remind_later,
             commands::check_update_now,
             commands::update_offer,

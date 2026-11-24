@@ -1,30 +1,52 @@
 // SPDX-License-Identifier: MPL-2.0
-// TeamCraft Desktop – pure rules of the first-start wizard (*Getting
-// started*, #422): which steps there are, which are skipped, when the wizard
-// shows and the texts of each step.
+// TeamCraft Desktop – pure rules of the first-start wizard *Getting
+// started* (#422): which steps there are, which are skipped, when the wizard
+// shows, which assemblies step 3 offers and the messages of each step.
+// The wizard has one job: bring a CAD user who has just signed in to a real
+// assembly of their group, with *Check out and open* in front of them. It is
+// read-only and shaped around no CAD program (docs/src/research/first-start.md).
+// The answers are message IDs of shared/i18n/ with their parameters;
+// onboarding.js turns them into text (shared/js/i18n.js t()).
 // No imports and no DOM: scripts/desktop-onboarding-rules.test.mjs tests it
-// with plain Node.js. Used by onboarding.js.
+// with plain Node.js.
 
-/** The steps in order. */
-export var ONBOARDING_STEPS = ["server", "signin", "folder", "group", "cad", "loop"];
+/** The steps in order: where the files go, the project group, the first assembly. */
+export var ONBOARDING_STEPS = ["folder", "group", "open"];
 
-/** The values the app stores in settings.json (`onboarding`, src/settings.rs). */
+/** The values the app stores per connection (`onboarding`, src/profiles.rs). */
 export var ONBOARDING_DONE = "done", ONBOARDING_DISMISSED = "dismissed";
+
+/** Most assemblies step 3 offers. */
+export var MAX_ASSEMBLIES = 5;
 
 /**
  * Whether the wizard opens by itself. `settings.onboarding` is the stored
- * value (`"done"`, `"dismissed"` or none); `ctx.fromHelp` is *Help → Getting
- * started…*, which always opens it; `ctx.signedInThisRun` is true when the
- * user came through the connect screen in this run of the app – a first start.
- * An app that starts already signed in (an update of an older version, a
- * reload of the window) does not show it: those users know the app.
+ * value of the active connection (`"done"`, `"dismissed"` or none);
+ * `ctx.fromHelp` is *Help → Getting started…*, which always opens it;
+ * `ctx.signedInThisRun` is true when the user came through the connect
+ * screen in this run of the app. `ctx.hasCheckouts` / `ctx.hasOwnChanges`
+ * (from the server, asked before the wizard opens): a user who already
+ * works on this server – a new computer, an expired sign-in – does not get
+ * it. An app that starts already signed in (an update, a reload) does not
+ * show it either.
  */
 export function shouldShow(settings, ctx) {
   ctx = ctx || {};
   if (ctx.fromHelp) return true;
   var stored = settings && settings.onboarding;
   if (stored === ONBOARDING_DONE || stored === ONBOARDING_DISMISSED) return false;
+  if (ctx.hasCheckouts || ctx.hasOwnChanges) return false;
   return !!ctx.signedInThisRun;
+}
+
+/** The user's groups as `{code, name, cad, cadVersion}` – a plain code
+ *  string counts as a group without name; empty codes are dropped. */
+export function groupList(list) {
+  return (Array.isArray(list) ? list : []).map(function (g) {
+    if (typeof g === "string") g = { code: g };
+    if (!g || typeof g.code !== "string" || !g.code.trim()) return null;
+    return { code: g.code.trim(), name: g.name || "", cad: g.cad || "", cadVersion: g.cadVersion || "" };
+  }).filter(Boolean);
 }
 
 /** Lower-case codes of a list of group codes (empty and non-text ones dropped). */
@@ -34,30 +56,38 @@ function codes(list) {
   }).map(function (c) { return c.trim().toLowerCase(); });
 }
 
+/** Whether a group (code) is already in the working folder. */
+export function onDisk(code, facts) {
+  return codes((facts || {}).groupsOnDisk).indexOf(String(code || "").toLowerCase()) !== -1;
+}
+
 /**
- * Why a step is skipped, or null when it is shown. `facts`:
+ * Why a step is skipped (a message ID), or null when it is shown. `facts`:
  *
- * * `serverFixed` – an organisation policy sets the server (#378);
- * * `signedIn` – the app has a sign-in;
- * * `groups` – codes of the project groups the user is a member of;
- * * `groupsOnDisk` – codes of the groups already fetched into this working folder.
+ * * `workspaceRootPolicy` – an organization policy sets where working
+ *   folders go (`WorkspaceRoot`, #378);
+ * * `groupsOnDisk` – codes of the groups already fetched into this working
+ *   folder: the folder was chosen before;
+ * * `groups` – the project groups the user is a member of (groupList).
+ *
+ * A skipped folder step shows the folder as a line in the header; with one
+ * group the group step is skipped and that group used; without a group the
+ * group step is the last one (it says how to get one).
  */
 export function skipReason(step, facts) {
   facts = facts || {};
+  var mine = groupList(facts.groups);
   switch (step) {
-    case "server":
-      return facts.serverFixed ? "Set by your organization" : null;
-    case "signin":
-      return facts.signedIn ? "Signed in" : null;
-    case "group": {
-      var mine = codes(facts.groups);
-      if (!mine.length) return "You are not a member of a project group yet";
-      var onDisk = codes(facts.groupsOnDisk);
-      if (mine.every(function (c) { return onDisk.indexOf(c) !== -1; })) return "Your project groups are already in the working folder";
+    case "folder":
+      if (facts.workspaceRootPolicy) return "onboarding.skip.folder_policy";
+      if (codes(facts.groupsOnDisk).length) return "onboarding.skip.folder_used";
       return null;
-    }
+    case "group":
+      return mine.length === 1 ? "onboarding.skip.one_group" : null;
+    case "open":
+      return mine.length ? null : "onboarding.skip.no_group";
     default:
-      return ONBOARDING_STEPS.indexOf(step) === -1 ? "Unknown step" : null;
+      return "onboarding.skip.unknown";
   }
 }
 
@@ -78,8 +108,6 @@ export function nextStep(wizard, facts) {
   var at = shown.indexOf(wizard.current);
   if (wizard.back) return at > 0 ? shown[at - 1] : null;
   if (at === -1) {
-    // a step that is skipped now (the group was fetched meanwhile): go on
-    // with the first shown step after it in the full order
     var full = ONBOARDING_STEPS.indexOf(wizard.current);
     if (full === -1) return shown[0] || null;
     for (var i = full + 1; i < ONBOARDING_STEPS.length; i++) {
@@ -90,97 +118,214 @@ export function nextStep(wizard, facts) {
   return at + 1 < shown.length ? shown[at + 1] : null;
 }
 
-/**
- * The project group the last step opens in Home (*Finish and open <group>*):
- * the first of the user's groups that a Get already fetched into this working
- * folder, else the first of the user's groups; null without groups (the step
- * then offers the Projects page). Returns the code as given in `facts.groups`.
- */
-export function startGroup(facts) {
-  facts = facts || {};
-  var mine = (Array.isArray(facts.groups) ? facts.groups : []).filter(function (c) {
-    return typeof c === "string" && c.trim() !== "";
-  });
-  if (!mine.length) return null;
-  var onDisk = codes(facts.groupsOnDisk);
-  var fetched = mine.filter(function (c) { return onDisk.indexOf(c.trim().toLowerCase()) !== -1; });
-  return (fetched[0] || mine[0]).trim();
+/** Whether `step` is the last shown one (it has the commit buttons). */
+export function isFinal(step, facts) {
+  return visibleSteps(facts).indexOf(step) !== -1 && nextStep({ current: step }, facts) === null;
 }
 
-/** `Step 2 of 4` of a shown step; "" for one that is skipped. */
+/** `Step 2 of 3` of a shown step as a message; null for one that is skipped. */
 export function stepPosition(step, facts) {
   var shown = visibleSteps(facts);
   var at = shown.indexOf(step);
-  return at === -1 ? "" : "Step " + (at + 1) + " of " + shown.length;
+  return at === -1 ? null : { id: "onboarding.position", params: { at: at + 1, total: shown.length } };
 }
 
 /**
- * What the planned CAD setup would create (OPEN_WORK §4, *Workspace setup
- * wizard*). Shown for information only: the wizard writes none of it yet.
+ * The group the wizard starts with: the first of the user's groups that a
+ * Get already fetched into this working folder, else the first group; null
+ * without groups. Returns the code as given.
  */
-export var CAD_SETUP_PREVIEW = [
-  { program: "Inventor", file: "<working folder>/<group>/<group>.ipj", what: "a project file whose workspace is the group's folder, so references resolve inside the working folder" },
-  { program: "NX", file: "load_options.def", what: "load options that search the group's folder (and its subfolders) for components" },
-  { program: "Solid Edge", file: "search paths", what: "the group's folder as a search path for linked documents" }
-];
+export function startGroup(facts) {
+  facts = facts || {};
+  var mine = groupList(facts.groups);
+  if (!mine.length) return null;
+  var fetched = mine.filter(function (g) { return onDisk(g.code, facts); });
+  return (fetched[0] || mine[0]).code;
+}
+
+/** The group the user chose in step 2 (`wanted`, a code) when it is one of
+ *  theirs, else startGroup's; null without groups. The group object. */
+export function chosenGroup(facts, wanted) {
+  var mine = groupList((facts || {}).groups);
+  var code = String(wanted || "").toLowerCase();
+  var hit = mine.filter(function (g) { return g.code.toLowerCase() === code; })[0];
+  if (hit) return hit;
+  var start = startGroup(facts);
+  return mine.filter(function (g) { return g.code === start; })[0] || null;
+}
+
+/** The group's folder in the working folder (`<dir>/<GROUP>`), with the
+ *  separator the folder already uses. */
+export function groupFolder(dir, code) {
+  dir = String(dir || "");
+  if (!dir) return code || "";
+  var sep = dir.indexOf("\\") !== -1 && dir.indexOf("/") === -1 ? "\\" : "/";
+  return dir.replace(/[\\/]+$/, "") + sep + (code || "");
+}
+
+/**
+ * The assemblies step 3 offers, from the top-level nodes of a group's
+ * structure (`GET /projects/{code}/structure`: no BOM line uses them).
+ * An assembly is an item of type `assembly` or one with BOM lines; a
+ * restricted placeholder, a node without a revision, and one checked out by
+ * somebody else (`me` = the user's display name) are left out. Order: in
+ * work first (those can be checked out), then the most BOM lines (the main
+ * assembly of a group, not a small sub-assembly), then by number. At most
+ * `n` (MAX_ASSEMBLIES).
+ */
+export function pickAssemblies(nodes, opts) {
+  opts = opts || {};
+  var n = typeof opts.n === "number" && opts.n > 0 ? opts.n : MAX_ASSEMBLIES;
+  return (Array.isArray(nodes) ? nodes : []).filter(function (x) {
+    if (!x || x.restricted || !x.item_number || !x.code) return false;
+    if (x.item_type !== "assembly" && !(x.bom_lines > 0)) return false;
+    return !x.checked_out_by_name || x.checked_out_by_name === opts.me;
+  }).slice().sort(function (a, b) {
+    var wa = a.state === "in_work" ? 0 : 1, wb = b.state === "in_work" ? 0 : 1;
+    if (wa !== wb) return wa - wb;
+    var la = a.bom_lines || 0, lb = b.bom_lines || 0;
+    if (la !== lb) return lb - la;
+    return a.item_number < b.item_number ? -1 : a.item_number > b.item_number ? 1 : 0;
+  }).slice(0, n);
+}
+
+/**
+ * The one CAD line of step 1: the CAD programs found on this computer
+ * (`cad_installed`: `{family, version, label}`), in neutral words. Labels are
+ * listed once each, in the order found.
+ */
+export function cadLine(programs) {
+  var seen = [];
+  (Array.isArray(programs) ? programs : []).forEach(function (p) {
+    var label = p && (p.label || p.family);
+    if (label && seen.indexOf(label) === -1) seen.push(label);
+  });
+  return seen.length
+    ? { id: "onboarding.cad.found", params: { programs: seen.join(", ") } }
+    : { id: "onboarding.cad.none", params: {} };
+}
+
+/** The group's default CAD program as text (`names`: family → program
+ *  name of the server's format list); "" without one. */
+export function groupCadText(group, names) {
+  if (!group || !group.cad) return "";
+  var name = (names && names[group.cad]) || group.cad;
+  return group.cadVersion ? name + " " + group.cadVersion : name;
+}
+
+/**
+ * What *Check out and open* will do, as the lead of step 3. `opts`:
+ * `dir` (working folder), `installed` (`cad_installed`), `names` (family →
+ * program name), `editor` (may check out). The program follows the group's
+ * default CAD program like the chip next to the button: an installed one by
+ * its label, else the default named with "not installed on this computer";
+ * without a default, the program chosen for each file. A viewer gets
+ * *Get…* instead – checking out needs the CAD editor role.
+ */
+export function openLine(group, opts) {
+  opts = opts || {};
+  var folder = groupFolder(opts.dir, group && group.code);
+  if (!opts.editor) return { id: "onboarding.open.viewer", params: { folder: folder } };
+  if (!group || !group.cad) return { id: "onboarding.open.any", params: { folder: folder } };
+  var found = (Array.isArray(opts.installed) ? opts.installed : []).filter(function (p) { return p && p.family === group.cad; });
+  var same = found.filter(function (p) { return group.cadVersion && p.version === group.cadVersion; })[0];
+  var pick = same || found[0];
+  if (pick) return { id: "onboarding.open.program", params: { folder: folder, program: pick.label || groupCadText(group, opts.names) } };
+  return { id: "onboarding.open.program_missing", params: { folder: folder, program: groupCadText(group, opts.names) } };
+}
+
+/** The message ID of a role in the header line (`admin`, `editor`, `viewer`). */
+export function roleMessage(role) {
+  return { admin: "onboarding.role.admin", editor: "onboarding.role.editor" }[role] || "onboarding.role.viewer";
+}
+
+/** The secondary commit: *Finish and show <group> in Home*. */
+export function finishLabel(code) {
+  return code ? { id: "onboarding.finish_home", params: { group: code } } : { id: "onboarding.finish", params: {} };
+}
+
+/** Per computer: where the user is with the daily-loop tip of the revision
+ *  tab (none, `learned` after the first check-in or cancelled check-out,
+ *  `done` once the closing line was shown). */
+export var LOOP_TIP_KEY = "tc.loopTip";
+
+/**
+ * The daily loop is taught where it happens, not on a wizard page: a tip
+ * on the revision tab while its next step is *Check out and open*, *Open in
+ * CAD* or *Check in…* (next-step.js; `checkout-open` in revision.js), until
+ * the user's first check-in or cancelled check-out; then one closing line,
+ * once. Returns the message ID to show (or null) and the value to store
+ * (or null to keep it).
+ */
+export function loopTip(stored, next) {
+  if (stored === "done") return { show: null, store: null };
+  if (stored === "learned") return { show: "onboarding.tip.loop_done", store: "done" };
+  return ["checkout", "checkout-open", "open", "checkin"].indexOf(next) !== -1
+    ? { show: "onboarding.tip.loop", store: null }
+    : { show: null, store: null };
+}
+
+/** The stored value after `action` – a check-in (`checkin`) or a cancelled
+ *  check-out (`cancel`) ends the tip; parking and anything else keep it. */
+export function loopTipAfter(stored, action) {
+  if (stored === "done" || stored === "learned") return stored;
+  return action === "checkin" || action === "cancel" ? "learned" : (stored || null);
+}
 
 /** Short names of the steps (the list on the left of the wizard). */
 export var STEP_NAMES = {
-  server: "Server",
-  signin: "Sign-in",
-  folder: "Working folder",
-  group: "Project group",
-  cad: "CAD setup",
-  loop: "Daily loop"
+  folder: "onboarding.step.folder",
+  group: "onboarding.step.group",
+  open: "onboarding.step.open"
 };
 
 /**
- * Title and paragraphs of a step. `facts` as for skipReason, plus
- * `serverUrl`, `workspaceDir`, `username`, `groups`.
+ * Title and paragraphs of a step as messages. `facts` as for skipReason,
+ * plus `workspaceDir`, `editor` (CAD editor or administrator), `login`.
  */
 export function stepSummary(step, facts) {
   facts = facts || {};
-  var ws = facts.workspaceDir || "the default folder";
-  var mine = codes(facts.groups);
+  var dir = facts.workspaceDir || "";
+  var mine = groupList(facts.groups);
   switch (step) {
-    case "server":
-      return { title: "Your TeamCraft server", text: [
-        facts.serverUrl ? "TeamCraft Desktop works with the server at " + facts.serverUrl + "." : "TeamCraft Desktop needs the address of your TeamCraft server.",
-        facts.serverFixed ? "Your organization set this server; it cannot be changed here." : "You can switch to another server later in Settings → Account."
-      ] };
-    case "signin":
-      return { title: "Sign in", text: [
-        facts.signedIn ? "You are signed in" + (facts.username ? " as " + facts.username : "") + "." : "Sign in with your TeamCraft account or your organization's single sign-on.",
-        "The sign-in is kept in your system's keychain, so you do not have to sign in at every start."
-      ] };
     case "folder":
-      return { title: "Your working folder", text: [
-        "Your CAD files live in the working folder on this computer: " + ws + ".",
-        "Every project group gets its own folder in it, with the folders of its files: <working folder>/<group>/<folder>/<file>. Open and save your CAD files there.",
-        "Files you have not checked out are read-only; checking out makes them writable, checking in sends your changes to the server."
+      return { title: STEP_NAMES.folder, text: [
+        { id: "onboarding.folder.text", params: { dir: dir } },
+        { id: "onboarding.folder.later", params: {} }
       ] };
     case "group":
-      return { title: "Get your project group", text: [
-        mine.length ? "You are a member of " + (mine.length === 1 ? "the project group " : mine.length + " project groups: ") + facts.groups.filter(function (c) { return typeof c === "string" && c.trim(); }).join(", ") + "." : "You are not a member of a project group yet.",
-        "Get project groups… copies the files of every item of a group into your working folder – the latest revision, also the ones still in work – so assemblies open with all their parts.",
-        "Nothing is overwritten: files you changed locally are kept and name clashes are reported."
-      ] };
-    case "cad":
-      return { title: "CAD setup", text: [
-        "Some CAD programs find the parts of an assembly through a project file or search paths. Point them at your working folder.",
-        "A later version of TeamCraft Desktop will offer to create these files for you – nothing ticked by default and never overwriting yours. Nothing is created now."
-      ] };
-    case "loop": {
-      var start = startGroup(facts);
-      return { title: "Your daily loop in 3 steps", text: [
-        "1. Check out and open – on an item or in its Workspace tab: locks the item for you, copies its files (and the parts of an assembly) and opens the main file in your CAD program.",
-        "2. Save in your CAD program – into the working folder, as always.",
-        "3. Check in… – sends the changed files to the server with a comment and releases the lock. Your worklist shows what you have checked out.",
-        start ? "Start now: Finish and open " + start + " shows the files of the group in Home – right-click the assembly → Check out and open."
-          : "Start now: Finish and show Projects lists the project groups – choose one, then right-click an assembly in its files → Check out and open."
-      ] };
-    }
+      if (!mine.length) {
+        return { title: STEP_NAMES.group, text: [facts.editor
+          ? { id: "onboarding.group.none.editor", params: {} }
+          : { id: "onboarding.group.none.viewer", params: { login: facts.login || "" } }] };
+      }
+      return { title: STEP_NAMES.group, text: [{ id: "onboarding.group.question", params: {} }]
+        .concat(facts.editor ? [] : [{ id: "onboarding.group.viewer", params: {} }]) };
+    case "open":
+      return { title: STEP_NAMES.open, text: [{ id: "onboarding.open.lead", params: {} }] };
     default:
       return { title: "", text: [] };
   }
 }
+
+/** Every message ID these rules and onboarding.js use (the test checks
+ *  both catalogs and their placeholders). */
+export var ONBOARDING_MESSAGE_IDS = [
+  "onboarding.title", "onboarding.steps", "onboarding.status.done", "onboarding.status.skipped",
+  "onboarding.connected", "onboarding.position",
+  "onboarding.role.admin", "onboarding.role.editor", "onboarding.role.viewer",
+  "onboarding.step.folder", "onboarding.step.group", "onboarding.step.open",
+  "onboarding.skip.folder_policy", "onboarding.skip.folder_used", "onboarding.skip.one_group",
+  "onboarding.skip.no_group", "onboarding.skip.unknown",
+  "onboarding.folder.text", "onboarding.folder.later", "onboarding.folder.line",
+  "onboarding.folder.change", "onboarding.folder.open",
+  "onboarding.cad.found", "onboarding.cad.none",
+  "onboarding.group.question", "onboarding.group.viewer", "onboarding.group.on_disk", "onboarding.group.one",
+  "onboarding.group.none.editor", "onboarding.group.none.viewer", "onboarding.group.create",
+  "onboarding.group.copy_login", "onboarding.group.copied",
+  "onboarding.open.lead", "onboarding.open.program", "onboarding.open.program_missing", "onboarding.open.any",
+  "onboarding.open.viewer", "onboarding.open.show", "onboarding.open.show.title", "onboarding.open.loading",
+  "onboarding.open.failed", "onboarding.open.none", "onboarding.open.cad_setup", "onboarding.open.cad_setup.link",
+  "onboarding.finish", "onboarding.finish_home", "onboarding.next", "onboarding.back", "onboarding.dismiss",
+  "onboarding.tip.loop", "onboarding.tip.loop_done"
+];

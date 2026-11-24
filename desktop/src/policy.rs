@@ -232,6 +232,7 @@ impl Policies {
             organization: self.organization_name.clone(),
             server_url: self.server_url.clone(),
             fixed: managed,
+            workspace_root: self.workspace_root.is_some(),
         }
     }
 }
@@ -247,6 +248,10 @@ pub struct PolicyView {
     pub server_url: Option<String>,
     /// Settings fixed by a policy: shown as *Set by your organization*, disabled.
     pub fixed: Vec<&'static str>,
+    /// `WorkspaceRoot` is set: the organization chose where working folders
+    /// go, so *Getting started* (#422) shows the folder as a line instead of
+    /// a step.
+    pub workspace_root: bool,
 }
 
 #[cfg_attr(windows, allow(dead_code))]
@@ -384,6 +389,8 @@ mod tests {
         // a drive path counts as absolute on every system (the policy file
         // may be written for Windows computers)
         assert_eq!(p.workspace_root, Some(PathBuf::from(r"D:\CAD")));
+        assert!(p.view().workspace_root, "Getting started shows it as set");
+        assert!(!Policies::default().view().workspace_root);
         assert_eq!(p.organization_name.as_deref(), Some("Example Lab"));
         assert_eq!(p.usage_statistics, Some(false));
         assert!(p.any() && p.server_locked());

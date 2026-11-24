@@ -30,6 +30,15 @@ export function cadFormats() {
   return cadFormatsPromise;
 }
 
+var installedCadPromise = null;
+/** The CAD programs found on this computer (`cad_installed`, src/cadlaunch.rs:
+ *  `{family, version, label, path}`), asked once per start; [] when the
+ *  search fails. Getting started names them (onboarding.js). */
+export function installedCad() {
+  if (!installedCadPromise) installedCadPromise = call("cad_installed").catch(function () { return []; });
+  return installedCadPromise;
+}
+
 /** The format family of a file of a revision ("" = neutral: STEP, PDF …). */
 export function fileFamily(f) {
   return (f && f.format_info && f.format_info.family) || "";

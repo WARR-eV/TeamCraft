@@ -231,10 +231,13 @@ pub struct Settings {
     /// Id of the active connection in [`Settings::profiles`].
     #[serde(default)]
     pub active_profile: Option<String>,
-    /// The first-start wizard *Getting started* (#422, ui/js/onboarding.js):
-    /// `"done"` or `"dismissed"` – it then no longer opens by itself (*Help →
-    /// Getting started…* still does). `None` in settings files of older
-    /// versions.
+    /// The first-start wizard *Getting started* (#422, ui/js/onboarding.js)
+    /// as older versions kept it, for the whole app: `"done"` or
+    /// `"dismissed"`. It is now kept per connection
+    /// ([`crate::profiles::Profile::onboarding`]); at start
+    /// `profiles::migrate_onboarding` moves this value onto the connection
+    /// that was active and clears it. Only without any server is it still
+    /// written here.
     #[serde(default)]
     pub onboarding: Option<String>,
     /// Not stored in settings.json.
