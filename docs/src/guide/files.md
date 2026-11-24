@@ -59,7 +59,8 @@ group below the list, e.g. *2 files in other CAD formats (SolidWorks, Inventor)*
 
 Meshes, point clouds and STEP models open in a WebGL viewer in the browser
 and in the desktop app. Drag to rotate, wheel or pinch to zoom, arrow keys to
-turn, double-click to reset; *Z up / Y up* switches the convention.
+turn, double-click to reset; the *Z up* toggle switches the convention
+(pressed: Z up, not pressed: Y up).
 **Panning** (moving the model sideways): right or middle drag, Shift or Ctrl +
 drag, both buttons held, two fingers on a touch screen, or Shift + arrow
 keys; *Reset view* centres the model again. Which button rotates and which

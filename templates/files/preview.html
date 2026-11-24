@@ -35,7 +35,7 @@
     <div id="viewer-overlay" class="viewer-overlay is-busy"><span>Loading the 3D model …</span></div>
     {#- the view controls sit on the canvas, so they are never below the fold -#}
     <div class="viewer-tools actions" role="toolbar" aria-label="View">
-      <button id="viewer-up" class="small" type="button" title="Switch between Z-up (most CAD programs, 3D printing) and Y-up models (glTF, games)">Z up</button>
+      <button id="viewer-up" class="small viewer-up" type="button" title="Switch between Z-up (most CAD programs, 3D printing) and Y-up models (glTF, games)">Z up</button>
       <button id="viewer-reset" class="small" type="button" title="Back to the initial view (double-click)">Reset view</button>
       {% if compare %}<select id="viewer-compare" class="small" aria-label="Compare with another revision or version (shown in red)">
         <option value="">Compare with …</option>

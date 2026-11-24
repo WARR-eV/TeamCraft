@@ -677,7 +677,9 @@ latest revision (`item_number`, `item_name`, `revision_id`, `revision_code`,
 `revision_state`) and `paths`: every item it depends on at that level as
 `{"via_number", "relation"}` (`bom`, `drawing`, `specification`, `reference`,
 `simulation` or `file`), sorted by number. `relation` and `via_number` repeat
-the first path. Items that are part of the change are not listed – the walk
+the first path. `root_item_ids` are the items of the change it is reached
+from on that level (sorted; one row can merge several walks), `root_item_id`
+is the first of them. Items that are part of the change are not listed – the walk
 goes on through them (#525). Dependents in groups the caller cannot see are
 left out and counted in `x-hidden-count`.
 

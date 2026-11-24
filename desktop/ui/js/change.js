@@ -61,12 +61,6 @@ export function suggestedReviewers(number) {
   return box;
 }
 
-/**
- * "Add reviewer" of a draft: any CAD editor or administrator by user name
- * (several separated by commas), not only the suggestions – with nobody
- * suggested a draft would otherwise be a dead end (#291). The own name is
- * refused here already (four-eyes principle); the server checks the rest.
- */
 // What one dependent of the impact analysis depends on: every item on its
 // level (`paths`, #525), the first three spelled out; older servers
 // send only `relation` and `via_number`.
@@ -76,6 +70,12 @@ function dependsOnText(dep) {
   return paths.length > 3 ? text + " and " + (paths.length - 3) + " more" : text;
 }
 
+/**
+ * "Add reviewer" of a draft: any CAD editor or administrator by user name
+ * (several separated by commas), not only the suggestions – with nobody
+ * suggested a draft would otherwise be a dead end (#291). The own name is
+ * refused here already (four-eyes principle); the server checks the rest.
+ */
 function addReviewerForm(number) {
   var input = h("input", { type: "text", maxlength: "200", spellcheck: "false", placeholder: "user name",
     "aria-label": "User name of the reviewer to add" });
@@ -257,7 +257,9 @@ export function renderChange(tab, body, toolbar) {
       list.length ? table(["Level", "Revision", "Name", "Depends on", "State"], list.map(function (dep) {
         return {
           cells: [String(dep.level), h("span.mono", { text: dep.item_number + "/" + dep.revision_code }),
-            dep.item_name, dependsOnText(dep), badge(dep.revision_state)],
+            // servers before #525 still list the change's own revisions, marked in_change
+            dep.in_change ? h("span", null, [dep.item_name, h("span.badge.badge-member", { text: " in this change" })]) : dep.item_name,
+            dependsOnText(dep), badge(dep.revision_state)],
           open: function () { openRevision(dep.item_number, dep.revision_code); }
         };
       }), { numeric: [0] }) : h("p.empty", { text: "No other item uses or references the revisions of this change." })]);

@@ -42,9 +42,10 @@ test("nothing to export without triangles (point clouds, no model yet)", () => {
   assert.match(stlExportBlocker(null), /no triangles/);
 });
 
-test("the up toggle is pressed while Z is up and keeps one accessible name", () => {
-  assert.deepEqual({ ...upToggle(true) }, { text: "Z up", label: "Z up", pressed: "true" });
-  assert.deepEqual({ ...upToggle(false) }, { text: "Y up", label: "Z up", pressed: "false" });
+test("the up toggle keeps its visible name and is pressed while Z is up", () => {
+  // no aria-label: the visible text is the name, the state only aria-pressed (WCAG 2.5.3)
+  assert.deepEqual({ ...upToggle(true) }, { text: "Z up", pressed: "true" });
+  assert.deepEqual({ ...upToggle(false) }, { text: "Z up", pressed: "false" });
 });
 
 test("the export button is enabled for a shape and removed for a result", () => {

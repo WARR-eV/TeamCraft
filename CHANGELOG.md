@@ -182,10 +182,13 @@ see the notices in the README.
   dependent appears once, on its nearest level, with every item it depends
   on there (`paths`, the page shows up to three and a count), and the
   change's own revisions are left out (the walk still goes on through them);
-  the `in_change` field is gone (#525).
+  the `in_change` field is gone, and `root_item_ids` names every item of
+  the change a row is reached from (`root_item_id` is the first of them).
+  The desktop app still marks rows *in this change* from older servers (#525).
 - 3D viewer (web and desktop): the *flip* label of the section plane no
-  longer wraps under its checkbox; the *Z up* toggle has `aria-pressed`
-  that follows its state (and a fixed accessible name); *Export STL* is not
+  longer wraps under its checkbox; the *Z up* toggle keeps its text (its
+  accessible name) and shows its state with `aria-pressed` and a pressed
+  style instead of switching to *Y up*; *Export STL* is not
   offered for simulation results with a result field, which STL would drop
   (#526).
 - Desktop: a check-out or check-in from Home marks the row (lock colour and

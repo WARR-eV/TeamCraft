@@ -46,7 +46,7 @@ export function revViewer(tab, el) {
   // can be out of view, which left a failed preview a silent black canvas (#290)
   var overlay = h("div.viewer-overlay.is-busy", null, h("span", { text: "Loading the 3D model …" }));
   var resetBtn = h("button.small", { type: "button", title: "Back to the initial view (double-click)" }, "Reset view");
-  var upBtn = h("button.small", { type: "button", title: "Switch between Z-up and Y-up models" }, "Z up");
+  var upBtn = h("button.small.viewer-up", { type: "button", title: "Switch between Z-up and Y-up models" }, "Z up");
   // STL export of STEP/3MF/… models (e.g. for 3D printing); saved through a native dialog in Rust.
   var noExport = ["stl", "pts", "xyz", "las", "e57"].indexOf(previewFormat(current)) !== -1;
   var stlBtn = noExport ? null : h("button.small", {
