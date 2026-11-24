@@ -2,7 +2,7 @@
 // TeamCraft Desktop – 3D viewer, workspace, check-out/in, edit, release, revise.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, api, badge, call, clear, confirmDialog, dialog, enc, errorText, field, h, invoke, lockBadge, materialField, run, setStatus, state, toast, tool } from "./core.js";
+import { $, api, badge, call, clear, confirmDialog, dialog, enc, errorNotice, errorText, field, h, invoke, lockBadge, materialField, reportLink, run, setStatus, state, toast, tool } from "./core.js";
 import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
 import { canEdit, canEditProject, isCancelled, refreshWorklistCount, rescanLocalChanges, uploadLine } from "./shell.js";
 import { reloadActive, renderActive, table } from "./tabs.js";
@@ -82,6 +82,13 @@ export function revViewer(tab, el) {
       resetBtn: resetBtn,
       upBtn: upBtn,
       onReady: function () { if (stlBtn) stlBtn.disabled = false; },
+      // the error on the canvas (parse, graphics memory, driver) offers
+      // *Report…* in place (#471)
+      onError: function (text) {
+        var link = reportLink("Showing the 3D preview of " + current.filename, text, previewInputs);
+        var box = overlay.querySelector("span");
+        if (link && box) box.append(" ", link);
+      },
       load: function () {
         return invoke("file_bytes", versionId ? { kind: "version-mesh", id: versionId } : { kind: "mesh", id: current.id })
           .catch(function (e) {
@@ -867,7 +874,7 @@ export function releaseDialog(tab) {
         boxes.push({ username: m.username, input: input });
         reviewerBox.appendChild(h("label.check", null, [input, m.display_name, h("span.dim", { text: " " + m.username + " · " + label(m.role) })]));
       });
-    }, function (err) { clear(reviewerBox); reviewerBox.appendChild(h("p.notice.error", { text: errorText(err) })); });
+    }, function (err) { clear(reviewerBox); reviewerBox.appendChild(errorNotice("p.notice.error", errorText(err), "Loading the reviewers of " + rev.project_code, revisionInputs(rev))); });
   } else {
     clear(reviewerBox);
   }

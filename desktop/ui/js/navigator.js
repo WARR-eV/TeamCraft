@@ -2,7 +2,7 @@
 // TeamCraft Desktop – Navigator views: home, worklist, changes, search.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, ICONS, api, append, badge, call, clear, dialog, enc, errorText, field, h, lockIcon, setStatus, state, svgIcon, toast } from "./core.js";
+import { $, ICONS, api, append, badge, call, clear, dialog, enc, errorNotice, errorText, field, h, lockIcon, setStatus, state, svgIcon, toast } from "./core.js";
 import { fmtDate, label } from "/static/shared/js/format.js";
 import { canSeeLocks, openLockOverview } from "./lock-overview.js";
 import { canEdit, canEditProject, checkInAll, fetchWorklist, refreshWorklistCount, reloadProjects, renderNotifications, rescanLocalChanges, rescanNewFiles, scanLocalChanges, scanNewFiles, sendLocalChanges, showWorklistCount } from "./shell.js";
@@ -41,7 +41,7 @@ export function selectView(view) {
   var render = { home: renderHome, projects: renderProjects, worklist: renderWorklist, changes: renderChanges, search: renderSearch, notifications: renderNotifications, agent: renderAgentView }[view] || renderHome;
   Promise.resolve().then(render).catch(function (err) {
     clear(nav);
-    nav.appendChild(h("p.notice.error", { text: errorText(err) }));
+    nav.appendChild(errorNotice("p.notice.error", errorText(err), "Showing " + view, [["view", view]]));
   });
 }
 
@@ -369,7 +369,7 @@ export function loadProjectItems(p, ul, count, opts) {
     items.forEach(function (it) { ul.appendChild(itemNode(it, opts)); });
   }, function (err) {
     clear(ul);
-    ul.appendChild(h("li.notice.error", { text: errorText(err) }));
+    ul.appendChild(errorNotice("li.notice.error", errorText(err), "Loading the items of " + p.code, [["group", p.code], ["view", "all items"]]));
   });
 }
 
@@ -486,7 +486,7 @@ function localChangesSection(nav) {
   if (plan.truncated) notes.push("Only part of the working folder was compared – it holds very many files.");
   if (plan.tracked > plan.compared) notes.push((plan.tracked - plan.compared) + " of " + plan.tracked + " revisions compared on this computer only (no outdated or conflict check)");
   if (notes.length) nav.appendChild(h("p.small.dim", { text: notes.join(" · ") }));
-  if (plan.errors.length) nav.appendChild(h("p.small.notice.error", { text: "Could not compare with the server: " + plan.errors.join("; ") }));
+  if (plan.errors.length) nav.appendChild(errorNotice("p.small.notice.error", "Could not compare with the server: " + plan.errors.join("; "), "Comparing the working folder with the server", [["errors", String(plan.errors.length)]]));
   if (editor) {
     nav.appendChild(h("p.small.dim", null, ["Files that belong to no item yet: ",
       h("button.link.small", { type: "button", on: { click: function () {
@@ -957,7 +957,7 @@ function loadStructureRoots(p, ul, count) {
     if (cut.hidden) ul.appendChild(h("li.empty", { text: "… and " + cut.hidden + " more – use the search or All items" }));
   }, function (err) {
     clear(ul);
-    ul.appendChild(h("li.notice.error", { text: errorText(err) }));
+    ul.appendChild(errorNotice("li.notice.error", errorText(err), "Loading the structure of " + p.code, [["group", p.code], ["view", "structure"], ["rule", structureRule()]]));
   });
 }
 
@@ -1039,6 +1039,7 @@ function loadStructureChildren(n, key, ul, showAll) {
     }
   }, function (err) {
     clear(ul);
-    ul.appendChild(h("li.notice.error", { text: errorText(err) }));
+    ul.appendChild(errorNotice("li.notice.error", errorText(err), "Loading the BOM of " + n.item_number + "/" + n.code,
+      [["item", n.item_number], ["revision", n.code], ["rule", structureRule()]]));
   });
 }

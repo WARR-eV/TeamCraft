@@ -939,8 +939,12 @@ organization*.
 
 ## Report a problem
 
-Every error message has a **Report…** link, and *Help → Report a Problem…*
-opens the same dialog without one. It shows the report before anything
+Every error message has a **Report…** link – the messages at the bottom,
+the errors in a dialog, and the errors shown in place: a list or tab that
+could not be loaded, the new-item file check, *No BOM lines found* in the BOM
+import preview, the error on the 3D view (also when the model cannot be read
+or the graphics memory runs out) and the problems of *Check in all*. *Help →
+Report a Problem…* opens the same dialog without one. It shows the report before anything
 leaves the app: a title (what you did and the error), the action, its key
 inputs, the error and the versions; add what
 you were trying to do (left out if empty) and, if you like, the error
@@ -957,7 +961,9 @@ removed. Edit the text as you like, then:
 The key inputs are what the action worked on, for example the project group,
 item number and revision of a check-out or check-in, the names of the ticked
 files, the file and format of a 3D preview, or the file name and options of a
-BOM or folder import. They are names and short values only: a path is
+BOM or folder import, the number and status of a change order or change
+request with the reviewer or decision, or the name and new value of a setting
+that could not be saved. They are names and short values only: a path is
 reduced to the file name, and file contents, item names, descriptions and
 BOM lines are never included.
 

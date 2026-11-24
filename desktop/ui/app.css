@@ -883,6 +883,8 @@ table.grid td.actions button { height: var(--ctl-h-sm); padding: 0 8px; font-siz
 .viewer-overlay[hidden] { display: none; }
 .viewer-overlay > span { max-width: 40rem; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--surface); }
 .viewer-overlay.is-error > span { color: var(--text); box-shadow: inset 3px 0 0 var(--st-danger-fg); }
+/* *Report…* on the error (#471): the overlay lets clicks through to the canvas, the link takes them */
+.viewer-overlay .report-link { pointer-events: auto; }
 .viewer-canvas:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .viewer-canvas:active { cursor: grabbing; }
 .viewer-bar { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-top: 8px; color: var(--text-muted); font-size: 12px; }

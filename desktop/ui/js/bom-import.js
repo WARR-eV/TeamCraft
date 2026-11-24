@@ -2,7 +2,7 @@
 // TeamCraft Desktop – Import BOM.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { api, badge, call, clear, dialog, enc, field, h, setStatus, state, toast } from "./core.js";
+import { api, badge, call, clear, dialog, enc, errorNotice, field, h, setStatus, state, toast } from "./core.js";
 import { fmtNum, label } from "/static/shared/js/format.js";
 import { canEdit, canEditProject, freshProjects, refreshWorklistCount } from "./shell.js";
 import { selectView } from "./navigator.js";
@@ -133,6 +133,12 @@ export function openImportBomDialog(rev) {
     if (el) el.addEventListener(el.tagName === "INPUT" && el.type === "text" ? "input" : "change", invalidate);
   });
 
+  // *Report…* (#381): the file name and the options, never the BOM lines
+  function importInputs() {
+    var extra = [["file", path ? baseName(path) : ""], ["numbers", numbers.value], ["match existing", match.checked ? "yes" : "no"]];
+    return rev ? revisionInputs(rev, extra) : [["group", project.value]].concat(extra);
+  }
+
   function showPlan(p) {
     clear(result);
     var target = p.target ? "Into " + p.root_label : "New assembly " + (p.root_number || "(number generated)") + " · " + p.root_name;
@@ -147,7 +153,8 @@ export function openImportBomDialog(rev) {
         h("ul", null, p.warnings.map(function (w) { return h("li", { text: w }); }))]));
     }
     if (!p.lines.length) {
-      result.appendChild(h("p.notice.error", { text: "No BOM lines found in " + p.filename + " – check the columns (part number, quantity, level)." }));
+      result.appendChild(errorNotice("p.notice.error", "No BOM lines found in " + p.filename + " – check the columns (part number, quantity, level).",
+        "Previewing the BOM import", importInputs));
       return;
     }
     var rows = p.lines.slice(0, BOM_PREVIEW_LINES).map(function (l) {
@@ -237,11 +244,7 @@ export function openImportBomDialog(rev) {
         });
       }
     }
-  ], { wide: true, inputs: function () {
-    // *Report…* (#381): the file name and the options, never the BOM lines
-    var extra = [["file", path ? baseName(path) : ""], ["numbers", numbers.value], ["match existing", match.checked ? "yes" : "no"]];
-    return rev ? revisionInputs(rev, extra) : [["group", project.value]].concat(extra);
-  } });
+  ], { wide: true, inputs: importInputs });
   importButton = handle.form.querySelector(".dialog-actions button.primary");
   importButton.disabled = true;
 }

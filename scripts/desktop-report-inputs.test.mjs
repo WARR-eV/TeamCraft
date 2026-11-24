@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const file = path.resolve(here, "../desktop/ui/js/report-inputs.js");
 const src = fs.readFileSync(file, "utf8");
-const { reportInputs, revisionInputs, failureOf, MAX_REPORT_INPUTS, MAX_REPORT_INPUT } = await import(
+const { changeInputs, reportInputs, requestInputs, revisionInputs, failureOf, settingInputs, MAX_REPORT_INPUTS, MAX_REPORT_INPUT } = await import(
   "data:text/javascript;base64," + Buffer.from(src).toString("base64"));
 
 let n = 0;
@@ -65,6 +65,19 @@ test("the caps match desktop/src/report.rs", () => {
   const rs = fs.readFileSync(path.resolve(here, "../desktop/src/report.rs"), "utf8");
   assert.match(rs, new RegExp("const MAX_INPUTS: usize = " + MAX_REPORT_INPUTS + ";"));
   assert.match(rs, new RegExp("const MAX_INPUT: usize = " + MAX_REPORT_INPUT + ";"));
+});
+
+test("change orders, requests and settings name their key inputs (#471)", () => {
+  assert.deepEqual(reportInputs(changeInputs({ number: "CHG-000002", status: "draft" }, [["reviewer", "alex"]])),
+    [["change", "CHG-000002"], ["status", "draft"], ["reviewer", "alex"]]);
+  // a change known only by its number: the status is left out
+  assert.deepEqual(reportInputs(changeInputs({ number: "CHG-000002" })), [["change", "CHG-000002"]]);
+  assert.deepEqual(reportInputs(changeInputs(null)), []);
+  assert.deepEqual(reportInputs(requestInputs({ number: "ECR-000004", status: "open" }, [["decision", "accept"]])),
+    [["request", "ECR-000004"], ["status", "open"], ["decision", "accept"]]);
+  assert.deepEqual(reportInputs(settingInputs("update check", true)), [["setting", "update check"], ["value", "on"]]);
+  assert.deepEqual(reportInputs(settingInputs("update check", false)), [["setting", "update check"], ["value", "off"]]);
+  assert.deepEqual(reportInputs(settingInputs("skin", "teamcraft-night")), [["setting", "skin"], ["value", "teamcraft-night"]]);
 });
 
 console.log(`${n} tests passed`);

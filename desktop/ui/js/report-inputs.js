@@ -55,3 +55,26 @@ export function revisionInputs(rev, extra) {
 export function failureOf(action, error, inputs) {
   return { action: action || "", error: error || "", inputs: reportInputs(inputs) };
 }
+
+/**
+ * The key inputs of an action on change order `c` (#471): its number and
+ * status, then `extra` (the reviewer, the decision …).
+ */
+export function changeInputs(c, extra) {
+  c = c || {};
+  return [["change", c.number], ["status", c.status]].concat(extra || []);
+}
+
+/** The key inputs of an action on change request `r` (#471). */
+export function requestInputs(r, extra) {
+  r = r || {};
+  return [["request", r.number], ["status", r.status]].concat(extra || []);
+}
+
+/**
+ * The key inputs of a setting that could not be saved (#471): its name and
+ * the value it was to get – a boolean as "on" / "off".
+ */
+export function settingInputs(name, value) {
+  return [["setting", name], ["value", value === true ? "on" : value === false ? "off" : value]];
+}

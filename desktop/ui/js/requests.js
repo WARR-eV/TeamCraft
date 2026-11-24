@@ -9,6 +9,7 @@ import { openTab, reloadActive, renderTabs, table } from "./tabs.js";
 import { dd, dt, openRevision } from "./revision.js";
 import { openChange } from "./change.js";
 import { baseName } from "./dialogs.js";
+import { requestInputs } from "./report-inputs.js";
 
 // ======================================================================
 // Change requests (ECR)
@@ -82,7 +83,8 @@ export function requestChangeDialog(rev, filename) {
           setStatus("");
           if (!number) { d.fail(err); return; }
           d.close();
-          toast(number + " was raised, but the attachment failed: " + errorText(err), "error");
+          toast(number + " was raised, but the attachment failed: " + errorText(err), "error", "Attaching the screenshot to " + number,
+            requestInputs({ number: number }, [["file", baseName(shot)]]));
           openRequest(number);
         });
       }
@@ -118,7 +120,7 @@ export function attachToRequest(r) {
   chooseAttachment().then(function (path) {
     if (!path) return;
     run("Attaching " + baseName(path), function () { return call("upload_request_attachment", { number: r.number, path: path }); },
-      [["request", r.number], ["file", baseName(path)]])
+      requestInputs(r, [["file", baseName(path)]]))
       .then(function (a) { toast("Attached " + a.filename + " to " + r.number); reloadActive(); }, function () {});
   }, function (e) { toast(errorText(e), "error"); });
 }
@@ -132,7 +134,7 @@ export function createChangeFromRequest(tab) {
     if (!ok) return;
     run("Creating the change order for " + r.number, function () {
       return api("POST", "/change-requests/" + enc(r.number) + "/create-change", {});
-    }).then(function (c) {
+    }, requestInputs(r)).then(function (c) {
       toast("Created " + c.change.number + (c.skipped.length ? " – not added: " + c.skipped.join("; ") : " – add reviewers and submit it"), c.skipped.length ? "info" : undefined);
       tab.data = null;
       refreshWorklistCount().catch(function () {});
@@ -144,7 +146,9 @@ export function createChangeFromRequest(tab) {
 export function renderRequest(tab, body, toolbar) {
   var d = tab.data, r = d.change_request, can = d.can || {};
   function action(path, text, payload) {
-    return run(text, function () { return api("POST", "/change-requests/" + enc(r.number) + "/" + path, payload === undefined ? null : payload); })
+    var extra = payload && payload.decision ? [["decision", payload.decision]] : [];
+    return run(text, function () { return api("POST", "/change-requests/" + enc(r.number) + "/" + path, payload === undefined ? null : payload); },
+      requestInputs(r, extra))
       .then(function () { toast(text + " – done"); reloadActive(); refreshWorklistCount().catch(function () {}); }, function () {});
   }
   var status = label(r.status);
@@ -250,7 +254,7 @@ export function renderRequest(tab, body, toolbar) {
     text,
     h("div.row", null, [h("button", { type: "button", on: { click: function () {
       if (!text.value.trim()) { text.focus(); return; }
-      run("Adding the comment", function () { return api("POST", "/change-requests/" + enc(r.number) + "/comments", { body: text.value }); })
+      run("Adding the comment", function () { return api("POST", "/change-requests/" + enc(r.number) + "/comments", { body: text.value }); }, requestInputs(r))
         .then(function () { reloadActive(); }, function () {});
     } } }, "Add comment")])
   ]));

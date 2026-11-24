@@ -125,6 +125,13 @@ see the notices in the README.
   TeamCraft Desktop 0.3.x*) and whether the update is it; the notice after
   connecting to a server that does not fit names that version too, instead
   of "the matching desktop app version".
+- **Desktop: *Report…* on the errors shown in place** (#471): a list or tab
+  that could not be loaded, the new-item file check, *No BOM lines found* in
+  the BOM import preview, the error on the 3D view (unreadable model,
+  graphics memory) and the problems of *Check in all* now offer *Report…*
+  like the toasts. Reports from change orders, change requests and settings
+  name their key inputs (number and status, reviewer or decision, the
+  setting and its new value).
 - **Panning in the 3D viewer** (#459), in the browser and the desktop app:
   every drag only rotated before. Right or middle drag, Shift or Ctrl + drag,
   a drag with both buttons, two fingers on a touch screen and Shift + arrow

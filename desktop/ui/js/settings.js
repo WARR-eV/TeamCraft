@@ -6,6 +6,7 @@ import { $, SKINS, TAURI, api, call, confirmDialog, dialog, errorText, field, h,
 import { label } from "/static/shared/js/format.js";
 import { LANGUAGES, negotiate, t } from "/static/shared/js/i18n.js";
 import { applySkin } from "./skins.js";
+import { settingInputs } from "./report-inputs.js";
 import { checkServerUrl, showConnect } from "./connect.js";
 import { atRisk, checkUpdate, checkoutsWithChanges, localChangesList, refreshWorklistCount, sendLocalChanges, showDonateTag } from "./shell.js";
 import { resetCompanyAi } from "./assistant.js";
@@ -69,7 +70,7 @@ export function openSettings() {
   var withParts = h("input", { type: "checkbox", checked: state.session.checkout_parts !== false, on: { change: function () {
     var on = withParts.checked;
     call("set_checkout_parts", { enabled: on }).then(function () { state.session.checkout_parts = on; },
-      function (e) { withParts.checked = !on; toast(errorText(e), "error"); });
+      function (e) { withParts.checked = !on; toast(errorText(e), "error", "Saving a setting", settingInputs("check out with parts", on)); });
   } } });
   var notifyBox = h("div.stack");
   var notify = notificationSettings(notifyBox);
@@ -78,12 +79,12 @@ export function openSettings() {
     call("set_update_check", { enabled: on }).then(function () {
       state.session.update_check = on;
       checkUpdate();
-    }, function (e) { updateCheck.checked = !on; toast(errorText(e), "error"); });
+    }, function (e) { updateCheck.checked = !on; toast(errorText(e), "error", "Saving a setting", settingInputs("update check", on)); });
   } } });
   var crashPrompt = h("input", { type: "checkbox", checked: state.session.crash_prompt !== false, disabled: fixedByPolicy("crash_prompt"), on: { change: function () {
     var on = crashPrompt.checked;
     call("set_crash_prompt", { enabled: on }).then(function () { state.session.crash_prompt = on; },
-      function (e) { crashPrompt.checked = !on; toast(errorText(e), "error"); });
+      function (e) { crashPrompt.checked = !on; toast(errorText(e), "error", "Saving a setting", settingInputs("crash report prompt", on)); });
   } } });
   // the Ko-fi tag at start (#403); switched off, a tag shown now goes too
   var donateTag = h("input", { type: "checkbox", checked: state.session.donate_tag !== false, disabled: fixedByPolicy("donate_tag"), on: { change: function () {
@@ -91,13 +92,13 @@ export function openSettings() {
     call("set_donate_tag", { enabled: on }).then(function () {
       state.session.donate_tag = on;
       if (!on) showDonateTag(false);
-    }, function (e) { donateTag.checked = !on; toast(errorText(e), "error"); });
+    }, function (e) { donateTag.checked = !on; toast(errorText(e), "error", "Saving a setting", settingInputs("Ko-fi tag", on)); });
   } } });
   // *Report a problem* (#381): the operator's own tracker instead of GitHub
   var reportUrl = h("input", { type: "url", value: state.session.report_url || "", spellcheck: "false", disabled: fixedByPolicy("report_url"), placeholder: "https://github.com/WARR-eV/TeamCraft/issues/new", on: { change: function () {
     var url = reportUrl.value.trim();
     call("set_report_url", { url: url }).then(function () { state.session.report_url = url || null; toast("Problem reports go to " + (url || "GitHub")); },
-      function (e) { toast(errorText(e), "error"); });
+      function (e) { toast(errorText(e), "error", "Saving a setting", settingInputs("report address", url ? "custom" : "GitHub")); });
   } } });
   var serverInsecure = h("p.notice.warn.small.hidden", { text: "This server is reached over plain http:// – the token and all data cross the network unencrypted. Ask your administrator for the https:// address." });
   checkServerUrl(state.session.server_url || "", serverInsecure);
@@ -107,7 +108,7 @@ export function openSettings() {
       on: {
         click: function () {
           applySkin(s.id);
-          call("set_skin", { skin: s.id }).catch(function (e) { toast(errorText(e), "error"); });
+          call("set_skin", { skin: s.id }).catch(function (e) { toast(errorText(e), "error", "Saving a setting", settingInputs("skin", s.id)); });
           skins.querySelectorAll(".skin-card").forEach(function (c) { c.classList.toggle("selected", c.getAttribute("data-skin") === s.id); });
         }
       }
@@ -201,7 +202,7 @@ function connectionsBox(closeSettings) {
   var box = h("div.stack", null, [h("p.hint", { text: "Loading …" })]);
   function switchTo(id) {
     call("switch_connection", { id: id }).then(function () { window.location.reload(); },
-      function (e) { toast(errorText(e), "error"); });
+      function (e) { toast(errorText(e), "error", "Switching the connection"); });
   }
   function draw(list) {
     var rows = list.map(function (c) {
@@ -222,7 +223,7 @@ function connectionsBox(closeSettings) {
             confirmDialog("Remove connection", "Forget the connection to " + c.server_url + (who ? " as " + who : "") +
               "? Its sign-in is removed from this computer; the working folder stays.", "Remove", true).then(function (ok) {
               if (!ok) return;
-              call("remove_connection", { id: c.id }).then(load, function (e) { toast(errorText(e), "error"); });
+              call("remove_connection", { id: c.id }).then(load, function (e) { toast(errorText(e), "error", "Removing a connection"); });
             });
           } } }, "Remove")
         ])
@@ -234,7 +235,7 @@ function connectionsBox(closeSettings) {
       h("div.row", null, [
         h("button", { type: "button", title: "Sign in with another account on " + (state.session.server_url || "this server") + "; your current sign-in is kept", on: { click: function () {
           closeSettings();
-          call("add_account").then(function () { window.location.reload(); }, function (e) { toast(errorText(e), "error"); });
+          call("add_account").then(function () { window.location.reload(); }, function (e) { toast(errorText(e), "error", "Adding an account"); });
         } } }, "Add another account…")
       ])
     );
@@ -278,7 +279,7 @@ export function notificationSettings(box) {
       field("Mattermost username", mmUser, "empty = your login"),
       h("div.stack", null, notes),
       h("div.row", null, [h("button", { type: "button", title: "Creates a notification for you and sends it through every channel you use", on: { click: function () {
-        call("api", { method: "POST", path: "/notifications/test", body: null }).then(function () { toast("Test notification sent"); }, function (e) { toast(errorText(e), "error"); });
+        call("api", { method: "POST", path: "/notifications/test", body: null }).then(function () { toast("Test notification sent"); }, function (e) { toast(errorText(e), "error", "Sending a test notification"); });
       } } }, "Send a test")])
     );
   }
@@ -386,7 +387,7 @@ function finishSignOut(changeServer) {
     agent.backend = null; // the next sign-in asks the server again (agent_policy)
     agent.available = [];
     showConnect(changeServer ? "server" : "signin");
-  }, function (e) { toast(errorText(e), "error"); });
+  }, function (e) { toast(errorText(e), "error", changeServer ? "Changing the server" : "Signing out"); });
 }
 
 export function openAbout() {
@@ -412,5 +413,5 @@ function showUsage() {
       h("p.hint", { text: "Sent to " + (state.session.server_url || "your TeamCraft server") + " once a day, for the day before." }),
     ].concat(block("Today, so far", r.today), block("Waiting to be sent", r.pending), block("Sent last", r.last_sent))),
     [{ label: "Close", primary: true, onClick: function (d) { d.close(); } }], { wide: true });
-  }, function (e) { toast(errorText(e), "error"); });
+  }, function (e) { toast(errorText(e), "error", "Showing the usage statistics"); });
 }
