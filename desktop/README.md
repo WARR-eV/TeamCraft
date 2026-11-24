@@ -158,7 +158,7 @@ files), downloads it into the Downloads folder – only from
 `github.com/WARR-eV/TeamCraft/releases/download/v<version>/`, redirects over https only, at most 1 GiB – and
 checks it against the release's `SHA256SUMS.txt`; a missing line or a mismatch deletes the file and
 nothing changes. A verified Windows installer starts after a question and the app closes; a `.dmg`
-opens; a zip or AppImage is shown in its folder (replacing it in place is not built yet). Flatpak and
+opens; a portable zip or AppImage replaces the running copy in place after *Replace and restart* (#466: `update_swap` – the zip unpacked by PowerShell `Expand-Archive` into `.teamcraft-update` next to the app, only `TeamCraft.exe`, `LICENSE.txt`, `README.txt` one folder deep, the old files moved to `*.old` and removed at the next start, every move undone when one fails; the AppImage copied to `<name>.new`, made executable and renamed over `$APPIMAGE`; pure steps in `src/update.rs`, tested), then `update_restart` starts the new copy; an unwritable folder or a failure changes nothing and offers *Show the file*. Flatpak and
 `.deb`/`.rpm` installations show the package-manager way instead. Nothing is downloaded without a
 click, and not while a check-in or Get runs. *Help → Check for Updates…* asks at once, also with the
 daily check off, and says *up to date* or the error. *Settings → Updates* switches the daily check off.

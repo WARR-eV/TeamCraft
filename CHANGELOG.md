@@ -147,6 +147,11 @@ see the notices in the README.
   AppImage, Flatpak, `.deb`/`.rpm`) for each release candidate – the notice,
   the update window, *Skip this version*, *Remind me later*, the download,
   checksum and policy cases; linked from `CONTRIBUTING.md`.
+- **Desktop: the portable zip and the AppImage update themselves** (#466):
+  *Update now* in the update window replaces the running copy in place after
+  *Replace and restart* and starts the new version. The old files are moved
+  aside and removed at the next start; a folder the app may not write into,
+  or any failed step, changes nothing and offers the verified file instead.
 - **Panning in the 3D viewer** (#459), in the browser and the desktop app:
   every drag only rotated before. Right or middle drag, Shift or Ctrl + drag,
   a drag with both buttons, two fingers on a touch screen and Shift + arrow

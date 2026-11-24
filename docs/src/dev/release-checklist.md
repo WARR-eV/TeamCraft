@@ -163,9 +163,9 @@ first candidate is checked after its final tag.
 |---|---|
 | Windows `.msi` (per machine, under *Program Files*) | the `.msi` lands in *Downloads*, *Verified: …* is shown, *Close TeamCraft and install?* → *Close and install* ends the app and starts the installer; after it, the app starts in the new version with the same sign-in, working folder and settings |
 | Windows NSIS `-setup.exe` (per user, under `AppData\Local`) | as for the `.msi`, with the `-setup.exe` |
-| Windows portable `.zip` | *Download*: the `.zip` lands in *Downloads* and is shown in Explorer; replace the folder by hand – the app itself is not swapped yet (#466) |
+| Windows portable `.zip` | *Update now* → *Replace and restart?* → *Replace and restart*: the files in the app's folder are replaced, TeamCraft restarts in the new version and the `*.old` files are gone after that start; *Not now* changes nothing; a read-only folder gives an error and *Show the file* (#466) |
 | macOS `.dmg` | *Update now*: the `.dmg` opens; drag TeamCraft to *Applications* and replace the old one |
-| Linux AppImage | *Download*: the AppImage lands in *Downloads* and is shown in its folder; replace the old file and make it executable |
+| Linux AppImage | *Update now* → *Replace and restart*: the AppImage file is replaced (still executable) and TeamCraft restarts in the new version; a read-only folder gives an error and *Show the file* (#466) |
 | Flatpak | no download: the window names `flatpak update` |
 | `.deb` / `.rpm` | no download: the window names the package manager |
 

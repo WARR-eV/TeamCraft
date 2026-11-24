@@ -1318,6 +1318,138 @@ pub fn update_install(app: AppHandle) -> CmdResult<()> {
     Ok(())
 }
 
+/// The app the restart after a swap starts (#466): the swapped
+/// `TeamCraft.exe` (Windows reports the renamed old file as the running
+/// one) or the AppImage.
+static RESTART_WITH: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+
+/// *Install* for a portable zip or an AppImage (#466): the verified download
+/// replaces this copy of the app in place – the portable folder's files are
+/// moved aside (`.old`, removed at the next start) and the new ones put in
+/// their place; an AppImage is renamed over. Nothing is changed when a step
+/// fails, and a folder the app may not write into is reported. The UI never
+/// calls it during a check-in or download.
+#[tauri::command]
+pub async fn update_swap() -> CmdResult<()> {
+    let file = VERIFIED_UPDATE
+        .lock()
+        .expect("update lock")
+        .clone()
+        .filter(|f| f.is_file())
+        .ok_or_else(|| ApiError::local("Download and verify the update first."))?;
+    let restart = tokio::task::spawn_blocking(move || swap_now(&file))
+        .await
+        .map_err(|e| ApiError::local(format!("The update could not be installed: {e}")))?
+        .map_err(ApiError::local)?;
+    *RESTART_WITH.lock().expect("restart lock") = Some(restart);
+    Ok(())
+}
+
+/// The swap for this install; the program to restart with.
+fn swap_now(file: &std::path::Path) -> Result<PathBuf, String> {
+    match update::this_install() {
+        update::InstallKind::WindowsPortable => swap_portable(file),
+        update::InstallKind::AppImage => {
+            let target = std::env::var_os("APPIMAGE")
+                .map(PathBuf::from)
+                .ok_or_else(|| "The AppImage's own path is not known.".to_string())?;
+            update::swap_appimage(file, &target)?;
+            Ok(target)
+        }
+        _ => Err("This installation is updated by its installer or package manager.".into()),
+    }
+}
+
+/// The portable folder: unpacked with Windows PowerShell's `Expand-Archive`
+/// into a staging folder next to the app (the paths go in as environment
+/// variables, never into the command), then [`update::swap_moves`].
+#[cfg(windows)]
+fn swap_portable(zip: &std::path::Path) -> Result<PathBuf, String> {
+    use std::os::windows::process::CommandExt;
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let dir = exe
+        .parent()
+        .ok_or_else(|| "The app's folder is not known.".to_string())?
+        .to_path_buf();
+    let app = dir.join("TeamCraft.exe");
+    if !exe
+        .file_name()
+        .is_some_and(|n| n.eq_ignore_ascii_case("TeamCraft.exe"))
+    {
+        return Err(format!(
+            "The app is not named TeamCraft.exe – unpack {} yourself.",
+            zip.display()
+        ));
+    }
+    if !update::writable(&dir) {
+        return Err(format!(
+            "{} is not writable – unpack {} yourself.",
+            dir.display(),
+            zip.display()
+        ));
+    }
+    let staging = dir.join(update::STAGING_DIR);
+    let _ = std::fs::remove_dir_all(&staging);
+    let status = std::process::Command::new("powershell.exe")
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "Expand-Archive -LiteralPath $env:TEAMCRAFT_ZIP -DestinationPath $env:TEAMCRAFT_DEST -Force",
+        ])
+        .env("TEAMCRAFT_ZIP", zip)
+        .env("TEAMCRAFT_DEST", &staging)
+        .creation_flags(0x0800_0000)
+        .status()
+        .map_err(|e| format!("The update could not be unpacked: {e}"))?;
+    if !status.success() {
+        let _ = std::fs::remove_dir_all(&staging);
+        return Err("The update could not be unpacked.".into());
+    }
+    let mut found = Vec::new();
+    for folder in std::fs::read_dir(&staging).into_iter().flatten().flatten() {
+        let folder_name = folder.file_name().to_string_lossy().into_owned();
+        for file in std::fs::read_dir(folder.path())
+            .into_iter()
+            .flatten()
+            .flatten()
+        {
+            let rel = format!("{folder_name}/{}", file.file_name().to_string_lossy());
+            if let Some(name) = update::portable_target(&rel) {
+                found.push((name, file.path()));
+            }
+        }
+    }
+    let moves = update::swap_moves(&dir, &found, |p| p.exists());
+    let result = if moves.is_empty() {
+        Err("The update has no TeamCraft.exe.".to_string())
+    } else {
+        update::run_moves(&moves)
+    };
+    let _ = std::fs::remove_dir_all(&staging);
+    result.map(|()| app)
+}
+
+#[cfg(not(windows))]
+fn swap_portable(_zip: &std::path::Path) -> Result<PathBuf, String> {
+    Err("A portable zip is only installed on Windows.".into())
+}
+
+/// *Restart now* after [`update_swap`]: starts the new copy and ends this one.
+#[tauri::command]
+pub fn update_restart(app: AppHandle) -> CmdResult<()> {
+    let program = RESTART_WITH
+        .lock()
+        .expect("restart lock")
+        .clone()
+        .ok_or_else(|| ApiError::local("Install the update first."))?;
+    std::process::Command::new(&program)
+        .spawn()
+        .map_err(|e| ApiError::local(format!("{} could not be started: {e}", program.display())))?;
+    app.exit(0);
+    Ok(())
+}
+
 /// *Settings → Workspace*: a check-out of an assembly gets its parts too.
 #[tauri::command]
 pub fn set_checkout_parts(state: State<'_, AppState>, enabled: bool) -> CmdResult<()> {
