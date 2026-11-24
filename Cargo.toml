@@ -1,6 +1,6 @@
 [package]
 name = "teamcraft"
-version = "0.2.13"
+version = "0.2.14"
 edition = "2021"
 rust-version = "1.82"
 description = "TeamCraft – an open-source product lifecycle management (PLM) system for engineering teams"
