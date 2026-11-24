@@ -63,6 +63,8 @@ mismatch.
   its local server by itself, the browser offers to create the administrator,
   the app signs in, quitting it stops the server, and the desktop app still
   shows its own server.
+- [ ] Run the [desktop update test](#desktop-update-test) for each install
+  type.
 - [ ] Note what was found in the soak in the changelog or in the release
   notes.
 
@@ -116,6 +118,80 @@ The image `ghcr.io/warr-ev/teamcraft` is published by CI only.
 - [ ] Report security fixes in the release through the advisory that was
   prepared under [SECURITY.md](https://github.com/WARR-eV/TeamCraft/blob/main/SECURITY.md),
   and publish it on the release day.
+
+## Desktop update test
+
+Run this for each release candidate and once more after the final tag, on
+one computer per install type (#469). It checks the update notice and the
+update window (#377) against the **published** release, so it starts from the
+previous release installed the normal way. Releases before the fix of #493
+(0.2.13 and older) never find an update; start from a later one.
+
+The app offers a release candidate (`-rc.N`) only to an app that is a
+candidate itself. To test a candidate, start from the previous candidate. A
+first candidate is checked after its final tag.
+
+**Before every install type**
+
+- [ ] Install the previous release (or candidate) and sign in to a test
+  server. *Settings → Updates → Tell me when a new version is out* is on.
+- [ ] *Help → Check for Updates…* names the new version. The green pill
+  *TeamCraft x.y.z is available* is in the status bar, and its tooltip names
+  the installed version. Both pills (with the Ko-fi one) fit side by side
+  when the window is narrow.
+- [ ] A click on the pill opens the update window: release notes of the new
+  version, *Update now* or *Download* (or the package-manager hint), *Skip
+  this version*, *Remind me later* and *Release page*.
+- [ ] *Release page* opens `github.com/WARR-eV/TeamCraft/releases/tag/v<new
+  version>` in the browser.
+- [ ] Connected to a server of another minor version (0.x), the window also
+  says *Your server runs … and needs TeamCraft Desktop …* (#468).
+
+**Skip and remind**
+
+- [ ] *Skip this version*: the pill goes and stays away after a restart.
+  *Help → Check for Updates…* still offers the version (asked on purpose).
+- [ ] *Remind me later* (after undoing the skip: delete `update_dismissed` in
+  `settings.json` while the app is closed): the pill goes. After a restart
+  it stays away – the reminder runs three days. *Help → Check for Updates…*
+  ends the reminder and opens the update window with the pill.
+- [ ] *×* on the pill is the same as *Skip this version*.
+
+**Per install type**
+
+| Install | Expected after *Update now* / *Download* |
+|---|---|
+| Windows `.msi` (per machine, under *Program Files*) | the `.msi` lands in *Downloads*, *Verified: …* is shown, *Close TeamCraft and install?* → *Close and install* ends the app and starts the installer; after it, the app starts in the new version with the same sign-in, working folder and settings |
+| Windows NSIS `-setup.exe` (per user, under `AppData\Local`) | as for the `.msi`, with the `-setup.exe` |
+| Windows portable `.zip` | *Download*: the `.zip` lands in *Downloads* and is shown in Explorer; replace the folder by hand – the app itself is not swapped yet (#466) |
+| macOS `.dmg` | *Update now*: the `.dmg` opens; drag TeamCraft to *Applications* and replace the old one |
+| Linux AppImage | *Download*: the AppImage lands in *Downloads* and is shown in its folder; replace the old file and make it executable |
+| Flatpak | no download: the window names `flatpak update` |
+| `.deb` / `.rpm` | no download: the window names the package manager |
+
+For each row also check:
+
+- [ ] *Not now* in *Close TeamCraft and install?* leaves the app running.
+- [ ] During a check-in or a *Get*, *Update now* refuses with *A check-in or
+  download is running – update when it has finished*.
+- [ ] *Help → About* shows the new version after the update. The status bar
+  pill is gone.
+
+**Checksum mismatch.** The app checks the downloaded file against
+`SHA256SUMS.txt` of the same release. A file that does not match is deleted
+and nothing changes. This cannot be provoked against a real release without
+changing a published asset – never do that. It is covered by the unit tests
+in `desktop/src/update.rs` (`verify_digest`, the checksum list parser).
+Manually, check only that a broken network during the download ends in an
+error message with *Report…* and leaves no partial file in *Downloads*.
+
+**Policies.** On one Windows computer with the ADMX template
+([Deploying the desktop app](../admin/desktop-deployment.md)):
+`CheckForUpdates = 0` disables the switch (*Set by your organization*), shows
+no pill and refuses *Help → Check for Updates…*.
+
+Write down what failed in the release notes or as an issue before the final
+tag.
 
 ## What is not part of a release
 

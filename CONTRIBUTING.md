@@ -218,6 +218,10 @@ described in [SECURITY.md](SECURITY.md).
    later in its own commit. Before a release, though, CI on `main` must pass,
    so many red commits delay the next release – if you want your change in
    the next release quickly, make CI green.
+   Releases follow the
+   [release checklist](docs/src/dev/release-checklist.md), including the
+   manual [desktop update test](docs/src/dev/release-checklist.md#desktop-update-test)
+   per install type for each release candidate.
 5. **Security is the strictest part.** Pull requests from people outside the
    maintainers get a strict security and vulnerability review. A pull
    request that tries to sneak a vulnerability into TeamCraft is closed

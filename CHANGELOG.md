@@ -142,6 +142,11 @@ see the notices in the README.
   the counts not sent yet are deleted. The desktop policy `UsageStatistics`
   now fixes the switch either way (`0` off, `1` on, *Set by your
   organization*); without it each user chooses.
+- **Release checklist: desktop update test** (#469): a manual script per install
+  type (Windows `.msi`, `-setup.exe` and portable zip, macOS `.dmg`,
+  AppImage, Flatpak, `.deb`/`.rpm`) for each release candidate – the notice,
+  the update window, *Skip this version*, *Remind me later*, the download,
+  checksum and policy cases; linked from `CONTRIBUTING.md`.
 - **Panning in the 3D viewer** (#459), in the browser and the desktop app:
   every drag only rotated before. Right or middle drag, Shift or Ctrl + drag,
   a drag with both buttons, two fingers on a touch screen and Shift + arrow
