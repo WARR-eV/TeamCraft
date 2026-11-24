@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const file = path.resolve(here, "../desktop/ui/js/report-inputs.js");
 const src = fs.readFileSync(file, "utf8");
-const { changeInputs, reportInputs, requestInputs, revisionInputs, failureOf, settingInputs, MAX_REPORT_INPUTS, MAX_REPORT_INPUT } = await import(
+const { changeInputs, checkInAllFailure, reportInputs, recentErrorsAfter, requestInputs, revisionInputs, failureOf, settingInputs, tabInputs, MAX_RECENT_ERRORS, MAX_REPORT_INPUTS, MAX_REPORT_INPUT } = await import(
   "data:text/javascript;base64," + Buffer.from(src).toString("base64"));
 
 let n = 0;
@@ -78,6 +78,58 @@ test("change orders, requests and settings name their key inputs (#471)", () => 
   assert.deepEqual(reportInputs(settingInputs("update check", true)), [["setting", "update check"], ["value", "on"]]);
   assert.deepEqual(reportInputs(settingInputs("update check", false)), [["setting", "update check"], ["value", "off"]]);
   assert.deepEqual(reportInputs(settingInputs("skin", "teamcraft-night")), [["setting", "skin"], ["value", "teamcraft-night"]]);
+});
+
+test("requests and settings without a status or value leave it out", () => {
+  assert.deepEqual(reportInputs(requestInputs(null)), []);
+  assert.deepEqual(reportInputs(requestInputs({ number: "ECR-000004" })), [["request", "ECR-000004"]]);
+  assert.deepEqual(reportInputs(settingInputs("report address", undefined)), [["setting", "report address"]]);
+  assert.deepEqual(reportInputs(settingInputs("report address", "")), [["setting", "report address"]]);
+  assert.deepEqual(reportInputs(settingInputs("report address", "custom")), [["setting", "report address"], ["value", "custom"]]);
+});
+
+test("a tab that failed to open names what it shows (#471)", () => {
+  assert.deepEqual(reportInputs(tabInputs({ kind: "change", number: "CHG-000002" })), [["change", "CHG-000002"]]);
+  assert.deepEqual(reportInputs(tabInputs({ kind: "request", number: "ECR-000004" })), [["request", "ECR-000004"]]);
+  assert.deepEqual(reportInputs(tabInputs({ kind: "locks", code: "ROVER" })), [["group", "ROVER"], ["view", "check-outs"]]);
+  assert.deepEqual(reportInputs(tabInputs({ kind: "revision", number: "PRT-000042", code: "B", sub: "files" })),
+    [["item", "PRT-000042"], ["revision", "B"], ["sub-tab", "files"]]);
+  assert.deepEqual(reportInputs(tabInputs({ kind: "revision", number: "PRT-000042", code: "B" })),
+    [["item", "PRT-000042"], ["revision", "B"]], "no sub-tab, no entry");
+});
+
+test("recent messages: 'action: text', the last 50, a redrawn error kept once (#471)", () => {
+  const at = new Date("2026-11-24T10:11:12Z");
+  assert.deepEqual(recentErrorsAfter(undefined, "Checking in", "locked", at), ["10:11:12 Checking in: locked"]);
+  assert.deepEqual(recentErrorsAfter([], "", "plain", at), ["10:11:12 plain"]);
+  // the same notice drawn again (a worklist redraw) is not kept again …
+  let list = [];
+  for (let i = 0; i < 20; i++) list = recentErrorsAfter(list, "Comparing", "offline", at);
+  assert.equal(list.length, 1);
+  // … also with another error in between
+  list = recentErrorsAfter(list, "Saving", "denied", at);
+  list = recentErrorsAfter(list, "Comparing", "offline", new Date("2026-11-24T10:12:00Z"));
+  assert.deepEqual(list, ["10:11:12 Comparing: offline", "10:11:12 Saving: denied"]);
+  // once it is no longer among the latest, it is kept again
+  for (let i = 0; i < 6; i++) list = recentErrorsAfter(list, "E" + i, "x", at);
+  list = recentErrorsAfter(list, "Comparing", "offline", at);
+  assert.equal(list[list.length - 1], "10:11:12 Comparing: offline");
+  // at most MAX_RECENT_ERRORS, the oldest go first
+  let many = [];
+  for (let i = 0; i < 70; i++) many = recentErrorsAfter(many, "", "error " + i, at);
+  assert.equal(many.length, MAX_RECENT_ERRORS);
+  assert.equal(many[0], "10:11:12 error 20");
+  assert.equal(many[many.length - 1], "10:11:12 error 69");
+});
+
+test("Check in all: no failures, no report; the count matches the list (#471)", () => {
+  assert.equal(checkInAllFailure([]), null);
+  assert.equal(checkInAllFailure(null), null);
+  assert.deepEqual(checkInAllFailure(["PRT-1 A: locked", "PRT-2 B: gone"]), {
+    action: "Checking in all my check-outs",
+    error: "PRT-1 A: locked; PRT-2 B: gone",
+    inputs: [["failed", "2"]]
+  });
 });
 
 console.log(`${n} tests passed`);

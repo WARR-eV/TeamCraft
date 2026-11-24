@@ -486,7 +486,8 @@ function localChangesSection(nav) {
   if (plan.truncated) notes.push("Only part of the working folder was compared – it holds very many files.");
   if (plan.tracked > plan.compared) notes.push((plan.tracked - plan.compared) + " of " + plan.tracked + " revisions compared on this computer only (no outdated or conflict check)");
   if (notes.length) nav.appendChild(h("p.small.dim", { text: notes.join(" · ") }));
-  if (plan.errors.length) nav.appendChild(errorNotice("p.small.notice.error", "Could not compare with the server: " + plan.errors.join("; "), "Comparing the working folder with the server", [["errors", String(plan.errors.length)]]));
+  // drawn on every redraw: remembered for the report once per scan (shell.js scanLocalChanges)
+  if (plan.errors.length) nav.appendChild(errorNotice("p.small.notice.error", "Could not compare with the server: " + plan.errors.join("; "), "Comparing the working folder with the server", [["errors", String(plan.errors.length)]], { remember: false }));
   if (editor) {
     nav.appendChild(h("p.small.dim", null, ["Files that belong to no item yet: ",
       h("button.link.small", { type: "button", on: { click: function () {
