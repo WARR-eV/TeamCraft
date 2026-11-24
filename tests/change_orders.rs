@@ -573,7 +573,7 @@ async fn revision_letters_follow_each_release() {
 }
 
 /// The impact analysis before approval lists the assemblies that use a
-/// changed part, on every level, and the change's own items are marked.
+/// changed part, on every level, and leaves out the change's own items.
 #[tokio::test]
 async fn impact_analysis_walks_up_the_structure() {
     let app = app_or_skip!();
@@ -674,5 +674,116 @@ async fn impact_analysis_walks_up_the_structure() {
         deps.iter().all(|d| d["item_number"] != bolt.as_str()),
         "{deps:?}"
     );
+    app.teardown().await;
+}
+
+/// The impact analysis lists each dependent once, on its lowest level, with
+/// every item it depends on there, and leaves out the change's own items
+/// (#525): the change holds two parts and the sub-assembly that uses them;
+/// the top assembly uses the sub-assembly and one of the parts directly.
+#[tokio::test]
+async fn impact_analysis_lists_each_dependent_once() {
+    let app = app_or_skip!();
+    let (_, author) = app.user_in("erika", Role::Editor, &["ROCKET"]).await;
+    let (_, reviewer) = app.user("rolf", Role::Editor).await;
+    let mut numbers = Vec::new();
+    for (item_type, name) in [
+        ("part", "Bolt"),
+        ("part", "Nut"),
+        ("assembly", "Fin can"),
+        ("assembly", "Rocket"),
+    ] {
+        numbers.push(
+            app.create_item(
+                &author,
+                json!({ "item_type": item_type, "name": name, "project": "ROCKET" }),
+            )
+            .await,
+        );
+    }
+    let [bolt, nut, sub, top] = <[String; 4]>::try_from(numbers).unwrap();
+    for (parent, children) in [(&sub, vec![&bolt, &nut]), (&top, vec![&sub, &bolt])] {
+        app.api(
+            Method::POST,
+            &format!("/api/v1/items/{parent}/revisions/A/checkout"),
+            &author,
+            None,
+        )
+        .await;
+        for child in children {
+            let r = app
+                .api(
+                    Method::POST,
+                    &format!("/api/v1/items/{parent}/revisions/A/bom"),
+                    &author,
+                    Some(json!({ "child": child, "quantity": 1 })),
+                )
+                .await;
+            assert_eq!(r.status, StatusCode::CREATED, "{}", r.text());
+        }
+        app.api(
+            Method::POST,
+            &format!("/api/v1/items/{parent}/revisions/A/checkin"),
+            &author,
+            None,
+        )
+        .await;
+    }
+    let r = app
+        .api(
+            Method::POST,
+            "/api/v1/changes",
+            &author,
+            Some(json!({ "title": "Fin can rework" })),
+        )
+        .await;
+    let chg = r.json()["number"].as_str().unwrap().to_string();
+    for item in [&bolt, &nut, &sub] {
+        let r = app
+            .api(
+                Method::POST,
+                &format!("/api/v1/changes/{chg}/items"),
+                &author,
+                Some(json!({ "item": item })),
+            )
+            .await;
+        assert!(r.status.is_success(), "{}", r.text());
+    }
+    let r = app
+        .api(
+            Method::GET,
+            &format!("/api/v1/changes/{chg}/impact"),
+            &reviewer,
+            None,
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let deps = r.json().as_array().unwrap().clone();
+    let rows: Vec<(String, i64)> = deps
+        .iter()
+        .map(|d| {
+            (
+                d["item_number"].as_str().unwrap().to_string(),
+                d["level"].as_i64().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(rows, vec![(top.clone(), 1)], "{deps:?}");
+    let mut paths: Vec<(String, String)> = deps[0]["paths"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| {
+            (
+                p["via_number"].as_str().unwrap().to_string(),
+                p["relation"].as_str().unwrap().to_string(),
+            )
+        })
+        .collect();
+    paths.sort();
+    let mut expected = vec![(sub.clone(), "bom".to_string()), (bolt, "bom".to_string())];
+    expected.sort();
+    assert_eq!(paths, expected, "{deps:?}");
+    assert_eq!(deps[0]["via_number"], json!(expected[0].0));
     app.teardown().await;
 }

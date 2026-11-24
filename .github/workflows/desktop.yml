@@ -156,6 +156,10 @@ jobs:
       # desktop's Report… in place, #471), a throwing hook never escapes
       - name: Test the 3D viewer's error hook
         run: node scripts/viewer-errors.test.mjs
+      # the view controls: Export STL never for result meshes with a field,
+      # aria-pressed of the Z-up toggle (#526)
+      - name: Test the 3D viewer's view controls
+        run: node scripts/viewer-controls.test.mjs
       # the shared rules (labels, numbers, sizes, ages, state glyphs,
       # markdown-lite) against shared/test-vectors – the same vectors
       # src/ui_vectors.rs pins the server's Rust side to

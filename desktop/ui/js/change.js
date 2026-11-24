@@ -67,6 +67,15 @@ export function suggestedReviewers(number) {
  * suggested a draft would otherwise be a dead end (#291). The own name is
  * refused here already (four-eyes principle); the server checks the rest.
  */
+// What one dependent of the impact analysis depends on: every item on its
+// level (`paths`, #525), the first three spelled out; older servers
+// send only `relation` and `via_number`.
+function dependsOnText(dep) {
+  var paths = dep.paths && dep.paths.length ? dep.paths : [{ relation: dep.relation, via_number: dep.via_number }];
+  var text = paths.slice(0, 3).map(function (p) { return relationText(p.relation, p.via_number); }).join("; ");
+  return paths.length > 3 ? text + " and " + (paths.length - 3) + " more" : text;
+}
+
 function addReviewerForm(number) {
   var input = h("input", { type: "text", maxlength: "200", spellcheck: "false", placeholder: "user name",
     "aria-label": "User name of the reviewer to add" });
@@ -243,13 +252,12 @@ export function renderChange(tab, body, toolbar) {
     clear(impactPanel);
     append(impactPanel, [h("h2", { text: "Impact analysis" }),
       list.length ? h("p.hint", { text: c.status === "released"
-        ? "These items depended on the released revisions; the ones not released with this change were flagged for a check."
-        : "These items depend on the revisions of this change; on approval the ones not in it are flagged for a check." }) : null,
+        ? "These items outside the change depended on the released revisions and were flagged for a check."
+        : "These items outside the change depend on its revisions, each on its nearest level; on approval they are flagged for a check." }) : null,
       list.length ? table(["Level", "Revision", "Name", "Depends on", "State"], list.map(function (dep) {
         return {
           cells: [String(dep.level), h("span.mono", { text: dep.item_number + "/" + dep.revision_code }),
-            h("span", null, [dep.item_name, dep.in_change ? h("span.badge.badge-member", { text: " in this change" }) : null]),
-            relationText(dep.relation, dep.via_number), badge(dep.revision_state)],
+            dep.item_name, dependsOnText(dep), badge(dep.revision_state)],
           open: function () { openRevision(dep.item_number, dep.revision_code); }
         };
       }), { numeric: [0] }) : h("p.empty", { text: "No other item uses or references the revisions of this change." })]);

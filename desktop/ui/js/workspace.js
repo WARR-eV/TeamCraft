@@ -85,7 +85,7 @@ export function revViewer(tab, el) {
       overlayEl: overlay,
       resetBtn: resetBtn,
       upBtn: upBtn,
-      onReady: function () { if (stlBtn) stlBtn.disabled = false; },
+      onReady: function (info) { window.TeamCraftViewer.showStlButton(stlBtn, info); },
       // the error on the canvas (parse, graphics memory, driver) offers
       // *Report…* in place (#471)
       onError: function (text) {

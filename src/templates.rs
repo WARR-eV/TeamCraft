@@ -1644,7 +1644,7 @@ mod tests {
                     "impact": [{ "root_item_id": ME, "level": 1, "item_id": OTHER, "item_number": "ASM-000001",
                                  "item_name": "Stage", "revision_id": OTHER, "revision_code": "A",
                                  "revision_state": "released", "relation": "bom", "via_number": "PRT-000001",
-                                 "in_change": false }],
+                                 "paths": [{ "via_number": "PRT-000001", "relation": "bom" }] }],
                     "can": { "modify": true, "edit_text": true, "submit": true, "withdraw": true, "reopen": true,
                              "cancel": true, "review": true, "replace_reviewer": true, "take_over": true },
                     "sign_off": { "reauth": "release", "rejections_too": false, "sso": false,

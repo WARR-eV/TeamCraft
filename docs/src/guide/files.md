@@ -114,7 +114,9 @@ background so the first viewer does not wait. Everything is pure Rust: STEP
 is read and tessellated with the [truck](https://github.com/ricosjp/truck)
 B-rep kernel (or from the tessellated geometry of AP242 files), the mesh
 readers are part of TeamCraft. *Export STL* (in the toolbar on the view) saves the shown triangles, e.g.
-for 3D printing. The same conversion computes the shape signature of the
+for 3D printing; it is not offered for simulation results with a result field (STL keeps only the
+shape) – download the result file instead. *Z up* switches between Z-up and Y-up models (a toggle
+button, pressed while Z is up). The same conversion computes the shape signature of the
 [similar part search](similar-parts.md).
 
 While the model loads, the canvas says so, and when there is nothing to show

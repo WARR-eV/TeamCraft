@@ -175,6 +175,19 @@ see the notices in the README.
   change request the run created – `DEMO_ECO`/`DEMO_ECR` are exported
   before the desktop app starts, which hands them to the agent (#528).
 
+- Impact analysis of a change (web, desktop, `GET /changes/{number}/impact`,
+  MCP `get_change`): an assembly reached through several revisions of the
+  change appeared once per level (e.g. on level 1 and level 2 for the same
+  link), and the change's own revisions were listed as dependents. Now each
+  dependent appears once, on its nearest level, with every item it depends
+  on there (`paths`, the page shows up to three and a count), and the
+  change's own revisions are left out (the walk still goes on through them);
+  the `in_change` field is gone (#525).
+- 3D viewer (web and desktop): the *flip* label of the section plane no
+  longer wraps under its checkbox; the *Z up* toggle has `aria-pressed`
+  that follows its state (and a fixed accessible name); *Export STL* is not
+  offered for simulation results with a result field, which STL would drop
+  (#526).
 - Desktop: a check-out or check-in from Home marks the row (lock colour and
   icon) at once instead of after leaving Home and coming back; the
   *Check-outs* tab of a group is loaded again each time it comes to the
