@@ -298,6 +298,31 @@ function inputsNow(inputs) {
 }
 
 /**
+ * *Report…* for an error shown in place (#471): a link button that opens the
+ * report dialog with `action`, `text` and the key `inputs` (as for run()),
+ * or null while reports are not wired up.
+ */
+export function reportLink(action, text, inputs) {
+  if (!reportHook.open) return null;
+  var failure = failureOf(action, text, inputsNow(inputs));
+  return h("button.link.small.report-link", { type: "button", on: { click: function () { reportHook.open(failure); } } }, "Report…");
+}
+
+/**
+ * An error shown in place – in a list, a tab or a dialog – instead of a
+ * toast (#471): `spec` as for h() (e.g. "p.notice.error"), the text, and
+ * *Report…* with what failed and its key inputs. Kept for the report's
+ * recent messages like a toast.
+ */
+export function errorNotice(spec, text, action, inputs) {
+  rememberError((action ? action + ": " : "") + text);
+  var el = h(spec, { role: "alert" }, [h("span", { text: text })]);
+  var link = reportLink(action, text, inputs);
+  if (link) el.append(" ", link);
+  return el;
+}
+
+/**
  * A message at the bottom; `action` names what failed and `inputs` are its
  * key inputs (as for run()), both for *Report…*.
  */

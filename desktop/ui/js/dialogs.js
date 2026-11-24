@@ -2,7 +2,7 @@
 // TeamCraft Desktop – Dialogs: new item, settings, about.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, ITEM_TYPES, TAURI, api, call, dialog, enc, errorText, field, h, materialField, setStatus, state, toast } from "./core.js";
+import { $, ITEM_TYPES, TAURI, api, call, dialog, enc, errorNotice, errorText, field, h, materialField, setStatus, state, toast } from "./core.js";
 import { label } from "/static/shared/js/format.js";
 import { canEdit, canEditProject, freshProjects, refreshWorklistCount, rescanNewFiles } from "./shell.js";
 import { activeProject, selectView } from "./navigator.js";
@@ -242,7 +242,7 @@ export function openNewItemDialog(opts) {
       if (token !== inspection) return false;
       findings = null;
       showInfo();
-      info.appendChild(line(".notice.error", errorText(err)));
+      info.appendChild(errorNotice("p.notice.error", errorText(err), "Checking the files of the new item", newItemInputs));
       return false;
     });
   }
@@ -262,7 +262,7 @@ export function openNewItemDialog(opts) {
     clearTimeout(checkTimer);
     checkTimer = setTimeout(function () {
       var token = ++inspection;
-      runCheck(token).catch(function (err) { if (token === inspection) { findings = null; showInfo(); info.appendChild(line(".notice.error", errorText(err))); } });
+      runCheck(token).catch(function (err) { if (token === inspection) { findings = null; showInfo(); info.appendChild(errorNotice("p.notice.error", errorText(err), "Checking the files of the new item", newItemInputs)); } });
     }, 400);
   }
   // *Report…* (#381): what the new item was to be, never its description

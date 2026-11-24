@@ -4,7 +4,7 @@
 // group is never loaded as a whole. The rules are in files-view.js.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { ICONS, api, badge, clear, enc, errorText, h, lockIcon, state, svgIcon, toast } from "./core.js";
+import { ICONS, api, badge, clear, enc, errorNotice, errorText, h, lockIcon, state, svgIcon, toast } from "./core.js";
 import { label } from "/static/shared/js/format.js";
 import { emptyHint, typeIcon } from "./navigator.js";
 import { emptyGroupHint } from "./empty-rules.js";
@@ -76,7 +76,7 @@ export function renderFiles(p, ul, opts) {
       return opts.olderServer();
     }
     clear(ul);
-    ul.appendChild(h("li.notice.error", { text: errorText(err) }));
+    ul.appendChild(errorNotice("li.notice.error", errorText(err), "Loading the files of " + p.code, [["group", p.code], ["folder", root || "(top)"]]));
   });
 }
 
@@ -135,7 +135,7 @@ function loadFolder(p, path, ul, opts) {
     drawLevel(p, path, ul, level, opts, "This folder is empty.");
   }, function (err) {
     clear(ul);
-    ul.appendChild(h("li.notice.error", { text: errorText(err) }));
+    ul.appendChild(errorNotice("li.notice.error", errorText(err), "Loading the folder " + path + " of " + p.code, [["group", p.code], ["folder", path]]));
   });
 }
 

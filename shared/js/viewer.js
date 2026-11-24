@@ -110,6 +110,8 @@
    *                   never just an empty (dark) canvas; hidden once the model
    *                   is shown
    * options.onReady   called when the model is shown
+   * options.onError   called with the text of every error the viewer shows
+   *                   (after the overlay shows it): the desktop adds *Report…*
    *
    * Returns { exportStl() → ArrayBuffer (binary STL), dispose() }.
    */
@@ -149,6 +151,9 @@
       canvas.setAttribute("data-ready", "error");
       setStatus(text, true);
       overlay(text, "error");
+      if (options.onError) {
+        try { options.onError(text); } catch (e) { /* the caller's hook never stops the viewer */ }
+      }
     }
 
     // ---------------------------------------------------------------- mesh

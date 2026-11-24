@@ -164,9 +164,9 @@ feature milestone – the features in *What works* are enough; what is missing i
   (`ReportUrl`), a request id on every answer and web error page (`x-request-id`, in the log line), the key inputs
   of the main actions (check-out/in, park, get, open, 3D preview, STEP/STL export, new item, add files, BOM and
   folder import, request attachments). Left: screenshot and affected-file attachments (pending a decision: what a
-  screenshot may show, and the warning for a file that leaves the organisation); key inputs for the remaining
-  smaller actions (change orders, requests, settings); *Report…* on inline error notices (new-item duplicate check, BOM
-  preview "No BOM lines found", the 3D viewer's canvas overlay incl. parse and graphics-memory errors)
+  screenshot may show, and the warning for a file that leaves the organisation, #470). Done since (#471): key inputs
+  of change orders, requests and settings; *Report…* on the errors shown in place (lists and tabs that failed to load,
+  the new-item file check, the BOM preview, the 3D viewer's overlay, *Check in all* problems)
 - [ ] Desktop: one-click update (#377). Done: update window (release notes, *Skip this version*, *Remind me later*),
   *Help → Check for Updates…*, download of this installation's file verified against `SHA256SUMS.txt`, Windows
   installers started, `.dmg` opened. Left: swapping a portable zip or AppImage in place with *Restart now*, a

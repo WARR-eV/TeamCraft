@@ -2,7 +2,7 @@
 // TeamCraft Desktop – Change tab.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { api, append, badge, call, clear, enc, errorText, h, lockBadge, moreMenu, priorityBadge, run, state, toast, tool, toolGroup } from "./core.js";
+import { api, append, badge, call, clear, enc, errorNotice, errorText, h, lockBadge, moreMenu, priorityBadge, run, state, toast, tool, toolGroup } from "./core.js";
 import { fmtDate, label } from "/static/shared/js/format.js";
 import { canEdit, refreshWorklistCount, watchTool } from "./shell.js";
 import { openTab, recordLink, reloadActive, renderTabs, table } from "./tabs.js";
@@ -10,6 +10,7 @@ import { agentButton } from "./agent.js";
 import { dd, dt, openRevision } from "./revision.js";
 import { relationText } from "./references.js";
 import { draftBlocker, reviewerProblem } from "./release-rules.js";
+import { changeInputs } from "./report-inputs.js";
 
 // ======================================================================
 // Change tab
@@ -52,7 +53,7 @@ export function suggestedReviewers(number) {
         add.disabled = true;
         run("Adding " + s.display_name, function () {
           return api("POST", "/changes/" + enc(number) + "/reviewers", { username: s.username });
-        }).then(function () { toast("Added reviewer " + s.display_name); reloadActive(); }, function () { add.disabled = false; });
+        }, changeInputs({ number: number }, [["reviewer", s.username]])).then(function () { toast("Added reviewer " + s.display_name); reloadActive(); }, function () { add.disabled = false; });
       } } }, "Add " + s.display_name);
       box.appendChild(h("div.suggestion", null, [add, why]));
     });
@@ -80,7 +81,7 @@ function addReviewerForm(number) {
       return p.reviewers.reduce(function (done, username) {
         return done.then(function () { return api("POST", "/changes/" + enc(number) + "/reviewers", { username: username }); });
       }, Promise.resolve());
-    }).then(function () { toast("Added " + p.reviewers.join(", ")); reloadActive(); },
+    }, changeInputs({ number: number }, [["reviewers", p.reviewers.join(", ")]])).then(function () { toast("Added " + p.reviewers.join(", ")); reloadActive(); },
       function () { add.disabled = false; reloadActive(); });
   } } }, [input, add]);
 }
@@ -91,7 +92,7 @@ function removeReviewerButton(number, r) {
     b.disabled = true;
     run("Removing " + r.reviewer_name, function () {
       return api("DELETE", "/changes/" + enc(number) + "/reviewers/" + enc(r.reviewer_username));
-    }).then(function () { toast("Removed reviewer " + r.reviewer_name); reloadActive(); }, function () { b.disabled = false; });
+    }, changeInputs({ number: number }, [["reviewer", r.reviewer_username]])).then(function () { toast("Removed reviewer " + r.reviewer_name); reloadActive(); }, function () { b.disabled = false; });
   } } }, "Remove");
   return b;
 }
@@ -102,7 +103,7 @@ export function renderChange(tab, body, toolbar) {
   var myReview = tab.data.reviews.filter(function (r) { return r.reviewer_id === me.id; })[0];
   var canReview = c.status === "in_review" && myReview && myReview.decision === "pending";
   function action(path, text) {
-    run(text, function () { return api("POST", "/changes/" + enc(c.number) + "/" + path); })
+    run(text, function () { return api("POST", "/changes/" + enc(c.number) + "/" + path); }, changeInputs(c))
       .then(function () { toast(text + " – done"); reloadActive(); refreshWorklistCount(); }, function () {});
   }
   var notOwner = owner ? null : "Only " + c.created_by_name + " (who created it) or an administrator can do this";
@@ -123,7 +124,7 @@ export function renderChange(tab, body, toolbar) {
     }
     run(decision === "approve" ? "Approving" : "Rejecting", function () {
       return api("POST", "/changes/" + enc(c.number) + "/review", { decision: decision, comment: comment.value });
-    }).then(function (r) {
+    }, changeInputs(c, [["decision", decision]])).then(function (r) {
       toast(c.number + " – " + (decision === "approve" ? "approved" : "rejected") + "; status " + label(r.change.status));
       reloadActive(); refreshWorklistCount();
     }, function () {});
@@ -208,7 +209,7 @@ export function renderChange(tab, body, toolbar) {
       append(readyPanel, [
         h("div.row", null, [h("h2", { text: "Release readiness" }),
           owner && c.status === "draft" && addable ? h("button.primary.small", { type: "button", on: { click: function () {
-            run("Adding the dependencies", function () { return api("POST", "/changes/" + enc(c.number) + "/dependencies"); })
+            run("Adding the dependencies", function () { return api("POST", "/changes/" + enc(c.number) + "/dependencies"); }, changeInputs(c))
               .then(function (res) { toast(res.added.length ? "Added " + res.added.join(", ") : "Nothing to add"); reloadActive(); }, function () {});
           } } }, "Add all to this change") : null]),
         r.ready
@@ -224,7 +225,8 @@ export function renderChange(tab, body, toolbar) {
           };
         })) : null
       ]);
-    }, function (err) { clear(readyPanel); append(readyPanel, [h("h2", { text: "Release readiness" }), h("p.notice.error", { text: errorText(err) })]); });
+    }, function (err) { clear(readyPanel); append(readyPanel, [h("h2", { text: "Release readiness" }),
+      errorNotice("p.notice.error", errorText(err), "Checking the release readiness of " + c.number, changeInputs(c))]); });
   }
   // Impact analysis: the items that depend on the revisions of this change.
   var impactPanel = h("section.panel", null, [h("h2", { text: "Impact analysis" }), h("p.muted.small", { text: "Loading …" })]);

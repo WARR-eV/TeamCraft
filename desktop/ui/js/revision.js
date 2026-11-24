@@ -2,7 +2,7 @@
 // TeamCraft Desktop – Revision tab: overview, files, structure, where used.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, ICONS, api, append, badge, call, dialog, enc, errorText, h, invoke, lockBadge, moreMenu, run, state, svgIcon, toast, tool, toolGroup } from "./core.js";
+import { $, ICONS, api, append, badge, call, dialog, enc, errorNotice, errorText, h, invoke, lockBadge, moreMenu, run, state, svgIcon, toast, tool, toolGroup } from "./core.js";
 import { fmtDate, fmtNum, fmtSize, label } from "/static/shared/js/format.js";
 import { canEdit, canEditProject, savePackage, watchTool } from "./shell.js";
 import { typeIcon } from "./navigator.js";
@@ -307,7 +307,8 @@ export function renderRevision(tab, body, toolbar) {
     graph: revGraph, changes: revChanges, history: revHistory, viewer: revViewer, workspace: revWorkspace
   }[tab.sub] || revOverview;
   Promise.resolve().then(function () { return render(tab, content); }).catch(function (err) {
-    content.appendChild(h("p.notice.error", { text: errorText(err) }));
+    content.appendChild(errorNotice("p.notice.error", errorText(err), "Showing " + (tab.sub || "overview") + " of " + tab.number + "/" + tab.code,
+      revisionInputs(tab.data && tab.data.rev, [["sub-tab", tab.sub || "overview"]])));
   });
 }
 
