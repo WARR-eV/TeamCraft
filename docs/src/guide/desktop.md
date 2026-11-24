@@ -473,7 +473,9 @@ the page offers *Get…* (copy
 groups into your workspace) and *Import CAD folder…*. While *Get…* copies,
 its dialog shows the progress, the groups and the revision rule cannot be
 changed, and the dialog stays open (Escape does not close it); *Stop* cancels
-the copy (*Stopping…*) and the dialog then shows *Stopped*. At the
+the copy once the file being copied has ended, and the dialog then shows
+*Stopped* – meanwhile *Close* hides the dialog and the result comes as a
+message (a new Get starts only once the stopped one has ended). At the
 end the dialog turns into a result: **Done** with a tick and the counts
 (items, files copied, local changes kept, items skipped – *Nothing to get*
 when no item has a released revision), or *Finished with problems* /

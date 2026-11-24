@@ -57,7 +57,7 @@ export function groupsGetResult(done, stopped, codes) {
     (upToDate ? " (everything was up to date)" : "")];
   if (done.kept) lines.push(n(done.kept, "locally modified file", "locally modified files") + " kept");
   if (done.skipped) lines.push(n(done.skipped, "item", "items") + " without a released revision skipped");
-  if (done.clashes) lines.push("Name clashes are listed below – nothing was overwritten");
+  if (done.clashes) lines.push((done.clashes === 1 ? "The name clash is" : "The name clashes are") + " listed below – nothing was overwritten");
   return { outcome: outcome, title: title, lines: lines, problems: errors.slice() };
 }
 

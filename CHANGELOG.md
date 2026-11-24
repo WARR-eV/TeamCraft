@@ -41,13 +41,17 @@ see the notices in the README.
   in every time zone, instead of as an ISO date (#527).
 - Desktop, *Get project groups* (#449): *Stop* keeps the dialog open
   (*Stopping…*) and shows the *Stopped* step instead of closing it; while the
+- Desktop, *Get project groups* (#449): *Stop* keeps the dialog open and
+  shows the *Stopped* step instead of closing it, once the file being copied
+  has ended; until then *Close* may hide the dialog (the result comes as a
+  message, and a new Get waits until the stopped one has ended); while the
   Get runs the dialog is modal, so Escape or a click beside it no longer
   hides it with the Get still running – a second Get could then run at the
   same time (#498); the revision rule and the groups are locked and the rule
   is taken once, so switching it midway no longer mixes revisions or marks
   the groups as fully fetched (#499); an earlier error of the dialog is
   cleared when a new run starts (#500); a name clash is listed once, among
-  the problems (#501); "everything was up to date" shows only when items
+  the problems, in the singular for one clash (#501); "everything was up to date" shows only when items
   were got and nothing failed or stopped, and a run where every item was
   skipped says *Nothing to get*.
 - Desktop, *Report…* (#471): the worklist's "Could not compare with the

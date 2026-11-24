@@ -109,8 +109,10 @@ test("a name clash is listed once, with the problems (#449)", () => {
   assert.equal(r.outcome, "problems");
   assert.equal(r.title, "Finished with problems: A, B");
   assert.deepEqual(r.problems, ["PRT-2: x.ipt – taken by PRT-1"]);
-  assert.deepEqual(r.lines, ["4 items got, 2 files copied", "Name clashes are listed below – nothing was overwritten"]);
+  assert.deepEqual(r.lines, ["4 items got, 2 files copied", "The name clash is listed below – nothing was overwritten"]);
   assert.equal(r.lines.some((l) => /1 name clash/.test(l)), false, "the clash is not counted again");
+  addDownload(done, "PRT-3", { downloaded: [], kept: [], failed: [], clashes: [{ path: "PRT-3", file: "x.ipt", with: "PRT-1" }] });
+  assert.equal(groupsGetResult(done, false, ["A", "B"]).lines[1], "The name clashes are listed below – nothing was overwritten");
 });
 
 test("the result tolerates missing codes and errors, and copies the problems", () => {
