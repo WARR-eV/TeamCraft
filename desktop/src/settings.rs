@@ -798,6 +798,11 @@ mod tests {
         );
         assert_eq!(loaded.onboarding, None);
         assert_eq!(loaded.donate_tag, None, "the Ko-fi tag stays on (#403)");
+        assert_eq!(
+            loaded.usage_report, None,
+            "the usage report stays as it was: on (#473)"
+        );
+        assert!(crate::policy::Policies::default().usage_report(loaded.usage_report));
     }
 
     #[test]

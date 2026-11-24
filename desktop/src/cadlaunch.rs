@@ -33,9 +33,13 @@
 //! (`GetActiveObject`, `InstallPath`,
 //! `DesignProjectManager.ActiveDesignProject`, `Documents.Open`) by a short
 //! Windows PowerShell script, like the STEP export (`cadexport.rs`); calls
-//! Inventor rejects while busy are asked again for up to 10 s. Any other
-//! answer starts a new instance as before, with a note why – also an
-//! Inventor that runs but cannot be asked (started as administrator).
+//! Inventor rejects while busy are asked again for up to 10 s (before the
+//! answer only until [`ASK_DEADLINE_SECS`]). Any other answer starts a new
+//! instance as before, with a note why – also an Inventor that runs in the
+//! user's own session but cannot be asked (started as administrator) or does
+//! not answer within [`ASK_LIMIT`]. An Inventor of another Windows session
+//! (another user) does not count. When the running instance fails to open
+//! the file after it answered, the app is told on the side.
 //!
 //! Not tested against real installations in the development environment;
 //! the paths are the installers' defaults.
@@ -539,6 +543,12 @@ const PROJECT_EXTENSION: &str = "ipj";
 #[cfg_attr(not(windows), allow(dead_code))]
 pub const ASK_LIMIT: std::time::Duration = std::time::Duration::from_secs(20);
 
+/// How long [`INVENTOR_OPEN_SCRIPT`] asks a busy Inventor again before it
+/// answers (`AddSeconds` in the script): below [`ASK_LIMIT`], with time for
+/// PowerShell to start. Opening the file afterwards keeps the full retries.
+#[allow(dead_code)] // the script has the number; a test pins the two together
+pub const ASK_DEADLINE_SECS: u64 = 14;
+
 /// The Inventor project file (`.ipj`) of a file in the working folder: the
 /// nearest folder, from the file's own up to the working folder `root`,
 /// that holds exactly one. A folder with several makes it unknown, and so
@@ -570,7 +580,7 @@ pub fn project_file(file: &Path, root: &Path) -> Option<PathBuf> {
 /// What a running Inventor answered when asked to open a file.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Running {
-    /// No Inventor the user started runs, or it could not be asked in time.
+    /// No Inventor the user started runs.
     Nothing,
     /// It opens the file as a new document window.
     Opening,
@@ -579,7 +589,8 @@ pub enum Running {
     /// It has another project active (its project file; empty = none).
     OtherProject(String),
     /// It runs, but did not answer: started as administrator (another
-    /// integrity level), still starting, or busy with a dialog.
+    /// integrity level), still starting, or busy with a dialog – or it did
+    /// not answer within [`ASK_LIMIT`].
     Unreachable,
 }
 
@@ -670,8 +681,12 @@ pub fn tasklist_has(answer: &str, image: &str) -> bool {
 
 /// Asks a running Inventor to open a file, and answers with one line (see
 /// [`parse_answer`]) – before `Documents.Open`, so the app does not wait
-/// for a large assembly to load. Only an instance the user can see counts:
-/// an invisible one is an automation run (a STEP export, `cadexport.rs`).
+/// for a large assembly to load. Only an instance the user can see in their
+/// own Windows session counts: an invisible one is an automation run (a
+/// STEP export, `cadexport.rs`), one in another session another user's.
+/// The questions before the answer are asked again only until
+/// [`ASK_DEADLINE_SECS`], so the answer comes within [`ASK_LIMIT`]. After
+/// `opening`, a failure to open the file is one more line ([`parse_failure`]).
 #[cfg_attr(not(windows), allow(dead_code))]
 pub const INVENTOR_OPEN_SCRIPT: &str = r#"param([Parameter(Mandatory = $true)][string]$Path, [Parameter(Mandatory = $true)][string]$InstallDir, [string]$Project = '')
 $ErrorActionPreference = 'Stop'
@@ -682,29 +697,44 @@ function Same([string]$A, [string]$B) {
     return [IO.Path]::GetFullPath($A).TrimEnd('\') -ieq [IO.Path]::GetFullPath($B).TrimEnd('\')
 }
 # Inventor rejects calls while it is busy (RPC_E_CALL_REJECTED 0x80010001,
-# RPC_E_SERVERCALL_RETRYLATER 0x8001010A): ask again for up to 10 s. PowerShell
-# wraps the COM error (MethodInvocationException …): the innermost one counts.
-function Ask([scriptblock]$Do) {
+# RPC_E_SERVERCALL_RETRYLATER 0x8001010A): ask again for up to 10 s, and not
+# after $Until. PowerShell wraps the COM error (MethodInvocationException …):
+# the innermost one counts.
+function Ask([scriptblock]$Do, $Until = $null) {
     for ($i = 0; ; $i++) {
         try { return (& $Do) }
         catch {
             $e = $_.Exception; while ($e.InnerException) { $e = $e.InnerException }
-            if ($i -ge 20 -or ($e.HResult -ne -2147418111 -and $e.HResult -ne -2147417846)) { throw }
+            if ($i -ge 20 -or ($Until -and [DateTime]::UtcNow -ge $Until) -or ($e.HResult -ne -2147418111 -and $e.HResult -ne -2147417846)) { throw }
             Start-Sleep -Milliseconds 500
         }
     }
 }
 try { $app = [Runtime.InteropServices.Marshal]::GetActiveObject('Inventor.Application') }
-catch { Say 'unreachable'; exit 0 }
+catch {
+    # only a visible Inventor in this user's own session counts (#483): another
+    # session's (remote desktop, fast user switching), a hidden automation run
+    # (STEP export) or one shutting down is none for this user
+    $seen = @()
+    try {
+        $own = (Get-Process -Id $PID).SessionId
+        $seen = @(Get-Process -Name Inventor -ErrorAction SilentlyContinue |
+            Where-Object { $_.SessionId -eq $own -and $_.MainWindowHandle -ne [IntPtr]::Zero })
+    } catch { }
+    if ($seen.Count -gt 0) { Say 'unreachable'; exit 0 }
+    Say 'none'; exit 0
+}
+# the answer is due within the app's limit (ASK_LIMIT, PowerShell's start included)
+$deadline = [DateTime]::UtcNow.AddSeconds(14)
 try {
-    if (-not (Ask { $app.Visible })) { Say 'none'; exit 0 }
-    $dir = [string](Ask { $app.InstallPath })
+    if (-not (Ask { $app.Visible } $deadline)) { Say 'none'; exit 0 }
+    $dir = [string](Ask { $app.InstallPath } $deadline)
     if (-not (Same $dir $InstallDir)) { Say "version $dir"; exit 0 }
     # without a project file in the working folder there is nothing to compare:
     # a new instance would start with the same (last active) project
     if ($Project) {
         $active = ''
-        $current = Ask { $app.DesignProjectManager.ActiveDesignProject }
+        $current = Ask { $app.DesignProjectManager.ActiveDesignProject } $deadline
         if ($null -ne $current) { $active = [string]$current.FullFileName }
         if (-not (Same $active $Project)) { Say "project $active"; exit 0 }
     }
@@ -716,10 +746,44 @@ try {
         if ($p.Path -and (Same (Split-Path (Split-Path $p.Path)) $InstallDir)) { [void]$shell.AppActivate($p.Id); break }
     }
 } catch { }
-$doc = $null
-foreach ($d in (Ask { $app.Documents })) { if (Same $d.FullFileName $Path) { $doc = $d } }
-if ($null -eq $doc) { [void](Ask { $app.Documents.Open($Path, $true) }) } else { [void](Ask { $doc.Activate() }) }
+# the app no longer waits: a failure is one more line. A document loaded only
+# as a reference of an open assembly has no window – Open shows it.
+try {
+    $doc = $null
+    foreach ($d in (Ask { $app.Documents.VisibleDocuments })) { if (Same $d.FullFileName $Path) { $doc = $d } }
+    if ($null -eq $doc) { [void](Ask { $app.Documents.Open($Path, $true) }) } else { [void](Ask { $doc.Activate() }) }
+} catch {
+    $e = $_.Exception; while ($e.InnerException) { $e = $e.InnerException }
+    $why = $e.Message -replace '\s+', ' '
+    Say "failed $why"
+}
 "#;
+
+/// The line [`INVENTOR_OPEN_SCRIPT`] prints when the file could not be
+/// opened after it answered `opening`: `failed <reason>` → the reason (may
+/// be empty); `None` for any other line.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn parse_failure(line: &str) -> Option<String> {
+    let line = line.trim();
+    line.strip_prefix("failed")
+        .filter(|r| r.is_empty() || r.starts_with(' '))
+        .map(|r| r.trim().to_string())
+}
+
+/// What the wait for the script's answer gives: an answer as read; no answer
+/// within [`ASK_LIMIT`] means a running Inventor that did not answer (only
+/// asked after `tasklist` saw one) – the script is stopped (`true`); a script
+/// that ended without an answer gives nothing to say.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn answer_after(
+    received: Result<Running, std::sync::mpsc::RecvTimeoutError>,
+) -> (Running, bool) {
+    match received {
+        Ok(answer) => (answer, false),
+        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => (Running::Unreachable, true),
+        Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => (Running::Nothing, false),
+    }
+}
 
 /// How *Check out and open* goes on after asking a running instance.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -735,15 +799,22 @@ pub enum Reuse {
 /// Opens `file` in a running instance of `program` when that is the
 /// installation [`plan`] chose and has the working folder's project active
 /// (#350; Inventor on Windows – anywhere else nothing is asked and a new
-/// instance starts, as before).
-pub fn open_in_running(program: &Installed, file: &Path, root: &Path) -> Reuse {
+/// instance starts, as before). The answer comes before the file is open:
+/// when the running instance then fails to open it, `failed` gets the reason
+/// (on the side, later).
+pub fn open_in_running(
+    program: &Installed,
+    file: &Path,
+    root: &Path,
+    failed: impl FnOnce(String) + Send + 'static,
+) -> Reuse {
     if program.family != "inventor" {
         return Reuse::NewInstance(String::new());
     }
     #[cfg(windows)]
     {
         let project = project_file(file, root);
-        match running::ask(program, file, project.as_deref()) {
+        match running::ask(program, file, project.as_deref(), failed) {
             Running::Opening => Reuse::Opened,
             other => Reuse::NewInstance(
                 running_note(&other, program, project.as_deref()).unwrap_or_default(),
@@ -752,7 +823,7 @@ pub fn open_in_running(program: &Installed, file: &Path, root: &Path) -> Reuse {
     }
     #[cfg(not(windows))]
     {
-        let _ = (file, root);
+        let _ = (file, root, failed);
         Reuse::NewInstance(String::new())
     }
 }
@@ -779,7 +850,12 @@ mod running {
             .is_ok_and(|o| tasklist_has(&String::from_utf8_lossy(&o.stdout), "Inventor.exe"))
     }
 
-    pub fn ask(program: &Installed, file: &Path, project: Option<&Path>) -> Running {
+    pub fn ask(
+        program: &Installed,
+        file: &Path,
+        project: Option<&Path>,
+        failed: impl FnOnce(String) + Send + 'static,
+    ) -> Running {
         // Bin\Inventor.exe → the install folder Inventor reports
         let Some(install) = program.path.parent().and_then(Path::parent) else {
             return Running::Nothing;
@@ -831,6 +907,7 @@ mod running {
         if let Some(out) = child.stdout.take() {
             std::thread::spawn(move || {
                 let mut answered = false;
+                let mut failed = Some(failed);
                 for line in std::io::BufReader::new(out).lines() {
                     let Ok(line) = line else { break };
                     if !answered {
@@ -838,15 +915,17 @@ mod running {
                             answered = true;
                             let _ = tx.send(answer);
                         }
+                    } else if let Some(why) = parse_failure(&line) {
+                        // after `opening`: the app already answered, so the
+                        // failure is reported on the side
+                        if let Some(report) = failed.take() {
+                            report(why);
+                        }
                     }
                 }
             });
         }
-        let (answer, stuck) = match rx.recv_timeout(ASK_LIMIT) {
-            Ok(answer) => (answer, false),
-            Err(mpsc::RecvTimeoutError::Timeout) => (Running::Nothing, true),
-            Err(mpsc::RecvTimeoutError::Disconnected) => (Running::Nothing, false),
-        };
+        let (answer, stuck) = answer_after(rx.recv_timeout(ASK_LIMIT));
         // the script goes on opening the file; collected on the side
         std::thread::spawn(move || {
             if stuck {
@@ -1132,6 +1211,46 @@ mod tests {
         assert_eq!(parse_answer("projects x"), None);
         assert_eq!(parse_answer("WARNING: something"), None);
         assert_eq!(parse_answer(""), None);
+        // the word alone, never a prefix of it
+        assert_eq!(parse_answer("unreachable \r"), Some(Running::Unreachable));
+        assert_eq!(parse_answer("unreachable x"), None);
+        assert_eq!(parse_answer("unreachables"), None);
+        // a failure after `opening` is not an answer
+        assert_eq!(parse_answer("failed The file is locked."), None);
+    }
+
+    #[test]
+    fn a_failure_after_opening_is_read() {
+        assert_eq!(
+            parse_failure("failed Cannot open C:\\w\\a.ipt.\r").as_deref(),
+            Some(r"Cannot open C:\w\a.ipt.")
+        );
+        assert_eq!(parse_failure("failed").as_deref(), Some(""));
+        assert_eq!(parse_failure("failedx"), None);
+        assert_eq!(parse_failure("opening"), None);
+        assert_eq!(parse_failure(""), None);
+    }
+
+    #[test]
+    fn no_answer_in_time_is_an_inventor_that_did_not_answer() {
+        use std::sync::mpsc::RecvTimeoutError;
+        let wanted = inst("inventor", "2026");
+        // tasklist saw Inventor, the script did not answer within ASK_LIMIT:
+        // the script is stopped, and the note says why a new instance starts
+        let (answer, stop) = answer_after(Err(RecvTimeoutError::Timeout));
+        assert_eq!((answer.clone(), stop), (Running::Unreachable, true));
+        assert!(running_note(&answer, &wanted, None)
+            .unwrap()
+            .starts_with("Inventor is running but did not answer"));
+        // a script that ended without an answer: nothing to say
+        assert_eq!(
+            answer_after(Err(RecvTimeoutError::Disconnected)),
+            (Running::Nothing, false)
+        );
+        assert_eq!(
+            answer_after(Ok(Running::Opening)),
+            (Running::Opening, false)
+        );
     }
 
     #[test]
@@ -1151,26 +1270,51 @@ mod tests {
         assert_eq!(
             says,
             vec![
+                // not in the ROT: a visible Inventor in this session, or none
                 "unreachable",
+                "none",
                 "none",
                 "version $dir",
                 "project $active",
                 "unreachable",
-                "opening"
+                "opening",
+                "failed $why"
             ]
         );
-        for said in says {
+        let (answers, after) = says.split_at(says.len() - 1);
+        for said in answers {
             let line = said
                 .replace("$dir", r"C:\x")
                 .replace("$active", r"C:\p.ipj");
             assert!(parse_answer(&line).is_some(), "{line}");
         }
+        // the failure after `opening` is its own line, never an answer
+        let failed = after[0].replace("$why", "Locked.");
+        assert_eq!(parse_answer(&failed), None);
+        assert_eq!(parse_failure(&failed).as_deref(), Some("Locked."));
         // the answer comes before the file is opened (a large assembly loads
         // for minutes), and only the user's visible instance is used
         let opening = INVENTOR_OPEN_SCRIPT.find("Say 'opening'").unwrap();
         assert!(INVENTOR_OPEN_SCRIPT.find("Documents.Open").unwrap() > opening);
-        assert!(INVENTOR_OPEN_SCRIPT.contains("if (-not (Ask { $app.Visible }))"));
+        assert!(INVENTOR_OPEN_SCRIPT.contains("if (-not (Ask { $app.Visible } $deadline))"));
         assert!(!INVENTOR_OPEN_SCRIPT.contains("New-Object -ComObject 'Inventor.Application'"));
+        // not in the ROT (#483): only a visible Inventor of this user's own
+        // Windows session is one that did not answer – another session's or
+        // a hidden automation run is none
+        let rot = INVENTOR_OPEN_SCRIPT.find("GetActiveObject").unwrap();
+        let first_catch =
+            &INVENTOR_OPEN_SCRIPT[rot..INVENTOR_OPEN_SCRIPT.find("$deadline =").unwrap()];
+        assert!(
+            first_catch.contains("$_.SessionId -eq $own"),
+            "{first_catch}"
+        );
+        assert!(first_catch.contains("MainWindowHandle -ne [IntPtr]::Zero"));
+        assert!(first_catch.contains("Say 'none'"));
+        // after `opening` every failure is caught and reported, and only a
+        // document with a window is activated
+        let open = &INVENTOR_OPEN_SCRIPT[opening..];
+        assert!(open.contains("$app.Documents.VisibleDocuments"));
+        assert!(open.contains("Say \"failed $why\""));
         // the project is compared only when the working folder has one
         // (#483): Inventor always has a project active, Default at least
         let compare = INVENTOR_OPEN_SCRIPT.find("if ($Project) {").unwrap();
@@ -1180,8 +1324,61 @@ mod tests {
                 .unwrap()
                 > compare
         );
-        // a busy Inventor is asked again (RPC_E_CALL_REJECTED)
+        // a busy Inventor is asked again (RPC_E_CALL_REJECTED,
+        // RPC_E_SERVERCALL_RETRYLATER) – on the innermost error, PowerShell
+        // wraps the COM one – at most 20 times
         assert!(INVENTOR_OPEN_SCRIPT.contains("-2147418111"));
+        assert!(INVENTOR_OPEN_SCRIPT.contains("-2147417846"));
+        assert!(INVENTOR_OPEN_SCRIPT.contains("while ($e.InnerException)"));
+        assert!(INVENTOR_OPEN_SCRIPT.contains("$i -ge 20"));
+    }
+
+    /// Every question to Inventor goes through `Ask` (asked again while
+    /// busy), and every one before the answer is inside the `try` that
+    /// answers `unreachable` and stops at the deadline.
+    #[test]
+    fn every_question_to_inventor_is_asked_again_and_answered() {
+        let script = INVENTOR_OPEN_SCRIPT;
+        let rot = script.find("GetActiveObject").unwrap();
+        for line in script[rot..].lines() {
+            assert_eq!(
+                line.matches("$app.").count(),
+                line.matches("Ask { $app.").count(),
+                "a question outside Ask: {line}"
+            );
+        }
+        let opening = script.find("Say 'opening'").unwrap();
+        let guarded = script.find("$deadline =").unwrap();
+        let start = guarded + script[guarded..].find("try {").unwrap();
+        let end = guarded
+            + script[guarded..]
+                .find("} catch { Say 'unreachable'")
+                .unwrap();
+        assert!(end < opening);
+        let mut asked = 0;
+        for (at, _) in script[rot..opening].match_indices("$app.") {
+            let at = rot + at;
+            assert!(at > start && at < end, "outside the try: {}", &script[at..]);
+        }
+        for line in script[start..end].lines().filter(|l| l.contains("Ask {")) {
+            asked += 1;
+            assert!(line.contains("} $deadline"), "no deadline: {line}");
+        }
+        assert_eq!(asked, 3);
+    }
+
+    /// The questions before the answer stop at the deadline, which leaves
+    /// time for PowerShell to start and for the last call within ASK_LIMIT;
+    /// without it, three questions of 10 s each would run past it.
+    #[test]
+    fn the_answer_comes_within_the_limit() {
+        assert!(INVENTOR_OPEN_SCRIPT.contains(&format!("AddSeconds({ASK_DEADLINE_SECS})")));
+        // PowerShell's start (up to 3 s), one more retry pause and the call
+        // that is running at the deadline
+        let margin = 5;
+        assert!(ASK_DEADLINE_SECS + margin <= ASK_LIMIT.as_secs());
+        let retry = INVENTOR_OPEN_SCRIPT.contains("($Until -and [DateTime]::UtcNow -ge $Until)");
+        assert!(retry, "Ask stops at the deadline");
     }
 
     #[test]
@@ -1206,6 +1403,17 @@ mod tests {
         assert_eq!(
             running_note(&none, &wanted, Some(&own)).unwrap(),
             "Inventor is running with no project, not Graksler 4.3 – opened in a new instance."
+        );
+        // without a project file in the working folder (#483) only the
+        // running one is named
+        let default = Running::OtherProject(r"C:\x\Default.ipj".into());
+        assert_eq!(
+            running_note(&default, &wanted, None).unwrap(),
+            "Inventor is running with the project Default – opened in a new instance."
+        );
+        assert_eq!(
+            running_note(&none, &wanted, None).unwrap(),
+            "Inventor is running with no project – opened in a new instance."
         );
         let note = running_note(&Running::Unreachable, &wanted, None).unwrap();
         assert!(
@@ -1236,12 +1444,12 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("a.sldprt");
         assert_eq!(
-            open_in_running(&inst("solidworks", "2025"), &file, dir.path()),
+            open_in_running(&inst("solidworks", "2025"), &file, dir.path(), |_| {}),
             Reuse::NewInstance(String::new())
         );
         #[cfg(not(windows))]
         assert_eq!(
-            open_in_running(&inst("inventor", "2026"), &file, dir.path()),
+            open_in_running(&inst("inventor", "2026"), &file, dir.path(), |_| {}),
             Reuse::NewInstance(String::new())
         );
     }

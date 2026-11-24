@@ -151,6 +151,12 @@ export function boot() {
   TAURI.event.listen("crash-reports", function () { checkCrashReports(); });
   // the SolidCraft plugin asks to open, check out or check in a revision (src/scbridge.rs)
   TAURI.event.listen("solidcraft-request", function (e) { onSolidcraftRequest(e.payload); });
+  // a running Inventor took the file but could not open it (#483): it
+  // answered before opening, so the failure comes on its own
+  TAURI.event.listen("cad-open-failed", function (e) {
+    var p = e.payload || {};
+    toast((p.program || "The program") + " could not open " + (p.file || "the file") + (p.reason ? ": " + p.reason : "."), "error", "Opening in a running CAD program", [["program", p.program], ["file", p.file]]);
+  });
   $("status-get-cancel").addEventListener("click", function () {
     $("status-get-text").textContent = "Stopping …";
     call("workspace_cancel").catch(function () {});

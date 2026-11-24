@@ -104,6 +104,32 @@ see the notices in the README.
   are retried for 10 seconds, and an Inventor that runs but cannot be asked
   (started as administrator) gives a note instead of silently starting a new
   instance (#483).
+- Desktop, reusing a running Inventor (#483): an Inventor that keeps the
+  script waiting past the 20-second limit gives the *did not answer* note
+  too, instead of a silent new instance (the questions before the answer
+  stop after 14 seconds); an Inventor of another Windows session (another
+  user on a remote desktop server, fast user switching) or a hidden
+  automation run no longer gives the *started as administrator* note – only
+  a visible Inventor in the user's own session counts.
+- Desktop: when a running Inventor took the file but could not open it
+  (locked or broken file, Inventor busy, a part already loaded as a hidden
+  reference of an open assembly), the app now shows an error with the
+  reason instead of nothing; a part loaded only as a reference is opened in
+  its own window (#508).
+- Desktop: the update window no longer tells you to install the desktop
+  version you already have – when this app fits the server and the offered
+  update does not, it says to keep this version until the server is
+  upgraded (#468).
+- Desktop usage report (#473): a report sent while you switched the report
+  off is no longer written back into the settings; a newer day's report that
+  became due during the send is kept instead of deleted (#509); *Show what
+  is sent* says the report is switched off instead of showing an empty
+  report; the error of the switch has *Report…* with its inputs like the
+  other settings.
+- Desktop: a setting that could not be saved (read-only or full settings
+  folder) no longer stays changed in memory while the window shows the old
+  value – e.g. a usage report switched back on that was counted and sent
+  while the box showed it off (#510).
 - Desktop: the update check never found a release – it asked GitHub for
   `releases/latest`, which leaves out pre-releases, and every 0.x release is
   published as one. It reads the list of releases now and offers the newest
