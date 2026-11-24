@@ -24,18 +24,19 @@ export var MAX_ASSEMBLIES = 5;
  * value of the active connection (`"done"`, `"dismissed"` or none);
  * `ctx.fromHelp` is *Help → Getting started…*, which always opens it;
  * `ctx.signedInThisRun` is true when the user came through the connect
- * screen in this run of the app. `ctx.hasCheckouts` / `ctx.hasOwnChanges`
- * (from the server, asked before the wizard opens): a user who already
- * works on this server – a new computer, an expired sign-in – does not get
- * it. An app that starts already signed in (an update, a reload) does not
- * show it either.
+ * screen in this run of the app. `ctx.hasCheckouts` (own check-outs) /
+ * `ctx.hasCheckedIn` (a file version of the user's stored before, a
+ * check-in or an upload – `has_checked_in` of GET /worklist), asked before
+ * the wizard opens: a user who already works on this server – a new
+ * computer, an expired sign-in – does not get it. An app that starts
+ * already signed in (an update, a reload) does not show it either.
  */
 export function shouldShow(settings, ctx) {
   ctx = ctx || {};
   if (ctx.fromHelp) return true;
   var stored = settings && settings.onboarding;
   if (stored === ONBOARDING_DONE || stored === ONBOARDING_DISMISSED) return false;
-  if (ctx.hasCheckouts || ctx.hasOwnChanges) return false;
+  if (ctx.hasCheckouts || ctx.hasCheckedIn) return false;
   return !!ctx.signedInThisRun;
 }
 
@@ -163,26 +164,37 @@ export function groupFolder(dir, code) {
   return dir.replace(/[\\/]+$/, "") + sep + (code || "");
 }
 
+/** Whether a node's check-out is the user's: by user id when the node has
+ *  one (`checked_out_by`), else by display name – names are not unique, so
+ *  the name is only a fallback for an older server. `me` = `{id, name}`. */
+export function lockedByMe(x, me) {
+  me = me || {};
+  if (x.checked_out_by && me.id) return x.checked_out_by === me.id;
+  return !!x.checked_out_by_name && x.checked_out_by_name === me.name;
+}
+
 /**
  * The assemblies step 3 offers, from the top-level nodes of a group's
  * structure (`GET /projects/{code}/structure`: no BOM line uses them).
  * An assembly is an item of type `assembly` or one with BOM lines; a
- * restricted placeholder, a node without a revision, and one checked out by
- * somebody else (`me` = the user's display name) are left out. Order: in
- * work first (those can be checked out), then the most BOM lines (the main
- * assembly of a group, not a small sub-assembly), then by number. At most
- * `n` (MAX_ASSEMBLIES).
+ * restricted placeholder and a node without a revision are left out. For a
+ * CAD editor (`opts.editor`, the default) only revisions in work that are
+ * free or checked out by the user (`opts.me` = `{id, name}`, lockedByMe):
+ * those are the ones *Check out and open* works on. A viewer gets them in
+ * any state. Order: the most BOM lines (the main assembly of a group, not a
+ * small sub-assembly), then by number. At most `n` (MAX_ASSEMBLIES).
  */
 export function pickAssemblies(nodes, opts) {
   opts = opts || {};
   var n = typeof opts.n === "number" && opts.n > 0 ? opts.n : MAX_ASSEMBLIES;
+  var editor = opts.editor !== false;
   return (Array.isArray(nodes) ? nodes : []).filter(function (x) {
     if (!x || x.restricted || !x.item_number || !x.code) return false;
     if (x.item_type !== "assembly" && !(x.bom_lines > 0)) return false;
-    return !x.checked_out_by_name || x.checked_out_by_name === opts.me;
+    if (!editor) return true;
+    if (x.state !== "in_work") return false;
+    return !(x.checked_out_by || x.checked_out_by_name) || lockedByMe(x, opts.me);
   }).slice().sort(function (a, b) {
-    var wa = a.state === "in_work" ? 0 : 1, wb = b.state === "in_work" ? 0 : 1;
-    if (wa !== wb) return wa - wb;
     var la = a.bom_lines || 0, lb = b.bom_lines || 0;
     if (la !== lb) return lb - la;
     return a.item_number < b.item_number ? -1 : a.item_number > b.item_number ? 1 : 0;
@@ -215,23 +227,38 @@ export function groupCadText(group, names) {
 
 /**
  * What *Check out and open* will do, as the lead of step 3. `opts`:
- * `dir` (working folder), `installed` (`cad_installed`), `names` (family →
- * program name), `editor` (may check out). The program follows the group's
- * default CAD program like the chip next to the button: an installed one by
- * its label, else the default named with "not installed on this computer";
- * without a default, the program chosen for each file. A viewer gets
- * *Get…* instead – checking out needs the CAD editor role.
+ * `dir` (working folder), `names` (family → program name), `editor` (may
+ * check out) and `plan` – the answer of `cad_open_plan` for a file of the
+ * group's default program (`{program, label, fallback}`), the same Rust rule
+ * (cadlaunch::plan) the chip next to the button and the launch use: the
+ * group's version when installed, else the newest installed version. So the
+ * line names an installed program by the plan's label (with the group's
+ * version named as missing when the plan fell back to another version), and
+ * the default named with "not installed on this computer" when the plan has
+ * no program. Without a default or without a plan: the program chosen for
+ * each file. A viewer gets *Get…* instead – checking out needs the CAD
+ * editor role.
  */
 export function openLine(group, opts) {
   opts = opts || {};
   var folder = groupFolder(opts.dir, group && group.code);
   if (!opts.editor) return { id: "onboarding.open.viewer", params: { folder: folder } };
-  if (!group || !group.cad) return { id: "onboarding.open.any", params: { folder: folder } };
-  var found = (Array.isArray(opts.installed) ? opts.installed : []).filter(function (p) { return p && p.family === group.cad; });
-  var same = found.filter(function (p) { return group.cadVersion && p.version === group.cadVersion; })[0];
-  var pick = same || found[0];
-  if (pick) return { id: "onboarding.open.program", params: { folder: folder, program: pick.label || groupCadText(group, opts.names) } };
-  return { id: "onboarding.open.program_missing", params: { folder: folder, program: groupCadText(group, opts.names) } };
+  var plan = opts.plan;
+  if (!group || !group.cad || !plan) return { id: "onboarding.open.any", params: { folder: folder } };
+  if (!plan.program) {
+    return { id: "onboarding.open.program_missing", params: { folder: folder, program: groupCadText(group, opts.names) } };
+  }
+  var label = plan.label || groupCadText(group, opts.names);
+  if (plan.fallback && group.cadVersion) {
+    return { id: "onboarding.open.program_other", params: { folder: folder, program: label, wanted: groupCadText(group, opts.names) } };
+  }
+  return { id: "onboarding.open.program", params: { folder: folder, program: label } };
+}
+
+/** What the *Show* button of step 3 says it does: an editor's next step is
+ *  *Check out and open*; a viewer only looks at the item. */
+export function showTitle(code, number, editor) {
+  return { id: editor ? "onboarding.open.show.title" : "onboarding.open.show.viewer_title", params: { group: code, number: number } };
 }
 
 /** The message ID of a role in the header line (`admin`, `editor`, `viewer`). */
@@ -318,13 +345,14 @@ export var ONBOARDING_MESSAGE_IDS = [
   "onboarding.skip.folder_policy", "onboarding.skip.folder_used", "onboarding.skip.one_group",
   "onboarding.skip.no_group", "onboarding.skip.unknown",
   "onboarding.folder.text", "onboarding.folder.later", "onboarding.folder.line",
-  "onboarding.folder.change", "onboarding.folder.open",
+  "onboarding.folder.change", "onboarding.folder.open", "onboarding.folder.missing",
   "onboarding.cad.found", "onboarding.cad.none",
   "onboarding.group.question", "onboarding.group.viewer", "onboarding.group.on_disk", "onboarding.group.one",
   "onboarding.group.none.editor", "onboarding.group.none.viewer", "onboarding.group.create",
   "onboarding.group.copy_login", "onboarding.group.copied",
-  "onboarding.open.lead", "onboarding.open.program", "onboarding.open.program_missing", "onboarding.open.any",
-  "onboarding.open.viewer", "onboarding.open.show", "onboarding.open.show.title", "onboarding.open.loading",
+  "onboarding.open.lead", "onboarding.open.program", "onboarding.open.program_other", "onboarding.open.program_missing",
+  "onboarding.open.any", "onboarding.open.viewer", "onboarding.open.show", "onboarding.open.show.title",
+  "onboarding.open.show.viewer_title", "onboarding.open.loading",
   "onboarding.open.failed", "onboarding.open.none", "onboarding.open.cad_setup", "onboarding.open.cad_setup.link",
   "onboarding.finish", "onboarding.finish_home", "onboarding.next", "onboarding.back", "onboarding.dismiss",
   "onboarding.tip.loop", "onboarding.tip.loop_done"

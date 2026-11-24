@@ -517,7 +517,7 @@ async fn index() -> Json<Value> {
             "GET    /api/v1/me                                        the caller, its groups and token_scope",
             "GET    /api/v1/audit?entity_type=&username=&action=&format=json|csv   audit log export (admins)",
             "POST   /api/v1/me/password                            {current_password, new_password} – change own password (throttled; ends web sessions)",
-            "GET    /api/v1/worklist                                  my check-outs, reviews waiting for me, my open changes, change requests assigned to me and raised by me, dependents to check (impacts, and grouped by dependent revision as impact_groups), statistics",
+            "GET    /api/v1/worklist                                  my check-outs, has_checked_in (a file version of mine stored before), reviews waiting for me, my open changes, change requests assigned to me and raised by me, dependents to check (impacts, and grouped by dependent revision as impact_groups), statistics",
             "POST   /api/v1/desktop/token                             {code, verifier} – desktop sign-in, no token needed",
             "GET    /api/v1/tokens                                    your personal access tokens (name, prefix, scope, expiry; never the value)",
             "POST   /api/v1/tokens                                    {name, expires_in_days?: 1..3650 (absent = never), scope?: full|write|read_only|mcp_only} – the value is answered once",
@@ -907,18 +907,22 @@ async fn desktop_token(
 /// The personal start page of the desktop app (and the web dashboard).
 async fn worklist(State(st): State<AppState>, ApiUser(me): ApiUser) -> AppResult<Json<Value>> {
     // independent queries run concurrently (like the dashboard)
-    let (checkouts, reviews, open, unread, my_changes, assigned, my_requests, stats) = tokio::try_join!(
-        revisions::checked_out_by(&st.db, &me),
-        changes::pending_reviews(&st.db, &me),
-        impacts::open_for(&st.db, &me),
-        notifications::unread_count(&st.db, &me),
-        changes::open_by(&st.db, &me),
-        requests::assigned_to(&st.db, &me),
-        requests::open_by(&st.db, &me),
-        stats::load(&st.db, &me),
-    )?;
+    let (checkouts, checked_in, reviews, open, unread, my_changes, assigned, my_requests, stats) =
+        tokio::try_join!(
+            revisions::checked_out_by(&st.db, &me),
+            revisions::has_checked_in(&st.db, &me),
+            changes::pending_reviews(&st.db, &me),
+            impacts::open_for(&st.db, &me),
+            notifications::unread_count(&st.db, &me),
+            changes::open_by(&st.db, &me),
+            requests::assigned_to(&st.db, &me),
+            requests::open_by(&st.db, &me),
+            stats::load(&st.db, &me),
+        )?;
     Ok(Json(json!({
         "checkouts": checkouts,
+        // the caller has stored a file version here before (#422)
+        "has_checked_in": checked_in,
         "reviews": reviews,
         "impact_groups": impacts::group_by_dependent(open.clone()),
         "impacts": open,

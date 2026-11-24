@@ -8,21 +8,23 @@
 //
 // The steps, which are skipped, the assemblies offered and the messages are
 // pure rules in onboarding-rules.js; the texts come from shared/i18n/. The
-// wizard is read-only: it creates no file or folder, gets and checks out
-// nothing and writes nothing to the server. It stores only `done` or
-// `dismissed` on the active connection (src/profiles.rs), the working folder
-// when the user picks one with *Change…*, and the active group on the final
-// click (*Show <number>* or *Finish and show <group> in Home*).
+// wizard is read-only: it creates no file or folder (*Open folder* only
+// opens a working folder that exists), gets and checks out nothing and
+// writes nothing to the server. It stores only `done` or `dismissed` on the
+// active connection (src/profiles.rs), the working folder when the user
+// picks one with *Change…*, and the active group on the final click
+// (*Show <number>* or *Finish and show <group> in Home*). The navigator
+// switches to *Files* for this run only – the stored mode stays.
 
 import { $, TAURI, api, call, dialog, errorText, h, invoke, state, toast } from "./core.js";
 import { t } from "/static/shared/js/i18n.js";
-import { ONBOARDING_DISMISSED, ONBOARDING_DONE, ONBOARDING_STEPS, STEP_NAMES, cadLine, chosenGroup, finishLabel, groupCadText, groupList, isFinal, nextStep, onDisk, openLine, pickAssemblies, roleMessage, shouldShow, skipReason, stepPosition, stepSummary } from "./onboarding-rules.js";
+import { ONBOARDING_DISMISSED, ONBOARDING_DONE, ONBOARDING_STEPS, STEP_NAMES, cadLine, chosenGroup, finishLabel, groupCadText, groupList, isFinal, nextStep, onDisk, openLine, pickAssemblies, roleMessage, shouldShow, showTitle, skipReason, stepPosition, stepSummary } from "./onboarding-rules.js";
 import { gotGroups } from "./group-sync.js";
 import { emptyHint, fetchStructureRoots, newProjectDialog, selectView, setActiveProject, setNavMode, typeIcon } from "./navigator.js";
 import { canEdit, canEditProject } from "./shell.js";
 import { emptyGroupHint } from "./empty-rules.js";
 import { openRevision } from "./revision.js";
-import { cadFormats, installedCad } from "./cad-open.js";
+import { cadFormats, groupOpenPlan, installedCad } from "./cad-open.js";
 import { thumbIco } from "./list-thumbs.js";
 import { renderActive, renderTabs } from "./tabs.js";
 import { openWorkspaceFolder } from "./workspace.js";
@@ -63,12 +65,14 @@ function saveOnboarding(value) {
 }
 
 /** Whether the user already works on this server – asked directly (not from
- *  a worklist that may not have loaded yet): own check-outs or changes. */
+ *  a worklist that may not have loaded yet): own check-outs, or a file
+ *  version of theirs stored before (`has_checked_in`: a check-in or an
+ *  upload, e.g. from another computer). */
 function returningUser() {
   return api("GET", "/worklist").then(function (w) {
     return {
       hasCheckouts: !!(w && Array.isArray(w.checkouts) && w.checkouts.length),
-      hasOwnChanges: !!(w && Array.isArray(w.my_changes) && w.my_changes.length)
+      hasCheckedIn: !!(w && w.has_checked_in)
     };
   }, function () { return {}; });
 }
@@ -87,7 +91,7 @@ export function maybeStartOnboarding() {
     if (state.session) state.session.onboarding = s.onboarding;
     if (!shouldShow(s, { signedInThisRun: signedInThisRun })) return null;
     return returningUser().then(function (r) {
-      if (!shouldShow(s, { signedInThisRun: signedInThisRun, hasCheckouts: r.hasCheckouts, hasOwnChanges: r.hasOwnChanges })) return null;
+      if (!shouldShow(s, { signedInThisRun: signedInThisRun, hasCheckouts: r.hasCheckouts, hasCheckedIn: r.hasCheckedIn })) return null;
       return openOnboarding(false);
     });
   }).catch(function () { /* no wizard rather than a blocked start */ });
@@ -98,16 +102,22 @@ export function maybeStartOnboarding() {
 export function openOnboarding(fromHelp) {
   if (wizard) return wizard.closed;
   var done;
-  wizard = { dialog: null, step: null, chosen: null, installed: [], names: {}, closed: new Promise(function (r) { done = r; }) };
+  wizard = { dialog: null, step: null, chosen: null, installed: [], names: {}, folderExists: false, closed: new Promise(function (r) { done = r; }) };
   wizard.resolve = done;
   var w = wizard;
   // what this computer and the server offer: the CAD programs found, the
-  // program names of the format families – both cached, never a reason to
-  // keep the wizard closed
-  Promise.all([installedCad(), cadFormats().catch(function () { return { names: {} }; })]).then(function (r) {
+  // program names of the format families – both cached – and whether the
+  // working folder exists (asked now: a Get may have created it since the
+  // start); never a reason to keep the wizard closed
+  Promise.all([
+    installedCad(),
+    cadFormats().catch(function () { return { names: {} }; }),
+    invoke("session").catch(function () { return null; })
+  ]).then(function (r) {
     if (wizard !== w) return;
     w.installed = r[0] || [];
     w.names = (r[1] && r[1].names) || {};
+    w.folderExists = !!(r[2] && r[2].workspace_exists);
     showStep(nextStep({ current: null }, onboardingFacts()));
   });
   return w.closed;
@@ -157,14 +167,19 @@ function header(facts) {
   return h("div.onboarding-head", null, lines);
 }
 
-/** Step 1: the folder, Change… / Open folder, the CAD programs found. */
+/** Step 1: the folder, Change… / Open folder, the CAD programs found.
+ *  *Open folder* only opens a folder that exists (opening a missing one
+ *  would create it); otherwise it is disabled with a hint. */
 function folderExtras(facts) {
+  var exists = wizard.folderExists;
   return h("div.stack", null, [
     h("code.onboarding-path", { text: facts.workspaceDir }),
     h("div.row", null, [
       TAURI.dialog ? h("button", { type: "button", on: { click: function () { changeFolder(facts.workspaceDir); } } }, t("onboarding.folder.change")) : null,
-      h("button", { type: "button", on: { click: function () { openWorkspaceFolder(null); } } }, t("onboarding.folder.open"))
+      h("button", { type: "button", disabled: !exists, title: exists ? null : t("onboarding.folder.missing"),
+        on: { click: function () { openWorkspaceFolder(null); } } }, t("onboarding.folder.open"))
     ]),
+    exists ? null : h("p.small.muted", { text: t("onboarding.folder.missing") }),
     h("p", { text: msg(cadLine(wizard.installed)) })
   ]);
 }
@@ -212,7 +227,8 @@ function openExtras(facts) {
       list.appendChild(emptyHint(emptyGroupHint(project ? canEditProject(project.id) : false, canEdit()), { project: group.code }));
       return;
     }
-    var picks = pickAssemblies(top.nodes, { me: state.me && state.me.display_name });
+    var me = state.me || {};
+    var picks = pickAssemblies(top.nodes, { me: { id: me.id, name: me.display_name }, editor: facts.editor });
     if (!picks.length) { list.appendChild(h("p", { text: t("onboarding.open.none", { group: group.code }) })); return; }
     list.appendChild(h("ul.onboarding-rows", null, picks.map(function (n, i) {
       return h("li", null, [
@@ -220,7 +236,7 @@ function openExtras(facts) {
         h("span.mono", { text: n.item_number + "/" + n.code }),
         h("span.label", { text: n.name }),
         h("button" + (i === 0 ? ".primary" : ""), {
-          type: "button", title: t("onboarding.open.show.title", { group: group.code, number: n.item_number }),
+          type: "button", title: msg(showTitle(group.code, n.item_number, facts.editor)),
           on: { click: function () { showAssembly(group.code, n); } }
         }, t("onboarding.open.show", { number: n.item_number }))
       ]);
@@ -229,8 +245,20 @@ function openExtras(facts) {
     if (wizard !== w) return;
     list.replaceChildren(h("p.notice.error", { text: t("onboarding.open.failed", { group: group.code, error: errorText(err) }) }));
   });
+  // the program: the same Rust rule as the chip next to *Check out and
+  // open* (cad_open_plan); the line is filled in once it answered
+  var line = h("p", { text: "" });
+  var lineOpts = { dir: facts.workspaceDir, names: wizard.names, editor: facts.editor, plan: null };
+  var planned = facts.editor && group.cad
+    ? groupOpenPlan(group.cad, group.cadVersion).catch(function () { return null; })
+    : Promise.resolve(null);
+  planned.then(function (plan) {
+    if (wizard !== w) return;
+    lineOpts.plan = plan;
+    line.textContent = msg(openLine(group, lineOpts));
+  });
   return h("div.stack", null, [
-    h("p", { text: msg(openLine(group, { dir: facts.workspaceDir, installed: wizard.installed, names: wizard.names, editor: facts.editor })) }),
+    line,
     list,
     h("p.small.muted", null, [t("onboarding.open.cad_setup") + " ",
       h("button.link.small", { type: "button", on: { click: function () {
@@ -240,8 +268,9 @@ function openExtras(facts) {
 }
 
 /** The commit: the group becomes the active one, the wizard closes and the
- *  real revision tab of the assembly opens – *Check out and open* is its
- *  highlighted next step (next-step.js). */
+ *  real revision tab of the assembly opens – for a CAD editor *Check out
+ *  and open* is its highlighted next step (next-step.js: step 3 offers only
+ *  revisions in work, free or checked out by the user). */
 function showAssembly(code, node) {
   setActiveProject(code);
   finishWizard(ONBOARDING_DONE);
@@ -250,11 +279,12 @@ function showAssembly(code, node) {
 }
 
 /** The secondary commit: the group becomes active, the navigator and the
- *  work area both show Home – the group's files. */
+ *  work area both show Home – the group's files. The navigator mode is
+ *  switched for this run only; the user's stored choice stays. */
 function finishInHome(code) {
   if (code) {
     setActiveProject(code);
-    setNavMode("files");
+    setNavMode("files", { remember: false });
   }
   finishWizard(ONBOARDING_DONE);
   selectView("home");
@@ -271,6 +301,8 @@ function changeFolder(current) {
       state.session.workspace_dir = dir;
       var status = $("status-ws");
       if (status) status.textContent = "Workspace: " + dir;
+      // the picker chooses an existing folder
+      if (wizard) wizard.folderExists = true;
       if (wizard && wizard.step === "folder") showStep("folder");
     });
   }).catch(function (err) { toast(errorText(err), "error", t("onboarding.folder.change")); });

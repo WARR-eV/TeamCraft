@@ -19,7 +19,7 @@ const R = await import("data:text/javascript;base64," + Buffer.from(src).toStrin
 const {
   ONBOARDING_STEPS, ONBOARDING_DONE, ONBOARDING_DISMISSED, ONBOARDING_MESSAGE_IDS, STEP_NAMES, MAX_ASSEMBLIES,
   shouldShow, skipReason, visibleSteps, nextStep, isFinal, stepPosition, stepSummary, startGroup, chosenGroup,
-  groupList, groupFolder, pickAssemblies, cadLine, groupCadText, openLine, finishLabel, roleMessage, loopTip, loopTipAfter
+  groupList, groupFolder, pickAssemblies, lockedByMe, cadLine, groupCadText, openLine, showTitle, finishLabel, roleMessage, loopTip, loopTipAfter
 } = R;
 const catalog = (lang) => JSON.parse(fs.readFileSync(path.join(root, "shared/i18n", lang + ".json"), "utf8"));
 const placeholders = (text) => new Set([...String(text).matchAll(/\{([A-Za-z0-9_]+)\}/g)].map((m) => m[1]));
@@ -59,10 +59,10 @@ test("not for an app that starts signed in (an update, a reload)", () => {
   assert.equal(shouldShow(null, undefined), false);
 });
 
-test("not for returning users: check-outs or own changes on this server", () => {
+test("not for returning users: own check-outs or an own check-in on this server", () => {
   assert.equal(shouldShow({}, { signedInThisRun: true, hasCheckouts: true }), false);
-  assert.equal(shouldShow({}, { signedInThisRun: true, hasOwnChanges: true }), false);
-  assert.equal(shouldShow({}, { signedInThisRun: true, hasCheckouts: false, hasOwnChanges: false }), true);
+  assert.equal(shouldShow({}, { signedInThisRun: true, hasCheckedIn: true }), false);
+  assert.equal(shouldShow({}, { signedInThisRun: true, hasCheckouts: false, hasCheckedIn: false }), true);
 });
 
 test("Help → Getting started always opens it", () => {
@@ -155,16 +155,36 @@ test("the group folder keeps the separator of the working folder", () => {
   assert.equal(groupFolder("", "ROVER"), "ROVER");
 });
 
-const node = (number, extra) => ({ item_number: number, code: "A", name: number, item_type: "assembly", state: "in_work", bom_lines: 3, checked_out_by_name: null, restricted: false, ...extra });
+const node = (number, extra) => ({ item_number: number, code: "A", name: number, item_type: "assembly", state: "in_work", bom_lines: 3, checked_out_by: null, checked_out_by_name: null, restricted: false, ...extra });
+const ME = { id: "u-erika", name: "Erika" };
 
-test("assemblies: in work first, then the most BOM lines, then the number", () => {
+test("assemblies: the most BOM lines first, then the number", () => {
   const picks = pickAssemblies([
     node("ASM-3", { bom_lines: 2 }),
-    node("ASM-1", { bom_lines: 9, state: "released" }),
     node("ASM-2", { bom_lines: 9 }),
     node("ASM-0", { bom_lines: 2 })
-  ]);
-  assert.deepEqual(picks.map((x) => x.item_number), ["ASM-2", "ASM-0", "ASM-3", "ASM-1"]);
+  ], { me: ME, editor: true });
+  assert.deepEqual(picks.map((x) => x.item_number), ["ASM-2", "ASM-0", "ASM-3"]);
+});
+
+test("assemblies for an editor: only in work – released, in review and obsolete are left out", () => {
+  const picks = pickAssemblies([
+    node("ASM-W"),
+    node("ASM-R", { state: "released", bom_lines: 9 }),
+    node("ASM-V", { state: "in_review", bom_lines: 9 }),
+    node("ASM-O", { state: "obsolete", bom_lines: 9 })
+  ], { me: ME, editor: true });
+  assert.deepEqual(picks.map((x) => x.item_number), ["ASM-W"], "Check out and open works on these");
+  assert.equal(pickAssemblies([node("ASM-R", { state: "released" })], { me: ME }).length, 0, "editor is the default");
+});
+
+test("assemblies for a viewer: any state, locks do not matter", () => {
+  const picks = pickAssemblies([
+    node("ASM-W"),
+    node("ASM-R", { state: "released", bom_lines: 9 }),
+    node("ASM-L", { checked_out_by: "u-max", checked_out_by_name: "Max", bom_lines: 1 })
+  ], { me: ME, editor: false });
+  assert.deepEqual(picks.map((x) => x.item_number), ["ASM-R", "ASM-W", "ASM-L"]);
 });
 
 test("assemblies: parts, placeholders, no revision and locked by others are left out", () => {
@@ -173,10 +193,20 @@ test("assemblies: parts, placeholders, no revision and locked by others are left
     node("PRT-2", { item_type: "part", bom_lines: 2 }),
     node("ASM-R", { restricted: true }),
     node("ASM-N", { code: null }),
-    node("ASM-O", { checked_out_by_name: "Max" }),
-    node("ASM-M", { checked_out_by_name: "Erika" })
-  ], { me: "Erika" });
+    node("ASM-O", { checked_out_by: "u-max", checked_out_by_name: "Max" }),
+    node("ASM-M", { checked_out_by: "u-erika", checked_out_by_name: "Erika" })
+  ], { me: ME, editor: true });
   assert.deepEqual(picks.map((x) => x.item_number), ["ASM-M", "PRT-2"], "an item with BOM lines counts; my own lock does not hide it");
+});
+
+test("mine is decided by user id; the display name only without one", () => {
+  assert.equal(lockedByMe(node("A", { checked_out_by: "u-other", checked_out_by_name: "Erika" }), ME), false, "another Erika");
+  assert.equal(lockedByMe(node("A", { checked_out_by: "u-erika", checked_out_by_name: "Erika M." }), ME), true);
+  assert.equal(lockedByMe(node("A", { checked_out_by_name: "Erika" }), ME), true, "an older server without the id");
+  assert.equal(lockedByMe(node("A", { checked_out_by_name: "Max" }), ME), false);
+  assert.equal(lockedByMe(node("A"), ME), false, "not checked out");
+  const picks = pickAssemblies([node("ASM-T", { checked_out_by: "u-other", checked_out_by_name: "Erika" })], { me: ME, editor: true });
+  assert.deepEqual(picks, [], "a namesake's lock is not mine");
 });
 
 test("assemblies: at most five, an empty group none", () => {
@@ -202,15 +232,30 @@ test("the group's default CAD program as text", () => {
   assert.equal(groupCadText(null, {}), "");
 });
 
-test("what Check out and open does: installed, not installed, no default, viewer", () => {
-  const installed = [{ family: "inventor", version: "2025", label: "Inventor 2025" }, { family: "inventor", version: "2026", label: "Inventor 2026" }];
-  const opts = { dir: "/home/u/TeamCraft", installed, names: { inventor: "Autodesk Inventor" }, editor: true };
-  assert.deepEqual(openLine(ROVER, opts), { id: "onboarding.open.program", params: { folder: "/home/u/TeamCraft/ROVER", program: "Inventor 2026" } });
-  assert.deepEqual(openLine({ ...ROVER, cadVersion: "" }, opts).params.program, "Inventor 2025", "the first found without a version");
-  assert.deepEqual(openLine(ROVER, { ...opts, installed: [] }),
-    { id: "onboarding.open.program_missing", params: { folder: "/home/u/TeamCraft/ROVER", program: "Autodesk Inventor 2026" } });
-  assert.equal(openLine(ARM, opts).id, "onboarding.open.any");
-  assert.deepEqual(openLine(ROVER, { ...opts, editor: false }), { id: "onboarding.open.viewer", params: { folder: "/home/u/TeamCraft/ROVER" } });
+test("what Check out and open does follows the chip's plan (cad_open_plan)", () => {
+  const opts = { dir: "/home/u/TeamCraft", names: { inventor: "Autodesk Inventor" }, editor: true };
+  const folder = "/home/u/TeamCraft/ROVER";
+  const exact = { program: { family: "inventor", version: "2026" }, label: "Inventor 2026", fallback: false };
+  assert.deepEqual(openLine(ROVER, { ...opts, plan: exact }), { id: "onboarding.open.program", params: { folder, program: "Inventor 2026" } });
+  // the group wants 2026, the plan took the newest installed one: both named
+  const other = { program: { family: "inventor", version: "2027" }, label: "Inventor 2027", fallback: true };
+  assert.deepEqual(openLine(ROVER, { ...opts, plan: other }),
+    { id: "onboarding.open.program_other", params: { folder, program: "Inventor 2027", wanted: "Autodesk Inventor 2026" } });
+  // no version wanted: the plan's (newest) program, never the first found
+  const newest = { program: { family: "inventor", version: "2027" }, label: "Inventor 2027", fallback: false };
+  assert.equal(openLine({ ...ROVER, cadVersion: "" }, { ...opts, plan: newest }).params.program, "Inventor 2027");
+  const none = { program: null, label: "Default app", fallback: true };
+  assert.deepEqual(openLine(ROVER, { ...opts, plan: none }),
+    { id: "onboarding.open.program_missing", params: { folder, program: "Autodesk Inventor 2026" } });
+  assert.equal(openLine(ROVER, { ...opts, plan: null }).id, "onboarding.open.any", "no plan (not asked or failed)");
+  assert.equal(openLine(ARM, { ...opts, plan: exact }).id, "onboarding.open.any");
+  assert.deepEqual(openLine(ROVER, { ...opts, plan: exact, editor: false }), { id: "onboarding.open.viewer", params: { folder } });
+});
+
+test("Show promises Check out and open only to an editor", () => {
+  assert.deepEqual(showTitle("ROVER", "ASM-1", true), { id: "onboarding.open.show.title", params: { group: "ROVER", number: "ASM-1" } });
+  assert.deepEqual(showTitle("ROVER", "ASM-1", false), { id: "onboarding.open.show.viewer_title", params: { group: "ROVER", number: "ASM-1" } });
+  assert.ok(!/check out/i.test(catalog("en")["onboarding.open.show.viewer_title"]));
 });
 
 test("step texts by role and situation", () => {

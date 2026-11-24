@@ -136,6 +136,9 @@ pub struct Session {
     pub signed_in: bool,
     pub skin: String,
     pub workspace_dir: PathBuf,
+    /// The working folder exists already: *Getting started* opens it only
+    /// then – the wizard creates no folder (#422).
+    pub workspace_exists: bool,
     pub version: &'static str,
     pub device: String,
     /// Zoom factor of the user interface.
@@ -172,7 +175,10 @@ pub struct Session {
 #[tauri::command]
 pub fn session(app: AppHandle, state: State<'_, AppState>) -> Session {
     let s = snapshot(&state);
+    let workspace_dir = workspace_root(&app, &state);
     Session {
+        workspace_exists: workspace_dir.is_dir(),
+        workspace_dir,
         token_storage: s.token.as_ref().and(s.token_storage),
         update_check: policy::current().update_check(s.update_check),
         checkout_parts: s.checkout_parts != Some(false),
@@ -183,7 +189,6 @@ pub fn session(app: AppHandle, state: State<'_, AppState>) -> Session {
         server_url: s.server_url.clone(),
         signed_in: s.token.is_some(),
         skin: s.skin.clone().unwrap_or_else(|| "teamcraft".into()),
-        workspace_dir: workspace_root(&app, &state),
         version: env!("CARGO_PKG_VERSION"),
         device: crate::device_name(),
         zoom: s.zoom.unwrap_or(1.0),

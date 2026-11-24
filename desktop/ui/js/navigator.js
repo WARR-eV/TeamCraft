@@ -912,9 +912,13 @@ export function navMode() {
   return state.navMode;
 }
 
-export function setNavMode(mode) {
+/** Switches the mode; `opts.remember === false` switches it for this run
+ *  only and keeps the stored choice (Getting started, #422). */
+export function setNavMode(mode, opts) {
   state.navMode = normalizeMode(mode);
-  try { window.localStorage.setItem(MODE_KEY, state.navMode); } catch (e) { /* not remembered */ }
+  if (!opts || opts.remember !== false) {
+    try { window.localStorage.setItem(MODE_KEY, state.navMode); } catch (e) { /* not remembered */ }
+  }
   if (state.view === "home") selectView("home");
 }
 

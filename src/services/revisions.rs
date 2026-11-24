@@ -111,6 +111,19 @@ pub async fn checked_out_by(pool: &PgPool, actor: &Actor) -> AppResult<Vec<Revis
     .await?)
 }
 
+/// Whether `actor` has ever stored a file version on this server – a
+/// check-in or an upload (`file_versions.uploaded_by`, indexed). The desktop
+/// app does not offer *Getting started* to a user who already worked here,
+/// e.g. on another computer (#422). Says nothing about other users.
+pub async fn has_checked_in(pool: &PgPool, actor: &Actor) -> AppResult<bool> {
+    Ok(sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS (SELECT 1 FROM file_versions WHERE uploaded_by = $1)",
+    )
+    .bind(actor.id)
+    .fetch_one(pool)
+    .await?)
+}
+
 /// Fails unless `actor` may change data of the revision's project:
 /// CAD editor (or admin) and member of the item's project group. A revision
 /// the actor may not even read answers "not found", so the message below
