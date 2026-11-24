@@ -492,6 +492,11 @@ const NOT_GUARDED: &[(&str, &str)] = &[
          no item content",
     ),
     (
+        "revisions::has_checked_in",
+        "the actor's own uploads only (uploaded_by = actor): one yes/no for the Getting \
+         started wizard, no item, revision or file data reaches the actor",
+    ),
+    (
         "season::members",
         "managers of the group only (require_manager); returns members and check-out counts, \
          no item content",
