@@ -94,7 +94,9 @@ see the notices in the README.
   version just warned of (#468).
 - Desktop update window: *Update now* waits for every running transfer –
   also the check-ins of *Local changes*, *Check in all* and sign-out, the
-  new-item upload, *Get project groups* and the folder import, counted
+  new-item upload, *Get project groups*, the folder import, *Add files…*,
+  the move of the workspace and every Get or check-out (two at once each
+  count, not only the shared progress bar), counted
   explicitly – and no longer refuses because a dialog shows an idle status
   line; the check is repeated before the swap, the restart and the
   installer start (#531, #532).
@@ -104,11 +106,12 @@ see the notices in the README.
   on top (#534).
 - Desktop update window: when the files were replaced but the new version
   does not start, the window says so and offers *Restart now* and *Close
-  TeamCraft* instead of a second *Update now* that cannot work (#466).
+  TeamCraft* instead of a second *Update now* that cannot work – also when
+  the window is opened again; two overlapping swaps are refused (#466).
 - Desktop in-place update (#466): only a folder unpacked from the portable
   zip (its `README.txt` or the new `.teamcraft-portable` marker) is updated
   in place – an MSI installed into a folder of one's choice or a
-  `TeamCraft.exe` copied elsewhere gets the download instead (#533); a
+  `TeamCraft.exe` copied elsewhere gets no *Update now* – the window points to the release page (#533); a
   `README.txt`/`LICENSE.txt` of the user's own next to the app is left
   alone, an existing `*.old` is never renamed over, and the next start
   removes only the files the swap listed; each instance unpacks into its own

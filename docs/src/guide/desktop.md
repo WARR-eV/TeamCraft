@@ -918,8 +918,8 @@ the **update window** with the release notes and:
   version until the administrator upgrades the server. The same version
   is named in the notice after connecting to a server that does not fit.
 
-* **Update now** (Windows installers, macOS) or **Download** (portable zip,
-  AppImage): downloads the file for your installation into your Downloads
+* **Update now** (Windows installers and portable zip, macOS, AppImage):
+  downloads the file for your installation into your Downloads
   folder and checks it against the release's published checksums
   (`SHA256SUMS.txt`). A file that does not match is deleted and nothing
   changes. A Windows installer then starts after you confirm – TeamCraft
@@ -929,20 +929,21 @@ the **update window** with the release notes and:
   (*Replace and restart*): the new version goes into the app's folder, the
   old files are removed at the next start, and TeamCraft restarts (#466).
   Only a folder unpacked from the portable zip is updated in place (it holds
-  the zip's `README.txt` or `.teamcraft-portable`); a `TeamCraft.exe` copied
-  somewhere else, or an MSI installed into a folder of your choice, gets
-  *Download* and the release page instead. A `README.txt` or `LICENSE.txt`
+  the zip's `README.txt` or `.teamcraft-portable`); for a `TeamCraft.exe`
+  copied somewhere else, or an MSI installed into a folder of your choice,
+  the window has no *Update now* – it says to download the new version from
+  the release page (*Release page*). A `README.txt` or `LICENSE.txt`
   of your own next to the app is left alone, and only the files the update
   moved aside are removed at the next start. A
   folder the app may not write into, or any other failure, changes nothing –
   the window says why and *Show the file* shows the verified download. If
   the files were replaced but the new version does not start, the window
-  says so and offers *Restart now* and *Close TeamCraft* – never a second
-  download. Installed with Flatpak or a
+  says so and offers *Restart now* and *Close TeamCraft* – also when you
+  open it again – never a second download. Installed with Flatpak or a
   `.deb`/`.rpm` package, the window names the package-manager way instead.
-  Not while a check-in, park, upload, Get, *Get project groups*, folder
-  import or Pack and Go runs – also one started from *Local changes* or
-  *Check in all*.
+  Not while a check-in, park, upload, Get or check-out, *Get project
+  groups*, folder import, *Add files…*, the move of the workspace or Pack
+  and Go runs – also one started from *Local changes* or *Check in all*.
 * When the offered version does not fit your server, *Update now* asks
   first (*Update anyway?*), and the release button reads **All releases**:
   it opens the list of releases, where you find the version your server

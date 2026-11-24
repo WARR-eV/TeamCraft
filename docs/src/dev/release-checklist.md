@@ -140,7 +140,7 @@ first candidate is checked after its final tag.
   the installed version. Both pills (with the Ko-fi one) fit side by side
   when the window is narrow.
 - [ ] A click on the pill opens the update window: release notes of the new
-  version, *Update now* or *Download* (or the package-manager hint), *Skip
+  version, *Update now* (or the package-manager hint), *Skip
   this version*, *Remind me later* and *Release page*.
 - [ ] *Release page* opens `github.com/WARR-eV/TeamCraft/releases/tag/v<new
   version>` in the browser.
@@ -159,11 +159,11 @@ first candidate is checked after its final tag.
 
 **Per install type**
 
-| Install | Expected after *Update now* / *Download* |
+| Install | Expected after *Update now* |
 |---|---|
 | Windows `.msi` (per machine, under *Program Files*) | the `.msi` lands in *Downloads*, *Verified: …* is shown, *Close TeamCraft and install?* → *Close and install* ends the app and starts the installer; after it, the app starts in the new version with the same sign-in, working folder and settings |
 | Windows NSIS `-setup.exe` (per user, under `AppData\Local`) | as for the `.msi`, with the `-setup.exe` |
-| Windows portable `.zip` | *Update now* → *Replace and restart?* → *Replace and restart*: the files in the app's folder are replaced, TeamCraft restarts in the new version and the `*.old` files are gone after that start; *Not now* changes nothing; a read-only folder gives an error and *Show the file* (#466). The zip holds `.teamcraft-portable`; a `TeamCraft.exe` copied alone into another folder offers *Download*, not *Update now* (#533) |
+| Windows portable `.zip` | *Update now* → *Replace and restart?* → *Replace and restart*: the files in the app's folder are replaced, TeamCraft restarts in the new version and the `*.old` files are gone after that start; *Not now* changes nothing; a read-only folder gives an error and *Show the file* (#466). The zip holds `.teamcraft-portable`; a `TeamCraft.exe` copied alone into another folder offers no *Update now*, only the line to download from the release page and *Release page* (#533); after a good swap whose restart failed, the window opened again shows *Restart now* / *Close TeamCraft* |
 | macOS `.dmg` | *Update now*: the `.dmg` opens; drag TeamCraft to *Applications* and replace the old one |
 | Linux AppImage | *Update now* → *Replace and restart*: the AppImage file is replaced (still executable) and TeamCraft restarts in the new version; a read-only folder gives an error and *Show the file* (#466) |
 | Flatpak | no download: the window names `flatpak update` |

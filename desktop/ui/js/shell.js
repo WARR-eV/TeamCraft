@@ -282,6 +282,15 @@ export function openUpdateWindow(version) {
   call("update_offer", { version: version }).then(function (offer) {
     notes.textContent = offer.notes || "No release notes.";
     how.textContent = installText(offer);
+    // replaced already in this session, the restart failed: the window
+    // opened again offers the restart, never a second download
+    if (swapped) {
+      var held = h("span");
+      actions.appendChild(held);
+      progress.classList.remove("hidden");
+      restartFailed(dlg, held, progress, "TeamCraft is updated already – restart it or close it and start it again.");
+      return;
+    }
     if (!offer.asset) return;
     var action = updateAction(offer.install);
     var btn = h("button.primary", { type: "button", on: { click: function () {
@@ -317,6 +326,11 @@ export function openUpdateWindow(version) {
   });
 }
 
+/** The files of this copy were replaced in this session (`update_swap`
+ *  succeeded) but the app still runs the old version: the update window
+ *  offers *Restart now* / *Close TeamCraft* only (#466). */
+var swapped = false;
+
 /**
  * The portable zip or AppImage swap (#466): after a confirmation the new
  * version replaces this copy in its folder (`update_swap`), then *Restart
@@ -331,6 +345,7 @@ function swapAndRestart(dlg, btn, progress, busyText) {
     btn.disabled = true;
     progress.textContent = "Replacing TeamCraft …";
     return call("update_swap").then(function () {
+      swapped = true;
       progress.textContent = "TeamCraft is updated – it restarts now.";
       if (busyWithTransfer()) return restartFailed(dlg, btn, progress, busyText);
       // the files are replaced: a failed start never offers *Update now* again

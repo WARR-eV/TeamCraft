@@ -2,7 +2,7 @@
 // TeamCraft Desktop – 3D viewer, workspace, check-out/in, edit, release, revise.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, api, badge, beginTransfer, call, clear, confirmDialog, dialog, enc, errorNotice, errorText, field, h, invoke, lockBadge, materialField, rememberError, reportLink, run, setStatus, state, toast, tool } from "./core.js";
+import { $, api, badge, beginTransfer, call, clear, confirmDialog, dialog, enc, errorNotice, errorText, field, h, invoke, lockBadge, materialField, rememberError, reportLink, run, setStatus, state, toast, tool, transfer } from "./core.js";
 import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
 import { canEdit, canEditProject, isCancelled, refreshWorklistCount, rescanLocalChanges, uploadLine } from "./shell.js";
 import { reloadActive, renderActive, table } from "./tabs.js";
@@ -260,15 +260,26 @@ export function getStructureDialog(rev) {
   ]);
 }
 
-/** Shows the progress of a Get in the status bar until it is done. */
+/** Shows the progress of a Get in the status bar until it is done. Every
+ *  Get or check-out is a counted transfer (core.js beginTransfer, #531);
+ *  the bar is only the display and stays until the last running Get has
+ *  finished. */
+var runningGets = 0;
 export function getting(promise) {
+  var end = beginTransfer();
   var box = $("status-get");
+  runningGets += 1;
   box.classList.remove("hidden");
   $("status-get-text").textContent = "Getting files …";
   $("status-get-bar").value = 0;
-  function hide() { box.classList.add("hidden"); }
-  // a Get changes the working folder: *Local changes* looks again (#416)
-  return promise.then(function (v) { hide(); rescanLocalChanges(); return v; }, function (e) { hide(); rescanLocalChanges(); throw e; });
+  function done() {
+    end();
+    runningGets = Math.max(0, runningGets - 1);
+    if (!runningGets) box.classList.add("hidden");
+    // a Get changes the working folder: *Local changes* looks again (#416)
+    rescanLocalChanges();
+  }
+  return promise.then(function (v) { done(); return v; }, function (e) { done(); throw e; });
 }
 
 export function onGetProgress(p) {
@@ -351,7 +362,7 @@ export function migrationDialog(plan) {
     { label: "Later", onClick: function (d) { d.close(); } },
     { label: "Move files", primary: true, submit: true, onClick: function (d) {
       d.close();
-      run("Moving the workspace", function () { return call("workspace_migrate"); }).then(function (r) {
+      run("Moving the workspace", function () { return transfer(function () { return call("workspace_migrate"); }); }).then(function (r) {
         var kept = r.steps.filter(function (s) { return s.action === "keep"; });
         dialog("Workspace moved", h("div.stack", null, [
           h("p", { text: r.moves + " file(s) moved, " + r.identical + " identical copies removed, " + r.kept + " kept in the old folders." }),
@@ -1056,7 +1067,10 @@ export function addFilesDialog(tab, presetPaths) {
           return getting(call("workspace_checkout", where));
         }, revisionInputs(rev));
         start.then(function () {
-          return call("workspace_add_files", Object.assign({ paths: paths, subfolder: subfolder.value.trim(), confirmed: confirmed }, where));
+          // copies into the working folder: counted, so no update swap runs meanwhile (#531)
+          return transfer(function () {
+            return call("workspace_add_files", Object.assign({ paths: paths, subfolder: subfolder.value.trim(), confirmed: confirmed }, where));
+          });
         }).then(function (r) {
           d.close();
           toast((r.copied.length ? "Added " + r.copied.join(", ") + " to the working folder" : "Nothing added") +
