@@ -20,8 +20,8 @@ use tokio::sync::Notify;
 use crate::{
     acp, addfiles,
     api::{self, Api, ApiError, Transfer},
-    bomimport, cadexport, cadlaunch, folderimport, layout, localchanges, localserver, policy,
-    profiles, scbridge, scprops,
+    bomimport, cadexport, cadlaunch, cadsetup, folderimport, layout, localchanges, localserver,
+    policy, profiles, scbridge, scprops,
     settings::{self, Settings, TokenStorage},
     signin, update, workspace, AppState,
 };
@@ -1164,6 +1164,39 @@ pub fn set_onboarding(state: State<'_, AppState>, value: String) -> CmdResult<()
         .ok_or_else(|| ApiError::local(format!("'{value}' is not a state of the wizard.")))?;
     update_settings(&state, |s| s.onboarding = Some(value.to_string()))?;
     Ok(())
+}
+
+fn cad_setup_kind(kind: &str) -> CmdResult<cadsetup::Kind> {
+    cadsetup::Kind::parse(kind)
+        .ok_or_else(|| ApiError::local(format!("'{kind}' is not a CAD setup file.")))
+}
+
+/// *Getting started* → *CAD setup* (#478): what the setup file `kind`
+/// (`inventor`, `nx`, `solidedge`) of the project group `group` would
+/// contain and where it would go – shown before anything is written. The web
+/// view names only the group and the kind, never a path.
+#[tauri::command]
+pub fn cad_setup_preview(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    group: String,
+    kind: String,
+) -> CmdResult<cadsetup::Planned> {
+    let kind = cad_setup_kind(&kind)?;
+    cadsetup::plan(&workspace_root(&app, &state), &group, kind).map_err(ApiError::local)
+}
+
+/// Creates the setup file the user ticked after the preview; an existing
+/// file is never overwritten (refused with a message). Returns its path.
+#[tauri::command]
+pub fn cad_setup_create(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    group: String,
+    kind: String,
+) -> CmdResult<PathBuf> {
+    let kind = cad_setup_kind(&kind)?;
+    cadsetup::create(&workspace_root(&app, &state), &group, kind).map_err(ApiError::local)
 }
 
 /// *Remind me later*: no notice for three days (#377).

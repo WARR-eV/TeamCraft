@@ -15,7 +15,8 @@ import { fileURLToPath } from "node:url";
 const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../desktop/ui/js/onboarding-rules.js");
 const src = fs.readFileSync(file, "utf8");
 const {
-  ONBOARDING_STEPS, ONBOARDING_DONE, ONBOARDING_DISMISSED, CAD_SETUP_PREVIEW, STEP_NAMES,
+  ONBOARDING_STEPS, ONBOARDING_DONE, ONBOARDING_DISMISSED, CAD_SETUP_FILES, STEP_NAMES,
+  cadSetupGroups, initialCadPicks, cadSetupRows, cadSetupToCreate, cadSetupReport,
   shouldShow, skipReason, visibleSteps, nextStep, stepPosition, stepSummary, startGroup
 } = await import("data:text/javascript;base64," + Buffer.from(src).toString("base64"));
 
@@ -156,10 +157,91 @@ test("the server step says when the organization set it", () => {
   assert.match(stepSummary("server", fresh).text.join(" "), /Settings/);
 });
 
-test("the CAD step promises nothing is created now", () => {
-  assert.match(stepSummary("cad", fresh).text.join(" "), /Nothing is created now/);
-  assert.ok(CAD_SETUP_PREVIEW.length >= 3);
-  for (const p of CAD_SETUP_PREVIEW) assert.ok(p.program && p.file && p.what);
+test("the CAD setup files and their kinds match the Rust side (src/cadsetup.rs)", () => {
+  assert.deepEqual(CAD_SETUP_FILES.map((f) => f.kind), ["inventor", "nx", "solidedge"]);
+  for (const f of CAD_SETUP_FILES) assert.ok(f.program && f.what);
+});
+
+test("the CAD step texts: optional, preview first, never overwritten, a starting point", () => {
+  const got = { ...fresh, groupsOnDisk: ["rover"] };
+  const text = stepSummary("cad", got).text.join(" ");
+  assert.match(text, /nothing is ticked at the start/);
+  assert.match(text, /never overwritten/);
+  assert.match(text, /starting point: check them in your CAD program/);
+  // without a fetched group: get one first
+  assert.match(stepSummary("cad", fresh).text.join(" "), /Get a project group first/);
+});
+
+test("the CAD step offers only groups already in the working folder", () => {
+  assert.deepEqual(cadSetupGroups(fresh), []);
+  assert.deepEqual(cadSetupGroups({ groups: ["ROVER", " Wärme Tauscher ", "ARM", "", 7], groupsOnDisk: ["wärme tauscher", "rover"] }), ["ROVER", "Wärme Tauscher"]);
+  assert.deepEqual(cadSetupGroups({}), []);
+});
+
+// what the app answers for a group folder with spaces and umlauts on Windows
+const dir = "C:\\Users\\Jörg Müller\\Documents\\TeamCraft\\Wärme Tauscher";
+const previews = {
+  inventor: { kind: "inventor", exists: false, path: dir + "\\Wärme Tauscher.ipj", content: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<InventorProject>…" },
+  nx: { kind: "nx", exists: false, path: dir + "\\NX load options (TeamCraft).txt", content: dir + "\\...\r\n" },
+  solidedge: { kind: "solidedge", exists: true, path: dir + "\\LinkMgmt.txt", content: "CONTAINER\r\n" }
+};
+
+test("nothing is ticked by default", () => {
+  assert.deepEqual(initialCadPicks(), {});
+  const rows = cadSetupRows(previews, initialCadPicks());
+  assert.equal(rows.length, 3);
+  assert.ok(rows.every((r) => r.ticked === false));
+  assert.deepEqual(cadSetupToCreate(previews, initialCadPicks()), []);
+  assert.deepEqual(cadSetupToCreate(previews, undefined), []);
+});
+
+test("a file can be ticked only with its preview shown", () => {
+  const picks = { inventor: true, nx: true, solidedge: true };
+  // still loading: nothing can be created
+  assert.deepEqual(cadSetupToCreate({}, picks), []);
+  const loading = cadSetupRows({}, picks);
+  assert.ok(loading.every((r) => r.disabled && !r.ticked && /Loading/.test(r.note)));
+  // loaded: the rows show the path and the content that will be written
+  const rows = cadSetupRows(previews, picks);
+  assert.equal(rows[0].path, dir + "\\Wärme Tauscher.ipj");
+  assert.match(rows[0].content, /<InventorProject>/);
+  assert.equal(rows[1].content, previews.nx.content);
+  // only `true` ticks
+  assert.deepEqual(cadSetupToCreate(previews, { inventor: "yes", nx: 1 }), []);
+});
+
+test("an existing file is never overwritten: its row cannot be ticked", () => {
+  const picks = { inventor: true, nx: true, solidedge: true };
+  const se = cadSetupRows(previews, picks)[2];
+  assert.equal(se.disabled, true);
+  assert.equal(se.ticked, false);
+  assert.equal(se.content, "");
+  assert.match(se.note, /never overwrites/);
+  assert.deepEqual(cadSetupToCreate(previews, picks), ["inventor", "nx"]);
+});
+
+test("a preview the app refused shows its message and cannot be ticked", () => {
+  const refused = { ...previews, inventor: { error: "The project group ROVER is not in the working folder yet – get it first (Get project groups…)." } };
+  const row = cadSetupRows(refused, { inventor: true })[0];
+  assert.equal(row.ticked, false);
+  assert.equal(row.disabled, true);
+  assert.match(row.note, /get it first/);
+  assert.equal(row.path, "");
+});
+
+test("the report after creating: written paths, refusals, the starting-point hint", () => {
+  const ok = cadSetupReport([{ kind: "inventor", path: previews.inventor.path }]);
+  assert.equal(ok.ok, true);
+  assert.match(ok.text, /^Inventor: created C:\\Users\\Jörg Müller\\.*Wärme Tauscher\.ipj\./);
+  assert.match(ok.text, /check the files in your CAD program/);
+  // the app refused (the file appeared after the preview): never overwritten
+  const refusal = "LinkMgmt.txt already exists in " + dir + " – TeamCraft never overwrites it. Check it in your CAD program, or delete it to create it again.";
+  const mixed = cadSetupReport([{ kind: "nx", path: previews.nx.path }, { kind: "solidedge", error: refusal }]);
+  assert.equal(mixed.ok, false);
+  assert.deepEqual(mixed.lines.slice(0, 2), ["NX: created " + previews.nx.path + ".", "Solid Edge: " + refusal]);
+  const none = cadSetupReport([]);
+  assert.equal(none.ok, false);
+  assert.equal(none.text, "");
 });
 
 test("the loop step has the three steps", () => {

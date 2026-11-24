@@ -5,12 +5,14 @@
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 //
 // The steps, which are skipped and their texts are pure rules in
-// onboarding-rules.js. The wizard itself creates no file and no folder: it
-// only opens the app's own confirmed actions (the folder picker, *Get project
-// groups*), and stores `done` or `dismissed` in the settings.
+// onboarding-rules.js. The wizard opens the app's own confirmed actions (the
+// folder picker, *Get project groups*) and stores `done` or `dismissed` in
+// the settings. The only files it writes are the CAD setup files (#478):
+// nothing ticked at the start, each file's content shown first, written only
+// on *Create ticked files*, never over an existing file (src/cadsetup.rs).
 
 import { $, TAURI, call, dialog, errorText, h, state, toast } from "./core.js";
-import { CAD_SETUP_PREVIEW, ONBOARDING_DISMISSED, ONBOARDING_DONE, ONBOARDING_STEPS, STEP_NAMES, nextStep, shouldShow, skipReason, startGroup, stepPosition, stepSummary } from "./onboarding-rules.js";
+import { CAD_SETUP_FILES, ONBOARDING_DISMISSED, ONBOARDING_DONE, ONBOARDING_STEPS, STEP_NAMES, cadSetupGroups, cadSetupReport, cadSetupRows, cadSetupToCreate, initialCadPicks, nextStep, shouldShow, skipReason, startGroup, stepPosition, stepSummary } from "./onboarding-rules.js";
 import { fixedByPolicy } from "./settings.js";
 import { getProjectsDialog, gotGroups } from "./group-sync.js";
 import { selectView, setActiveProject } from "./navigator.js";
@@ -104,13 +106,7 @@ function stepExtras(step, facts) {
         h("button", { type: "button", on: { click: function () { getProjectsDialog(); } } }, "Get project groups…")
       ]);
     case "cad":
-      return h("ul.onboarding-cad", null, CAD_SETUP_PREVIEW.map(function (p) {
-        return h("li", null, [
-          h("strong", { text: p.program }), ": ",
-          h("code", { text: p.file }), " – " + p.what + " ",
-          h("span.small.muted", { text: "(not created)" })
-        ]);
-      }));
+      return cadSetup(facts);
     case "loop": {
       // finish here and go where the loop starts: the files of the group in
       // Home (as choosing it on the Projects page does), or the group picker
@@ -126,6 +122,81 @@ function stepExtras(step, facts) {
     default:
       return null;
   }
+}
+
+/**
+ * The CAD step's files (#478): a group choice, one row per file with its
+ * tick box (none ticked at the start), target path and content preview, and
+ * *Create ticked files*. The previews come from the app (`cad_setup_preview`),
+ * so the text shown is the text written; the web view sends only the group
+ * code and the kind.
+ */
+function cadSetup(facts) {
+  var groups = cadSetupGroups(facts);
+  if (!groups.length) return null;
+  var current = { group: groups[0], picks: initialCadPicks(), previews: {} };
+  var box = h("div.stack");
+
+  function load() {
+    var group = current.group;
+    current.previews = {};
+    current.picks = initialCadPicks();
+    render();
+    CAD_SETUP_FILES.forEach(function (f) {
+      call("cad_setup_preview", { group: group, kind: f.kind }).then(function (p) {
+        if (current.group === group) { current.previews[f.kind] = p; render(); }
+      }, function (err) {
+        if (current.group === group) { current.previews[f.kind] = { error: errorText(err) }; render(); }
+      });
+    });
+  }
+
+  function create(button) {
+    var kinds = cadSetupToCreate(current.previews, current.picks);
+    if (!kinds.length) return;
+    button.disabled = true;
+    var group = current.group, results = [];
+    kinds.reduce(function (done, kind) {
+      return done.then(function () {
+        return call("cad_setup_create", { group: group, kind: kind }).then(function (path) {
+          results.push({ kind: kind, path: path });
+        }, function (err) { results.push({ kind: kind, error: errorText(err) }); });
+      });
+    }, Promise.resolve()).then(function () {
+      var report = cadSetupReport(results);
+      toast(report.text, report.ok ? null : "error", "CAD setup");
+      if (current.group === group) load();
+    });
+  }
+
+  function render() {
+    var rows = cadSetupRows(current.previews, current.picks);
+    var picker = groups.length > 1
+      ? h("label.row", null, ["Project group ", h("select", { on: { change: function (e) { current.group = e.target.value; load(); } } },
+        groups.map(function (g) { return h("option", { value: g, selected: g === current.group, text: g }); }))])
+      : h("p", null, ["Project group: ", h("strong", { text: current.group })]);
+    var createButton = h("button", { type: "button", disabled: !rows.some(function (r) { return r.ticked; }) }, "Create ticked files");
+    createButton.addEventListener("click", function () { create(createButton); });
+    box.replaceChildren(
+      picker,
+      h("ul.onboarding-cad", null, rows.map(function (r) {
+        var id = "cad-setup-" + r.kind;
+        return h("li.stack", null, [
+          h("label", { for: id }, [
+            h("input", { id: id, type: "checkbox", checked: r.ticked, disabled: r.disabled, on: { change: function (e) { current.picks[r.kind] = e.target.checked; render(); } } }),
+            " ", h("strong", { text: r.program }), " – " + r.what
+          ]),
+          r.path ? h("code.onboarding-path", { text: r.path }) : null,
+          r.note ? h("span.small.muted", { text: r.note }) : null,
+          r.content ? h("details", { open: r.ticked }, [h("summary", { text: "Preview of the content" }), h("pre.onboarding-preview", { text: r.content })]) : null
+        ]);
+      })),
+      h("div.row", null, [createButton])
+    );
+  }
+
+  load();
+  return box;
 }
 
 /** *Change…*: the folder picker, then the same command as Settings → Workspace. */

@@ -115,14 +115,88 @@ export function stepPosition(step, facts) {
 }
 
 /**
- * What the planned CAD setup would create (OPEN_WORK §4, *Workspace setup
- * wizard*). Shown for information only: the wizard writes none of it yet.
+ * The setup files of the CAD step (#478), in the order shown. `kind` is the
+ * value the app's commands `cad_setup_preview` / `cad_setup_create` take
+ * (src/cadsetup.rs, `Kind::as_str`); the app writes the content, the web
+ * view never names a path. Formats and their sources:
+ * docs/src/research/cad-setup-files.md.
  */
-export var CAD_SETUP_PREVIEW = [
-  { program: "Inventor", file: "<working folder>/<group>/<group>.ipj", what: "a project file whose workspace is the group's folder, so references resolve inside the working folder" },
-  { program: "NX", file: "load_options.def", what: "load options that search the group's folder (and its subfolders) for components" },
-  { program: "Solid Edge", file: "search paths", what: "the group's folder as a search path for linked documents" }
+export var CAD_SETUP_FILES = [
+  { kind: "inventor", program: "Inventor", what: "a project file (<group>.ipj) whose workspace is the group's folder, so references resolve inside it" },
+  { kind: "nx", program: "NX", what: "a text file with the group's folder (and its subfolders) as search folder and where to enter it in the Assembly Load Options" },
+  { kind: "solidedge", program: "Solid Edge", what: "a link management file (LinkMgmt.txt) with the group's folder as search path" }
 ];
+
+/**
+ * The project groups the CAD step offers: the user's groups that a Get
+ * already fetched into this working folder (the files go into the group's
+ * folder, so it must be there). Codes as given in `facts.groups`, in order.
+ */
+export function cadSetupGroups(facts) {
+  facts = facts || {};
+  var onDisk = codes(facts.groupsOnDisk);
+  return (Array.isArray(facts.groups) ? facts.groups : []).filter(function (c) {
+    return typeof c === "string" && c.trim() !== "" && onDisk.indexOf(c.trim().toLowerCase()) !== -1;
+  }).map(function (c) { return c.trim(); });
+}
+
+/** The picks at the start of the step: nothing ticked. */
+export function initialCadPicks() {
+  return {};
+}
+
+/**
+ * The rows of the CAD step. `previews` maps a kind to what the app answered
+ * for it: `{ exists, path, content }`, `{ error }`, or nothing while it
+ * loads; `picks` maps a kind to true when the user ticked it. A row can be
+ * ticked only with its preview shown and when its file does not exist yet –
+ * an existing file is never overwritten.
+ */
+export function cadSetupRows(previews, picks) {
+  previews = previews || {};
+  picks = picks || {};
+  return CAD_SETUP_FILES.map(function (f) {
+    var p = previews[f.kind];
+    var note = !p ? "Loading the preview …"
+      : p.error ? p.error
+      : p.exists ? "Already there – TeamCraft never overwrites it."
+      : "";
+    var disabled = !p || !!p.error || !!p.exists;
+    return {
+      kind: f.kind,
+      program: f.program,
+      what: f.what,
+      path: p && !p.error ? p.path || "" : "",
+      content: p && !p.error && !p.exists ? p.content || "" : "",
+      disabled: disabled,
+      ticked: !disabled && picks[f.kind] === true,
+      note: note
+    };
+  });
+}
+
+/** The kinds to create: ticked, previewed and not there yet. */
+export function cadSetupToCreate(previews, picks) {
+  return cadSetupRows(previews, picks).filter(function (r) { return r.ticked; }).map(function (r) { return r.kind; });
+}
+
+/**
+ * The message after creating: `results` lists `{ kind, path }` for a file
+ * written and `{ kind, error }` for one refused. `{ ok, lines, text }`.
+ */
+export function cadSetupReport(results) {
+  results = Array.isArray(results) ? results : [];
+  var name = function (kind) {
+    var f = CAD_SETUP_FILES.filter(function (x) { return x.kind === kind; })[0];
+    return f ? f.program : kind;
+  };
+  var made = results.filter(function (r) { return r && r.path && !r.error; });
+  var failed = results.filter(function (r) { return r && r.error; });
+  var lines = made.map(function (r) { return name(r.kind) + ": created " + r.path + "."; })
+    .concat(failed.map(function (r) { return name(r.kind) + ": " + r.error; }));
+  if (made.length) lines.push("A starting point: check the files in your CAD program.");
+  return { ok: failed.length === 0 && made.length > 0, lines: lines, text: lines.join(" ") };
+}
 
 /** Short names of the steps (the list on the left of the wizard). */
 export var STEP_NAMES = {
@@ -165,11 +239,16 @@ export function stepSummary(step, facts) {
         "Get project groups… copies the files of every item of a group into your working folder – the latest revision, also the ones still in work – so assemblies open with all their parts.",
         "Nothing is overwritten: files you changed locally are kept and name clashes are reported."
       ] };
-    case "cad":
-      return { title: "CAD setup", text: [
-        "Some CAD programs find the parts of an assembly through a project file or search paths. Point them at your working folder.",
-        "A later version of TeamCraft Desktop will offer to create these files for you – nothing ticked by default and never overwriting yours. Nothing is created now."
+    case "cad": {
+      var onDisk = cadSetupGroups(facts);
+      return { title: "CAD setup (optional)", text: [
+        "Some CAD programs find the parts of an assembly through a project file or search paths. TeamCraft can create small setup files that point them at a project group's folder.",
+        onDisk.length
+          ? "Tick the files you want and check the preview: nothing is ticked at the start, nothing is written before you choose Create, and a file that is already there is never overwritten."
+          : "Get a project group first (the step before): the files go into its folder. You can come back with Help → Getting started….",
+        "The files are a starting point: check them in your CAD program. They were not tested with every version of Inventor, NX and Solid Edge."
       ] };
+    }
     case "loop": {
       var start = startGroup(facts);
       return { title: "Your daily loop in 3 steps", text: [

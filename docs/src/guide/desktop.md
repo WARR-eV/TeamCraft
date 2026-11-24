@@ -792,9 +792,10 @@ you from the sign-in to your first opened assembly:
    complete *Get project groups* on this computer (no failed item or name
    clash, *Latest revision*) already fetched all of
    them into this working folder.
-5. **CAD setup** – for information only: the Inventor project file
-   (`.ipj`), the NX load options and the Solid Edge search paths that a later
-   version will offer to create. The wizard creates none of them.
+5. **CAD setup** (optional) – small setup files that point your CAD program
+   at a project group's folder; see [CAD setup files](#cad-setup-files)
+   below. Nothing is ticked at the start and nothing is written before you
+   choose *Create ticked files*.
 6. **Your daily loop in 3 steps** – *Check out and open* → save in your CAD
    program → *Check in…*. *Finish and open* with the group code makes one of your
    groups the active one (a group you already fetched first) and shows its
@@ -806,11 +807,39 @@ Every step has *Don't show again*; *Back*, *Skip* and *Next* move between
 the steps, and the last step has *Finish*. The step list on the left ticks
 the steps you went through with *Next* and marks the ones you skipped with
 a dash (also read out by screen readers). The wizard
-itself creates no file or folder – only the app's own actions it opens do,
-after you confirm them (the folder picker, *Get files*). Once you finish it
+creates no folder, and no file except the CAD setup files you tick – the
+other changes come from the app's own actions it opens, after you confirm
+them (the folder picker, *Get files*). Once you finish it
 or choose *Don't show again* it no longer opens by itself; an app that
 starts already signed in – after an update from an older version – does not
 show it either.
+
+### CAD setup files
+
+The *CAD setup* step offers three files for a project group that is already
+in your working folder (fetched with *Get project groups…*; with several,
+choose the group first). Each row shows the path the file would get and,
+when you tick it, its content; *Create ticked files* writes the ticked ones
+and names the paths it wrote.
+
+| Program | File | What it does |
+|---|---|---|
+| Inventor | `<group>/<group>.ipj` | a project file whose workspace is its own folder (`.\`), so Inventor looks for referenced parts in the group's folder first. Make it active in Inventor's *Projects* dialog. |
+| NX | `<group>/NX load options (TeamCraft).txt` | the search folder `<group folder>\...` (the `...` includes the subfolders) and where to enter it: *File → Options → Assembly Load Options*, *Load: From Search Folders*, then save the load options. TeamCraft does not change NX's own `load_options.def`. |
+| Solid Edge | `<group>/LinkMgmt.txt` | a link management file: `CONTAINER`, `RELATIVE`, `ABSOLUTE` and the group's folder as search path. Point Solid Edge at it in *Options → File Locations → Link Management* – Solid Edge uses one such file for all documents, so this replaces your own. |
+
+* **Nothing is ticked** at the start, and a row can only be ticked once its
+  preview is loaded.
+* **Never overwritten:** a file that is already there cannot be ticked, and
+  one that appears between the preview and *Create* is refused with a
+  message – delete it yourself to create it again.
+* **A starting point:** the files are minimal and were not tested with every
+  version of Inventor, NX and Solid Edge. Check them in your CAD program.
+  The formats and their sources:
+  [CAD setup files](../research/cad-setup-files.md).
+* The files are in the group's folder, so the worklist lists them under
+  *New on this computer*: check the `.ipj` in for the team, or ignore the
+  files there.
 
 ## Empty views
 

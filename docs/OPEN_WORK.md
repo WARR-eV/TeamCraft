@@ -697,14 +697,19 @@ real files and belong to section 3 once such files are at hand.
   `.ipj`, NX load options, Solid Edge search paths; nothing ticked by default, preview of what would be created, never
   created automatically, existing files never overwritten without asking; can be opened again from the settings.
   The wizard frame exists (#422: *Getting started* in the desktop app, also *Help → Getting Started…*); its *CAD
-  setup* step only lists what would be created. Left: creating the files themselves (needs the CAD programs to
-  verify the generated `.ipj`, load options and search paths); issue #422 stays open for this step 5 of its plan
+  setup* step creates the files (#478, `desktop/src/cadsetup.rs`, research page *CAD setup files of the Getting
+  started wizard*): Inventor `<group>.ipj` (workspace `.\`), Solid Edge `LinkMgmt.txt` (group folder as search
+  path), NX as a text file with the search folder `<group folder>\...` – nothing ticked, preview first, never
+  overwritten, only for groups already in the working folder. Left: verify the `.ipj` and `LinkMgmt.txt` with
+  Inventor and Solid Edge; write NX's `load_options.def` itself once its syntax is confirmed with NX; choosing the
+  team's existing `.ipj` instead; offering the step also after *Get project groups* and from the settings
 
 **Autodesk Inventor**
 
 - [ ] Project file (`.ipj`) for the workspace only on request, in the workspace wizard: either create a new `.ipj`
   (workspace = group folder, "Using Unique File Names", library paths adjustable) or choose the team's existing `.ipj`
-  and only check/show it
+  and only check/show it. Created on request since #478 (workspace = group folder, minimal); left: "Using Unique File
+  Names", library paths, choosing an existing `.ipj`, a check with Inventor
 - [ ] Folder import: read the paths of an included `.ipj`; recognise Content Center and library folders
 - [ ] Test the reference scan with real `.iam` files, also with derived parts, iParts/iAssemblies and Frame Generator
 - [ ] Test the STEP export (built) with real files on Windows – the preview images are verified with the NIST Inventor
@@ -746,7 +751,9 @@ real files and belong to section 3 once such files are at hand.
 - [ ] Folder import for the master model concept: the drawing `*_dwg*.prt` belongs into the item of the model
 - [ ] Test the BOM import with real NX BOM exports
 - [ ] STEP export through the local NX (NX Open / journal), on Windows and Linux
-- [ ] NX load options for the workspace only on request, in the workspace wizard; NX part of the tutorial
+- [ ] NX load options for the workspace only on request, in the workspace wizard; NX part of the tutorial. Since #478
+  the wizard writes the search folder as a text file with the steps; left: `load_options.def` itself (syntax to confirm
+  with NX)
 
 **SolidCraft** (research page *SolidCraft designs*)
 

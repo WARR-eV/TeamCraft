@@ -15,6 +15,7 @@ mod bomimport;
 mod cadexport;
 mod cadlaunch;
 mod cadlock;
+mod cadsetup;
 mod commands;
 mod compat;
 mod crash;
@@ -305,6 +306,8 @@ fn main() {
             commands::check_update,
             commands::dismiss_update,
             commands::set_onboarding,
+            commands::cad_setup_preview,
+            commands::cad_setup_create,
             commands::update_remind_later,
             commands::check_update_now,
             commands::update_offer,

@@ -68,8 +68,8 @@ installations and the desktop app:
 
 **Desktop app, first start:** after you connect to the server and sign in,
 TeamCraft Desktop opens *Getting started* – a short wizard through the
-working folder, *Get project groups…* for your groups, the CAD setup (for
-information) and the daily loop *Check out and open* → save in CAD →
+working folder, *Get project groups…* for your groups, optional CAD setup files (an
+Inventor `.ipj`, NX search folders, a Solid Edge `LinkMgmt.txt` – nothing ticked, preview first, never overwritten) and the daily loop *Check out and open* → save in CAD →
 *Check in…*. Every step can be skipped; *Help → Getting Started…* opens it
 again. See [Desktop app](desktop.md#getting-started).
 

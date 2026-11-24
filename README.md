@@ -242,7 +242,9 @@ backups are described under [Enterprise management](#enterprise-management).
 - **Desktop app** – a Linux, macOS and Windows client with a local working
   folder:
     - **Getting started** – a wizard after the first sign-in (working folder,
-      *Get* of your project groups, the daily loop), *Get* of whole
+      *Get* of your project groups, optional CAD setup files – Inventor `.ipj`,
+      Solid Edge `LinkMgmt.txt`, NX search folders, never overwritten – and the
+      daily loop), *Get* of whole
       assemblies and an import wizard.
     - ***Files* view** of each project group, with *New item here* on every
       folder; it can start in a favourite folder, e.g. the one with the

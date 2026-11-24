@@ -950,7 +950,9 @@ canvas.viewer-measuring { cursor: crosshair; }
 .onboarding-body h3 { margin: 0; }
 .onboarding-body p { margin: 0; }
 .onboarding-path { display: block; padding: 6px 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); overflow-wrap: anywhere; }
-.onboarding-cad { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.onboarding-cad { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.onboarding-cad li { gap: 4px; }
+.onboarding-preview { margin: 4px 0 0; padding: 6px 8px; max-height: 180px; overflow: auto; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); font-size: 12px; white-space: pre; }
 @media (max-width: 640px) {
   .onboarding { grid-template-columns: minmax(0, 1fr); }
 }

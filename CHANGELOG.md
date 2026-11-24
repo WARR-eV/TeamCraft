@@ -124,6 +124,19 @@ see the notices in the README.
 
 ### Added
 
+- **Desktop: the Getting started wizard creates the CAD setup files** (#478,
+  part of #422). For a project group already in the working folder the *CAD
+  setup* step offers an Inventor project file `<group>.ipj` (workspace `.\`),
+  a Solid Edge `LinkMgmt.txt` with the group's folder as search path and a
+  text file with the NX search folder (`<group folder>\...`) and where to
+  enter it. Nothing is ticked at the start, each file's content is shown
+  before *Create ticked files* writes it, and a file that exists is never
+  overwritten (refused with a message). The app writes the files itself
+  (`desktop/src/cadsetup.rs`, created with `create_new`); the web view names
+  only the group and the kind. The files are a starting point to check in
+  the CAD program – not verified with Inventor, NX or Solid Edge yet.
+  Formats and sources: research page *CAD setup files of the Getting
+  started wizard*.
 - **Desktop: the version a server needs** (#468). When this app or the offered
   update does not fit the connected server, the update window says which
   desktop version the server needs (*Your server runs 0.3.0 and needs

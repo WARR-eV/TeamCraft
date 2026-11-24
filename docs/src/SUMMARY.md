@@ -65,6 +65,7 @@
 # Research
 
 - [Research notes](research/index.md)
+    - [CAD setup files of the Getting started wizard](research/cad-setup-files.md)
     - [A hosted live demo](research/live-demo.md)
     - [One download to try TeamCraft on a laptop](research/local-test-server.md)
     - [Deprovisioning through the identity provider (SCIM)](research/scim-deprovisioning.md)
