@@ -26,11 +26,12 @@ see the notices in the README.
   1440 px – the name column takes the room that is left and ends in an
   ellipsis, and the table scrolls inside the card instead of running past
   its edge (#521).
-- Web: a section link (revision page, simulation results, as-built) no longer
-  scrolls the card's heading under the sticky section nav. Anchors clear the
-  top bar on every page and, below a section nav, also the nav, whose height
-  is one CSS variable (`--section-nav-h`); the screenshot script scrolls the
-  same way (#523).
+- Web: a section link (revision page, simulation results, as-built) lands
+  below the sticky top bar and section nav. Anchors clear the top bar on every
+  page and, below a section nav, also the nav by its measured height (app.js
+  sets `--section-nav-h`, so a taller nav – larger fonts, zoom, a classic
+  scrollbar under its list – is cleared too); the screenshot script scrolls
+  with `scrollIntoView` and so the same way (#523).
 - Web: error pages offer *Details for a bug report* only for server errors
   (5xx); a 404 – also an object hidden by need-to-know – is no bug. A
   signed-in user's 404 or 403 is shown inside the app with the top bar,

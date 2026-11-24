@@ -882,7 +882,19 @@
   // simply jump.
   (function () {
     var nav = document.querySelector("[data-section-nav]");
-    if (!nav || !("IntersectionObserver" in window)) return;
+    if (!nav) return;
+    // Anchors clear the nav by --section-nav-h (#523). The stylesheet's value
+    // is a fallback; the nav's real height differs with fonts, zoom and a
+    // classic scrollbar under its overflowing list, so it is measured here.
+    var root = document.documentElement;
+    var measure = function () {
+      var h = nav.getBoundingClientRect().height;
+      if (h > 0) root.style.setProperty("--section-nav-h", Math.ceil(h) + "px");
+    };
+    measure();
+    if ("ResizeObserver" in window) new ResizeObserver(measure).observe(nav);
+    else window.addEventListener("resize", measure);
+    if (!("IntersectionObserver" in window)) return;
     var links = Array.prototype.slice.call(nav.querySelectorAll('a[href^="#"]'));
     var inView = {};
     var observer = new IntersectionObserver(function (entries) {

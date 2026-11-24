@@ -1954,9 +1954,17 @@ fn anchor_offsets_and_explorer_table_fit() {
         root.contains("scroll-padding-top: calc(var(--topbar-h)"),
         "anchors clear the top bar on every page: {root}"
     );
-    assert!(rule(".section-nav").contains("min-height: var(--section-nav-h)"));
     assert!(rule(".section-nav ~ * [id], .section-nav ~ [id]")
         .contains("scroll-margin-top: var(--section-nav-h)"));
+    // the fallback is replaced by the nav's measured height; a min-height of
+    // the variable would keep the nav from shrinking back
+    assert!(!rule(".section-nav").contains("min-height"));
+    let js =
+        std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/static/app.js")).unwrap();
+    assert!(
+        js.contains("root.style.setProperty(\"--section-nav-h\""),
+        "app.js measures the section nav"
+    );
     assert!(!css.contains("+ 52px"), "no second copy of the nav height");
     assert!(rule(".explorer-list td.ellipsis").contains("max-width: 0"));
     assert!(

@@ -16,8 +16,9 @@
 :root {
   --gutter: 24px;
   --page-width: min(100% - 2 * var(--gutter), 1600px);
-  /* height of the sticky section nav (.section-nav) – the one value its box
-     and the anchor offset below share (#523) */
+  /* height of the sticky section nav (.section-nav) that anchors clear (#523):
+     a fallback – app.js sets the nav's measured height (fonts, zoom and a
+     classic scrollbar under its list change it) */
   --section-nav-h: 40px;
   /* anchored targets (#files, #history …) land below the sticky top bar on
      every page; after a section nav they also clear the nav (see .section-nav) */
@@ -1536,7 +1537,7 @@ pre.json { max-height: 24rem; overflow: auto; white-space: pre-wrap; overflow-wr
 
 /* revision page: section nav (#421) – sticky under the top bar, scrolls sideways on narrow screens */
 .section-nav { position: sticky; top: var(--topbar-h); z-index: 5; margin: 0 0 var(--space-4); background: var(--bg);
-  border-bottom: 1px solid var(--border); min-height: var(--section-nav-h); }
+  border-bottom: 1px solid var(--border); }
 .section-nav ul { display: flex; gap: 2px; margin: 0; padding: 0; list-style: none; overflow-x: auto; white-space: nowrap;
   scrollbar-width: thin; }
 .section-nav a { display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 2px solid transparent;
@@ -1546,8 +1547,8 @@ pre.json { max-height: 24rem; overflow: auto; white-space: pre-wrap; overflow-wr
 .section-nav a[aria-current="true"] { color: var(--text); border-bottom-color: var(--link); }
 .section-nav .count { color: var(--text-dim); font-size: 12px; font-weight: 400; }
 /* anchors land below the top bar and the section nav (#523): the root's
-   scroll-padding-top clears the top bar, this margin adds the nav's height –
-   every anchored element after the nav, not only section cards */
+   scroll-padding-top clears the top bar, this margin adds the nav's measured
+   height – every anchored element after the nav, not only section cards */
 .section-nav ~ * [id], .section-nav ~ [id] { scroll-margin-top: var(--section-nav-h); }
 
 /* Component picker of the BOM (#419, static/app.js): suggestions under the

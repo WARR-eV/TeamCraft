@@ -88,5 +88,19 @@ async fn only_server_errors_offer_a_bug_report() {
         !html.contains("class=\"topbar\""),
         "server errors stay plain"
     );
+
+    // a reverse proxy's id is the one *Copy details* names
+    let proxied = Request::builder()
+        .method(Method::GET)
+        .uri("/items")
+        .header(axum::http::header::COOKIE, &cookie)
+        .header("x-request-id", "edge-7f3a")
+        .body(Body::empty())
+        .unwrap();
+    let page = app.send(proxied).await;
+    assert_eq!(page.status, StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(page.header("x-request-id").as_deref(), Some("edge-7f3a"));
+    let html = page.text();
+    assert!(html.contains("Request id: edge-7f3a"), "{html}");
     app.teardown().await;
 }

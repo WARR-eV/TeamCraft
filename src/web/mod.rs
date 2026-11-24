@@ -898,22 +898,23 @@ async fn html_errors(State(st): State<AppState>, req: Request, next: Next) -> Re
         .extensions()
         .get::<crate::RequestId>()
         .map(|r| r.0.clone());
-    // what the signed-in user of a 4xx page is resolved from (#524)
-    let shell = (
-        req.uri().clone(),
-        req.headers().clone(),
-        req.extensions()
-            .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
-            .cloned(),
-    );
-    let response = next.run(req).await;
-    // The viewer fetches preview meshes itself and shows the JSON error message.
     let path = target.split('?').next().unwrap_or("");
-    if path.ends_with("/mesh") {
-        return response;
-    }
-    // So does the chunked upload of app.js – a 401 too, it then asks to sign in.
-    if path == "/uploads" || path.starts_with("/uploads/") || path.starts_with("/assistant/") {
+    let passes_through = keeps_json_errors(path);
+    // what the signed-in user of a 4xx page is resolved from (#524): copied
+    // only when a page may be rendered and a session cookie can sign one in
+    let shell = (!passes_through
+        && auth::cookie_value(req.headers(), auth::SESSION_COOKIE).is_some())
+    .then(|| {
+        (
+            req.uri().clone(),
+            req.headers().clone(),
+            req.extensions()
+                .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
+                .cloned(),
+        )
+    });
+    let response = next.run(req).await;
+    if passes_through {
         return response;
     }
     let Some(info) = response.extensions().get::<ErrorInfo>().cloned() else {
@@ -950,10 +951,9 @@ async fn html_errors(State(st): State<AppState>, req: Request, next: Next) -> Re
         "skin": skin,
         "branding": branding,
     });
-    let ctx = if keeps_app_shell(info.status) {
-        error_page_ctx(&st, shell).await
-    } else {
-        None
+    let ctx = match shell {
+        Some(shell) if keeps_app_shell(info.status) => error_page_ctx(&st, shell).await,
+        _ => None,
     };
     let rendered = match &ctx {
         Some(ctx) => render(&st, ctx, "error.html", data),
@@ -966,6 +966,16 @@ async fn html_errors(State(st): State<AppState>, req: Request, next: Next) -> Re
         }
         Err(_) => (info.status, info.message).into_response(),
     }
+}
+
+/// Paths whose errors stay JSON: the viewer fetches preview meshes itself and
+/// shows the JSON error message; so do the chunked upload of app.js (a 401
+/// too, it then asks to sign in) and the assistant.
+fn keeps_json_errors(path: &str) -> bool {
+    path.ends_with("/mesh")
+        || path == "/uploads"
+        || path.starts_with("/uploads/")
+        || path.starts_with("/assistant/")
 }
 
 /// Whether an error page offers *Details for a bug report* (#381): only for
