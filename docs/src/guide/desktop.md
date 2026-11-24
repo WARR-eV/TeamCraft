@@ -416,8 +416,10 @@ and open*, not *Release…*.
   of *Your review* goes with it, required for a rejection) while your review
   is pending · **Lifecycle** (*Submit for review*, highlighted on your draft –
   disabled with the reason as tooltip while the draft has no revision or no
-  reviewer –, *Withdraw*, *Cancel change* for a draft or rejected change, at
-  once) · **Collaborate**. On your draft the *Reviewers* panel has *Add
+  reviewer –, *Withdraw* on your change in review, *Cancel change* for a draft
+  or rejected change, at once) · **Collaborate**. An administrator who did not
+  create the change finds *Withdraw (administrator)* in **More ▾** instead –
+  never next to *Approve change* – and confirms it first. On your draft the *Reviewers* panel has *Add
   reviewer* (user names, any CAD editor or administrator – not you), *Remove*
   per reviewer and the suggested reviewers;
 * change request tab: **Triage** (*Start triage* or *Create change order*

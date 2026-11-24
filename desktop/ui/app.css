@@ -126,6 +126,14 @@ button.link.plain-weight { font-weight: 400; }
   button.ghost:where(:enabled):hover { background: var(--surface-hover); border-color: var(--control-border); }
 }
 button.primary:where(:enabled):active { background: var(--primary-active); }
+/* A disabled primary (or danger) button looks disabled in every skin (#516):
+   after the variants, so their colours do not win; [aria-disabled] too, with
+   its hover and press, as it stays :enabled. */
+button.primary:disabled, button.danger:disabled,
+button.primary[aria-disabled="true"], button.primary[aria-disabled="true"]:hover, button.primary[aria-disabled="true"]:active,
+button.danger[aria-disabled="true"], button.danger[aria-disabled="true"]:hover, button.danger[aria-disabled="true"]:active {
+  color: var(--text-dim); background: var(--surface-2); border-color: var(--border); cursor: not-allowed; transform: none;
+}
 button svg, .rail svg, .global-search svg, .tool svg {
   width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75;
   stroke-linecap: round; stroke-linejoin: round;

@@ -5,7 +5,7 @@
 import { $, ICONS, api, append, badge, call, clear, dialog, enc, errorNotice, errorText, field, h, lockIcon, setStatus, state, svgIcon, toast } from "./core.js";
 import { fmtDate, label } from "/static/shared/js/format.js";
 import { canSeeLocks, openLockOverview } from "./lock-overview.js";
-import { canEdit, canEditProject, checkInAll, fetchWorklist, refreshWorklistCount, reloadProjects, renderNotifications, rescanLocalChanges, rescanNewFiles, scanLocalChanges, scanNewFiles, sendLocalChanges, showWorklistCount } from "./shell.js";
+import { CHECK_IN_ALL_TITLE, canEdit, canEditProject, checkInAll, fetchWorklist, refreshWorklistCount, reloadProjects, renderNotifications, rescanLocalChanges, rescanNewFiles, scanLocalChanges, scanNewFiles, sendLocalChanges, showWorklistCount } from "./shell.js";
 import { assistantContextChanged } from "./assistant.js";
 import { agent, renderAgentView } from "./agent.js";
 import { openRevision } from "./revision.js";
@@ -398,7 +398,7 @@ export function drawWorklist(w) {
   var top = nav.scrollTop;
   clear(nav);
   nav.appendChild(navHead("My worklist", [
-    w.checkouts.length ? h("button.small", { type: "button", title: "Check in all your check-outs – the ones with local changes are listed first, to check them in with their files",
+    w.checkouts.length ? h("button.small", { type: "button", title: CHECK_IN_ALL_TITLE,
       on: { click: function () { checkInAll(); } } }, [svgIcon(ICONS.checkin), " Check in all"]) : null,
     h("button.icon", { type: "button", title: "Refresh", "aria-label": "Refresh", on: { click: function () { selectView("worklist"); } } }, svgIcon(ICONS.refresh))
   ]));
