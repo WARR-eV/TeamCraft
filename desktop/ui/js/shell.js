@@ -16,6 +16,9 @@ import { openChange } from "./change.js";
 import { openRequest } from "./requests.js";
 import { openSettings } from "./settings.js";
 import { formatKinds } from "./folder-import.js";
+import { markLock } from "./browser.js";
+import { lockChanges } from "./files-view.js";
+import { locksChanged } from "./lock-overview.js";
 import { planNewFiles } from "./new-files.js";
 import { planLocalChanges } from "./local-changes.js";
 import { maybeStartOnboarding } from "./onboarding.js";
@@ -662,8 +665,17 @@ function releaseClean(total, report, sent) {
 /** Gets the worklist and shows its count on the rail (no redraw). */
 export function fetchWorklist() {
   return api("GET", "/worklist").then(function (w) {
+    var before = state.worklist;
     state.worklist = w;
     showWorklistCount();
+    // the own check-outs changed (#451): Home's rows and the Check-outs
+    // tabs show it at once, whichever action took or released the lock
+    var c = lockChanges(before, w);
+    if (c.taken.length || c.released.length) {
+      c.taken.forEach(function (r) { markLock(r.item, r.code, state.me ? state.me.display_name : null); });
+      c.released.forEach(function (r) { markLock(r.item, r.code, null); });
+      locksChanged();
+    }
     return w;
   });
 }

@@ -5,9 +5,9 @@
 // server decides, GET /me `managed_projects` says where to offer it.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { api, append, call, enc, errorText, h, state, toast, tool, toolGroup } from "./core.js";
+import { $, api, append, call, clear, enc, errorText, h, state, toast, tool, toolGroup } from "./core.js";
 import { fmtDate, fmtAge, label } from "/static/shared/js/format.js";
-import { openTab, reloadActive } from "./tabs.js";
+import { activeTab, openTab, reloadActive } from "./tabs.js";
 import { openRevision } from "./revision.js";
 import { HOLDER_W, HOLDER_X, LOCK_W, LOCK_X, NODE_H, lockGraph } from "./lock-layout.js";
 
@@ -20,12 +20,67 @@ export function canSeeLocks(project) {
 }
 
 export function openLockOverview(code) {
+  watchLocks();
   openTab({ key: "locks:" + code, kind: "locks", code: code, title: "Check-outs " + code });
 }
 
+function fetchLocks(code) {
+  return api("GET", "/projects/" + enc(code) + "/checkouts");
+}
+
+/** The overview of a tab. Each time the tab is shown it is loaded again
+ *  (tabs.js activate drops `tab.data`, #451): opening it shows the current
+ *  state, not the one of the first visit. */
 export function loadLocks(tab) {
   if (tab.data) return Promise.resolve(tab.data);
-  return api("GET", "/projects/" + enc(tab.code) + "/checkouts").then(function (o) { tab.data = o; return o; });
+  return fetchLocks(tab.code).then(function (o) { tab.data = o; return o; });
+}
+
+/** Every POLL_MS while a Check-outs tab is in front and the window has the
+ *  focus, and whenever the window gets it back, the overview is fetched again
+ *  and painted when something changed – a check-out by someone else shows up
+ *  without *Refresh* (#451). */
+var POLL_MS = 30000;
+var watching = false;
+
+function watchLocks() {
+  if (watching) return;
+  watching = true;
+  setInterval(function () { if (document.hasFocus()) pollLocks(); }, POLL_MS);
+  window.addEventListener("focus", pollLocks);
+}
+
+function pollLocks() {
+  var tab = activeTab();
+  if (!tab || tab.kind !== "locks" || !tab.data || !state.me) return;
+  fetchLocks(tab.code).then(function (o) {
+    if (activeTab() !== tab || JSON.stringify(o) === JSON.stringify(tab.data)) return;
+    tab.data = o;
+    repaint();
+  }, function () { /* the next poll tries again; Refresh shows the error */ });
+}
+
+/** Paints the active tab again from its data, keeping the scroll position. */
+function repaint() {
+  var tab = activeTab(), body = $("tab-body"), toolbar = $("toolbar");
+  var top = body.scrollTop;
+  clear(body);
+  clear(toolbar);
+  renderLocks(tab, body, toolbar);
+  body.scrollTop = top;
+}
+
+/** The user's own check-outs changed (shell.js fetchWorklist): every
+ *  Check-outs tab loads again; the one in front at once. */
+export function locksChanged() {
+  state.tabs.forEach(function (t) { if (t.kind === "locks") t.data = null; });
+  var tab = activeTab();
+  if (tab && tab.kind === "locks") {
+    fetchLocks(tab.code).then(function (o) {
+      tab.data = o;
+      if (activeTab() === tab) repaint();
+    }, function () {});
+  }
 }
 
 function svg(name, attrs, children) {

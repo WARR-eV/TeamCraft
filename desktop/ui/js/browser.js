@@ -228,10 +228,7 @@ function entryNode(p, path, e) {
   var key = "rev:" + e.item_number + ":" + e.code;
   var meta = [];
   if (e.state) meta.push(badge(e.state));
-  if (e.checked_out_by_name) {
-    var mine = !!state.me && e.checked_out_by_name === state.me.display_name;
-    meta.push(h("span.lock-owner", { title: "Checked out by " + (mine ? "you" : e.checked_out_by_name) }, lockIcon(mine)));
-  }
+  if (e.checked_out_by_name) meta.push(lockOwner(e.checked_out_by_name));
   var node = row("div.node.file" + checkedOutClass(e) + (state.active === key ? ".selected" : ""), {
     title: entryTitle(e, label), "data-item": e.item_number, "data-rev": e.code
   }, [
@@ -240,4 +237,30 @@ function entryNode(p, path, e) {
     h("span.meta", null, meta)
   ], function () { remember(p, path); openRevision(e.item_number, e.code); });
   return h("li", null, node);
+}
+
+/** The lock marker of a row, held by `name` (a display name). */
+function lockOwner(name) {
+  var mine = !!state.me && name === state.me.display_name;
+  return h("span.lock-owner", { title: "Checked out by " + (mine ? "you" : name) }, lockIcon(mine));
+}
+
+/**
+ * Marks the rows of revision `item`/`code` in the navigator again, in place:
+ * checked out by `holder` (a display name) or by nobody (null). Called when
+ * the user's own check-outs changed (shell.js fetchWorklist, #451), so Home
+ * shows the colour at once – without drawing the list again, which would
+ * lose the scroll position and the open folders.
+ */
+export function markLock(item, code, holder) {
+  var rows = document.querySelectorAll("#navigator .node.file[data-item][data-rev]");
+  Array.prototype.forEach.call(rows, function (node) {
+    if (node.dataset.item !== item || node.dataset.rev !== code) return;
+    node.classList.toggle("checked-out", !!holder);
+    var meta = node.querySelector(".meta");
+    if (!meta) return;
+    var old = meta.querySelector(".lock-owner");
+    if (old) old.remove();
+    if (holder) meta.appendChild(lockOwner(holder));
+  });
 }
