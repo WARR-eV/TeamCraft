@@ -90,6 +90,31 @@ fn update_settings(
     Ok(s.clone())
 }
 
+/// Like [`update_settings`], but keeps the change in memory even when the
+/// save fails: for state that is already in effect – the started local
+/// server, the started agent, its picked model – which the app must at
+/// least remember for this session.
+fn remember_settings(
+    state: &State<'_, AppState>,
+    change: impl FnOnce(&mut Settings),
+) -> CmdResult<Settings> {
+    let mut s = state.settings.lock().expect("settings lock");
+    change_kept(&mut s, change, |next| next.save(&state.config_dir))
+        .map_err(|e| ApiError::local(format!("Settings could not be saved: {e}")))?;
+    Ok(s.clone())
+}
+
+/// Applies `change` to the settings in memory and then saves them; a failed
+/// save is returned but the change stays (see [`remember_settings`]).
+fn change_kept<E>(
+    s: &mut Settings,
+    change: impl FnOnce(&mut Settings),
+    save: impl FnOnce(&Settings) -> Result<(), E>,
+) -> Result<(), E> {
+    change(s);
+    save(s)
+}
+
 /// Applies `change` to a copy of the settings and keeps it only when `save`
 /// stored it: a failed save leaves the settings in memory as they were – as
 /// the UI shows them after the error (it puts the control back).
@@ -227,7 +252,7 @@ pub async fn local_server_start(app: AppHandle, state: State<'_, AppState>) -> C
         .map_err(ApiError::local)?;
     *state.local_server.lock().expect("local server lock") = Some(running);
     let was_in_use = local_server_in_use(&s);
-    update_settings(&state, |s| {
+    remember_settings(&state, |s| {
         s.local_server_port = Some(port);
         if was_in_use {
             s.server_url = Some(localserver::url(port));
@@ -1714,6 +1739,27 @@ mod tests {
         assert_eq!(s.usage_report, Some(true));
     }
 
+    /// State already in effect (the started local server, the agent and
+    /// its model) is remembered for the session even when the save fails.
+    #[test]
+    fn a_failed_save_keeps_what_is_already_in_effect() {
+        let mut s = Settings::default();
+        let failed = change_kept(
+            &mut s,
+            |s| {
+                s.local_server_port = Some(5433);
+                s.agent = Some("helper".into());
+            },
+            |next| {
+                assert_eq!(next.local_server_port, Some(5433), "the change is saved");
+                Err("read-only")
+            },
+        );
+        assert_eq!(failed, Err("read-only"));
+        assert_eq!(s.local_server_port, Some(5433));
+        assert_eq!(s.agent.as_deref(), Some("helper"));
+    }
+
     #[test]
     fn switching_the_usage_report_off_clears_the_counts() {
         let mut s = Settings::default();
@@ -2804,7 +2850,7 @@ pub async fn agent_start(
             let _ = agent.set_model(&model).await;
         }
     }
-    let _ = update_settings(&state, |s| s.agent = Some(name.clone()));
+    let _ = remember_settings(&state, |s| s.agent = Some(name.clone()));
     let running = RunningAgent {
         session,
         name,
@@ -2878,7 +2924,7 @@ pub async fn agent_set_model(
         .map(|r| (r.name.clone(), r.agent.clone()))
         .ok_or_else(|| ApiError::local("This agent is no longer running."))?;
     let models = agent.set_model(&model).await.map_err(ApiError::local)?;
-    let _ = update_settings(&state, |s| {
+    let _ = remember_settings(&state, |s| {
         s.agent_models.insert(name, model);
     });
     Ok(models)

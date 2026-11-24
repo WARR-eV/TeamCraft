@@ -110,7 +110,9 @@ see the notices in the README.
   stop after 14 seconds); an Inventor of another Windows session (another
   user on a remote desktop server, fast user switching) or a hidden
   automation run no longer gives the *started as administrator* note – only
-  a visible Inventor in the user's own session counts.
+  a visible Inventor in the user's own session counts. Every call to Inventor, also
+  reading the active project and looking up the open documents, is asked
+  again while Inventor is busy.
 - Desktop: when a running Inventor took the file but could not open it
   (locked or broken file, Inventor busy, a part already loaded as a hidden
   reference of an open assembly), the app now shows an error with the
@@ -129,7 +131,9 @@ see the notices in the README.
 - Desktop: a setting that could not be saved (read-only or full settings
   folder) no longer stays changed in memory while the window shows the old
   value – e.g. a usage report switched back on that was counted and sent
-  while the box showed it off (#510).
+  while the box showed it off (#510). What is already in effect is still
+  remembered for the session when the save fails: the started local server
+  (*Try TeamCraft on this computer*), the started agent and its model.
 - Desktop: the update check never found a release – it asked GitHub for
   `releases/latest`, which leaves out pre-releases, and every 0.x release is
   published as one. It reads the list of releases now and offers the newest
