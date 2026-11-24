@@ -279,18 +279,19 @@ export function openUpdateWindow(version) {
   ], { wide: true });
   var pageBtn = dlg.form.querySelector(".dialog-actions button:last-child");
   var BUSY = "A check-in or download is running – update when it has finished.";
+  // replaced already in this session, the restart failed: the window
+  // opened again offers the restart, never a second download – also when
+  // the release cannot be loaded now
+  if (swapped) {
+    var held = h("span");
+    actions.appendChild(held);
+    progress.classList.remove("hidden");
+    restartFailed(dlg, held, progress, "TeamCraft is updated already – restart it or close it and start it again.");
+  }
   call("update_offer", { version: version }).then(function (offer) {
     notes.textContent = offer.notes || "No release notes.";
     how.textContent = installText(offer);
-    // replaced already in this session, the restart failed: the window
-    // opened again offers the restart, never a second download
-    if (swapped) {
-      var held = h("span");
-      actions.appendChild(held);
-      progress.classList.remove("hidden");
-      restartFailed(dlg, held, progress, "TeamCraft is updated already – restart it or close it and start it again.");
-      return;
-    }
+    if (swapped) return;
     if (!offer.asset) return;
     var action = updateAction(offer.install);
     var btn = h("button.primary", { type: "button", on: { click: function () {
