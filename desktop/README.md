@@ -186,7 +186,8 @@ Where the app keeps its data:
 
 `build.rs` copies the assets the app shares with the web UI into `ui/static/`
 (git-ignored): the whole `shared/` tree (skins, fonts, the 3D viewer, the assistant,
-formatters, state glyphs, markdown-lite) to
+formatters, state glyphs, markdown-lite – loose numbered lists stay one list and keep their
+first number, #514 – and `css/components.css`, whose `[hidden]` rule always hides, #515) to
 `ui/static/shared/` and the logos and icons from `media/`. The app loads them
 from the same URLs as the web UI (`/static/shared/…`, `/static/media/…`); the
 test `shared_ui_files_are_mirrored` checks the copy byte for byte. What belongs

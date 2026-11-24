@@ -45,7 +45,9 @@ Open it with the sparkle icon in the top bar (desktop app: the **Agent**
 view on *Company AI*, `Ctrl/Cmd+4`). You can add your own words to a quick action, e.g. "focus on the weld
 seams". The answer shows the tools that the assistant used. Item numbers in
 the answer link to the item. Numbered lists keep their numbers, also when
-the items are separated by blank lines. The assistant remembers the conversation: see
+the items are separated by blank lines; as in Markdown (CommonMark), two
+numbered lists with only a blank line between them count on as one list.
+The assistant remembers the conversation: see
 [The sidebar](#the-sidebar).
 
 ## The sidebar

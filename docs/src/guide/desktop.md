@@ -293,8 +293,10 @@ check-outs and reviews, and a **local working folder**:
       revision rule), change order or change request tab you opened, offers
       quick actions that fit it (*Draft release notes*, *Check before
       release*, *Brief me for this review* …), has the *Allow drafting*
-      checkbox, *Cancel* and *New conversation*, and keeps one conversation on
-      the server that survives restarts.
+      checkbox, *Cancel* (shown only while an answer is on its way) and
+      *New conversation*, and keeps one conversation on the server that
+      survives restarts. Numbered lists in its answers keep their numbers,
+      also when the items are separated by blank lines.
     * **Local agent** – an AI agent on your computer that you set up under *Settings → Agents…*, for example Claude Code
       through its ACP adapter
       or Gemini CLI. None is set up by default. The app starts the agent in
