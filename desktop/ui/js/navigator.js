@@ -385,7 +385,8 @@ export function renderWorklist() {
   return Promise.all([fetchWorklist(), scanNewFiles(true).catch(function () { return null; }),
     scanLocalChanges(false).catch(function () { return null; })]).then(function (r) {
     showWorklistCount();
-    drawWorklist(r[0]);
+    // null: the answer came after a sign-out (shell.js fetchWorklist)
+    if (r[0]) drawWorklist(r[0]);
   });
 }
 

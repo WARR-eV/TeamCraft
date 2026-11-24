@@ -25,6 +25,25 @@ export function acceptSeq(o, seq) {
   return true;
 }
 
+/**
+ * Drops every answer of `o` still on its way (sign-out, #504): marks a fresh
+ * number as applied, so acceptSeq refuses each request taken before it and
+ * accepts the next one.
+ */
+export function dropPending(o) {
+  o.applied = takeSeq(o);
+}
+
+/**
+ * What a caller of shell.js fetchWorklist gets when its own answer was
+ * dropped: the newer worklist applied meanwhile (`current`), or null when the
+ * worklist was forgotten since (sign-out) – never the dropped answer, which
+ * may be the previous user's (#504).
+ */
+export function droppedAnswer(current) {
+  return current || null;
+}
+
 /** Whether the tab in front polls its overview: a Check-outs tab with data
  *  (it is not loading) while someone is signed in. */
 export function shouldPoll(tab, me) {

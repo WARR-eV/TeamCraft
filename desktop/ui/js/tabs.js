@@ -456,7 +456,7 @@ export function renderWelcome(body, toolbar) {
       })) : emptyHint(worklistHint("checkouts", canEdit()))]));
   };
   if (w) fill(w);
-  else refreshWorklistCount().then(fill, function () {});
+  else refreshWorklistCount().then(function (wl) { if (wl) fill(wl); }, function () {});
 }
 
 /** A Home card title with its count as a muted trailing number, like the

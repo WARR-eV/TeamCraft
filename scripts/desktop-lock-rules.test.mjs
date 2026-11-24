@@ -52,13 +52,27 @@ test("an answer older than one already applied is dropped", () => {
 });
 
 test("forgetting the worklist drops the answers still on their way", () => {
-  // shell.js forgetWorklist: take a number and mark it applied
+  // shell.js forgetWorklist (sign-out) calls dropPending on the worklist counter
   const w = {};
-  const before = R.takeSeq(w);
-  R.takeSeq(w);
-  w.applied = w.seq;
-  assert.equal(R.acceptSeq(w, before), false);
+  const older = R.takeSeq(w);
+  const late = R.takeSeq(w);
+  assert.equal(R.acceptSeq(w, older), true, "an answer before the sign-out applies");
+  R.dropPending(w);
+  assert.equal(R.acceptSeq(w, late), false, "the previous user's answer is dropped");
   assert.equal(R.acceptSeq(w, R.takeSeq(w)), true, "the next user's request applies");
+  // a fresh counter (nothing asked yet) can be reset too
+  const fresh = {};
+  R.dropPending(fresh);
+  assert.equal(R.acceptSeq(fresh, R.takeSeq(fresh)), true);
+});
+
+test("a dropped answer is never handed to the caller", () => {
+  const theirs = { checkouts: [{ item_number: "PRT-1", code: "A" }] };
+  // a newer answer was applied meanwhile: the caller gets that one
+  assert.equal(R.droppedAnswer(theirs), theirs);
+  // the worklist was forgotten (sign-out): nothing to draw
+  assert.equal(R.droppedAnswer(null), null);
+  assert.equal(R.droppedAnswer(undefined), null);
 });
 
 test("own check-outs changed: hidden Check-outs tabs forget their data, the one in front keeps it", () => {

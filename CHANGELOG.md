@@ -77,7 +77,9 @@ see the notices in the README.
 - Desktop: after signing out and in again (another user or server), Home
   no longer shows the previous user's worklist, and the first worklist of
   the new session no longer marks the previous user's locks as released
-  (#504).
+  (#504). A worklist answer or a scan of the working folder (*New on this
+  computer*, *Local changes*) still on its way at the sign-out is dropped
+  instead of being drawn for the next user.
 - Desktop: worklist answers that arrive out of order no longer leave a
   stale worklist (rail count, *Check in all*, Home) or mark a released row
   as checked out (#505).
