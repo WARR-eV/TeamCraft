@@ -632,7 +632,6 @@ pub fn running_note(
         Running::Unreachable => Some(
             "Inventor is running but did not answer (started as administrator, still starting, or busy with a dialog) – opened in a new instance.".into(),
         ),
-| Running::Opening => None,
         Running::OtherVersion(dir) => Some(format!(
             "{} is running, not {} – opened in a new instance.",
             last_part(dir),
