@@ -918,7 +918,10 @@ desktop_run() {
     # preference, so the dark run names the dark GTK theme itself.
     local gtk_theme=
     [[ $suffix == -dark ]] && gtk_theme=Adwaita:dark
-    XDG_CONFIG_HOME=$WORK/xdg-config XDG_DATA_HOME=$WORK/xdg-data XDG_CACHE_HOME=$WORK/xdg-cache \
+    # Each run has its own web storage (XDG_DATA_HOME/XDG_CACHE_HOME): the
+    # active project group the first run chose would otherwise make the dark
+    # run start on Home with ROVER, and the clicks below would miss (#424).
+    XDG_CONFIG_HOME=$WORK/xdg-config XDG_DATA_HOME=$WORK/xdg-data$suffix XDG_CACHE_HOME=$WORK/xdg-cache$suffix \
         GDK_BACKEND=x11 NO_AT_BRIDGE=1 \
         WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 \
         env ${gtk_theme:+GTK_THEME=$gtk_theme} "$DESKTOP_APP" >"$WORK/desktop.log" 2>&1 &
