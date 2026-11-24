@@ -698,27 +698,17 @@ mod tests {
         ];
         // README.txt was deleted by the user: it just comes back
         let moves = swap_moves(dir, &found, |p| p.ends_with("TeamCraft.exe"));
-        let pairs: Vec<(String, String)> = moves
+        // paths compared as paths: Path::join writes `\` on Windows
+        let pairs: Vec<(std::path::PathBuf, std::path::PathBuf)> = moves
             .iter()
-            .map(|m| {
-                (
-                    m.from.to_string_lossy().into_owned(),
-                    m.to.to_string_lossy().into_owned(),
-                )
-            })
+            .map(|m| (m.from.clone(), m.to.clone()))
             .collect();
         assert_eq!(
             pairs,
             vec![
-                ("/app/TeamCraft.exe".into(), "/app/TeamCraft.exe.old".into()),
-                (
-                    "/app/.teamcraft-update/T/TeamCraft.exe".into(),
-                    "/app/TeamCraft.exe".into()
-                ),
-                (
-                    "/app/.teamcraft-update/T/README.txt".into(),
-                    "/app/README.txt".into()
-                ),
+                (dir.join("TeamCraft.exe"), dir.join("TeamCraft.exe.old")),
+                (staged("TeamCraft.exe"), dir.join("TeamCraft.exe")),
+                (staged("README.txt"), dir.join("README.txt")),
             ]
         );
         // a zip without the app: nothing at all
