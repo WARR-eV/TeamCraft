@@ -62,6 +62,25 @@ see the notices in the README.
   are kept for the recent messages too; Escape in the report dialog opened
   from a dialog's error closes only the report, not the dialog underneath
   with its input (#502).
+- Desktop: follow-ups of the lock refresh (#451). The *Check-outs* tab keeps
+  polling after a failed reload, an older answer (a slow poll after
+  *Refresh*) no longer paints over a newer one, a tab that comes to the
+  front because its neighbour was closed loads again, and a repaint keeps
+  the keyboard focus on the revision it was on. *Force unlock* of someone
+  else's lock clears the Home row's marker at once, and a re-marked row's
+  tooltip names the new holder.
+- Desktop: whether a lock is yours is decided by your account, not your
+  display name – a colleague with the same name no longer shows as you, and
+  a rename no longer turns your locks into someone else's.
+  `GET /projects/{code}/files` and the structure endpoints send the
+  holder's id (`checked_out_by`) for it (#503).
+- Desktop: after signing out and in again (another user or server), Home
+  no longer shows the previous user's worklist, and the first worklist of
+  the new session no longer marks the previous user's locks as released
+  (#504).
+- Desktop: worklist answers that arrive out of order no longer leave a
+  stale worklist (rail count, *Check in all*, Home) or mark a released row
+  as checked out (#505).
 - Desktop: a check-out or check-in from Home marks the row (lock colour and
   icon) at once instead of after leaving Home and coming back; the
   *Check-outs* tab of a group is loaded again each time it comes to the

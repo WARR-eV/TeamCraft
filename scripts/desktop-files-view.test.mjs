@@ -15,7 +15,8 @@ const source = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../de
 const {
   checkedOutClass, compareNames, countText, entryIconType, entryName, entryRevision, entryTitle, folderKey,
   favouriteKey, favouritePath, favouriteSuggestions, groupTotal, mergeEntries, newItemFolder, normalizeFavourite,
-  lockChanges, parentFolder, remaining, rowThumb, sortEntries, sortFolders, suggestionKey
+  isMineLock, lockChanges, lockMarks, parentFolder, relockedEntry, remaining, rowThumb, sortEntries, sortFolders,
+  suggestionKey
 } = await import("data:text/javascript;base64," + Buffer.from(fs.readFileSync(source, "utf8")).toString("base64"));
 
 let passed = 0;
@@ -214,6 +215,49 @@ test("the own check-outs that changed between two worklists (#451)", () => {
   // the first worklist of a session changes nothing; a missing list is empty
   assert.deepEqual(lockChanges(null, wl("PRT-1/A")), { taken: [], released: [] });
   assert.deepEqual(lockChanges({}, wl("PRT-1/A")), { taken: [{ item: "PRT-1", code: "A" }], released: [] });
+});
+
+test("the marks of Home after the own check-outs changed: taken by me, released by nobody", () => {
+  const wl = (...refs) => ({ checkouts: refs.map((r) => ({ item_number: r.split("/")[0], code: r.split("/")[1], name: "x" })) });
+  const me = { id: "u-1", display_name: "Alex Meyer" };
+  assert.deepEqual(lockMarks(wl("PRT-1/A"), wl("PRT-2/B"), me), [
+    { item: "PRT-2", code: "B", holder: "Alex Meyer", holderId: "u-1" },
+    { item: "PRT-1", code: "A", holder: null, holderId: null }
+  ]);
+  // signed out in between: nobody to name
+  assert.deepEqual(lockMarks(wl(), wl("PRT-2/B"), null), [{ item: "PRT-2", code: "B", holder: null, holderId: null }]);
+  // the first worklist of a session (or after a sign-out) marks nothing
+  assert.deepEqual(lockMarks(null, wl("PRT-2/B"), me), []);
+  assert.deepEqual(lockMarks(wl("PRT-1/A"), wl("PRT-1/A"), me), []);
+});
+
+test("a lock is mine by the holder's id, not by a display name another user may share", () => {
+  const me = { id: "u-1", display_name: "Alex Meyer" };
+  assert.equal(isMineLock({ checked_out_by: "u-1", checked_out_by_name: "Alex Meyer" }, me), true);
+  // a namesake is someone else
+  assert.equal(isMineLock({ checked_out_by: "u-2", checked_out_by_name: "Alex Meyer" }, me), false);
+  // renamed by an administrator after GET /me: still mine
+  assert.equal(isMineLock({ checked_out_by: "u-1", checked_out_by_name: "Alex M. Meyer" }, me), true);
+  assert.equal(isMineLock({ checked_out_by: null, checked_out_by_name: null }, me), false);
+  assert.equal(isMineLock({ checked_out_by: "u-1", checked_out_by_name: "Alex Meyer" }, null), false);
+  assert.equal(isMineLock(null, me), false);
+  // an older server sends only the name
+  assert.equal(isMineLock({ checked_out_by_name: "Alex Meyer" }, me), true);
+  assert.equal(isMineLock({ checked_out_by_name: "Kim" }, me), false);
+});
+
+test("a row's tooltip follows its lock: a check-out adds the holder, a check-in removes it", () => {
+  const row = file("bracket.ipt", { name: "Bracket" });
+  const taken = relockedEntry(row, "Alex Meyer", "u-1");
+  assert.match(entryTitle(taken), /checked out by Alex Meyer$/);
+  assert.equal(taken.checked_out_by, "u-1");
+  assert.equal(row.checked_out_by_name, null, "the row's own entry is not changed");
+  const released = relockedEntry(taken, null, null);
+  assert.doesNotMatch(entryTitle(released), /checked out/);
+  assert.equal(released.checked_out_by, null);
+  // marked twice: the text is there once
+  const again = relockedEntry(relockedEntry(taken, "Alex Meyer", "u-1"), "Alex Meyer", "u-1");
+  assert.equal(entryTitle(again).split("checked out by").length, 2);
 });
 
 console.log(passed + " tests passed");

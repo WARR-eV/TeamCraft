@@ -18,7 +18,8 @@ import { openRequest } from "./requests.js";
 import { openSettings } from "./settings.js";
 import { formatKinds } from "./folder-import.js";
 import { markLock } from "./browser.js";
-import { lockChanges } from "./files-view.js";
+import { lockMarks } from "./files-view.js";
+import { acceptSeq, takeSeq } from "./lock-rules.js";
 import { locksChanged } from "./lock-overview.js";
 import { planNewFiles } from "./new-files.js";
 import { planLocalChanges } from "./local-changes.js";
@@ -113,6 +114,8 @@ export function applyBranding() {
 }
 
 export function enterShell() {
+  // a sign-in after a sign-out (no page reload): nothing of the user before
+  forgetWorklist();
   return reloadProjects().then(function () {
     $("connect").classList.add("hidden");
     $("shell").classList.remove("hidden");
@@ -723,22 +726,39 @@ function releaseClean(total, report, sent) {
   }, function () {});
 }
 
+/** The requests of GET /worklist, numbered (lock-rules.js takeSeq): several
+ *  actions ask for it close together, and the answers may come back in any
+ *  order – an older one must not replace a newer one. */
+var worklistOrder = {};
+
 /** Gets the worklist and shows its count on the rail (no redraw). */
 export function fetchWorklist() {
+  var my = takeSeq(worklistOrder);
   return api("GET", "/worklist").then(function (w) {
+    if (!acceptSeq(worklistOrder, my)) return state.worklist || w;
     var before = state.worklist;
     state.worklist = w;
     showWorklistCount();
     // the own check-outs changed (#451): Home's rows and the Check-outs
     // tabs show it at once, whichever action took or released the lock
-    var c = lockChanges(before, w);
-    if (c.taken.length || c.released.length) {
-      c.taken.forEach(function (r) { markLock(r.item, r.code, state.me ? state.me.display_name : null); });
-      c.released.forEach(function (r) { markLock(r.item, r.code, null); });
+    var marks = lockMarks(before, w, state.me);
+    if (marks.length) {
+      marks.forEach(function (m) { markLock(m.item, m.code, m.holder, m.holderId); });
       locksChanged();
     }
     return w;
   });
+}
+
+/** Forgets the worklist and the scans of the working folder of the user who
+ *  signed out (settings.js), and drops the answers still on their way: the
+ *  next user's Home and lock marks never start from them. */
+export function forgetWorklist() {
+  takeSeq(worklistOrder);
+  worklistOrder.applied = worklistOrder.seq;
+  state.worklist = null;
+  state.newFiles = null;
+  state.localChanges = null;
 }
 
 /** The count on the rail: the open worklist entries, the files on this

@@ -83,12 +83,16 @@ export function markSelection() {
 export function closeTab(key) {
   var i = state.tabs.findIndex(function (t) { return t.key === key; });
   if (i === -1) return;
+  var wasActive = state.active === key;
   state.tabs.splice(i, 1);
-  if (state.active === key) {
-    var next = state.tabs[i] || state.tabs[i - 1];
-    state.active = next ? next.key : null;
-  }
   disposeViewer();
+  if (wasActive) {
+    // the neighbour comes to the front like any other tab (a Check-outs tab
+    // loads again, #451; the agent's context follows)
+    var next = state.tabs[i] || state.tabs[i - 1];
+    if (next) { activate(next.key); return; }
+    state.active = null;
+  }
   renderTabs();
   renderActive();
 }

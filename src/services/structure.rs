@@ -63,6 +63,9 @@ pub struct StructureNode {
     /// ("not released yet" under `released`).
     pub code: Option<String>,
     pub state: Option<String>,
+    /// Who holds the lock of the resolved revision (desktop: whether it is
+    /// the user's own – display names are not unique).
+    pub checked_out_by: Option<Uuid>,
     pub checked_out_by_name: Option<String>,
     pub unit: String,
     /// Assemblies (distinct items) that use the item, visible to the actor.
@@ -123,7 +126,7 @@ pub async fn roots(pool: &PgPool, actor: &Actor, project_id: Uuid, page: Page) -
     )?;
     let rows = sqlx::query_as::<_, Counted>(&format!(
         "SELECT i.number AS item_number, i.item_type, lr.name, lr.code AS code, lr.state AS state,
-                u.display_name AS checked_out_by_name, i.unit,
+                lr.checked_out_by, u.display_name AS checked_out_by_name, i.unit,
                 (SELECT COUNT(DISTINCT pr.item_id) FROM bom_lines x
                    JOIN revisions pr ON pr.id = x.parent_revision_id
                    JOIN items pi ON pi.id = pr.item_id
@@ -166,7 +169,8 @@ pub async fn children(
 ) -> AppResult<Level> {
     let mut rows = sqlx::query_as::<_, Counted>(&format!(
         "SELECT ci.number AS item_number, ci.item_type, COALESCE(cr.name, '') AS name,
-                cr.code AS code, cr.state AS state, u.display_name AS checked_out_by_name, ci.unit,
+                cr.code AS code, cr.state AS state, cr.checked_out_by,
+                u.display_name AS checked_out_by_name, ci.unit,
                 (SELECT COUNT(DISTINCT pr.item_id) FROM bom_lines x
                    JOIN revisions pr ON pr.id = x.parent_revision_id
                    JOIN items pi ON pi.id = pr.item_id
@@ -201,6 +205,7 @@ pub async fn children(
         n.unit.clear();
         n.code = None;
         n.state = None;
+        n.checked_out_by = None;
         n.checked_out_by_name = None;
         n.used_in = 0;
         n.bom_lines = 0;

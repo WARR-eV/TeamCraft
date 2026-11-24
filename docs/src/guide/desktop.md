@@ -467,7 +467,8 @@ revision opens it (#428, the same overview as on the group page in the web
 UI, *Open in browser*). The tab is loaded again each time it comes to the
 front, and while it is in front it looks again every 30 seconds and when the
 window gets the focus back, so a check-out by someone else shows up without
-*Refresh*.
+*Refresh*. A failed look is tried again at the next one; the keyboard focus
+stays on the revision it was on when the overview is painted again.
 CAD editors create a new group there (*New* – you become its manager; tick *Restricted* to keep it to its members), and
 the page offers *Get…* (copy
 groups into your workspace) and *Import CAD folder…*. While *Get…* copies,
@@ -491,8 +492,11 @@ group is kept on this computer.
   before `Part10`), each with the state and the lock of its item. A checked-out file is marked
   with a bar in the lock colour at the left edge of its row and a light tint
   of the row (the same for your check-outs and other people's; also in
-  *Structure*). Your own check-out or check-in shows at once, in place; other
-  people's locks show the next time the list is loaded (*Refresh*). The file
+  *Structure*). Your own check-out or check-in, and a lock of someone else you
+  release (*Force unlock*), show at once, in place, with the row's tooltip; other
+  people's locks show the next time the list is loaded (*Refresh*). Whether a
+  lock is yours is decided by your account, not your display name, so a
+  colleague with the same name is never shown as you. The file
   name comes first and the number and revision after it, so a narrow navigator
   cuts the number, not the name. A folder opens its own level – a large group
   is never loaded as a whole, and a folder with more than 500 files offers *show … more*. The files are those of the

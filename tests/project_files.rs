@@ -101,7 +101,7 @@ fn sub(name: &str, path: &str, files: i64) -> (String, String, i64) {
 #[tokio::test]
 async fn one_folder_level_with_subfolders_files_and_loose_items() {
     let app = app_or_skip!();
-    let (_, erika) = app.user_in("erika", Role::Editor, &["ROVER"]).await;
+    let (erika_actor, erika) = app.user_in("erika", Role::Editor, &["ROVER"]).await;
     let bracket = item(
         &app,
         &erika,
@@ -175,6 +175,8 @@ async fn one_folder_level_with_subfolders_files_and_loose_items() {
     assert!(w["file_id"].is_string(), "{w}");
     // a new item is checked out by the user who created it
     assert_eq!(w["checked_out_by_name"], "erika (test)");
+    // by id too: the desktop decides by it whether the lock is the user's own
+    assert_eq!(w["checked_out_by"], erika_actor.id.to_string());
     let loose = &top["entries"][3];
     assert!(
         loose["file_id"].is_null() && loose["filename"].is_null(),

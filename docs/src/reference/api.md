@@ -397,7 +397,8 @@ group (no BOM line of the group uses them) and
 `GET …/revisions/{code}/structure?rule=latest|released&limit=` the BOM lines of
 one revision. Both answer `{nodes, total}`; a node has `item_number`,
 `item_type`, `name`, the revision the rule resolves to (`code`, `state`, both
-`null` when there is none, e.g. not released yet), `checked_out_by_name`,
+`null` when there is none, e.g. not released yet), `checked_out_by` (the
+holder's user id) and `checked_out_by_name`,
 `used_in` (assemblies that use it), `bom_lines` (more than 0 = expandable) and,
 for BOM lines, `find_number` and `quantity`. A child in a restricted group the
 caller cannot read is a placeholder (`restricted: true`, no identity); hidden
@@ -411,8 +412,8 @@ are the folders directly below it (`name`, `path` to ask for, `files` = files
 in it at any depth, an item without files counted as one). `entries` are its files by name, each with the item it
 belongs to: `file_id`, `filename`, `size_bytes`, `format`, `format_label`,
 `format_kind` (`part`, `assembly`, `drawing`, …; `null` if unknown),
-`item_number`, `item_type`, and `name`, `code`, `state` and
-`checked_out_by_name` of the item's latest revision – the browser shows the
+`item_number`, `item_type`, and `name`, `code`, `state`, `checked_out_by`
+(the holder's user id) and `checked_out_by_name` of the item's latest revision – the browser shows the
 files of the latest revision of every item. The items without files follow
 the files in their own folder (`file_id` and `filename` are `null`; the top of
 the group unless the item was given a folder), so every item of the group is

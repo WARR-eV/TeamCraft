@@ -8,7 +8,7 @@ import { LANGUAGES, negotiate, t } from "/static/shared/js/i18n.js";
 import { applySkin } from "./skins.js";
 import { settingInputs } from "./report-inputs.js";
 import { checkServerUrl, showConnect } from "./connect.js";
-import { atRisk, checkUpdate, checkoutsWithChanges, localChangesList, refreshWorklistCount, sendLocalChanges, showDonateTag } from "./shell.js";
+import { atRisk, checkUpdate, checkoutsWithChanges, forgetWorklist, localChangesList, refreshWorklistCount, sendLocalChanges, showDonateTag } from "./shell.js";
 import { resetCompanyAi } from "./assistant.js";
 import { agent, agentSettingsDialog, endAgentPermissions, localAgentsAllowed, localAgentsOffText } from "./agent.js";
 
@@ -388,6 +388,8 @@ function finishSignOut(changeServer) {
     state.tabs = [];
     state.active = null;
     state.me = null;
+    // the next user's Home and lock marks never start from this worklist
+    forgetWorklist();
     resetCompanyAi();
     endAgentPermissions();
     agent.running = null; // signing out stops the agent (src/commands.rs)

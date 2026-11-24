@@ -203,3 +203,35 @@ export function lockChanges(before, after) {
   Object.keys(was).forEach(function (k) { if (!now[k]) out.released.push(was[k]); });
   return out;
 }
+
+/**
+ * How Home marks its rows after the own check-outs changed (#451): one
+ * `{ item, code, holder, holderId }` per revision – a taken lock is held by
+ * the user (`me`: display name and id), a released one by nobody (null).
+ */
+export function lockMarks(before, after, me) {
+  var c = lockChanges(before, after);
+  return c.taken.map(function (r) {
+    return { item: r.item, code: r.code, holder: me ? me.display_name : null, holderId: me ? me.id : null };
+  }).concat(c.released.map(function (r) {
+    return { item: r.item, code: r.code, holder: null, holderId: null };
+  }));
+}
+
+/**
+ * Whether the lock of a row (a Files entry or a structure node) is the
+ * user's own: by the holder's id (`checked_out_by`) – display names are not
+ * unique and change when an administrator renames someone. An older server
+ * that sends only the name is compared by name.
+ */
+export function isMineLock(e, me) {
+  if (!e || !me) return false;
+  if (e.checked_out_by) return e.checked_out_by === me.id;
+  return !!e.checked_out_by_name && e.checked_out_by_name === me.display_name;
+}
+
+/** The entry of a row after its lock changed in place (browser.js markLock):
+ *  held by `holder` (a display name, id `holderId`) or by nobody (null). */
+export function relockedEntry(e, holder, holderId) {
+  return Object.assign({}, e, { checked_out_by_name: holder || null, checked_out_by: holder ? holderId || null : null });
+}

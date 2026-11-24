@@ -12,7 +12,7 @@ import { openRevision } from "./revision.js";
 import { canEdit, canEditProject } from "./shell.js";
 import { newItemDialog } from "./dialogs.js";
 import { thumbIco } from "./list-thumbs.js";
-import { checkedOutClass, countText, entryIconType, entryName, entryRevision, entryTitle, favouritePath, favouriteSuggestions, folderKey, groupTotal, mergeEntries, parentFolder, remaining, sortEntries, sortFolders } from "./files-view.js";
+import { checkedOutClass, countText, entryIconType, entryName, entryRevision, entryTitle, favouritePath, favouriteSuggestions, folderKey, groupTotal, isMineLock, mergeEntries, parentFolder, relockedEntry, remaining, sortEntries, sortFolders } from "./files-view.js";
 
 /** Entries asked for per request (the server's maximum). */
 var PAGE = 500;
@@ -228,7 +228,7 @@ function entryNode(p, path, e) {
   var key = "rev:" + e.item_number + ":" + e.code;
   var meta = [];
   if (e.state) meta.push(badge(e.state));
-  if (e.checked_out_by_name) meta.push(lockOwner(e.checked_out_by_name));
+  if (e.checked_out_by_name) meta.push(lockOwner(e.checked_out_by_name, isMineLock(e, state.me)));
   var node = row("div.node.file" + checkedOutClass(e) + (state.active === key ? ".selected" : ""), {
     title: entryTitle(e, label), "data-item": e.item_number, "data-rev": e.code
   }, [
@@ -236,31 +236,38 @@ function entryNode(p, path, e) {
     h("span.label", null, [h("span.fname", { text: entryName(e) }), h("span.dim.mono", { text: " " + entryRevision(e) })]),
     h("span.meta", null, meta)
   ], function () { remember(p, path); openRevision(e.item_number, e.code); });
+  // markLock rebuilds the tooltip from it when the lock changes in place
+  node._entry = e;
   return h("li", null, node);
 }
 
-/** The lock marker of a row, held by `name` (a display name). */
-function lockOwner(name) {
-  var mine = !!state.me && name === state.me.display_name;
+/** The lock marker of a row, held by `name` (a display name); `mine`: by the user. */
+function lockOwner(name, mine) {
   return h("span.lock-owner", { title: "Checked out by " + (mine ? "you" : name) }, lockIcon(mine));
 }
 
 /**
  * Marks the rows of revision `item`/`code` in the navigator again, in place:
- * checked out by `holder` (a display name) or by nobody (null). Called when
- * the user's own check-outs changed (shell.js fetchWorklist, #451), so Home
- * shows the colour at once – without drawing the list again, which would
- * lose the scroll position and the open folders.
+ * checked out by `holder` (a display name, user id `holderId`) or by nobody
+ * (null). Called when the user's own check-outs changed (shell.js
+ * fetchWorklist, #451) or a lock was released (workspace.js), so Home shows
+ * the colour, the marker and the tooltip at once – without drawing the list
+ * again, which would lose the scroll position and the open folders.
  */
-export function markLock(item, code, holder) {
+export function markLock(item, code, holder, holderId) {
   var rows = document.querySelectorAll("#navigator .node.file[data-item][data-rev]");
   Array.prototype.forEach.call(rows, function (node) {
     if (node.dataset.item !== item || node.dataset.rev !== code) return;
     node.classList.toggle("checked-out", !!holder);
+    var e = relockedEntry(node._entry || { item_number: item, code: code }, holder, holderId);
+    if (node._entry) {
+      node._entry = e;
+      node.title = entryTitle(e, label);
+    }
     var meta = node.querySelector(".meta");
     if (!meta) return;
     var old = meta.querySelector(".lock-owner");
     if (old) old.remove();
-    if (holder) meta.appendChild(lockOwner(holder));
+    if (holder) meta.appendChild(lockOwner(holder, isMineLock(e, state.me)));
   });
 }
