@@ -725,7 +725,7 @@
   <dl class="props cols-2">
     <dt>Design</dt><dd>{% if rec.restricted %}{{ m.restricted() }}{% else %}<a class="mono" href="/revisions/{{ rec.design_revision_id }}">{{ rec.design_number }}/{{ rec.design_code }}</a> {{ rec.design_name }} {{ m.badge(rec.design_state) }}{% endif %}</dd>
     <dt>Serial / lot</dt><dd class="mono">{% if rec.serial_number %}{{ rec.serial_number }}{% else %}<span class="muted">—</span>{% endif %}</dd>
-    <dt>Built on</dt><dd>{% if rec.built_on %}{{ rec.built_on }}{% else %}<span class="muted">—</span>{% endif %}</dd>
+    <dt>Built on</dt><dd>{{ m.day(rec.built_on) }}</dd>
     <dt>Recorded</dt><dd>{{ m.time(rec.updated_at) }} by {{ rec.updated_by_name }}</dd>
     {% if rec.note %}<dt>Note</dt><dd>{{ rec.note }}</dd>{% endif %}
   </dl>
@@ -1023,7 +1023,7 @@
         <td>{{ u.unit_name }}</td>
         <td>{{ m.badge(u.unit_state) }}</td>
         <td class="small nowrap"><a class="mono" href="/revisions/{{ u.design_revision_id }}">{{ u.design_code }}</a>{% if u.newer_design %} <span class="badge badge-out_of_date" title="{{ u.newer_design }}">Older revision</span>{% endif %}</td>
-        <td class="small nowrap">{% if u.built_on %}{{ u.built_on }}{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td class="small nowrap">{{ m.day(u.built_on) }}</td>
         <td class="small nowrap">{% if u.open_count %}<span class="badge badge-out_of_date">{{ u.open_count }} open</span> of {{ u.deviation_count }}{% elif u.deviation_count %}{{ u.deviation_count }}, all decided{% else %}<span class="muted">none</span>{% endif %}</td>
       </tr>
     {% endfor %}

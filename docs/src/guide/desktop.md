@@ -971,8 +971,9 @@ that could not be saved. They are names and short values only: a path is
 reduced to the file name, and file contents, item names, descriptions and
 BOM lines are never included.
 
-The error pages of the web UI have *Details for a bug report* with *Copy
-details* (status, message, page, time, version and the request id). The
+The web UI's pages for server errors have *Details for a bug report* with
+*Copy details* (status, message, page, time, version and the request id); a
+page that was not found has none – a missing or hidden object is no bug. The
 request id is also in the server log, so your administrator can find the
 error there.
 

@@ -426,9 +426,19 @@
   // <time data-date>: the date alone, for narrow columns (the title keeps the time).
   var dateFmt = null;
   try { dateFmt = new Intl.DateTimeFormat(undefined, { year: "numeric", month: "2-digit", day: "2-digit" }); } catch (e) { dateFmt = null; }
+  // <time data-day>: a calendar date without a time (Built on, #527). It parses
+  // as midnight UTC, so it is formatted in UTC – the same day in every zone.
+  var dayFmt = null;
+  try {
+    dayFmt = new Intl.DateTimeFormat(undefined, { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "UTC" });
+  } catch (e) { dayFmt = null; }
   if (fmt) {
     document.querySelectorAll("time[datetime]").forEach(function (el) {
       var d = new Date(el.getAttribute("datetime"));
+      if (el.hasAttribute("data-day")) {
+        if (dayFmt && !isNaN(d.getTime())) el.textContent = dayFmt.format(d);
+        return;
+      }
       if (!isNaN(d.getTime())) {
         el.title = fmt.format(d);
         el.textContent = el.hasAttribute("data-date") && dateFmt ? dateFmt.format(d) : fmt.format(d);

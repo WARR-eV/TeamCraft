@@ -898,6 +898,14 @@ async fn html_errors(State(st): State<AppState>, req: Request, next: Next) -> Re
         .extensions()
         .get::<crate::RequestId>()
         .map(|r| r.0.clone());
+    // what the signed-in user of a 4xx page is resolved from (#524)
+    let shell = (
+        req.uri().clone(),
+        req.headers().clone(),
+        req.extensions()
+            .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
+            .cloned(),
+    );
     let response = next.run(req).await;
     // The viewer fetches preview meshes itself and shows the JSON error message.
     let path = target.split('?').next().unwrap_or("");
@@ -938,16 +946,64 @@ async fn html_errors(State(st): State<AppState>, req: Request, next: Next) -> Re
         "version": env!("CARGO_PKG_VERSION"),
         // the `x-request-id` of this answer: matches the server log line
         "request_id": request_id,
+        "report_details": offers_bug_report(info.status),
         "skin": skin,
         "branding": branding,
     });
-    match render_public(&st, "error.html", data, None) {
+    let ctx = if keeps_app_shell(info.status) {
+        error_page_ctx(&st, shell).await
+    } else {
+        None
+    };
+    let rendered = match &ctx {
+        Some(ctx) => render(&st, ctx, "error.html", data),
+        None => render_public(&st, "error.html", data, None),
+    };
+    match rendered {
         Ok(mut page) => {
             *page.status_mut() = info.status;
             page
         }
         Err(_) => (info.status, info.message).into_response(),
     }
+}
+
+/// Whether an error page offers *Details for a bug report* (#381): only for
+/// server errors. A missing or hidden object (404, also need-to-know) or a
+/// refusal (403) is not a bug, and the details would invite reports of it
+/// (#524).
+pub(crate) fn offers_bug_report(status: StatusCode) -> bool {
+    status.is_server_error()
+}
+
+/// Whether an error page keeps the app shell (top bar and navigation) for a
+/// signed-in user (#524): for client errors, so a 404 is a page of the app
+/// with a way on. Server errors stay plain – their cause may be the database
+/// the shell is read from.
+pub(crate) fn keeps_app_shell(status: StatusCode) -> bool {
+    status.is_client_error()
+}
+
+/// The signed-in user of a request that ended in an error page, read again
+/// from its URI, headers and peer address (the handler's own extractors are
+/// gone with its request) as a read-only GET. `None` without a valid session
+/// or when reading it fails – the page is then shown without the shell.
+async fn error_page_ctx(
+    st: &AppState,
+    (uri, headers, peer): (
+        Uri,
+        HeaderMap,
+        Option<axum::extract::ConnectInfo<std::net::SocketAddr>>,
+    ),
+) -> Option<WebCtx> {
+    let mut req = Request::new(axum::body::Body::empty());
+    *req.uri_mut() = uri;
+    *req.headers_mut() = headers;
+    if let Some(peer) = peer {
+        req.extensions_mut().insert(peer);
+    }
+    let (mut parts, _) = req.into_parts();
+    WebCtx::from_request_parts(&mut parts, st).await.ok()
 }
 
 /// Rejects cross-site form submissions (defence in depth on top of
@@ -1041,6 +1097,30 @@ mod tests {
             );
         }
         h
+    }
+
+    /// #524: bug-report details only for server errors; the app shell for
+    /// client errors (404, 403, need-to-know not found) only.
+    #[test]
+    fn error_pages_report_details_and_shell_by_status() {
+        for status in [
+            StatusCode::BAD_REQUEST,
+            StatusCode::FORBIDDEN,
+            StatusCode::NOT_FOUND,
+            StatusCode::CONFLICT,
+            StatusCode::PAYLOAD_TOO_LARGE,
+        ] {
+            assert!(!offers_bug_report(status), "{status}");
+            assert!(keeps_app_shell(status), "{status}");
+        }
+        for status in [
+            StatusCode::INTERNAL_SERVER_ERROR,
+            StatusCode::BAD_GATEWAY,
+            StatusCode::SERVICE_UNAVAILABLE,
+        ] {
+            assert!(offers_bug_report(status), "{status}");
+            assert!(!keeps_app_shell(status), "{status}");
+        }
     }
 
     #[test]

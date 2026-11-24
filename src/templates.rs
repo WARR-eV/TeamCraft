@@ -745,11 +745,25 @@ mod tests {
             "login.html",
             json!({ "next": "/", "next_encoded": "%2F", "setup_needs_code": true, "local_login": true, "flash": null }),
         );
-        render(
+        // a 404 offers no bug report (#524), even with the version at hand
+        let html = render(
             &env,
             "error.html",
-            json!({ "status": 404, "reason": "Not Found", "message": "gone", "flash": null, "local_login": true }),
+            json!({ "status": 404, "reason": "Not Found", "message": "gone", "flash": null, "local_login": true,
+                    "version": "0.2.12", "path": "/items/x", "report_details": false }),
         );
+        assert!(!html.contains("Details for a bug report") && html.contains("class=\"login\""));
+        // signed in: the app shell, no big logo (#524)
+        let html = render(
+            &env,
+            "error.html",
+            with_common(
+                json!({ "status": 404, "reason": "Not Found", "message": "gone",
+                                "report_details": false, "here": "/items/x" }),
+            ),
+        );
+        assert!(html.contains("class=\"topbar\"") && html.contains("class=\"error-page\""));
+        assert!(!html.contains("login-logo") && html.contains("data-back"));
         // *Copy details* (#381): status, message, page, time and version
         let html = render(
             &env,
@@ -757,7 +771,7 @@ mod tests {
             json!({ "status": 500, "reason": "Internal Server Error", "message": "Something went wrong <b>",
                     "flash": null, "local_login": true, "path": "/items/PRT-000042",
                     "time": "2026-11-22 08:00:00 UTC", "version": "0.2.12",
-                    "request_id": "0b7c6f0e-4d3a-4c1e-9a55-2f1d8e6b7a90" }),
+                    "request_id": "0b7c6f0e-4d3a-4c1e-9a55-2f1d8e6b7a90", "report_details": true }),
         );
         // (MiniJinja escapes `/` in text as `&#x2f;`; the copied text is decoded)
         assert!(
@@ -1322,7 +1336,8 @@ mod tests {
                 "id=\"as-built\"",
                 "Built to",
                 "SN &lt;0042&gt;",
-                "2026-11-02",
+                // a calendar date app.js formats like the card's timestamps (#527)
+                "<time datetime=\"2026-11-02\" data-day>2026-11-02</time>",
                 "Deviations from the design",
                 "1 open",
                 "Bore &lt;Ø12&gt;",

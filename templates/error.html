@@ -1,12 +1,16 @@
 {% extends "base.html" %}
 {% block title %}{{ status }} {{ reason }}{% endblock %}
 {% block content %}
-<div class="login">
+{#- Signed in and a client error (404, 403 …): a page of the app under its top
+    bar, without the big logo (#524); otherwise the plain sign-in frame. -#}
+<div class="{{ 'error-page' if me else 'login' }}">
+  {% if not me %}
   {% if branding and branding.wide %}
   <img class="login-logo" src="/branding/wide?v={{ branding.wide }}" alt="{{ (branding.display_name if branding and branding.display_name else instance_name) }}">
   {% else %}
   <img class="login-logo on-dark" src="/static/media/logos/TeamCraft_Logo_White.svg?v={{ assets }}" alt="TeamCraft">
   <img class="login-logo on-light" src="/static/media/logos/TeamCraft_Logo_Blue.svg?v={{ assets }}" alt="TeamCraft">
+  {% endif %}
   {% endif %}
   <div class="card">
     <p class="meta">Error {{ status }}</p>
@@ -16,7 +20,8 @@
       <a class="button" href="/" data-back>Back</a>
       <a class="button primary" href="/">Dashboard</a>
     </div>
-    {% if version %}
+    {#- only server errors are bugs; a missing or hidden object is not (#524) -#}
+    {% if report_details and version %}
     <details class="error-details">
       <summary>Details for a bug report</summary>
       <pre id="error-details">TeamCraft {{ version }}

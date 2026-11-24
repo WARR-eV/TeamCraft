@@ -164,6 +164,13 @@
 {% if value %}<time datetime="{{ value }}" data-date>{{ value|dt }}</time>{% else %}<span class="muted">—</span>{% endif %}
 {%- endmacro %}
 
+{#- A calendar date without a time (`2026-10-28`, e.g. *Built on*): app.js
+    shows it in the viewer's date format like the timestamps around it, as the
+    same day in every time zone (#527). -#}
+{% macro day(value) -%}
+{% if value %}<time datetime="{{ value }}" data-day>{{ value }}</time>{% else %}<span class="muted">—</span>{% endif %}
+{%- endmacro %}
+
 {#- Who holds the lock; `mine`: the signed-in user. -#}
 {% macro lock(name, mine=false) -%}
 <span class="lock{% if mine %} lock-mine{% endif %}" title="Checked out by {% if mine %}you{% else %}{{ name }}{% endif %}"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>{{ name }}{% if mine %} <span class="dim">(you)</span>{% endif %}</span>

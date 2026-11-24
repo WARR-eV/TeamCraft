@@ -707,11 +707,11 @@ shot() {
     local name=$1 path=$2 scroll=${3:-}
     open_page "$path"
     if [[ -n $scroll ]]; then
+        # scrollIntoView honours the page's own anchor offset (scroll-padding-top
+        # below the sticky top bar, scroll-margin-top below a section nav, #523),
+        # so the picture shows what a click on a section link shows.
         [[ $(js 'var el = document.querySelector(arguments[0]);
-            // Below the sticky page header.
-            var bar = document.querySelector("header.topbar");
-            var offset = (bar ? bar.getBoundingClientRect().height : 0) + 16;
-            if (el) { window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - offset); }
+            if (el) { el.scrollIntoView({ block: "start", behavior: "instant" }); }
             return Boolean(el);' "$(jq -nc --arg s "$scroll" '[$s]')") == true ]] ||
             die "$path has no element '$scroll'"
     fi
