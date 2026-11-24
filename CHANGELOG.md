@@ -22,6 +22,11 @@ see the notices in the README.
 
 ### Fixed
 
+- README screenshots replaced with the run of #545 (all 24, checked one by
+  one): the desktop Home shows the files of the active group, the Graph and
+  dark captures are right, and the images show the fixes of today (vault
+  table in its card, full card headings, numbered lists, the 3D viewer
+  controls, *Withdraw* in *More* for an administrator reviewer).
 - Desktop: the STEP export at check-in exports parts and small assemblies
   only; an assembly file (`.iam`, Solid Edge `.asm`) larger than 5 MB is
   skipped, named in the check-in dialog and the result, and its 3D preview
