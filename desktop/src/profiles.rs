@@ -45,6 +45,12 @@ pub struct Profile {
     /// Working folder; `None` = the app's default folder (first connection).
     #[serde(default)]
     pub workspace_dir: Option<PathBuf>,
+    /// *Getting started* (#422) on this connection: `done` or `dismissed`
+    /// (`settings::onboarding_value`); `None` = it opens once after a
+    /// sign-in. Per connection, so a second server or account offers it
+    /// once more. Settings files of older versions have no field.
+    #[serde(default)]
+    pub onboarding: Option<String>,
 }
 
 /// Where the tokens of inactive connections are parked.
@@ -178,6 +184,7 @@ pub fn ensure_active(s: &mut Settings) -> Option<String> {
         username: None,
         display_name: None,
         workspace_dir: s.workspace_dir.clone(),
+        onboarding: None,
     });
     s.active_profile = Some(id.clone());
     Some(id)
@@ -198,6 +205,55 @@ pub fn record_user(s: &mut Settings, username: &str, display_name: &str) -> bool
         p.display_name = Some(display_name.to_string()).filter(|d| !d.is_empty());
     }
     (s.profiles.clone(), s.active_profile.clone()) != before
+}
+
+/// *Getting started* (#422) of the active connection: `done`, `dismissed`
+/// or `None`. Without an active saved connection: the value an older
+/// settings file kept for the whole app (not migrated yet, see
+/// [`migrate_onboarding`]).
+pub fn onboarding(s: &Settings) -> Option<String> {
+    s.active_profile
+        .as_deref()
+        .and_then(|id| s.profiles.iter().find(|p| p.id == id))
+        .map_or_else(|| s.onboarding.clone(), |p| p.onboarding.clone())
+}
+
+/// Stores `done` or `dismissed` (checked by the caller with
+/// `settings::onboarding_value`) on the active connection; without a server
+/// in the old app-wide field, which [`migrate_onboarding`] moves later.
+pub fn set_onboarding(s: &mut Settings, value: &str) {
+    migrate_onboarding(s);
+    let profile = match ensure_active(s) {
+        Some(id) => s.profiles.iter_mut().find(|p| p.id == id),
+        None => None,
+    };
+    match profile {
+        Some(p) => p.onboarding = Some(value.to_string()),
+        None => s.onboarding = Some(value.to_string()),
+    }
+}
+
+/// App versions before the per-connection setting kept one `onboarding` for
+/// the whole app. It was stored while the then active connection was in use,
+/// so it moves onto that connection; the other saved connections offer the
+/// wizard once (it opens only after a sign-in in that run of the app). A
+/// value the connection already has wins. Without a server the old field
+/// stays until there is one. Returns whether anything changed (the caller
+/// then saves the settings).
+pub fn migrate_onboarding(s: &mut Settings) -> bool {
+    let Some(value) = s.onboarding.clone() else {
+        return false;
+    };
+    let Some(id) = ensure_active(s) else {
+        return false;
+    };
+    if let Some(p) = s.profiles.iter_mut().find(|p| p.id == id) {
+        if p.onboarding.is_none() {
+            p.onboarding = Some(value);
+        }
+    }
+    s.onboarding = None;
+    true
 }
 
 /// Parks the active token (or forgets a parked one when signed out).
@@ -319,6 +375,7 @@ pub fn add(
         username: None,
         display_name: None,
         workspace_dir: Some(workspace.clone()),
+        onboarding: None,
     });
     s.save_token_with(dir, keychain, None)?;
     s.server_url = Some(server_url.to_string());
@@ -543,6 +600,105 @@ mod tests {
             "gone"
         );
         fs::remove_dir_all(dir).ok();
+    }
+
+    /// Getting started (#422) is remembered per connection: a second server
+    /// or account offers it once more, switching back keeps the first one's.
+    #[test]
+    fn getting_started_is_remembered_per_connection() {
+        let dir = temp_dir();
+        let (keychain, parking) = (Active::default(), Parking::default());
+        let root = dir.join("TeamCraft");
+        let mut s = Settings::default();
+        connect(&mut s, &dir, &keychain, &parking, A, &root).unwrap();
+        let first = s.active_profile.clone().unwrap();
+        assert_eq!(onboarding(&s), None, "a new connection offers it");
+        set_onboarding(&mut s, "done");
+        assert_eq!(onboarding(&s).as_deref(), Some("done"));
+        assert_eq!(s.onboarding, None, "not app-wide any more");
+
+        // another server: offered once more
+        connect(&mut s, &dir, &keychain, &parking, B, &root).unwrap();
+        assert_eq!(onboarding(&s), None);
+        set_onboarding(&mut s, "dismissed");
+        // another account on the first server: offered too
+        add(&mut s, &dir, &keychain, &parking, A, &root).unwrap();
+        assert_eq!(onboarding(&s), None);
+
+        // back to the first: its own value
+        switch(&mut s, &dir, &keychain, &parking, &first).unwrap();
+        assert_eq!(onboarding(&s).as_deref(), Some("done"));
+        let saved: Vec<Option<&str>> = s.profiles.iter().map(|p| p.onboarding.as_deref()).collect();
+        assert_eq!(saved, vec![Some("done"), Some("dismissed"), None]);
+        fs::remove_dir_all(dir).ok();
+    }
+
+    /// The app-wide value of older versions moves onto the connection that
+    /// was active; the other saved connections offer the wizard once.
+    #[test]
+    fn the_old_app_wide_getting_started_moves_to_the_active_connection() {
+        let other = Profile {
+            id: "0000000000000002".into(),
+            server_url: B.into(),
+            ..Profile::default()
+        };
+        let mut s = Settings {
+            server_url: Some(A.into()),
+            onboarding: Some("dismissed".into()),
+            profiles: vec![
+                Profile {
+                    id: "0000000000000001".into(),
+                    server_url: A.into(),
+                    ..Profile::default()
+                },
+                other.clone(),
+            ],
+            active_profile: Some("0000000000000001".into()),
+            ..Settings::default()
+        };
+        assert_eq!(onboarding(&s), None, "not read before the migration");
+        assert!(migrate_onboarding(&mut s));
+        assert_eq!(s.onboarding, None);
+        assert_eq!(onboarding(&s).as_deref(), Some("dismissed"));
+        assert_eq!(s.profiles[1], other, "the other connection is untouched");
+        assert!(!migrate_onboarding(&mut s), "once");
+
+        // a value the connection already has wins
+        s.onboarding = Some("done".into());
+        assert!(migrate_onboarding(&mut s));
+        assert_eq!(onboarding(&s).as_deref(), Some("dismissed"));
+
+        // a settings file from before the connections: the server becomes
+        // the first connection and gets the value
+        let mut old = Settings {
+            server_url: Some(A.into()),
+            onboarding: Some("done".into()),
+            ..Settings::default()
+        };
+        assert!(migrate_onboarding(&mut old));
+        assert_eq!(old.profiles.len(), 1);
+        assert_eq!(onboarding(&old).as_deref(), Some("done"));
+
+        // no server yet: the old field stays (and is what counts)
+        let mut none = Settings {
+            onboarding: Some("done".into()),
+            ..Settings::default()
+        };
+        assert!(!migrate_onboarding(&mut none));
+        assert_eq!(onboarding(&none).as_deref(), Some("done"));
+        set_onboarding(&mut none, "dismissed");
+        assert_eq!(none.onboarding.as_deref(), Some("dismissed"));
+    }
+
+    /// Connections saved by older versions have no `onboarding` field.
+    #[test]
+    fn connections_of_older_versions_still_load() {
+        let p: Profile = serde_json::from_str(
+            r#"{"id":"abcd","server_url":"https://plm.example.org","workspace_dir":null}"#,
+        )
+        .unwrap();
+        assert_eq!(p.onboarding, None);
+        assert_eq!(p.server_url, A);
     }
 
     #[test]

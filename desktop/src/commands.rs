@@ -190,7 +190,7 @@ pub fn session(app: AppHandle, state: State<'_, AppState>) -> Session {
         local_server_available: localserver::sidecar().is_some(),
         local_server_in_use: local_server_in_use(&s),
         policy: policy::current().view(),
-        onboarding: s.onboarding.clone(),
+        onboarding: profiles::onboarding(&s),
     }
 }
 
@@ -1193,13 +1193,37 @@ pub fn dismiss_update(state: State<'_, AppState>, version: String) -> CmdResult<
 }
 
 /// *Getting started* (#422): the wizard was finished (`done`) or closed with
-/// *Don't show again* (`dismissed`); it then no longer opens by itself.
+/// *Don't show again* (`dismissed`); it then no longer opens by itself on
+/// this connection (a second server or account offers it once more).
 #[tauri::command]
 pub fn set_onboarding(state: State<'_, AppState>, value: String) -> CmdResult<()> {
     let value = crate::settings::onboarding_value(&value)
         .ok_or_else(|| ApiError::local(format!("'{value}' is not a state of the wizard.")))?;
-    update_settings(&state, |s| s.onboarding = Some(value.to_string()))?;
+    update_settings(&state, |s| profiles::set_onboarding(s, value))?;
     Ok(())
+}
+
+/// Pages of the documentation the app links to. The web view names a page,
+/// never an address, so it cannot open anything else.
+pub fn guide_url(page: &str) -> Option<&'static str> {
+    match page {
+        "cad-setup" => Some("https://warr-ev.github.io/TeamCraft/admin/cad-setup.html"),
+        "getting-started" => {
+            Some("https://warr-ev.github.io/TeamCraft/guide/desktop.html#getting-started")
+        }
+        _ => None,
+    }
+}
+
+/// Opens a page of the documentation ([`guide_url`]) in the default browser
+/// – *Getting started* links the administrator page on CAD setup.
+#[tauri::command]
+pub fn open_guide(app: AppHandle, page: String) -> CmdResult<()> {
+    let url = guide_url(&page)
+        .ok_or_else(|| ApiError::local(format!("'{page}' is not a page of the guide.")))?;
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| ApiError::local(format!("The browser could not be opened: {e}")))
 }
 
 /// *Remind me later*: no notice for three days (#377).
@@ -1862,6 +1886,22 @@ mod tests {
         assert_eq!(clamp_zoom(0.1), ZOOM_RANGE.0);
         assert_eq!(clamp_zoom(9.0), ZOOM_RANGE.1);
         assert_eq!(clamp_zoom(f64::NAN), 1.0);
+    }
+
+    /// *Getting started* opens only fixed https pages of the documentation;
+    /// anything else the web view names is refused.
+    #[test]
+    fn guide_pages_are_fixed_documentation_addresses() {
+        for page in ["cad-setup", "getting-started"] {
+            let url = guide_url(page).expect(page);
+            assert!(
+                url.starts_with("https://warr-ev.github.io/TeamCraft/"),
+                "{url}"
+            );
+        }
+        for bad in ["", "https://example.org", "../cad-setup", "CAD-SETUP"] {
+            assert_eq!(guide_url(bad), None, "{bad:?}");
+        }
     }
 
     /// The Ko-fi tag (#403) opens one fixed https address of ko-fi.com, and

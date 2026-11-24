@@ -944,11 +944,16 @@ function structureRule() {
   return state.structureRule === "released" ? "released" : "latest";
 }
 
+/** The top-level items of a group (no BOM line of the group uses them):
+ *  `{nodes, total}` – the Structure view and Getting started's assemblies. */
+export function fetchStructureRoots(code) {
+  return api("GET", "/projects/" + enc(code) + "/structure?limit=500").then(rootNodes);
+}
+
 /** Top-level items of a group; every assembly expands into its parts. */
 function loadStructureRoots(p, ul, count) {
-  return api("GET", "/projects/" + enc(p.code) + "/structure?limit=500").then(function (r) {
+  return fetchStructureRoots(p.code).then(function (top) {
     clear(ul);
-    var top = rootNodes(r);
     count.textContent = String(top.total);
     if (!top.nodes.length) {
       ul.appendChild(emptyHint(emptyGroupHint(canEditProject(p.id), canEdit()), { project: p.code, tag: "li" }));

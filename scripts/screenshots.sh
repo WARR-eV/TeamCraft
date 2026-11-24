@@ -897,7 +897,7 @@ capture_desktop() {
 }
 
 # desktop_run SUFFIX SKIN – starts the app with SKIN, captures its screens
-# (home, worklist, revision, change order, graph, agent) as
+# (home, worklist, revision, change order, graph, agent, Getting started) as
 # desktop-*SUFFIX.png and quits the app again.
 desktop_run() {
     local suffix=$1 skin=$2 settings=$WORK/xdg-config/io.github.rudalabs.teamcraft/settings.json
@@ -948,6 +948,7 @@ desktop_run() {
     desktop_snap "desktop-change$suffix"
     desktop_graph "$suffix"
     desktop_agent "$suffix"
+    desktop_onboarding "$suffix"
     kill "$APP_PID" 2>/dev/null || true
     wait "$APP_PID" 2>/dev/null || true
     APP_PID=
@@ -999,6 +1000,30 @@ desktop_agent() {
     desktop_key Return
     settle 6 "the agent's answer"
     desktop_snap "desktop-agent$suffix"
+}
+
+# desktop_onboarding SUFFIX – step 3 of *Getting started* (#422): the first
+# assemblies of ROVER with their *Show* buttons. The app starts signed in, so
+# the wizard does not open by itself; *Help → Getting Started…* opens it
+# through the keyboard: F10 opens the first menu of the GTK menu bar, Left
+# wraps round to *Help*, Down selects its first item. admin is a member of
+# ROVER only (LAB is seeded later), so the group step is skipped and Return
+# (*Next*) goes from the working folder to step 3. desktop-onboarding-menu*.png
+# is the calibration image of the menu, not in the README. The last step of
+# the run: the app is quit with the wizard open.
+desktop_onboarding() {
+    local suffix=$1
+    desktop_key F10
+    settle 1 "the menu bar"
+    desktop_key Left
+    desktop_key Down
+    settle 1 "the Help menu"
+    desktop_snap "desktop-onboarding-menu$suffix"
+    desktop_key Return
+    settle 2 "Getting started"
+    desktop_key Return
+    settle 3 "the assemblies of ROVER"
+    desktop_snap "desktop-getting-started$suffix"
 }
 
 # desktop_click X Y – left click at screen position X,Y, then the pointer
