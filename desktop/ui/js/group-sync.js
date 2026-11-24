@@ -4,7 +4,7 @@
 
 import { api, call, dialog, enc, errorText, field, h, state, toast } from "./core.js";
 import { label } from "/static/shared/js/format.js";
-import { groupsGetResult } from "./get-rules.js";
+import { addDownload, groupsGetResult, mergeGotGroups, rememberGroups } from "./get-rules.js";
 import { freshProjects } from "./shell.js";
 
 // ------------------------------------------- whole project groups locally
@@ -33,17 +33,16 @@ function gotGroupsKey() {
  *  empty answer (private window, cleared storage) just shows the step. */
 export function gotGroups() {
   try {
-    var list = JSON.parse(window.localStorage.getItem(gotGroupsKey()) || "[]");
-    return Array.isArray(list) ? list.filter(function (c) { return typeof c === "string"; }) : [];
+    return mergeGotGroups(JSON.parse(window.localStorage.getItem(gotGroupsKey()) || "[]"), []);
   } catch (e) { return []; }
 }
 
 /** Remembers the groups of a Get that ran to its end without a problem
- *  (not stopped, no failed item or name clash, rule *Latest revision*). */
+ *  (get-rules.js rememberGroups: not stopped, no failed item or name clash,
+ *  rule *Latest revision*). */
 export function rememberGotGroups(list) {
-  var all = gotGroups();
-  (list || []).forEach(function (c) { if (all.indexOf(c) === -1) all.push(c); });
-  try { window.localStorage.setItem(gotGroupsKey(), JSON.stringify(all.slice(-200))); } catch (e) { /* storage blocked: the step shows again */ }
+  var all = mergeGotGroups(gotGroups(), list);
+  try { window.localStorage.setItem(gotGroupsKey(), JSON.stringify(all)); } catch (e) { /* storage blocked: the step shows again */ }
 }
 
 /** For new team members or a fresh computer: copies the files of every item
@@ -82,8 +81,23 @@ export function openGetProjectsDialog(opts) {
     field("Revision", rule),
     bar, report
   ]);
+  // modal while the Get runs: Escape or a click beside the dialog would hide
+  // it without stopping the Get (only *Stop* stops it)
+  var dopts = { wide: true };
   dialog("Get project groups", content, [
-    { label: "Close", onClick: function (d) { stop = true; if (running) call("workspace_cancel").catch(function () {}); d.close(); } },
+    { label: "Close", onClick: function (d) {
+      if (running) {
+        // *Stop*: the dialog stays open and shows the "Stopped" step once the
+        // download under way has ended
+        stop = true;
+        call("workspace_cancel").catch(function () {});
+        var s = buttons(d)[0];
+        s.disabled = true;
+        s.textContent = "Stopping…";
+        return;
+      }
+      d.close();
+    } },
     {
       label: "Get files", primary: true, submit: true, onClick: function (d) {
         if (running) return;
@@ -91,7 +105,10 @@ export function openGetProjectsDialog(opts) {
         if (finished) { d.close(); return; }
         var codes = boxes.filter(function (b) { return b.input.checked; }).map(function (b) { return b.code; });
         if (!codes.length) { d.fail("Choose at least one project group."); return; }
-        running = true; stop = false;
+        // the rule of the whole run: changing the select meanwhile changes nothing
+        var ruleValue = rule.value;
+        running = true; stop = false; dopts.modal = true;
+        d.clear();
         busy(d, true);
         var done = { items: 0, files: 0, kept: 0, skipped: 0, clashes: 0, errors: [] };
         report.textContent = "Listing the items …";
@@ -103,41 +120,40 @@ export function openGetProjectsDialog(opts) {
           return jobs.reduce(function (chain, job, i) {
             return chain.then(function () {
               if (stop) return;
-              var code = rule.value === "released" ? job.item.released_code : job.item.latest_code;
+              var code = ruleValue === "released" ? job.item.released_code : job.item.latest_code;
               bar.value = i + 1;
               report.textContent = "Item " + (i + 1) + " of " + jobs.length + ": " + job.project + " / " + job.item.number;
               if (!code) { done.skipped++; return; }
               return call("workspace_download", { project: job.project, item: job.item.number, code: code }).then(function (r) {
-                done.items++; done.files += r.downloaded.length; done.kept += r.kept.length; done.clashes += r.clashes.length;
-                if (r.cancelled) stop = true;
-                r.failed.forEach(function (t) { done.errors.push(job.item.number + ": " + t); });
-                r.clashes.forEach(function (c) { done.errors.push(c.path + ": " + c.file + " – taken by " + c.with); });
+                if (addDownload(done, job.item.number, r)) stop = true;
               }, function (err) { done.errors.push(job.item.number + ": " + errorText(err)); });
             });
           }, Promise.resolve());
         }).then(function () {
-          running = false; finished = true;
+          running = false; finished = true; dopts.modal = false;
           // only a complete copy: no problems, no clashes, the latest revision of every item
-          if (!stop && !done.errors.length && rule.value === "latest") rememberGotGroups(codes);
+          if (rememberGroups(done, stop, ruleValue)) rememberGotGroups(codes);
           var result = groupsGetResult(done, stop, codes);
           showResult(d, content, result);
-          // the toast stays for whoever closed the dialog meanwhile
           toast(result.title, result.outcome === "done" ? null : "error");
-        }, function (err) { running = false; busy(d, false); d.fail(err); });
+        }, function (err) { running = false; dopts.modal = false; busy(d, false); d.fail(err); });
       }
     }
-  ], { wide: true });
+  ], dopts);
 }
 
 /** The dialog's buttons: [Close, Get files]. */
 function buttons(d) { return d.form.querySelectorAll(".dialog-actions button"); }
 
-/** While the files are copied, *Get files* waits and *Close* stops. */
+/** While the files are copied, *Get files* waits, *Close* stops and the
+ *  groups and the rule cannot be changed (the run keeps the ones it started with). */
 function busy(d, on) {
   var b = buttons(d);
+  b[0].disabled = false;
   b[0].textContent = on ? "Stop" : "Close";
   b[1].disabled = on;
   b[1].textContent = on ? "Getting files…" : "Get files";
+  d.form.querySelectorAll("select, input").forEach(function (el) { el.disabled = on; });
 }
 
 /**
@@ -164,6 +180,7 @@ function showResult(d, content, r) {
     call("workspace_open", { project: null, item: null, code: null, file: null }).catch(function (e) { toast(errorText(e), "error"); });
   } } }, "Open working folder");
   b[1].replaceWith(openFolder);
+  b[0].disabled = false; // it was "Stopping…" after a Stop
   b[0].textContent = "Close";
   b[0].classList.add("primary");
   b[0].focus();

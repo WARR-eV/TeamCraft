@@ -471,11 +471,15 @@ window gets the focus back, so a check-out by someone else shows up without
 CAD editors create a new group there (*New* – you become its manager; tick *Restricted* to keep it to its members), and
 the page offers *Get…* (copy
 groups into your workspace) and *Import CAD folder…*. While *Get…* copies,
-its dialog shows the progress and *Close* stops it; at the end the dialog
-turns into a result: **Done** with a tick and the counts (items, files copied,
-local changes kept, items skipped), or *Finished with problems* / *Stopped*
-with every problem listed, and *Open working folder* next to *Close*. The
-choice of the group is kept on this computer.
+its dialog shows the progress, the groups and the revision rule cannot be
+changed, and the dialog stays open (Escape does not close it); *Stop* cancels
+the copy (*Stopping…*) and the dialog then shows *Stopped*. At the
+end the dialog turns into a result: **Done** with a tick and the counts
+(items, files copied, local changes kept, items skipped – *Nothing to get*
+when no item has a released revision), or *Finished with problems* /
+*Stopped* with every problem listed (a name clash among them, nothing
+overwritten), and *Open working folder* next to *Close*. The choice of the
+group is kept on this computer.
 
 **Home** is a file browser of the active group, in three views:
 
@@ -947,7 +951,10 @@ Every error message has a **Report…** link – the messages at the bottom,
 the errors in a dialog, and the errors shown in place: a list or tab that
 could not be loaded, the new-item file check, *No BOM lines found* in the BOM
 import preview, the error on the 3D view (also when the model cannot be read
-or the graphics memory runs out) and the problems of *Check in all*. *Help →
+or the graphics memory runs out) and the problems of *Check in all*. These
+errors are also among the session's error messages a later report can add –
+each once, even when the list showing it is drawn again. Escape in the report
+dialog closes only the report, not the dialog it was opened from. *Help →
 Report a Problem…* opens the same dialog without one. It shows the report before anything
 leaves the app: a title (what you did and the error), the action, its key
 inputs, the error and the versions; add what

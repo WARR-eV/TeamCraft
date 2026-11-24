@@ -2,7 +2,7 @@
 // TeamCraft Desktop – 3D viewer, workspace, check-out/in, edit, release, revise.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, api, badge, call, clear, confirmDialog, dialog, enc, errorNotice, errorText, field, h, invoke, lockBadge, materialField, reportLink, run, setStatus, state, toast, tool } from "./core.js";
+import { $, api, badge, call, clear, confirmDialog, dialog, enc, errorNotice, errorText, field, h, invoke, lockBadge, materialField, rememberError, reportLink, run, setStatus, state, toast, tool } from "./core.js";
 import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
 import { canEdit, canEditProject, isCancelled, refreshWorklistCount, rescanLocalChanges, uploadLine } from "./shell.js";
 import { reloadActive, renderActive, table } from "./tabs.js";
@@ -75,6 +75,8 @@ export function revViewer(tab, el) {
   // *Report…* of a failed preview (#381): the file, its format and version
   var previewInputs = revisionInputs(tab.data.rev, [["file", current.filename], ["format", previewFormat(current)],
     ["version", versionId ? "older version" : "v" + current.version]]);
+  // a load failure is toasted (and so already kept for the report's recent messages)
+  var toastedLoad = false;
   try {
     var viewer = state.viewer = window.TeamCraftViewer.mount(canvas, {
       statusEl: status,
@@ -85,6 +87,9 @@ export function revViewer(tab, el) {
       // the error on the canvas (parse, graphics memory, driver) offers
       // *Report…* in place (#471)
       onError: function (text) {
+        // the errors only shown on the canvas (unreadable mesh, graphics
+        // memory, lost context, driver) are kept for the report too
+        if (toastedLoad) toastedLoad = false; else rememberError("Showing the 3D preview of " + current.filename + ": " + text);
         var link = reportLink("Showing the 3D preview of " + current.filename, text, previewInputs);
         var box = overlay.querySelector("span");
         if (link && box) box.append(" ", link);
@@ -94,7 +99,7 @@ export function revViewer(tab, el) {
           .catch(function (e) {
             // only while this viewer is still on screen: a late failure of a viewer already
             // replaced or disposed is not about the preview the user sees
-            if (state.viewer === viewer) toast(errorText(e), "error", "Loading the 3D preview of " + current.filename, previewInputs);
+            if (state.viewer === viewer) { toastedLoad = true; toast(errorText(e), "error", "Loading the 3D preview of " + current.filename, previewInputs); }
             throw e;
           });
       }

@@ -6,7 +6,7 @@ import { showConnect } from "./connect.js";
 import { agent } from "./agent.js";
 import { projectItems } from "./group-sync.js";
 import { label } from "/static/shared/js/format.js";
-import { failureOf } from "./report-inputs.js";
+import { failureOf, recentErrorsAfter } from "./report-inputs.js";
 
 export var TAURI = window.__TAURI__;
 export var invoke = TAURI.core.invoke;
@@ -286,9 +286,11 @@ export function setStatus(text) { $("status-msg").textContent = text || ""; }
  *  messages then offer *Report…*. */
 export var reportHook = { open: null };
 
-/** Remembers an error message for the report's recent messages (the last 50). */
-function rememberError(text) {
-  state.recentErrors = (state.recentErrors || []).concat([new Date().toISOString().slice(11, 19) + " " + text]).slice(-50);
+/** Remembers an error message for the report's recent messages (the last
+ *  50; the same message again while it is among the latest is not kept
+ *  twice – report-inputs.js recentErrorsAfter). */
+export function rememberError(text) {
+  state.recentErrors = recentErrorsAfter(state.recentErrors, "", text, new Date());
 }
 
 /** `inputs` as given to run()/dialog(): a list of [name, value] or a function returning one. */
@@ -312,10 +314,12 @@ export function reportLink(action, text, inputs) {
  * An error shown in place – in a list, a tab or a dialog – instead of a
  * toast (#471): `spec` as for h() (e.g. "p.notice.error"), the text, and
  * *Report…* with what failed and its key inputs. Kept for the report's
- * recent messages like a toast.
+ * recent messages like a toast – unless `opts.remember` is false: a notice
+ * drawn again on every redraw (the worklist) is remembered where its error
+ * comes up instead.
  */
-export function errorNotice(spec, text, action, inputs) {
-  rememberError((action ? action + ": " : "") + text);
+export function errorNotice(spec, text, action, inputs, opts) {
+  if (!opts || opts.remember !== false) rememberError((action ? action + ": " : "") + text);
   var el = h(spec, { role: "alert" }, [h("span", { text: text })]);
   var link = reportLink(action, text, inputs);
   if (link) el.append(" ", link);
@@ -405,7 +409,11 @@ export function dialog(title, body, actions, opts) {
   }, [h("h2", { text: title }), body, errorEl, h("div.dialog-actions", null, buttons)]);
   var backdrop = h("div.dialog-backdrop", { on: { mousedown: function (e) { if (e.target === backdrop && !opts.modal) close(); } } }, form);
   function close() { backdrop.remove(); document.removeEventListener("keydown", onKey); }
-  function onKey(e) { if (e.key === "Escape" && !opts.modal) close(); }
+  // only the dialog on top: Escape in a dialog opened from another one (the
+  // report from a Report… in place) must not close the one underneath too
+  function onKey(e) { if (e.key === "Escape" && !opts.modal && root.lastElementChild === backdrop) close(); }
+  /** Hides an error shown by fail() (a new attempt of the dialog's action started). */
+  function clearError() { errorEl.replaceChildren(); errorEl.classList.add("hidden"); }
   function fail(err) {
     var text = errorText(err);
     errorEl.replaceChildren(h("span", { text: text }));
@@ -418,7 +426,7 @@ export function dialog(title, body, actions, opts) {
     }
     errorEl.classList.remove("hidden");
   }
-  var handle = { close: close, fail: fail, form: form };
+  var handle = { close: close, fail: fail, clear: clearError, form: form };
   document.addEventListener("keydown", onKey);
   root.appendChild(backdrop);
   var first = form.querySelector("input, select, textarea, button.primary");

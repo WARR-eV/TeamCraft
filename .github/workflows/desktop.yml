@@ -136,6 +136,10 @@ jobs:
       # viewer's Mouse setting (#459)
       - name: Test the 3D viewer's mouse schemes
         run: node scripts/viewer-input.test.mjs
+      # every error the viewer shows on the canvas reaches onError (the
+      # desktop's Report… in place, #471), a throwing hook never escapes
+      - name: Test the 3D viewer's error hook
+        run: node scripts/viewer-errors.test.mjs
       # the shared rules (labels, numbers, sizes, ages, state glyphs,
       # markdown-lite) against shared/test-vectors – the same vectors
       # src/ui_vectors.rs pins the server's Rust side to

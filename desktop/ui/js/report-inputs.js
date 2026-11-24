@@ -78,3 +78,46 @@ export function requestInputs(r, extra) {
 export function settingInputs(name, value) {
   return [["setting", name], ["value", value === true ? "on" : value === false ? "off" : value]];
 }
+
+/**
+ * The key inputs of a tab whose content could not be loaded (#471): a change
+ * order or request by its number, the check-outs of a group, otherwise a
+ * revision with its sub-tab.
+ */
+export function tabInputs(tab) {
+  if (tab.kind === "change") return changeInputs({ number: tab.number });
+  if (tab.kind === "request") return requestInputs({ number: tab.number });
+  if (tab.kind === "locks") return [["group", tab.code], ["view", "check-outs"]];
+  return [["item", tab.number], ["revision", tab.code], ["sub-tab", tab.sub]];
+}
+
+/** At most this many messages are kept for the report's recent messages. */
+export var MAX_RECENT_ERRORS = 50;
+/** A message equal to one of this many latest ones is not kept again. */
+var RECENT_REPEAT = 5;
+
+/**
+ * The report's recent messages `list` ("HH:MM:SS text", oldest first) after
+ * the error `text` of `action` came up at `now` (a Date): "action: text",
+ * the last MAX_RECENT_ERRORS. The same message drawn again – a list redrawn
+ * with the same error in place – is not kept again while it is among the
+ * latest few, so it cannot push older errors out.
+ */
+export function recentErrorsAfter(list, action, text, now) {
+  list = Array.isArray(list) ? list : [];
+  var message = (action ? action + ": " : "") + text;
+  var latest = list.slice(-RECENT_REPEAT);
+  for (var i = 0; i < latest.length; i++) {
+    if (String(latest[i]).slice(9) === message) return list;
+  }
+  return list.concat([now.toISOString().slice(11, 19) + " " + message]).slice(-MAX_RECENT_ERRORS);
+}
+
+/**
+ * The failure of *Check in all* for *Report…* (#471): `list` = the revisions
+ * it could not check in (texts); null when there were none.
+ */
+export function checkInAllFailure(list) {
+  if (!Array.isArray(list) || !list.length) return null;
+  return failureOf("Checking in all my check-outs", list.join("; "), [["failed", String(list.length)]]);
+}

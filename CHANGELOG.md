@@ -39,6 +39,25 @@ see the notices in the README.
 - Web: *Built on* of an as-built unit (card and *Built units* list) is shown
   in the viewer's date format like the other dates of the card, the same day
   in every time zone, instead of as an ISO date (#527).
+- Desktop, *Get project groups* (#449): *Stop* keeps the dialog open
+  (*Stopping…*) and shows the *Stopped* step instead of closing it; while the
+  Get runs the dialog is modal, so Escape or a click beside it no longer
+  hides it with the Get still running – a second Get could then run at the
+  same time (#498); the revision rule and the groups are locked and the rule
+  is taken once, so switching it midway no longer mixes revisions or marks
+  the groups as fully fetched (#499); an earlier error of the dialog is
+  cleared when a new run starts (#500); a name clash is listed once, among
+  the problems (#501); "everything was up to date" shows only when items
+  were got and nothing failed or stopped, and a run where every item was
+  skipped says *Nothing to get*.
+- Desktop, *Report…* (#471): the worklist's "Could not compare with the
+  server" is kept for the report's recent messages once per scan, not on
+  every redraw (window focus, refresh), and a message equal to one of the
+  last five is not kept again, so repeats no longer push older errors out;
+  the 3D viewer's errors on the canvas and the problems of *Check in all*
+  are kept for the recent messages too; Escape in the report dialog opened
+  from a dialog's error closes only the report, not the dialog underneath
+  with its input (#502).
 - Desktop: a check-out or check-in from Home marks the row (lock colour and
   icon) at once instead of after leaving Home and coming back; the
   *Check-outs* tab of a group is loaded again each time it comes to the

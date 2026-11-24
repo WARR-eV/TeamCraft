@@ -2,7 +2,8 @@
 // TeamCraft Desktop – The main window: rail, navigator, status bar, update notice, notifications, long operations.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, ICONS, api, badge, call, clear, dialog, enc, errorText, h, invoke, reportLink, run, setStatus, state, svgIcon, toast, tool } from "./core.js";
+import { $, ICONS, api, badge, call, clear, dialog, enc, errorText, h, invoke, rememberError, reportLink, run, setStatus, state, svgIcon, toast, tool } from "./core.js";
+import { checkInAllFailure } from "./report-inputs.js";
 import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
 import { t } from "/static/shared/js/i18n.js";
 import { checkServerVersion, showConnect } from "./connect.js";
@@ -652,7 +653,11 @@ function lines(title, list, cls) {
 /** The revisions *Check in all* could not check in, with *Report…* (#471). */
 function problems(list) {
   var box = lines("Problems:", list, ".notice.error");
-  var link = box ? reportLink("Checking in all my check-outs", list.join("; "), [["failed", String(list.length)]]) : null;
+  var failure = box ? checkInAllFailure(list) : null;
+  if (!failure) return box;
+  // kept for the report's recent messages like a toast
+  rememberError(failure.action + ": " + failure.error);
+  var link = reportLink(failure.action, failure.error, failure.inputs);
   if (link) box.appendChild(link);
   return box;
 }
@@ -815,6 +820,10 @@ export function scanLocalChanges(force) {
   localChangesScan = call("local_changes_scan").then(function (scan) {
     state.localChanges = { at: Date.now(), scan: scan, plan: planLocalChanges(scan) };
     localChangesScan = null;
+    // the worklist draws this error in place on every redraw (navigator.js):
+    // kept for the report's recent messages here, once per scan
+    var errors = state.localChanges.plan.errors || [];
+    if (errors.length) rememberError("Comparing the working folder with the server: Could not compare with the server: " + errors.join("; "));
     showWorklistCount();
     return state.localChanges;
   }, function (err) {

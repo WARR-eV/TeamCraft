@@ -3,7 +3,7 @@
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
 import { $, ICONS, append, clear, errorNotice, errorText, h, state, svgIcon, tool } from "./core.js";
-import { changeInputs, requestInputs } from "./report-inputs.js";
+import { tabInputs } from "./report-inputs.js";
 import { loadLocks, renderLocks } from "./lock-overview.js";
 import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
 import { canEdit, checkInAll, refreshWorklistCount } from "./shell.js";
@@ -401,14 +401,6 @@ export function renderActive() {
     clear(toolbar);
     body.appendChild(errorNotice("p.notice.error", errorText(err), "Opening " + tab.title, tabInputs(tab)));
   });
-}
-
-/** The key inputs of a tab that failed to open (#471): what it shows. */
-function tabInputs(tab) {
-  if (tab.kind === "change") return changeInputs({ number: tab.number });
-  if (tab.kind === "request") return requestInputs({ number: tab.number });
-  if (tab.kind === "locks") return [["group", tab.code], ["view", "check-outs"]];
-  return [["item", tab.number], ["revision", tab.code], ["sub-tab", tab.sub]];
 }
 
 export function reloadActive() {
