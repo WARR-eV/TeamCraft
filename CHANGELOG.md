@@ -36,6 +36,13 @@ see the notices in the README.
 - `desktop/README.md`: the *Ko-fi tag* row stood above the title instead of
   in the feature table, and *Revision tabs* was in the table twice with
   different details; one merged row now (#486).
+- Desktop: *Check out and open* reuses a running Inventor again when the
+  working folder has no Inventor project file (`.ipj`) – Inventor always has
+  a project active (Default at least), so the check compared it with nothing
+  and always started a second instance. Calls Inventor rejects while busy
+  are retried for 10 seconds, and an Inventor that runs but cannot be asked
+  (started as administrator) gives a note instead of silently starting a new
+  instance (#483).
 - CI: the comment of the shared component picker named its issue as
   "#419", which the no-literal-colours guard of `shared/css/` reads as a
   hex colour; it says "issue 419" now.

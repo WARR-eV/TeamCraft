@@ -24,14 +24,18 @@
 //! operating system opens the file with its default application.
 //!
 //! **A running Inventor** ([`open_in_running`], Windows): when an Inventor
-//! the user started is already running, is the installation [`plan`] chose
-//! and has the working folder's Inventor project ([`project_file`]) active,
-//! the file opens there as a new document window instead of in a second
+//! the user started is already running and is the installation [`plan`]
+//! chose, the file opens there when that Inventor has the working folder's
+//! Inventor project ([`project_file`]) active – or when the working folder
+//! has none: a new instance would start with the same, last active project
+//! anyway (#483). It opens there as a new document window instead of in a second
 //! instance (#350). Inventor is asked through its documented COM interface
 //! (`GetActiveObject`, `InstallPath`,
 //! `DesignProjectManager.ActiveDesignProject`, `Documents.Open`) by a short
-//! Windows PowerShell script, like the STEP export (`cadexport.rs`). Any
-//! other answer starts a new instance as before, with a note why.
+//! Windows PowerShell script, like the STEP export (`cadexport.rs`); calls
+//! Inventor rejects while busy are asked again for up to 10 s. Any other
+//! answer starts a new instance as before, with a note why – also an
+//! Inventor that runs but cannot be asked (started as administrator).
 //!
 //! Not tested against real installations in the development environment;
 //! the paths are the installers' defaults.
@@ -574,11 +578,14 @@ pub enum Running {
     OtherVersion(String),
     /// It has another project active (its project file; empty = none).
     OtherProject(String),
+    /// It runs, but did not answer: started as administrator (another
+    /// integrity level), still starting, or busy with a dialog.
+    Unreachable,
 }
 
 /// One line of [`INVENTOR_OPEN_SCRIPT`]'s answer: `none`, `opening`,
-/// `version <install folder>` or `project <project file>`; `None` for any
-/// other line.
+/// `unreachable`, `version <install folder>` or `project <project file>`;
+/// `None` for any other line.
 #[cfg_attr(not(windows), allow(dead_code))]
 pub fn parse_answer(line: &str) -> Option<Running> {
     let line = line.trim();
@@ -590,6 +597,7 @@ pub fn parse_answer(line: &str) -> Option<Running> {
     match line {
         "none" => Some(Running::Nothing),
         "opening" => Some(Running::Opening),
+        "unreachable" => Some(Running::Unreachable),
         _ => rest("version")
             .map(Running::OtherVersion)
             .or_else(|| rest("project").map(Running::OtherProject)),
@@ -621,6 +629,10 @@ pub fn running_note(
 ) -> Option<String> {
     match running {
         Running::Nothing | Running::Opening => None,
+        Running::Unreachable => Some(
+            "Inventor is running but did not answer (started as administrator, still starting, or busy with a dialog) – opened in a new instance.".into(),
+        ),
+| Running::Opening => None,
         Running::OtherVersion(dir) => Some(format!(
             "{} is running, not {} – opened in a new instance.",
             last_part(dir),
@@ -637,9 +649,8 @@ pub fn running_note(
                     "Inventor is running with {active}, not {} – opened in a new instance.",
                     last_part(&own.to_string_lossy())
                 ),
-                None => format!(
-                    "Inventor is running with {active}, and the working folder has no Inventor project file (.ipj) to compare it with – opened in a new instance."
-                ),
+                // the script compares only when the working folder has one
+                None => format!("Inventor is running with {active} – opened in a new instance."),
             })
         }
     }
@@ -671,15 +682,32 @@ function Same([string]$A, [string]$B) {
     if (-not $A -or -not $B) { return $false }
     return [IO.Path]::GetFullPath($A).TrimEnd('\') -ieq [IO.Path]::GetFullPath($B).TrimEnd('\')
 }
+# Inventor rejects calls while it is busy (RPC_E_CALL_REJECTED, 0x80010001): ask again for up to 10 s
+function Ask([scriptblock]$Do) {
+    for ($i = 0; $i -lt 20; $i++) {
+        try { return (& $Do) }
+        catch [Runtime.InteropServices.COMException] {
+            if ($_.Exception.ErrorCode -ne -2147418111) { throw }
+            Start-Sleep -Milliseconds 500
+        }
+    }
+    return (& $Do)
+}
 try { $app = [Runtime.InteropServices.Marshal]::GetActiveObject('Inventor.Application') }
-catch { Say 'none'; exit 0 }
-if (-not $app.Visible) { Say 'none'; exit 0 }
-$dir = [string]$app.InstallPath
-if (-not (Same $dir $InstallDir)) { Say "version $dir"; exit 0 }
-$active = ''
-$current = $app.DesignProjectManager.ActiveDesignProject
-if ($null -ne $current) { $active = [string]$current.FullFileName }
-if (-not (Same $active $Project)) { Say "project $active"; exit 0 }
+catch { Say 'unreachable'; exit 0 }
+try {
+    if (-not (Ask { $app.Visible })) { Say 'none'; exit 0 }
+    $dir = [string](Ask { $app.InstallPath })
+    if (-not (Same $dir $InstallDir)) { Say "version $dir"; exit 0 }
+    # without a project file in the working folder there is nothing to compare:
+    # a new instance would start with the same (last active) project
+    if ($Project) {
+        $active = ''
+        $current = Ask { $app.DesignProjectManager.ActiveDesignProject }
+        if ($null -ne $current) { $active = [string]$current.FullFileName }
+        if (-not (Same $active $Project)) { Say "project $active"; exit 0 }
+    }
+} catch { Say 'unreachable'; exit 0 }
 Say 'opening'
 try {
     $shell = New-Object -ComObject WScript.Shell
@@ -688,8 +716,8 @@ try {
     }
 } catch { }
 $doc = $null
-foreach ($d in $app.Documents) { if (Same $d.FullFileName $Path) { $doc = $d } }
-if ($null -eq $doc) { [void]$app.Documents.Open($Path, $true) } else { [void]$doc.Activate() }
+foreach ($d in (Ask { $app.Documents })) { if (Same $d.FullFileName $Path) { $doc = $d } }
+if ($null -eq $doc) { [void](Ask { $app.Documents.Open($Path, $true) }) } else { [void](Ask { $doc.Activate() }) }
 "#;
 
 /// How *Check out and open* goes on after asking a running instance.
@@ -1082,6 +1110,7 @@ mod tests {
     fn the_running_inventor_answers_are_read() {
         assert_eq!(parse_answer("none\r"), Some(Running::Nothing));
         assert_eq!(parse_answer(" opening "), Some(Running::Opening));
+        assert_eq!(parse_answer("unreachable"), Some(Running::Unreachable));
         assert_eq!(
             parse_answer(r"version C:\Program Files\Autodesk\Inventor 2025\"),
             Some(Running::OtherVersion(
@@ -1120,7 +1149,14 @@ mod tests {
             .collect();
         assert_eq!(
             says,
-            vec!["none", "none", "version $dir", "project $active", "opening"]
+            vec![
+                "unreachable",
+                "none",
+                "version $dir",
+                "project $active",
+                "unreachable",
+                "opening"
+            ]
         );
         for said in says {
             let line = said
@@ -1132,8 +1168,19 @@ mod tests {
         // for minutes), and only the user's visible instance is used
         let opening = INVENTOR_OPEN_SCRIPT.find("Say 'opening'").unwrap();
         assert!(INVENTOR_OPEN_SCRIPT.find("Documents.Open").unwrap() > opening);
-        assert!(INVENTOR_OPEN_SCRIPT.contains("if (-not $app.Visible)"));
+        assert!(INVENTOR_OPEN_SCRIPT.contains("if (-not (Ask { $app.Visible }))"));
         assert!(!INVENTOR_OPEN_SCRIPT.contains("New-Object -ComObject 'Inventor.Application'"));
+        // the project is compared only when the working folder has one
+        // (#483): Inventor always has a project active, Default at least
+        let compare = INVENTOR_OPEN_SCRIPT.find("if ($Project) {").unwrap();
+        assert!(
+            INVENTOR_OPEN_SCRIPT
+                .find("Say \"project $active\"")
+                .unwrap()
+                > compare
+        );
+        // a busy Inventor is asked again (RPC_E_CALL_REJECTED)
+        assert!(INVENTOR_OPEN_SCRIPT.contains("-2147418111"));
     }
 
     #[test]
@@ -1155,12 +1202,16 @@ mod tests {
             "Inventor is running with the project Default, not Graksler 4.3 – opened in a new instance."
         );
         let none = Running::OtherProject(String::new());
-        let note = running_note(&none, &wanted, None).unwrap();
+        assert_eq!(
+            running_note(&none, &wanted, Some(&own)).unwrap(),
+            "Inventor is running with no project, not Graksler 4.3 – opened in a new instance."
+        );
+        let note = running_note(&Running::Unreachable, &wanted, None).unwrap();
         assert!(
-            note.starts_with("Inventor is running with no project,"),
+            note.starts_with("Inventor is running but did not answer"),
             "{note}"
         );
-        assert!(note.contains("no Inventor project file (.ipj)"), "{note}");
+        assert!(note.contains("administrator"), "{note}");
     }
 
     #[test]
