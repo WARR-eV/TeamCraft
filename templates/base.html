@@ -42,25 +42,39 @@
       {%- endif %}
     </a>
     <nav class="nav" aria-label="Main">
-      <a href="/" class="{% block nav_home %}{% endblock %}">{{ t("nav.dashboard") }}</a>
-      <a href="/vault" class="{% block nav_vault %}{% endblock %}" title="{{ t("nav.vault.title") }}">{{ t("nav.vault") }}</a>
-      <a href="/items" class="{% block nav_items %}{% endblock %}">{{ t("nav.items") }}</a>
-      <a href="/requests" class="{% block nav_requests %}{% endblock %}" title="{{ t("nav.requests.title") }}">{{ t("nav.requests") }}</a>
-      <a href="/changes" class="{% block nav_changes %}{% endblock %}">{{ t("nav.changes") }}</a>
-      <a href="/projects" class="{% block nav_projects %}{% endblock %}">{{ t("nav.projects") }}</a>
+      {%- set nav_cur %}{% block nav_home %}{% endblock %}{% endset %}
+      <a href="/" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %}>{{ t("nav.dashboard") }}</a>
+      {%- set nav_cur %}{% block nav_vault %}{% endblock %}{% endset %}
+      <a href="/vault" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %} title="{{ t("nav.vault.title") }}">{{ t("nav.vault") }}</a>
+      {%- set nav_cur %}{% block nav_items %}{% endblock %}{% endset %}
+      <a href="/items" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %}>{{ t("nav.items") }}</a>
+      {%- set nav_cur %}{% block nav_requests %}{% endblock %}{% endset %}
+      <a href="/requests" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %} title="{{ t("nav.requests.title") }}">{{ t("nav.requests") }}</a>
+      {%- set nav_cur %}{% block nav_changes %}{% endblock %}{% endset %}
+      <a href="/changes" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %}>{{ t("nav.changes") }}</a>
+      {%- set nav_cur %}{% block nav_projects %}{% endblock %}{% endset %}
+      <a href="/projects" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %}>{{ t("nav.projects") }}</a>
     </nav>
     {% if me.is_admin %}
     <details class="menu nav-admin">
       <summary>Admin <span class="chev" aria-hidden="true"></span></summary>
       <div class="menu-pop">
-        <a href="/admin/users" class="{% block nav_users %}{% endblock %}">Users</a>
-        <a href="/admin/attributes" class="{% block nav_attributes %}{% endblock %}" title="Custom attributes of items">Attributes</a>
-        <a href="/materials" class="{% block nav_materials %}{% endblock %}" title="Material library: densities for the mass properties">Materials</a>
-        <a href="/admin/webhooks" class="{% block nav_webhooks %}{% endblock %}" title="Send events to CI, ERP or chat">Webhooks</a>
-        <a href="/admin/ai" class="{% block nav_ai %}{% endblock %}" title="Company AI: the assistant and local agents">AI</a>
-        <a href="/admin/branding" class="{% block nav_branding %}{% endblock %}" title="Replace the logos">Branding</a>
-        <a href="/admin/usage" class="{% block nav_usage %}{% endblock %}" title="What the desktop apps report; sharing with the developers">Usage statistics</a>
-        <a href="/admin/audit" class="{% block nav_audit %}{% endblock %}">Audit log</a>
+        {%- set nav_cur %}{% block nav_users %}{% endblock %}{% endset %}
+        <a href="/admin/users" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %}>Users</a>
+        {%- set nav_cur %}{% block nav_attributes %}{% endblock %}{% endset %}
+        <a href="/admin/attributes" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %} title="Custom attributes of items">Attributes</a>
+        {%- set nav_cur %}{% block nav_materials %}{% endblock %}{% endset %}
+        <a href="/materials" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %} title="Material library: densities for the mass properties">Materials</a>
+        {%- set nav_cur %}{% block nav_webhooks %}{% endblock %}{% endset %}
+        <a href="/admin/webhooks" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %} title="Send events to CI, ERP or chat">Webhooks</a>
+        {%- set nav_cur %}{% block nav_ai %}{% endblock %}{% endset %}
+        <a href="/admin/ai" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %} title="Company AI: the assistant and local agents">AI</a>
+        {%- set nav_cur %}{% block nav_branding %}{% endblock %}{% endset %}
+        <a href="/admin/branding" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %} title="Replace the logos">Branding</a>
+        {%- set nav_cur %}{% block nav_usage %}{% endblock %}{% endset %}
+        <a href="/admin/usage" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %} title="What the desktop apps report; sharing with the developers">Usage statistics</a>
+        {%- set nav_cur %}{% block nav_audit %}{% endblock %}{% endset %}
+        <a href="/admin/audit" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %}>Audit log</a>
       </div>
     </details>
     {% endif %}
