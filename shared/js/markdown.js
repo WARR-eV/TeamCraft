@@ -2,7 +2,10 @@
 // The assistant's markdown-lite as DOM nodes: headings, lists, pipe tables,
 // code blocks, paragraphs, `code` and **bold**. Nothing is ever parsed as
 // HTML. A blank line between two list items keeps the list open, and a
-// numbered list keeps its first number (<ol start>). The server's assistant::render_markdown renders the same dialect as
+// numbered list keeps its first number (<ol start>). As in CommonMark, two
+// numbered lists separated only by a blank line are therefore one list
+// (numbered straight through); text or a heading between them starts a new
+// one. The server's assistant::render_markdown renders the same dialect as
 // HTML; both are pinned to shared/test-vectors/markdown.json
 // (src/ui_vectors.rs, scripts/shared-vectors.test.mjs).
 

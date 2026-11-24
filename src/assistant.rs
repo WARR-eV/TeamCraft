@@ -1401,7 +1401,9 @@ fn is_separator_row(line: &str) -> bool {
 /// tables, code blocks, paragraphs, `code` and **bold**. All text is
 /// escaped; the only generated links point to items of this server.
 /// A blank line between two items keeps the list open (a "loose" list), and
-/// a numbered list keeps its first number (`<ol start="n">`).
+/// a numbered list keeps its first number (`<ol start="n">`). As in
+/// CommonMark, two numbered lists separated only by a blank line are one
+/// list; text or a heading between them starts a new one.
 pub fn render_markdown(text: &str) -> String {
     let lines: Vec<&str> = text.lines().collect();
     let mut out = String::new();

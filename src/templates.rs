@@ -407,6 +407,22 @@ mod tests {
         assert!(!assistant.contains("aria-current"), "{assistant}");
         assert!(!assistant.contains("class=\"active\""), "{assistant}");
         assert!(assistant.contains("<a href=\"/\" class=\"\">"));
+
+        // the Admin menu marks its current entry the same way
+        let branding = render(
+            &env,
+            "admin/branding.html",
+            with_common(json!({ "slots": [], "max_kib": 512, "max_pixels": 4096 })),
+        );
+        assert!(
+            branding.contains(
+                "<a href=\"/admin/branding\" class=\"active\" aria-current=\"page\" title=\"Replace the logos\">"
+            ),
+            "{branding}"
+        );
+        assert_eq!(branding.matches("aria-current=\"page\"").count(), 1);
+        assert!(branding.contains("<a href=\"/admin/users\" class=\"\">"));
+        assert!(branding.contains("<a href=\"/\" class=\"\">"));
     }
 
     /// The empty states of the dashboard, the vault explorer and the lists

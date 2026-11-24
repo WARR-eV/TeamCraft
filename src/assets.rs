@@ -634,6 +634,27 @@ mod tests {
         assert!(components.contains("[hidden] { display: none !important; }"));
         assert!(include_str!("../templates/base.html").contains("shared/css/components.css"));
         assert!(include_str!("../desktop/ui/index.html").contains("shared/css/components.css"));
+        // The cascade: an author `!important` rule beats every rule without
+        // it, so only another important `display` could show a hidden
+        // element. Every important `display` of both apps must hide.
+        let mut sheets = shared_sheets();
+        sheets.push(("static/style.css".into(), STYLE_CSS.into()));
+        sheets.push(("desktop/ui/app.css".into(), APP_CSS.into()));
+        for (path, css) in &sheets {
+            for decl in css.split([';', '{', '}']) {
+                let decl = decl.trim();
+                let Some((property, value)) = decl.split_once(':') else {
+                    continue;
+                };
+                if property.trim() == "display" && value.contains("!important") {
+                    assert_eq!(
+                        value.replace("!important", "").trim(),
+                        "none",
+                        "{path}: `{decl}` could show an element with the hidden attribute"
+                    );
+                }
+            }
+        }
     }
 
     /// One set of density tokens (shared/css/skins.css): the desktop app

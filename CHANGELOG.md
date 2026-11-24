@@ -145,11 +145,14 @@ see the notices in the README.
   every item, and a list that starts at another number keeps it
   (`<ol start>`); fixed in `shared/js/markdown.js` and its Rust twin
   `assistant::render_markdown`, pinned by new cases in
-  `shared/test-vectors/markdown.json` (#514).
+  `shared/test-vectors/markdown.json` (#514). As in CommonMark, two numbered
+  lists with only a blank line between them are now one list (a vector pins
+  it); text or a heading between them still starts a new list.
 - Web and desktop: an element hidden with the `hidden` attribute stays
   hidden – `button { display: inline-flex }` showed the web assistant's
   *Cancel* button while idle; `[hidden]` now always wins
-  (`shared/css/components.css`, #515).
+  (`shared/css/components.css`, #515); a guard test fails on any
+  `display: … !important` in the stylesheets of both apps that does not hide.
 - Web: the standalone assistant page (`/assistant`) no longer marks
   *Dashboard* as the current section, and the current entry of the main nav
   and the Admin menu carries `aria-current="page"` for screen readers (#522).
