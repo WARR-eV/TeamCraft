@@ -21,23 +21,28 @@ let n = 0;
 function test(name, fn) { fn(); n++; console.log("ok - " + name); }
 
 const ME = "u-me", OTHER = "u-other";
+// the revision was created at CREATED; BEFORE and AFTER are uploads made in it
+const CREATED = "2026-11-24T08:00:00Z";
 const CHECKED_OUT_AT = "2026-11-24T10:00:00Z";
 const BEFORE = "2026-11-24T09:00:00Z", AFTER = "2026-11-24T11:00:00Z";
+// uploads of the previous revision, carried over by *Revise* with their old
+// uploaded_by / uploaded_at (services::revisions::revise)
+const CARRIED = "2026-11-01T12:00:00Z";
 // what revisionAbilities gives an editor of the group on a revision in work
 const EDITOR = { checkout: true, release: true, revise: false };
 
 function mine(extra) {
   return Object.assign({
-    rev: { state: "in_work", checked_out_by: ME, checked_out_at: CHECKED_OUT_AT },
+    rev: { state: "in_work", checked_out_by: ME, checked_out_at: CHECKED_OUT_AT, created_at: CREATED },
     files: [{ uploaded_by: OTHER, uploaded_at: BEFORE }],
     me: ME, localChanges: false, cadFile: true,
     can: { checkout: false, release: true, revise: false }
   }, extra);
 }
 
-function free(files, can) {
+function free(files, can, created) {
   return {
-    rev: { state: "in_work", checked_out_by: null, checked_out_at: null },
+    rev: { state: "in_work", checked_out_by: null, checked_out_at: null, created_at: created === undefined ? CREATED : created },
     files: files, me: ME, localChanges: null, cadFile: true, can: can || EDITOR
   };
 }
@@ -85,7 +90,54 @@ test("checked out by somebody else: nothing", () => {
 
 test("checked in by me last and releasable: Release…", () => {
   const files = [{ uploaded_by: OTHER, uploaded_at: BEFORE }, { uploaded_by: ME, uploaded_at: AFTER }];
-  assert.equal(lastCheckinMine(files, ME), true);
+  assert.equal(lastCheckinMine(free(files).rev, files, ME), true);
+  assert.equal(revisionNextStep(free(files)), "release");
+});
+
+test("a revised revision with only carried-over files of mine: Check out and open, not Release… (#537 review)", () => {
+  // I made the last upload to A; *Revise* copied it into B with its old time
+  const carried = [{ uploaded_by: OTHER, uploaded_at: "2026-10-30T08:00:00Z" }, { uploaded_by: ME, uploaded_at: CARRIED }];
+  const revisedAt = "2026-11-20T09:00:00Z";
+  // B right after *Revise*: checked out to me at its creation, nothing changed
+  const fresh = {
+    rev: { state: "in_work", checked_out_by: ME, checked_out_at: revisedAt, created_at: revisedAt },
+    files: carried, me: ME, localChanges: false, cadFile: true, can: { checkout: false, release: true, revise: false }
+  };
+  assert.equal(parkedSinceCheckout(fresh.rev, carried, ME), false);
+  assert.equal(revisionNextStep(fresh), "open");
+  // … and after *Cancel check-out* (no upload): the carried files say nothing
+  const cancelled = free(carried, EDITOR, revisedAt);
+  assert.equal(lastCheckinMine(cancelled.rev, carried, ME), false);
+  assert.equal(revisionNextStep(cancelled), "checkout");
+  // once I check in a change to B, Release… is the next step
+  const checkedIn = carried.concat([{ uploaded_by: ME, uploaded_at: "2026-11-21T15:00:00Z" }]);
+  assert.equal(revisionNextStep(free(checkedIn, EDITOR, revisedAt)), "release");
+  // a colleague's check-in to B after mine: Check out and open
+  const colleague = checkedIn.concat([{ uploaded_by: OTHER, uploaded_at: "2026-11-22T15:00:00Z" }]);
+  assert.equal(revisionNextStep(free(colleague, EDITOR, revisedAt)), "checkout");
+});
+
+test("a cancelled check-out does not make a revision ready for Release…", () => {
+  // checked out and cancelled without any upload: the files are as before
+  const theirs = [{ uploaded_by: OTHER, uploaded_at: BEFORE }];
+  assert.equal(revisionNextStep(mine({ files: theirs })), "open");
+  assert.equal(revisionNextStep(free(theirs)), "checkout");
+  // a revision my own earlier check-in left ready stays ready after a cancelled check-out
+  const myCheckin = [{ uploaded_by: ME, uploaded_at: BEFORE }];
+  assert.equal(revisionNextStep(free(myCheckin)), "release");
+});
+
+test("no creation time in the payload: no guess on a releasable free revision", () => {
+  const files = [{ uploaded_by: ME, uploaded_at: AFTER }];
+  assert.equal(lastCheckinMine({ created_at: null }, files, ME), null);
+  assert.equal(lastCheckinMine(null, files, ME), null);
+  assert.equal(revisionNextStep(free(files, EDITOR, null)), null);
+  // without the right to release, Check out and open needs no creation time
+  assert.equal(revisionNextStep(free(files, { checkout: true, release: false, revise: false }, null)), "checkout");
+});
+
+test("an upload in the same transaction as the revision counts as made in it", () => {
+  const files = [{ uploaded_by: ME, uploaded_at: CREATED }];
   assert.equal(revisionNextStep(free(files)), "release");
 });
 
@@ -97,7 +149,7 @@ test("checked in, but not releasable (open change order): Check out and open", (
 test("a free revision last changed by somebody else or without files: Check out and open", () => {
   assert.equal(revisionNextStep(free([{ uploaded_by: ME, uploaded_at: BEFORE }, { uploaded_by: OTHER, uploaded_at: AFTER }])), "checkout");
   assert.equal(revisionNextStep(free([])), "checkout");
-  assert.equal(lastCheckinMine([], ME), false);
+  assert.equal(lastCheckinMine({ created_at: CREATED }, [], ME), false);
 });
 
 test("not an editor of the group: nothing on a free revision", () => {

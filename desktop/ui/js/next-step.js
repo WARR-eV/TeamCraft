@@ -24,13 +24,24 @@ export function parkedSinceCheckout(rev, files, me) {
 }
 
 /**
- * Whether the newest upload of a revision is the user's own – they checked
- * their work in last, so the revision is ready for the next step.
+ * Whether the revision was checked in by `me` since it was created: the
+ * newest upload *made in this revision* is the user's own. `true`/`false`,
+ * or `null` when that cannot be told (no creation time in the payload).
+ *
+ * Only uploads at or after the revision's `created_at` count: *Revise*
+ * copies every file of the previous revision with its old `uploaded_by` /
+ * `uploaded_at` (`services::revisions::revise`), so those carried-over files
+ * are older than the revision and say nothing about work done in it. A
+ * cancelled check-out uploads nothing, so it changes nothing here either.
  */
-export function lastCheckinMine(files, me) {
+export function lastCheckinMine(rev, files, me) {
+  var created = time(rev && rev.created_at);
+  if (!(created === created)) return null;
   var newest = null;
   (files || []).forEach(function (f) {
-    if (!newest || time(f.uploaded_at) > time(newest.uploaded_at)) newest = f;
+    var at = time(f.uploaded_at);
+    if (!(at >= created)) return;
+    if (!newest || at > time(newest.uploaded_at)) newest = f;
   });
   return !!newest && newest.uploaded_by === me;
 }
@@ -39,7 +50,7 @@ export function lastCheckinMine(files, me) {
  * The most likely next step on a revision – drawn as the toolbar's one
  * primary button. `facts`:
  *
- * * `rev` – `state`, `checked_out_by`, `checked_out_at`;
+ * * `rev` – `state`, `checked_out_by`, `checked_out_at`, `created_at`;
  * * `files` – the revision's files (`uploaded_by`, `uploaded_at`);
  * * `me` – the user's id;
  * * `localChanges` – my check-out: `true` (modified, new or conflicting files
@@ -56,11 +67,15 @@ export function lastCheckinMine(files, me) {
  *   the check-out, with an unreadable working folder, or without a CAD file
  *   to open: *Check in…*;
  * * `"release"` – not checked out, in work, releasable (no open change
- *   order) and my own check-in was the last one: *Release…*;
- * * `"checkout"` – a free revision in work otherwise: *Check out and open*;
+ *   order) and the newest upload made in this revision is mine
+ *   (lastCheckinMine): *Release…*;
+ * * `"checkout"` – a free revision in work otherwise – also one that holds
+ *   only the files *Revise* carried over, or whose check-out was cancelled
+ *   without an upload: *Check out and open*;
  * * `"revise"` – a released revision: *Revise*;
- * * `null` – nothing: in review, obsolete, checked out by somebody else, or
- *   the user may not act.
+ * * `null` – nothing: in review, obsolete, checked out by somebody else, the
+ *   user may not act, or a releasable free revision whose payload has no
+ *   creation time to tell a check-in from carried-over files (no guess).
  */
 export function revisionNextStep(facts) {
   var rev = facts.rev, can = facts.can || {};
@@ -71,7 +86,11 @@ export function revisionNextStep(facts) {
     return facts.cadFile ? "open" : "checkin";
   }
   if (rev.state === "in_work") {
-    if (can.release && lastCheckinMine(facts.files, facts.me)) return "release";
+    if (can.release) {
+      var checkedIn = lastCheckinMine(rev, facts.files, facts.me);
+      if (checkedIn === null) return null;
+      if (checkedIn) return "release";
+    }
     if (can.checkout) return "checkout";
     return null;
   }
