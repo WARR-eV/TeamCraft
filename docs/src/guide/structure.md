@@ -226,7 +226,9 @@ dependent – via BOM, references, CAD file references or as the basis of a
 [simulation](simulation.md) – is flagged **Check needed**. A CAD editor acknowledges it with
 a note (*form, fit and
 function unchanged*) or revises and releases the dependent, which resolves
-the check and propagates one level further. Every change shows this **impact analysis** before it is approved.
+the check and propagates one level further. Every change shows this **impact analysis** before it is approved:
+each item outside the change that depends on it appears once, on the nearest level, with everything it
+depends on there; the change's own revisions are not listed.
 
 *Dependents to check* on the dashboard (and in the desktop app) groups the
 open checks by the dependent revision: one header per assembly, drawing or

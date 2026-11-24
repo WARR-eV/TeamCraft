@@ -667,6 +667,20 @@ with the latest revisions of all other items – see
 or mesh file) or `failed` (`message` says why, e.g. the model could not be
 read). `volume` is `null` when the mesh is not watertight.
 
+### Impact analysis
+
+`GET /changes/{number}/impact` lists the items outside the change that depend
+on its revisions (BOM, references, CAD file references, simulation bases) –
+directly (`level` 1) or through other dependents, up to 12 levels. Each
+dependent is listed **once**, on the lowest level it is reached on, with its
+latest revision (`item_number`, `item_name`, `revision_id`, `revision_code`,
+`revision_state`) and `paths`: every item it depends on at that level as
+`{"via_number", "relation"}` (`bom`, `drawing`, `specification`, `reference`,
+`simulation` or `file`), sorted by number. `relation` and `via_number` repeat
+the first path. Items that are part of the change are not listed – the walk
+goes on through them (#525). Dependents in groups the caller cannot see are
+left out and counted in `x-hidden-count`.
+
 ### Suggested reviewers
 
 `GET /changes/{number}/suggested-reviewers?limit=5` (1–20) answers *who

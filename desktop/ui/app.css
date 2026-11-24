@@ -905,6 +905,7 @@ table.grid td.actions button { height: var(--ctl-h-sm); padding: 0 8px; font-siz
 /* section plane and measuring (inserted by viewer.js below the canvas) */
 .viewer-section { margin: 8px 0 0; }
 .viewer-section input[type="range"] { width: min(14rem, 30vw); }
+.viewer-section label.check { white-space: nowrap; } /* "flip" stays next to its box (#526) */
 canvas.viewer-measuring { cursor: crosshair; }
 .viewer-notes { flex-basis: 100%; margin: 0; padding-left: 20px; }
 .viewer-notes li { margin: 2px 0; }

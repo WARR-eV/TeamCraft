@@ -77,7 +77,7 @@ async fn change_overview(
                 "state": d.revision_state,
                 "relation": d.relation,
                 "via": d.via_number,
-                "in_change": d.in_change,
+                "paths": d.paths.iter().take(MAX_LIST).collect::<Vec<_>>(),
             })).collect::<Vec<_>>(),
             "truncated": truncated,
             "hidden_dependents": hidden,

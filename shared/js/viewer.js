@@ -93,6 +93,41 @@
     }
   }
 
+  /**
+   * Why a parsed model cannot be exported as STL, or null when it can (#526):
+   * STL holds triangles only, so a point cloud has nothing to export and a
+   * simulation result would lose its result fields (the export is hidden).
+   */
+  function stlExportBlocker(mesh) {
+    if (!mesh || !mesh.indices || !mesh.indices.length) return "There are no triangles to export.";
+    if (mesh.fields && mesh.fields.length) {
+      return "STL keeps only the shape, not the result field" + (mesh.fields.length > 1 ? "s" : "") +
+        " – download the result file instead.";
+    }
+    return null;
+  }
+
+  /**
+   * Text, accessible name and aria-pressed of the up-axis toggle (#526): the
+   * button shows the current axis; to a screen reader it is the toggle
+   * "Z up", pressed while the model is shown Z-up (the default) – a fixed
+   * name, so the state is not announced twice or contradictorily.
+   */
+  function upToggle(zUp) {
+    return { text: zUp ? "Z up" : "Y up", label: "Z up", pressed: zUp ? "true" : "false" };
+  }
+
+  /**
+   * The *Export STL* button once the model is shown (`info` from onReady):
+   * enabled, or removed when the model cannot be exported as STL
+   * (stlExportBlocker) – a result mesh would lose its field (#526).
+   */
+  function showStlButton(btn, info) {
+    if (!btn) return;
+    if (info && info.stlBlocker) btn.remove();
+    else btn.disabled = false;
+  }
+
   /** The stored mouse scheme, or the first one. */
   function storedMouseScheme() {
     var id = null;
@@ -570,12 +605,13 @@
       at.disabled = true;
       at.setAttribute("aria-label", "Section position");
       var flipLabel = document.createElement("label");
-      flipLabel.className = "small";
+      // a check label: the box and "flip" on one line, never wrapped (#526)
+      flipLabel.className = "small check viewer-flip";
       var flip = document.createElement("input");
       flip.type = "checkbox";
       flip.disabled = true;
       flipLabel.appendChild(flip);
-      flipLabel.appendChild(document.createTextNode(" flip"));
+      flipLabel.appendChild(document.createTextNode("flip"));
       var where = document.createElement("span");
       where.className = "viewer-legend-value";
       function update() {
@@ -941,10 +977,17 @@
       e.preventDefault();
     });
     if (resetBtn) resetBtn.addEventListener("click", reset);
+    function showUp() {
+      var t = upToggle(view.zUp);
+      upBtn.textContent = t.text;
+      upBtn.setAttribute("aria-label", t.label);
+      upBtn.setAttribute("aria-pressed", t.pressed);
+    }
     if (upBtn) {
+      showUp();
       upBtn.addEventListener("click", function () {
         view.zUp = !view.zUp;
-        upBtn.textContent = view.zUp ? "Z up" : "Y up";
+        showUp();
         redraw();
       });
     }
@@ -987,7 +1030,9 @@
         canvas.insertAdjacentElement("afterend", sectionEl);
         canvas.setAttribute("data-ready", "true");
         overlay(null, null);
-        if (options.onReady) options.onReady();
+        // onReady gets what the page needs to know about the model: whether
+        // *Export STL* applies (null) or why not (#526)
+        if (options.onReady) options.onReady({ stlBlocker: stlExportBlocker(mesh) });
         redraw();
       })
       .catch(function (err) {
@@ -997,7 +1042,8 @@
     // Binary STL of the shown triangles, in model coordinates as in the file
     // (STL has no units: STEP exports are usually millimetres).
     function exportStl() {
-      if (!loaded || !loaded.indices) throw new Error("There are no triangles to export.");
+      var blocker = stlExportBlocker(loaded);
+      if (blocker) throw new Error(blocker);
       var p = loaded.positions, idx = loaded.indices, count = idx.length / 3;
       var buffer = new ArrayBuffer(84 + count * 50), dv = new DataView(buffer);
       var header = "TeamCraft STL export";
@@ -1049,7 +1095,10 @@
     };
   }
 
-  window.TeamCraftViewer = { mount: mount, checkMesh: checkMesh, dragAction: dragAction, MOUSE_SCHEMES: MOUSE_SCHEMES };
+  window.TeamCraftViewer = {
+    mount: mount, checkMesh: checkMesh, dragAction: dragAction, MOUSE_SCHEMES: MOUSE_SCHEMES,
+    stlExportBlocker: stlExportBlocker, upToggle: upToggle, showStlButton: showStlButton
+  };
 
   // Web pages: <canvas id="viewer-canvas" data-src [data-name]>.
   var canvas = document.getElementById("viewer-canvas");
@@ -1081,7 +1130,7 @@
       overlayEl: document.getElementById("viewer-overlay"),
       resetBtn: document.getElementById("viewer-reset"),
       upBtn: document.getElementById("viewer-up"),
-      onReady: function () { if (stlBtn) stlBtn.disabled = false; },
+      onReady: function (info) { showStlButton(stlBtn, info); },
       load: function () {
         return fetch(src, { credentials: "same-origin" }).then(function (r) {
           if (r.ok) return r.arrayBuffer();

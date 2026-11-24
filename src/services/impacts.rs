@@ -804,8 +804,10 @@ pub(crate) async fn on_obsolete(
 // ---------------------------------------------------------------------------
 
 /// An item that depends – directly (level 1) or through other dependents –
-/// on a revision of a change.
-#[derive(Clone, Debug, Serialize, sqlx::FromRow)]
+/// on a revision of a change: one row per dependent, on the lowest level it
+/// is reached on. Items that are part of the change are not listed (the walk
+/// still goes on through them).
+#[derive(Clone, Debug, Serialize)]
 pub struct Dependent {
     /// The item of the change it depends on.
     pub root_item_id: Uuid,
@@ -816,17 +818,82 @@ pub struct Dependent {
     pub revision_id: Uuid,
     pub revision_code: String,
     pub revision_state: String,
-    /// `bom`, `drawing`, `specification`, `reference`, `simulation` or `file`.
+    /// `bom`, `drawing`, `specification`, `reference`, `simulation` or
+    /// `file` – the first of `paths`.
     pub relation: String,
-    /// The item it uses or references.
+    /// The item it uses or references – the first of `paths`.
     pub via_number: String,
-    /// Released together in the same change (not flagged).
-    #[sqlx(default)]
-    pub in_change: bool,
-    /// Whether the reader may see the dependent (hidden ones are dropped).
-    #[sqlx(default)]
-    #[serde(skip)]
-    pub visible: bool,
+    /// Every item it depends on at its level, with the relation (sorted by
+    /// number, then relation; at least one).
+    pub paths: Vec<DependsOn>,
+}
+
+/// One link of a [`Dependent`] to the item it depends on.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+pub struct DependsOn {
+    pub via_number: String,
+    pub relation: String,
+}
+
+/// A dependent reached by the walk of [`analysis`]: from the change's item
+/// `root`, on `level`, through `via` (the item it depends on there).
+#[derive(Clone, Debug, PartialEq)]
+struct Found {
+    root: Uuid,
+    item: Uuid,
+    level: i32,
+    relation: String,
+    via: Uuid,
+    visible: bool,
+}
+
+/// One row of the impact analysis before the texts are added: a dependent on
+/// its lowest level with every `(relation, via)` link on that level.
+#[derive(Debug, PartialEq)]
+struct Nearest {
+    root: Uuid,
+    item: Uuid,
+    level: i32,
+    links: Vec<(String, Uuid)>,
+}
+
+/// One row per dependent: the walk reaches a dependent once per item of the
+/// change (and an item of the change through another one), so the same
+/// assembly could show up on several levels. Each dependent is kept on its
+/// lowest level, with all its links on that level (in the order found, each
+/// once); items in `in_change` are left out – they are reviewed in the
+/// change, not flagged. Order: first seen.
+fn nearest_per_item(
+    found: Vec<Found>,
+    in_change: &std::collections::HashSet<Uuid>,
+) -> Vec<Nearest> {
+    use std::collections::{HashMap, HashSet};
+    let mut lowest: HashMap<Uuid, i32> = HashMap::new();
+    for f in found.iter().filter(|f| !in_change.contains(&f.item)) {
+        let level = lowest.entry(f.item).or_insert(f.level);
+        *level = (*level).min(f.level);
+    }
+    let mut index: HashMap<Uuid, usize> = HashMap::new();
+    let mut linked: HashSet<(Uuid, Uuid, String)> = HashSet::new();
+    let mut out: Vec<Nearest> = Vec::new();
+    for f in found {
+        if lowest.get(&f.item) != Some(&f.level)
+            || !linked.insert((f.item, f.via, f.relation.clone()))
+        {
+            continue;
+        }
+        let at = *index.entry(f.item).or_insert_with(|| {
+            out.push(Nearest {
+                root: f.root,
+                item: f.item,
+                level: f.level,
+                links: Vec::new(),
+            });
+            out.len() - 1
+        });
+        out[at].links.push((f.relation, f.via));
+    }
+    out
 }
 
 /// Levels the impact analysis walks up.
@@ -902,14 +969,6 @@ pub async fn analysis(
         target: Uuid,
         dependent: Uuid,
         relation: String,
-        visible: bool,
-    }
-    struct Found {
-        root: Uuid,
-        item: Uuid,
-        level: i32,
-        relation: String,
-        via: Uuid,
         visible: bool,
     }
     // CAD files of other items that reference the files (one level), for
@@ -1034,6 +1093,11 @@ pub async fn analysis(
         }
     }
 
+    // One row per dependent, on its lowest level; the change's own items
+    // are left out (#525).
+    let in_change: HashSet<Uuid> = roots.iter().map(|r| r.item_id).collect();
+    let nearest = nearest_per_item(found, &in_change);
+
     // Numbers, names and latest revisions of everything found, in one query.
     #[derive(sqlx::FromRow)]
     struct Latest {
@@ -1044,9 +1108,9 @@ pub async fn analysis(
         state: String,
         name: String,
     }
-    let ids: Vec<Uuid> = found
+    let ids: Vec<Uuid> = nearest
         .iter()
-        .flat_map(|f| [f.item, f.via])
+        .flat_map(|n| std::iter::once(n.item).chain(n.links.iter().map(|(_, via)| *via)))
         .collect::<HashSet<_>>()
         .into_iter()
         .collect();
@@ -1065,38 +1129,41 @@ pub async fn analysis(
     .into_iter()
     .map(|l| (l.item_id, l))
     .collect();
-    let in_change: HashSet<Uuid> = roots.iter().map(|r| r.item_id).collect();
-    // The same dependent on the same level through the same item, reached
-    // from several revisions of the change, is listed once (the sort and
-    // dedup below would drop all but the first anyway) – before any text
-    // is copied for it.
-    let mut listed: HashSet<(i32, Uuid, Uuid)> = HashSet::new();
-    let mut out: Vec<Dependent> = found
+    let mut out: Vec<Dependent> = nearest
         .into_iter()
-        .filter(|f| listed.insert((f.level, f.item, f.via)))
-        .filter_map(|f| {
-            let item = latest.get(&f.item)?;
-            let via = latest.get(&f.via)?;
+        .filter_map(|n| {
+            let item = latest.get(&n.item)?;
+            let mut paths: Vec<DependsOn> = n
+                .links
+                .into_iter()
+                .filter_map(|(relation, via)| {
+                    Some(DependsOn {
+                        via_number: latest.get(&via)?.number.clone(),
+                        relation,
+                    })
+                })
+                .collect();
+            paths.sort();
+            paths.dedup();
+            let first = paths.first()?.clone();
             Some(Dependent {
-                root_item_id: f.root,
-                level: f.level,
-                item_id: f.item,
+                root_item_id: n.root,
+                level: n.level,
+                item_id: n.item,
                 item_number: item.number.clone(),
                 item_name: item.name.clone(),
                 revision_id: item.revision_id,
                 revision_code: item.code.clone(),
                 revision_state: item.state.clone(),
-                relation: f.relation,
-                via_number: via.number.clone(),
-                in_change: in_change.contains(&f.item),
-                visible: true,
+                relation: first.relation,
+                via_number: first.via_number,
+                paths,
             })
         })
         .collect();
     out.sort_by(|a, b| {
         (a.level, &a.item_number, &a.via_number).cmp(&(b.level, &b.item_number, &b.via_number))
     });
-    out.dedup_by(|a, b| a.item_id == b.item_id && a.via_number == b.via_number);
     Ok((out, hidden_items.len() as i64))
 }
 
@@ -1191,5 +1258,83 @@ mod tests {
         let id = Uuid::from_u128(7);
         assert_eq!(parse_ids(&format!(" {id} ,")).unwrap(), Some(vec![id]));
         assert!(parse_ids("nope").is_err());
+    }
+
+    fn found(root: u128, item: u128, level: i32, relation: &str, via: u128) -> Found {
+        Found {
+            root: Uuid::from_u128(root),
+            item: Uuid::from_u128(item),
+            level,
+            relation: relation.into(),
+            via: Uuid::from_u128(via),
+            visible: true,
+        }
+    }
+
+    /// The case of the UI review (#525): the change holds four parts and
+    /// the assembly ASM-2 that uses them; ASM-1 uses ASM-2. The walk reaches
+    /// ASM-2 from every part and ASM-1 on level 1 (from ASM-2) and level 2
+    /// (from the parts through ASM-2).
+    #[test]
+    fn one_row_per_dependent_without_the_changes_own_items() {
+        let (asm1, asm2) = (1, 2);
+        let parts = [11, 12, 13, 14];
+        let mut walk = Vec::new();
+        for p in parts {
+            walk.push(found(p, asm2, 1, "bom", p));
+        }
+        walk.push(found(asm2, asm1, 1, "bom", asm2));
+        for p in parts {
+            walk.push(found(p, asm1, 2, "bom", asm2));
+        }
+        let in_change: std::collections::HashSet<Uuid> = [asm2, 11, 12, 13, 14]
+            .into_iter()
+            .map(Uuid::from_u128)
+            .collect();
+        assert_eq!(
+            nearest_per_item(walk, &in_change),
+            vec![Nearest {
+                root: Uuid::from_u128(asm2),
+                item: Uuid::from_u128(asm1),
+                level: 1,
+                links: vec![("bom".into(), Uuid::from_u128(asm2))],
+            }]
+        );
+    }
+
+    /// A dependent that uses several items of the change keeps every link
+    /// of its lowest level, each once; links on higher levels are dropped.
+    #[test]
+    fn keeps_all_links_of_the_lowest_level() {
+        let walk = vec![
+            found(10, 1, 2, "bom", 5),
+            found(10, 1, 1, "bom", 10),
+            found(11, 1, 1, "drawing", 11),
+            found(11, 1, 1, "drawing", 11),
+            found(10, 2, 1, "file", 10),
+            found(11, 2, 1, "file", 11),
+        ];
+        let rows = nearest_per_item(walk, &std::collections::HashSet::new());
+        let shape: Vec<(u128, i32, Vec<(&str, u128)>)> = rows
+            .iter()
+            .map(|r| {
+                (
+                    r.item.as_u128(),
+                    r.level,
+                    r.links
+                        .iter()
+                        .map(|(rel, via)| (rel.as_str(), via.as_u128()))
+                        .collect(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            shape,
+            vec![
+                (1, 1, vec![("bom", 10), ("drawing", 11)]),
+                (2, 1, vec![("file", 10), ("file", 11)]),
+            ]
+        );
+        assert!(nearest_per_item(Vec::new(), &std::collections::HashSet::new()).is_empty());
     }
 }
