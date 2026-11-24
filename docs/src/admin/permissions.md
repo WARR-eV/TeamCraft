@@ -12,6 +12,8 @@ Every item belongs to a project group (or to none). A group is either
 
 The background and the alternatives that were considered are in the
 research note [Read permissions for project groups](../research/read-permissions.md).
+How a group's manager sets up the members' CAD programs to find the parts
+of its assemblies is on [Set up CAD programs for a project group](cad-setup.md).
 
 ## Effective rights
 

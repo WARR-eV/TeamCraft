@@ -67,11 +67,16 @@ installations and the desktop app:
 5. **Check in**, then release it with a change order.
 
 **Desktop app, first start:** after you connect to the server and sign in,
-TeamCraft Desktop opens *Getting started* – a short wizard through the
-working folder, *Get project groups…* for your groups, the CAD setup (for
-information) and the daily loop *Check out and open* → save in CAD →
-*Check in…*. Every step can be skipped; *Help → Getting Started…* opens it
-again. See [Desktop app](desktop.md#getting-started).
+TeamCraft Desktop opens *Getting started* – at most three read-only steps:
+where your files go (the working folder and the CAD programs found on the
+computer), your project group (only when you have several, or none yet) and
+your first assembly – up to five of the group's assemblies, each with
+**Show**, which opens its revision tab with *Check out and open* as the next
+step. The wizard creates no file or folder and works the same for every CAD
+program; it is remembered per server and account, and *Help → Getting
+Started…* opens it again. See [Desktop app](desktop.md#getting-started).
+How a group's manager sets up the CAD programs to find the parts of its
+assemblies: [Set up CAD programs](../admin/cad-setup.md).
 
 **Empty pages name the next step** (#423): with no project group yet, the
 vault and *Projects* offer *Create a project group* to CAD editors and tell

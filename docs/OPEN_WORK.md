@@ -700,18 +700,23 @@ real files and belong to section 3 once such files are at hand.
   read-only (#367: shown, searchable, mismatches flagged, prefill of new items); left: other CAD formats, material
 - [ ] Recognise standard and library parts (Content Center, Toolbox, Standard Parts) and treat them as purchased parts
   instead of importing them again and again
-- [ ] Workspace setup wizard (first start or when getting a project group): optional CAD settings to tick – Inventor
-  `.ipj`, NX load options, Solid Edge search paths; nothing ticked by default, preview of what would be created, never
-  created automatically, existing files never overwritten without asking; can be opened again from the settings.
-  The wizard frame exists (#422: *Getting started* in the desktop app, also *Help → Getting Started…*); its *CAD
-  setup* step only lists what would be created. Left: creating the files themselves (needs the CAD programs to
-  verify the generated `.ipj`, load options and search paths); issue #422 stays open for this step 5 of its plan
+- [x] First-start wizard (#422): *Getting started* in the desktop app is a read-only, CAD-neutral hand-over – where
+  your files go, your project group, your first assembly (*Show* opens its revision tab with *Check out and open*
+  highlighted); it creates no file or folder, remembered per saved connection (research page *The first start of the
+  desktop app*). Follow-ups: a self-ticking *Getting started* card on Home for users who closed the wizard early,
+  the size and file count of a whole-group *Get* before it starts (`group-sync.js`), a read-only view of a group's
+  CAD setup for its managers on the Projects page
+- [ ] CAD project setup without generated files (#478): team-owned project and configuration files of the CAD
+  programs kept as ordinary vaulted files of the group, search paths set in each program's own dialogs, documented
+  per CAD program at equal depth (admin page *Set up CAD programs for a project group*, public sources only).
+  TeamCraft creates no CAD settings files. Left: check each program's section with the program itself and record
+  what was confirmed
 
 **Autodesk Inventor**
 
-- [ ] Project file (`.ipj`) for the workspace only on request, in the workspace wizard: either create a new `.ipj`
-  (workspace = group folder, "Using Unique File Names", library paths adjustable) or choose the team's existing `.ipj`
-  and only check/show it
+- [ ] Team project file (`.ipj`) as a vaulted file of the group (#478): made in Inventor by the group's manager,
+  workspace at the group folder, checked in – documented on *Set up CAD programs for a project group*; TeamCraft
+  generates none. Left: confirm the documented steps with Inventor
 - [ ] Folder import: read the paths of an included `.ipj`; recognise Content Center and library folders
 - [ ] Test the reference scan with real `.iam` files, also with derived parts, iParts/iAssemblies and Frame Generator
 - [ ] Test the STEP export (built) with real files on Windows – the preview images are verified with the NIST Inventor
@@ -753,7 +758,9 @@ real files and belong to section 3 once such files are at hand.
 - [ ] Folder import for the master model concept: the drawing `*_dwg*.prt` belongs into the item of the model
 - [ ] Test the BOM import with real NX BOM exports
 - [ ] STEP export through the local NX (NX Open / journal), on Windows and Linux
-- [ ] NX load options for the workspace only on request, in the workspace wizard; NX part of the tutorial
+- [ ] NX load options (#478): *From Search Folders* with the group folder, set by each user in NX's own dialog –
+  documented on *Set up CAD programs for a project group*; TeamCraft writes no load options file. Left: confirm with
+  NX; NX part of the tutorial
 
 **SolidCraft** (research page *SolidCraft designs*)
 
@@ -796,8 +803,8 @@ needs an issue with a reason first (see *Direction*).
   wizard *Getting started*, #423 empty states that name the next step (web and desktop, by role, i18n catalogs).
   Left: #424 new desktop screenshots; follow-ups – *Revise and check out* for released parts (#415), a list picture
   for revisions with only STEP or mesh files (#420: a fallback rendered from the 3D preview needs
-  `thumbnail::supports` and `cadformat` widened), the CAD file creation of the wizard's *CAD setup* step (#422), the
-  other empty states (detail tabs, admin pages; still in English only), a *Get…* hint for viewers and a check
+  `thumbnail::supports` and `cadformat` widened), the *Getting started* follow-ups (#422: Home checklist card,
+  Get size preview, managers' CAD-setup view), the other empty states (detail tabs, admin pages; still in English only), a *Get…* hint for viewers and a check
   whether the working folder really lacks the active group's files (#423)
 - [ ] Responsive pages on large data (1M files, 100k items, 10k-line BOMs – see the scale targets)
 - [ ] Faster opening of large CAD files and assemblies
@@ -898,8 +905,9 @@ needs an issue with a reason first (see *Direction*).
 - [ ] Upgrades: proven upgrade chain per release, restore-based rollback guide, a plugin/extension layer (design: research page *A sandboxed extension layer*, #382)
 - [ ] CAD clone workflows: clone an assembly with selective reuse, Save As / revise per component over a whole
   structure, shown as an indented tree
-- [ ] Interactive onboarding and contextual help – the desktop first-start wizard *Getting started* is done (#422);
-  empty states that name the next step are done too (#423); left: contextual help
+- [ ] Interactive onboarding and contextual help – the desktop first-start wizard *Getting started* is done (#422,
+  read-only, ends on the first assembly); the daily loop is taught as a one-time tip on the revision tab; empty
+  states that name the next step are done too (#423); left: more contextual help
 - [ ] Migration tooling from commercial PLM/PDM systems
 - [ ] GA proofs: production readiness, migration and concurrency safety, scale validation, external security review,
   support and versioning policy

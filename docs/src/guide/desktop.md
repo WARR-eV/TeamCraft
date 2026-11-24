@@ -801,41 +801,62 @@ too, and every step is written to `.teamcraft/migration.log`.
 ## Getting started
 
 After the **first sign-in** the app opens a short wizard, *Getting
-started*; *Help → Getting Started…* opens it again at any time. It guides
-you from the sign-in to your first opened assembly:
+started*; *Help → Getting Started…* opens it again at any time. It has one
+job: bring you to a real assembly of your project group, with *Check out
+and open* in front of you. A line at the top says which server and account
+you are connected with (change them in *Settings → Account*). It has at
+most three steps:
 
-1. **Server** – the server the app works with. Skipped when your
-   organization fixed the server ([Managed computers](#managed-computers)).
-2. **Sign-in** – already done when the wizard opens; shown as a ticked step.
-3. **Working folder** – what it is and where your CAD files will live
+1. **Where your files go** – your CAD files live in the working folder,
+   each project group in its own folder
    (`<working folder>/<group>/<folder>/<file>`). *Change…* picks another
    folder (the same setting as *Settings → Workspace*), *Open folder* shows
-   it in the file manager.
-4. **Project group** – the groups you are a member of and *Get project
-   groups…*, which copies their files into the working folder (latest
-   revision, also in work). Skipped when you are in no group yet, or when a
-   complete *Get project groups* on this computer (no failed item or name
-   clash, *Latest revision*) already fetched all of
-   them into this working folder.
-5. **CAD setup** – for information only: the Inventor project file
-   (`.ipj`), the NX load options and the Solid Edge search paths that a later
-   version will offer to create. The wizard creates none of them.
-6. **Your daily loop in 3 steps** – *Check out and open* → save in your CAD
-   program → *Check in…*. *Finish and open* with the group code makes one of your
-   groups the active one (a group you already fetched first) and shows its
-   files in *Home* – right-click the assembly → *Check out and open*. Without
-   a group, *Finish and show Projects* lists the groups instead; *Finish and
-   open my worklist* shows what you have checked out.
+   it in the file manager. Below, one line names the CAD programs found on
+   this computer – or says that none was found and you can still open files
+   yourself from the working folder. Skipped when your organization set
+   where working folders go ([Managed computers](#managed-computers)) or a
+   *Get* already used the folder; the header then shows the folder.
+2. **Your project group** – with several groups: *Which group do you work in
+   first?*, one row per group with its default CAD program and *already in
+   your working folder* where that is so. Skipped with exactly one group.
+   **Without a group** this is the last step: CAD editors get *Create a
+   project group* (the wizard closes and *Projects → New* opens), viewers
+   *Copy user name* to send to a group manager who adds them.
+3. **Your first assembly** – what *Check out and open* will do: lock the
+   assembly, copy it with its parts into `<working folder>/<group>/` and
+   open it in the group's CAD program (named; *not installed on this
+   computer* when it is missing). Below, up to five assemblies of the group –
+   top-level ones, in work first, the largest first, none locked by somebody
+   else – with their picture and **Show** *number*. An empty group shows
+   *Import CAD folder…* and *New item* (see [Empty views](#empty-views)); a
+   viewer reads that *Get…* copies an item with its parts. A link leads to
+   how a group sets up its CAD programs
+   ([Set up CAD programs](../admin/cad-setup.md)).
 
-Every step has *Don't show again*; *Back*, *Skip* and *Next* move between
-the steps, and the last step has *Finish*. The step list on the left ticks
-the steps you went through with *Next* and marks the ones you skipped with
-a dash (also read out by screen readers). The wizard
-itself creates no file or folder – only the app's own actions it opens do,
-after you confirm them (the folder picker, *Get files*). Once you finish it
-or choose *Don't show again* it no longer opens by itself; an app that
-starts already signed in – after an update from an older version – does not
-show it either.
+**Show** *number* makes that group your active one, closes the wizard and
+opens the revision tab of the assembly, where **Check out and open** is the
+highlighted next step – your next click is real work. *Finish and show
+<group> in Home* instead makes the group active and shows its files in the
+navigator and *Home*. The group you pick in step 2 only counts with one of
+these clicks: *Back* and *Don't show again* change nothing.
+
+The wizard **creates no file or folder**, gets and checks out nothing and
+writes nothing to the server; it is the same whichever CAD program you use.
+It stores only that you finished it (or chose *Don't show again*) – **per
+saved connection**, so a second server or account offers it once more – the
+working folder if you pick one with *Change…*, and the active group. It
+does not open by itself for an app that starts already signed in (an
+update, a reload), nor for an account that already has check-outs or open
+changes on that server (a new computer, an expired sign-in). The update
+notice, the *Support us* tag and the keychain warning wait until it is
+closed; the question to move a workspace of the old layout comes first.
+
+**The daily loop, where it happens.** While a revision's next step is
+*Check out and open*, *Open in CAD* or *Check in…*, its tab shows one tip: a
+check-out only locks it – *Cancel check-out* undoes it without a new
+version; save in your CAD program as usual, then *Check in…* there or in
+your worklist. After your first check-in or cancelled check-out the tip
+goes, and one line says *This is your daily loop* (once per computer).
 
 ## Empty views
 
