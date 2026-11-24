@@ -65,6 +65,15 @@ mismatch.
   shows its own server.
 - [ ] Run the [desktop update test](#desktop-update-test) for each install
   type.
+- [ ] Desktop first use (*Getting started*, #422), with a fresh settings
+  folder: (1) a new **viewer without a group** signs in – the wizard ends on
+  the group step with *Copy user name*, nothing is created in the working
+  folder; (2) a new **CAD editor in a group with an assembly** signs in –
+  *Show* opens the revision tab with *Check out and open* highlighted and the
+  loop tip, *Check out and open* opens the assembly with its parts; after
+  *Cancel check-out* the tip gives way to *This is your daily loop*;
+  (3) *Settings → Connections → Add another account* and sign in – the
+  wizard opens once more for that account, not again for the first one.
 - [ ] Note what was found in the soak in the changelog or in the release
   notes.
 

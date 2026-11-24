@@ -37,7 +37,7 @@ It cites public design guidelines only; no product is taken as a model.
   click. No *Get*, no check-out, no server write.
 * Nothing in the wizard depends on one CAD program. How a project group sets
   up its CAD programs is an administrator page
-  (*Set up CAD programs for a project group*, `admin/cad-setup.md`), linked
+  ([Set up CAD programs for a project group](../admin/cad-setup.md)), linked
   from step 3.
 * Follow-ups, not in the wizard: a self-ticking *Getting started* card on
   Home for users who closed the wizard early, the size of a whole-group *Get*

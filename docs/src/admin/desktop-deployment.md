@@ -14,7 +14,7 @@ these *policies*, once at start; nothing about them is sent anywhere
 | `AllowOtherServers` | switch | `1`: users may add other servers although `ServerUrl` is set (it is then only the default)              |
 | `CheckForUpdates`   | switch | `1`: the daily release check is on and cannot be turned off; `0`: no checks at all                      |
 | `CrashReportPrompt` | switch | `0`: crash reports stay on the computer and are never offered for sharing; `1`: always offered          |
-| `WorkspaceRoot`     | text   | The folder new working folders are created in (an absolute path); users can still choose another one   |
+| `WorkspaceRoot`     | text   | The folder new working folders are created in (an absolute path); users can still choose another one. *Getting started* then shows the folder as a line instead of asking. CAD programs are configured with your own deployment tools ([Set up CAD programs](cad-setup.md)) |
 | `ReportUrl`         | text   | Where *Report a problem* sends reports: your help desk's issue form (`https://…`), opened with the reviewed report as `title` and `body`; replaces *Settings → Report problems to*, which shows *Set by your organization* |
 | `OrganizationName`  | text   | Shown as *Managed by …* in *Settings* and *About* (one line, at most 64 characters)                     |
 | `UsageStatistics`   | switch | `0`: the app counts, keeps and sends no usage report to its server (#383); `1`: it reports to its own server and users cannot switch it off; not set: each user chooses (*Settings → Privacy*, on unless switched off, #473). Fixed either way, the switch shows *Set by your organization*. Whether the server shares a summary with the developers is its administrator's choice ([Privacy](privacy.md)) |
