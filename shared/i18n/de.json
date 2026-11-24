@@ -108,6 +108,7 @@
   "onboarding.open.loading": "Baugruppen werden gesucht …",
   "onboarding.open.failed": "Die Baugruppen von {group} konnten nicht geladen werden: {error}",
   "onboarding.open.none": "{group} hat noch keine Baugruppe zum Einstieg – ihre Dateien sind in „Home“.",
+  "onboarding.open.none_free": "Keine Baugruppe von {group} ist frei und in Arbeit – sie sind freigegeben, in Prüfung oder ausgecheckt. Öffne eine in „Home“ und überarbeite sie („Revise“), um daran zu arbeiten.",
   "onboarding.open.cad_setup": "Ihr CAD-Programm findet die Teile einer Baugruppe über seine eigenen Projekt- oder Suchpfad-Einstellungen; der Manager Ihrer Gruppe richtet sie einmal ein.",
   "onboarding.open.cad_setup.link": "Wie eine Gruppe ihre CAD-Programme einrichtet",
   "onboarding.finish": "Fertig",

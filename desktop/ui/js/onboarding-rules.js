@@ -178,9 +178,9 @@ export function lockedByMe(x, me) {
  * structure (`GET /projects/{code}/structure`: no BOM line uses them).
  * An assembly is an item of type `assembly` or one with BOM lines; a
  * restricted placeholder and a node without a revision are left out. For a
- * CAD editor (`opts.editor`, the default) only revisions in work that are
- * free or checked out by the user (`opts.me` = `{id, name}`, lockedByMe):
- * those are the ones *Check out and open* works on. A viewer gets them in
+ * CAD editor (`opts.editor`, the default) only free revisions in work:
+ * those are the ones *Check out and open* is the next step for (one the
+ * user holds already would offer *Open in CAD* or *Check in…* instead). A viewer gets them in
  * any state. Order: the most BOM lines (the main assembly of a group, not a
  * small sub-assembly), then by number. At most `n` (MAX_ASSEMBLIES).
  */
@@ -193,12 +193,25 @@ export function pickAssemblies(nodes, opts) {
     if (x.item_type !== "assembly" && !(x.bom_lines > 0)) return false;
     if (!editor) return true;
     if (x.state !== "in_work") return false;
-    return !(x.checked_out_by || x.checked_out_by_name) || lockedByMe(x, opts.me);
+    return !(x.checked_out_by || x.checked_out_by_name);
   }).slice().sort(function (a, b) {
     var la = a.bom_lines || 0, lb = b.bom_lines || 0;
     if (la !== lb) return lb - la;
     return a.item_number < b.item_number ? -1 : a.item_number > b.item_number ? 1 : 0;
   }).slice(0, n);
+}
+
+/**
+ * Why step 3 offers no assembly: the group has none (`onboarding.open.none`),
+ * or – for a CAD editor – none of them is free and in work, e.g. all are
+ * released or checked out (`onboarding.open.none_free`, which says so).
+ */
+export function noAssemblyMessage(nodes, opts) {
+  opts = opts || {};
+  var any = (Array.isArray(nodes) ? nodes : []).some(function (x) {
+    return x && !x.restricted && x.item_number && x.code && (x.item_type === "assembly" || x.bom_lines > 0);
+  });
+  return any && opts.editor !== false ? "onboarding.open.none_free" : "onboarding.open.none";
 }
 
 /**
@@ -353,7 +366,7 @@ export var ONBOARDING_MESSAGE_IDS = [
   "onboarding.open.lead", "onboarding.open.program", "onboarding.open.program_other", "onboarding.open.program_missing",
   "onboarding.open.any", "onboarding.open.viewer", "onboarding.open.show", "onboarding.open.show.title",
   "onboarding.open.show.viewer_title", "onboarding.open.loading",
-  "onboarding.open.failed", "onboarding.open.none", "onboarding.open.cad_setup", "onboarding.open.cad_setup.link",
+  "onboarding.open.failed", "onboarding.open.none", "onboarding.open.none_free", "onboarding.open.cad_setup", "onboarding.open.cad_setup.link",
   "onboarding.finish", "onboarding.finish_home", "onboarding.next", "onboarding.back", "onboarding.dismiss",
   "onboarding.tip.loop", "onboarding.tip.loop_done"
 ];

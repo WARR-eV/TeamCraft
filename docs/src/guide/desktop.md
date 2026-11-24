@@ -826,14 +826,16 @@ most three steps:
    *Copy user name* to send to a group manager who adds them.
 3. **Your first assembly** – what *Check out and open* will do: lock the
    assembly, copy it with its parts into `<working folder>/<group>/` and
-   open it in the group's CAD program – named by the same rule as the chip
-   next to *Check out and open*: the group's version when it is installed,
+   open it in the group's CAD program – for files of that program the same
+   rule as the chip next to *Check out and open* (a STEP or other neutral
+   file opens as the chip of its tab says): the group's version when it is installed,
    else the newest installed version (the line then says that the group's
    version is missing), else *not installed on this computer*. Below, up
    to five assemblies of the group – top-level ones that are **in work** and
-   free or checked out by you, the largest first – with their picture and
-   **Show** *number*. A released or in-review assembly is not offered: it
-   cannot be checked out. An empty group shows *Import CAD folder…* and
+   free, the largest first – with their picture and **Show** *number*. A
+   released, in-review or checked-out assembly is not offered (one you hold
+   already is in your worklist); when none is free and in work, the step
+   says so – open one in Home and revise it to work on it. An empty group shows *Import CAD folder…* and
    *New item* (see [Empty views](#empty-views)); a viewer reads that
    *Get…* copies an item with its parts and gets the group's assemblies in
    any state, with no check-out promise. A link leads to

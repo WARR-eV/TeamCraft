@@ -108,6 +108,7 @@
   "onboarding.open.loading": "Looking for assemblies …",
   "onboarding.open.failed": "The assemblies of {group} could not be loaded: {error}",
   "onboarding.open.none": "{group} has no assembly to start with yet – its files are in Home.",
+  "onboarding.open.none_free": "None of the assemblies of {group} is free and in work – they are released, in review or checked out. Open one in Home and revise it to start working on it.",
   "onboarding.open.cad_setup": "Your CAD program finds the parts of an assembly through its own project or search-path settings; your group manager sets them up once.",
   "onboarding.open.cad_setup.link": "How a group sets up its CAD programs",
   "onboarding.finish": "Finish",

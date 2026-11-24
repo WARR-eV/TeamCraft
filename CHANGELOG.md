@@ -206,10 +206,11 @@ see the notices in the README.
   computer), *Your project group* (only with several groups; without one it
   says how to get one – *Create a project group* for CAD editors, *Copy user
   name* for viewers) and *Your first assembly* (what *Check out and open*
-  does, naming the program by the same rule as the chip next to the button;
+  does, naming the program for files of the group's program by the same
+  rule as the chip next to the button;
   up to five assemblies of the group with their picture and **Show**
-  *number* – for CAD editors only assemblies in work, free or checked out by
-  you, so the revision tab opens with *Check out and open* highlighted;
+  *number* – for CAD editors only free assemblies in work (with a message
+  when none is), so the revision tab opens with *Check out and open* highlighted;
   viewers get the group's assemblies in any state and no check-out promise;
   *Finish and show <group> in Home*). The server, sign-in, CAD setup and
   daily-loop pages are gone: the connection is one header line, the daily
