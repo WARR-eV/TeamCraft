@@ -44,7 +44,8 @@ CAD generation:
 Open it with the sparkle icon in the top bar (desktop app: the **Agent**
 view on *Company AI*, `Ctrl/Cmd+4`). You can add your own words to a quick action, e.g. "focus on the weld
 seams". The answer shows the tools that the assistant used. Item numbers in
-the answer link to the item. The assistant remembers the conversation: see
+the answer link to the item. Numbered lists keep their numbers, also when
+the items are separated by blank lines. The assistant remembers the conversation: see
 [The sidebar](#the-sidebar).
 
 ## The sidebar
@@ -115,7 +116,7 @@ as "and which of those are released?" works. **New conversation** deletes it.
   (`TEAMCRAFT_ASSISTANT_RETENTION_DAYS`); deleting a user deletes the
   conversation.
 - While an answer is on its way the drawer shows that it is working and
-  offers **Cancel**; a cancelled question is not stored.
+  offers **Cancel** (shown only then); a cancelled question is not stored.
 - The answer does not stream in: it appears when it is complete.
 
 ## What it can and cannot do

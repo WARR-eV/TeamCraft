@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 // The assistant's markdown-lite as DOM nodes: headings, lists, pipe tables,
 // code blocks, paragraphs, `code` and **bold**. Nothing is ever parsed as
-// HTML. The server's assistant::render_markdown renders the same dialect as
+// HTML. A blank line between two list items keeps the list open, and a
+// numbered list keeps its first number (<ol start>). The server's assistant::render_markdown renders the same dialect as
 // HTML; both are pinned to shared/test-vectors/markdown.json
 // (src/ui_vectors.rs, scripts/shared-vectors.test.mjs).
 
@@ -73,7 +74,9 @@ export function markdown(text, link) {
       root.appendChild(el("pre", null, el("code", { text: code.join("\n") })));
       continue;
     }
-    if (!t) { end(); continue; }
+    // a blank line keeps the list open: an item after it continues the list
+    // (a "loose" list), anything else closes it
+    if (!t) { para = null; continue; }
     if ((m = /^(#{1,6})\s+(.*)$/.exec(t))) {
       end();
       var head = el(m[1].length <= 2 ? "h3" : "h4");
@@ -96,13 +99,18 @@ export function markdown(text, link) {
       continue;
     }
     if (/^[-*_]{3,}$/.test(t)) { end(); root.appendChild(el("hr")); continue; }
-    var bullet = /^(?:[-*•])\s+(.*)$/.exec(t), numbered = /^\d{1,3}[.)]\s+(.*)$/.exec(t);
+    var bullet = /^(?:[-*•])\s+(.*)$/.exec(t), numbered = /^(\d{1,3})[.)]\s+(.*)$/.exec(t);
     if (bullet || numbered) {
       para = null;
       var tag = bullet ? "ul" : "ol";
-      if (!list || list.tagName.toLowerCase() !== tag) { list = el(tag); root.appendChild(list); }
+      if (!list || list.tagName.toLowerCase() !== tag) {
+        // a numbered list keeps its first number
+        var start = numbered ? parseInt(numbered[1], 10) : 1;
+        list = el(tag, start !== 1 ? { start: String(start) } : null);
+        root.appendChild(list);
+      }
       var li = el("li");
-      add(li, inlineNodes((bullet || numbered)[1], link));
+      add(li, inlineNodes(bullet ? bullet[1] : numbered[2], link));
       list.appendChild(li);
       continue;
     }

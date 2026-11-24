@@ -140,6 +140,19 @@ see the notices in the README.
   that says what the button does: check-outs without local changes are
   checked in, the ones with modified or new files are listed first to check
   them in with their files, conflicts stay checked out (#520).
+- Assistant (web and desktop): a numbered list whose items are separated by
+  blank lines (a "loose" list) stays one list instead of showing "1." on
+  every item, and a list that starts at another number keeps it
+  (`<ol start>`); fixed in `shared/js/markdown.js` and its Rust twin
+  `assistant::render_markdown`, pinned by new cases in
+  `shared/test-vectors/markdown.json` (#514).
+- Web and desktop: an element hidden with the `hidden` attribute stays
+  hidden – `button { display: inline-flex }` showed the web assistant's
+  *Cancel* button while idle; `[hidden]` now always wins
+  (`shared/css/components.css`, #515).
+- Web: the standalone assistant page (`/assistant`) no longer marks
+  *Dashboard* as the current section, and the current entry of the main nav
+  and the Admin menu carries `aria-current="page"` for screen readers (#522).
 - Desktop: a check-out or check-in from Home marks the row (lock colour and
   icon) at once instead of after leaving Home and coming back; the
   *Check-outs* tab of a group is loaded again each time it comes to the

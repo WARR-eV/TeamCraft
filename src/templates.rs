@@ -372,6 +372,43 @@ mod tests {
         assert!(html.contains("<html lang=\"en\"") && html.contains(">Items<"));
     }
 
+    /// The main nav marks the current section with `aria-current="page"`
+    /// next to the `active` class, and the assistant page marks no section
+    /// (issue 522: it highlighted *Dashboard*).
+    #[test]
+    fn main_nav_marks_the_current_page() {
+        let env = environment("TeamCraft Test").expect("templates compile");
+        let dashboard = render(
+            &env,
+            "dashboard.html",
+            with_common(json!({
+                "stats": { "items": 0, "revisions_in_work": 0, "revisions_in_review": 0, "revisions_released": 0,
+                           "open_changes": 0, "files": 0, "stored_bytes": 0 },
+                "checkouts": [], "reviews": [], "my_changes": [], "activity": [], "impact_groups": [],
+                "assigned_requests": [], "my_requests": [],
+            })),
+        );
+        assert!(
+            dashboard.contains("<a href=\"/\" class=\"active\" aria-current=\"page\">"),
+            "{dashboard}"
+        );
+        assert_eq!(dashboard.matches("aria-current=\"page\"").count(), 1);
+        assert!(dashboard.contains("<a href=\"/items\" class=\"\">"));
+
+        let assistant = render(
+            &env,
+            "assistant.html",
+            with_common(json!({
+                "actions": [["attention", "What needs my attention"]],
+                "form": { "question": "", "item": "", "revision": "", "change": "" },
+                "back": "/assistant", "error": null, "run": null,
+            })),
+        );
+        assert!(!assistant.contains("aria-current"), "{assistant}");
+        assert!(!assistant.contains("class=\"active\""), "{assistant}");
+        assert!(assistant.contains("<a href=\"/\" class=\"\">"));
+    }
+
     /// The empty states of the dashboard, the vault explorer and the lists
     /// name the next step – by role (#423); rendered as a CAD editor and as
     /// a viewer, in English and in German. Part of `every_template_renders`,

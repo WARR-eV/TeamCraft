@@ -626,6 +626,16 @@ mod tests {
         }
     }
 
+    /// The hidden attribute wins over every component rule in both apps
+    /// (issue 515: `button { display: inline-flex }` showed hidden buttons).
+    #[test]
+    fn hidden_attribute_always_hides() {
+        let components = include_str!("../shared/css/components.css");
+        assert!(components.contains("[hidden] { display: none !important; }"));
+        assert!(include_str!("../templates/base.html").contains("shared/css/components.css"));
+        assert!(include_str!("../desktop/ui/index.html").contains("shared/css/components.css"));
+    }
+
     /// One set of density tokens (shared/css/skins.css): the desktop app
     /// selects the compact set instead of declaring its own control and row
     /// heights or body text size.

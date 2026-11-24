@@ -1359,11 +1359,12 @@ fn inline(text: &str) -> String {
     out
 }
 
-fn list_item(line: &str) -> Option<(&'static str, &str)> {
+/// A list item: its tag, its number (1 for a bullet) and its text.
+fn list_item(line: &str) -> Option<(&'static str, u32, &str)> {
     let t = line.trim_start();
     for bullet in ["- ", "* ", "• "] {
         if let Some(rest) = t.strip_prefix(bullet) {
-            return Some(("ul", rest));
+            return Some(("ul", 1, rest));
         }
     }
     let digits = t.bytes().take_while(u8::is_ascii_digit).count();
@@ -1372,7 +1373,8 @@ fn list_item(line: &str) -> Option<(&'static str, &str)> {
             .strip_prefix(". ")
             .or_else(|| t[digits..].strip_prefix(") "))
         {
-            return Some(("ol", rest));
+            let start = t[..digits].parse().unwrap_or(1);
+            return Some(("ol", start, rest));
         }
     }
     None
@@ -1398,6 +1400,8 @@ fn is_separator_row(line: &str) -> bool {
 /// Renders the model's markdown-lite as safe HTML: headings, lists, pipe
 /// tables, code blocks, paragraphs, `code` and **bold**. All text is
 /// escaped; the only generated links point to items of this server.
+/// A blank line between two items keeps the list open (a "loose" list), and
+/// a numbered list keeps its first number (`<ol start="n">`).
 pub fn render_markdown(text: &str) -> String {
     let lines: Vec<&str> = text.lines().collect();
     let mut out = String::new();
@@ -1436,8 +1440,9 @@ pub fn render_markdown(text: &str) -> String {
             continue;
         }
         if trimmed.is_empty() {
+            // the list stays open: an item after the blank line continues it,
+            // anything else closes it
             flush_paragraph(&mut out, &mut paragraph);
-            close_list(&mut out, &mut list);
             i += 1;
             continue;
         }
@@ -1480,11 +1485,15 @@ pub fn render_markdown(text: &str) -> String {
             i += 1;
             continue;
         }
-        if let Some((tag, rest)) = list_item(line) {
+        if let Some((tag, start, rest)) = list_item(line) {
             flush_paragraph(&mut out, &mut paragraph);
             if list != Some(tag) {
                 close_list(&mut out, &mut list);
-                out.push_str(&format!("<{tag}>\n"));
+                if start == 1 {
+                    out.push_str(&format!("<{tag}>\n"));
+                } else {
+                    out.push_str(&format!("<{tag} start=\"{start}\">\n"));
+                }
                 list = Some(tag);
             }
             out.push_str(&format!("<li>{}</li>\n", inline(rest.trim())));
