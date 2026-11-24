@@ -10,6 +10,7 @@ import { fmtDate, fmtAge, label } from "/static/shared/js/format.js";
 import { activeTab, openTab, reloadActive } from "./tabs.js";
 import { openRevision } from "./revision.js";
 import { HOLDER_W, HOLDER_X, LOCK_W, LOCK_X, NODE_H, lockGraph } from "./lock-layout.js";
+import { acceptSeq, forgetHiddenLocks, locksDiffer, shouldPoll, takeSeq } from "./lock-rules.js";
 
 var SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -30,10 +31,16 @@ function fetchLocks(code) {
 
 /** The overview of a tab. Each time the tab is shown it is loaded again
  *  (tabs.js activate drops `tab.data`, #451): opening it shows the current
- *  state, not the one of the first visit. */
+ *  state, not the one of the first visit. Every fetch of a tab is numbered
+ *  (lock-rules.js takeSeq): an answer older than one already applied – a
+ *  slow poll after *Refresh* – is dropped. */
 export function loadLocks(tab) {
   if (tab.data) return Promise.resolve(tab.data);
-  return fetchLocks(tab.code).then(function (o) { tab.data = o; return o; });
+  var my = takeSeq(tab);
+  return fetchLocks(tab.code).then(function (o) {
+    if (acceptSeq(tab, my)) tab.data = o;
+    return tab.data || o;
+  });
 }
 
 /** Every POLL_MS while a Check-outs tab is in front and the window has the
@@ -52,35 +59,66 @@ function watchLocks() {
 
 function pollLocks() {
   var tab = activeTab();
-  if (!tab || tab.kind !== "locks" || !tab.data || !state.me) return;
+  if (!shouldPoll(tab, state.me)) return;
+  var my = takeSeq(tab);
   fetchLocks(tab.code).then(function (o) {
-    if (activeTab() !== tab || JSON.stringify(o) === JSON.stringify(tab.data)) return;
+    if (activeTab() !== tab || !acceptSeq(tab, my) || !locksDiffer(o, tab.data)) return;
     tab.data = o;
     repaint();
   }, function () { /* the next poll tries again; Refresh shows the error */ });
 }
 
-/** Paints the active tab again from its data, keeping the scroll position. */
+/** Paints the active tab again from its data, keeping the scroll position
+ *  and the keyboard focus: a revision link or button that is still there
+ *  gets it back (`data-focus-key`), a released one hands it to the heading
+ *  instead of letting it fall back to the page. */
 function repaint() {
   var tab = activeTab(), body = $("tab-body"), toolbar = $("toolbar");
   var top = body.scrollTop;
+  var focus = focusedPlace(body, toolbar);
   clear(body);
   clear(toolbar);
   renderLocks(tab, body, toolbar);
   body.scrollTop = top;
+  restoreFocus(focus, body, toolbar);
 }
 
-/** The user's own check-outs changed (shell.js fetchWorklist): every
- *  Check-outs tab loads again; the one in front at once. */
-export function locksChanged() {
-  state.tabs.forEach(function (t) { if (t.kind === "locks") t.data = null; });
-  var tab = activeTab();
-  if (tab && tab.kind === "locks") {
-    fetchLocks(tab.code).then(function (o) {
-      tab.data = o;
-      if (activeTab() === tab) repaint();
-    }, function () {});
+/** Where the focus is inside the overview: the key of a body element or the
+ *  index of a toolbar button; null when it is elsewhere. */
+function focusedPlace(body, toolbar) {
+  var a = document.activeElement;
+  if (!a || a === document.body) return null;
+  if (toolbar.contains(a)) return { tool: Array.prototype.indexOf.call(toolbar.querySelectorAll("button"), a) };
+  if (body.contains(a)) return { key: a.getAttribute ? a.getAttribute("data-focus-key") : null };
+  return null;
+}
+
+function restoreFocus(place, body, toolbar) {
+  if (!place) return;
+  var el = null;
+  if (place.tool != null && place.tool >= 0) el = toolbar.querySelectorAll("button")[place.tool] || null;
+  else if (place.key) el = body.querySelector('[data-focus-key="' + CSS.escape(place.key) + '"]');
+  if (!el) {
+    el = body.querySelector("h1");
+    if (el) el.setAttribute("tabindex", "-1");
   }
+  if (el) el.focus({ preventScroll: true });
+}
+
+/** The user's own check-outs changed (shell.js fetchWorklist, or a lock of
+ *  someone else released in workspace.js): every Check-outs tab loads again;
+ *  the one in front at once. That one keeps its data until the new data is
+ *  there, so a failed fetch leaves it polling (lock-rules.js forgetHiddenLocks). */
+export function locksChanged() {
+  var tab = activeTab();
+  forgetHiddenLocks(state.tabs, tab);
+  if (!tab || tab.kind !== "locks") return;
+  var my = takeSeq(tab);
+  fetchLocks(tab.code).then(function (o) {
+    if (activeTab() !== tab || !acceptSeq(tab, my)) return;
+    tab.data = o;
+    repaint();
+  }, function () { /* data kept: the next poll tries again */ });
 }
 
 function svg(name, attrs, children) {
@@ -105,7 +143,8 @@ function graphSvg(o) {
   });
   g.locks.forEach(function (l) {
     // a revision is a link: click or Enter opens it
-    var link = svg("a", { href: "#", tabindex: "0", role: "link", "aria-label": l.label + " – " + label(l.sub) }, [
+    var link = svg("a", { href: "#", tabindex: "0", role: "link", "aria-label": l.label + " – " + label(l.sub),
+      "data-focus-key": "g:" + l.number + "/" + l.code }, [
       svg("g", { "class": "lg-node lg-lock lg-" + l.age }, [
         svg("rect", { x: LOCK_X, y: l.y, width: LOCK_W, height: NODE_H, rx: 6 }),
         svg("text", { x: LOCK_X + 10, y: l.y + NODE_H / 2 }, [l.label])
@@ -155,7 +194,7 @@ export function renderLocks(tab, body, toolbar) {
         h("span.muted.small", { text: " " + holder.locks.length + " checked out" })]),
       h("ul.lock-list", null, holder.locks.map(function (l) {
         return h("li", null, [
-          h("button.link.mono", { type: "button", on: { click: function () { openRevision(l.item_number, l.code); } } }, l.item_number + "/" + l.code),
+          h("button.link.mono", { type: "button", "data-focus-key": "l:" + l.item_number + "/" + l.code, on: { click: function () { openRevision(l.item_number, l.code); } } }, l.item_number + "/" + l.code),
           " " + l.name + " ",
           h("span.muted.small", { text: label(l.item_type) + " · since " + fmtDate(l.checked_out_at) + " (" + fmtAge(Math.max(0, (Date.now() - Date.parse(l.checked_out_at)) / 1000)) + ")" })
         ]);

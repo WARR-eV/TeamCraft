@@ -102,6 +102,10 @@ jobs:
       # the check-out graph of a project group: the server's layout (#428)
       - name: Test the check-out graph layout
         run: node scripts/desktop-lock-layout.test.mjs
+      # refreshing lock data: when the Check-outs tab polls, which answer
+      # may still be applied, which tabs load again (#451)
+      - name: Test the lock refresh rules
+        run: node scripts/desktop-lock-rules.test.mjs
       # whether a Get left the working folder complete enough to open the
       # main CAD file (Check out and open after Cancel, #348)
       - name: Test the Get rules

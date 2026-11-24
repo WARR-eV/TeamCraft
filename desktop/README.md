@@ -1,4 +1,4 @@
-# TeamCraft Desktop
+reloaded when the own check-outs change (`js/shell.js` fetchWorklist → `lockMarks` in `js/files-view.js`, which also re-marks the Home rows and their tooltips in place: `markLock` in `js/browser.js`; also after *Force unlock* of someone else's lock); every fetch is numbered and an older answer never paints over a newer one, a failed reload keeps the tab polling and a repaint keeps the keyboard focus (`js/lock-rules.js`, tested by `scripts/desktop-lock-rules.test.mjs`); a lock is the user's own by `checked_out_by`, not the display name (`isMineLock`) – #428, #451 |# TeamCraft Desktop
 
 The rich client of TeamCraft for **Linux, macOS and Windows**: a navigation
 rail, a navigator tree of the project groups, object tabs with sub-tabs, a

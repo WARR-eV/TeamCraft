@@ -19,6 +19,8 @@ import { newItemDialog } from "./dialogs.js";
 import { offerBomUpdate, checkinBomText } from "./checkin-bom.js";
 import { revisionInputs } from "./report-inputs.js";
 import { t } from "/static/shared/js/i18n.js";
+import { markLock } from "./browser.js";
+import { locksChanged } from "./lock-overview.js";
 
 // ---------------------------------------------------------------- 3D viewer
 
@@ -585,6 +587,9 @@ export function doCancelCheckout(tab) {
       return api("POST", "/items/" + enc(rev.item_number) + "/revisions/" + enc(rev.code) + "/cancel-checkout");
     }, revisionInputs(rev)).then(function () {
       toast("Released the check-out of " + rev.item_number + "/" + rev.code);
+      // someone else's lock: the own worklist does not change, so fetchWorklist
+      // marks nothing – Home's row and the Check-outs tabs follow here (#451)
+      if (other) { markLock(rev.item_number, rev.code, null, null); locksChanged(); }
       call("usage_count", { action: "cancel_checkout" }).catch(function () {});
       // the unchanged local files become read-only again
       call("workspace_status", { project: rev.project_code, item: rev.item_number, code: rev.code }).catch(function () {}).then(function () {

@@ -102,7 +102,7 @@ async fn fixture(app: &common::TestApp, token: &str) -> Fixture {
 #[tokio::test]
 async fn shared_parts_appear_under_every_assembly_and_not_at_the_top() {
     let app = app_or_skip!();
-    let (_, erika) = app.user_in("erika", Role::Editor, &["ROVER"]).await;
+    let (erika_actor, erika) = app.user_in("erika", Role::Editor, &["ROVER"]).await;
     let f = fixture(&app, &erika).await;
 
     let r = get(&app, &erika, "/api/v1/projects/ROVER/structure").await;
@@ -159,6 +159,11 @@ async fn shared_parts_appear_under_every_assembly_and_not_at_the_top() {
         assert_eq!(
             node(&l, &f.screw)["checked_out_by_name"],
             "erika (test)",
+            "{l}"
+        );
+        assert_eq!(
+            node(&l, &f.screw)["checked_out_by"],
+            erika_actor.id.to_string(),
             "{l}"
         );
     }

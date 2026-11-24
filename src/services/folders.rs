@@ -73,6 +73,9 @@ pub struct Entry {
     pub name: String,
     pub code: String,
     pub state: String,
+    /// Who holds the lock of the latest revision (desktop: whether it is the
+    /// user's own – display names are not unique).
+    pub checked_out_by: Option<Uuid>,
     pub checked_out_by_name: Option<String>,
 }
 
@@ -161,14 +164,15 @@ pub async fn level(
          FROM (SELECT f.id AS file_id, f.filename, f.size_bytes, COALESCE(f.format, '') AS format,
                       f.sha256,
                       i.number AS item_number, i.item_type, lr.name, lr.code, lr.state,
-                      u.display_name AS checked_out_by_name
+                      lr.checked_out_by, u.display_name AS checked_out_by_name
                FROM items i {LATEST}
                JOIN files f ON f.revision_id = lr.id
                LEFT JOIN users u ON u.id = lr.checked_out_by
                WHERE i.project_id = $1 AND {visible} AND f.folder = $3
                UNION ALL
                SELECT NULL::uuid, NULL::text, NULL::bigint, '', NULL::text,
-                      i.number, i.item_type, lr.name, lr.code, lr.state, u.display_name
+                      i.number, i.item_type, lr.name, lr.code, lr.state, lr.checked_out_by,
+                      u.display_name
                FROM items i {LATEST}
                LEFT JOIN users u ON u.id = lr.checked_out_by
                WHERE i.project_id = $1 AND {visible} AND i.folder = $3

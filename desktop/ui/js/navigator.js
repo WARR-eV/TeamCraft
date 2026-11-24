@@ -19,7 +19,7 @@ import { getProjectsDialog } from "./group-sync.js";
 import { formatKinds, importFolderDialog } from "./folder-import.js";
 import { renderFiles } from "./browser.js";
 import { ageText, batchSummary, newItemFindings, newItemPlacement } from "./new-files.js";
-import { checkedOutClass, favouriteKey, normalizeFavourite, suggestionKey } from "./files-view.js";
+import { checkedOutClass, favouriteKey, isMineLock, normalizeFavourite, suggestionKey } from "./files-view.js";
 import { cutLevel, describeNode, normalizeMode, pathKey, quantityText, rootNodes, usageBadge } from "./structure.js";
 import { thumbIco } from "./list-thumbs.js";
 import { emptyActionLabel, emptyGroupHint, noGroupsHint, noNewFilesHint, worklistHint } from "./empty-rules.js";
@@ -984,7 +984,7 @@ export function structureNode(n, parentKey) {
   if (qty) meta.push(h("span.dim", { text: qty }));
   if (n.code) meta.push(badge(n.state));
   if (n.checked_out_by_name) {
-    var mine = state.me && n.checked_out_by_name === state.me.display_name;
+    var mine = isMineLock(n, state.me);
     meta.push(h("span.lock-owner", { title: "Checked out by " + n.checked_out_by_name }, [lockIcon(mine), " " + n.checked_out_by_name]));
   }
   var usage = usageBadge(n);
