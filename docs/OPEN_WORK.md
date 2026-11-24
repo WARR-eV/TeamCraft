@@ -155,9 +155,9 @@ feature milestone – the features in *What works* are enough; what is missing i
 - [x] Usage statistics (#383): desktop → own server always (anonymous daily report, fixed fields, *Show what is
   sent*), *Admin → Usage statistics*, sharing an aggregate with the developers off by default
   (`TEAMCRAFT_USAGE_STATISTICS[_URL]`, `DO_NOT_TRACK`, `TEAMCRAFT_NO_TELEMETRY`); the desktop counts every
-  listed action (guard test in `desktop/src/usage.rs`). Left: a collection service run
-  by the project (where, who operates it, retention) and its published results; the
-  desktop policy `UsageStatistics` (#378) once the developers' share is decided per desktop
+  listed action (guard test in `desktop/src/usage.rs`); a user switch *Send an anonymous usage report*, fixed by
+  the desktop policy `UsageStatistics` (0 off, 1 on, #473). Left: a collection service run by the project (where,
+  who operates it, retention) and its published results (#472)
 - [ ] Desktop: report a problem from any error (#381). Done: *Report…* on every toast and dialog error, *Help → Report a
   Problem…*, redacted prefilled report (`desktop/src/report.rs`), *Open issue form* / *Copy* / *Save*, own tracker
   setting, *Copy details* on web error pages, the server version in the report, the tracker as a desktop policy

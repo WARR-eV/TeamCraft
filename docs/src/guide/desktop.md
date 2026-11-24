@@ -981,8 +981,11 @@ actions were used (check-out, check-in, cancel check-out, get files, open in
 CAD, 3D preview, BOM and folder imports, new items, releases, searches and
 assistant questions, STEP exports per CAD program) – never names,
 numbers, paths, search terms or anything you type, and not who you are.
-*Settings → Privacy → Show what is sent* shows the exact report. The report
-stays with your organisation; your administrator decides whether the server
+*Settings → Privacy → Show what is sent* shows the exact report, and *Send an
+anonymous usage report* switches it off: nothing is then counted, kept or
+sent, and the counts not sent yet are deleted (#473). If your organisation
+set the `UsageStatistics` policy, the switch shows *Set by your organization*.
+The report stays with your organisation; your administrator decides whether the server
 shares a summary with the TeamCraft developers (off unless they turn it on) –
 see [Privacy](../admin/privacy.md).
 

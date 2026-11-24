@@ -112,6 +112,9 @@ pub struct Session {
     /// Show the *Support us on Ko-fi* tag once at this start (#403): the
     /// policy, else the user's choice.
     pub donate_tag: bool,
+    /// The daily usage report to the own server (#473): the policy, else the
+    /// user's choice.
+    pub usage_report: bool,
     /// *Settings → Report problems to* (#381); `None` = GitHub.
     pub report_url: Option<String>,
     /// A *with local server* installation: the connect screen offers *Try
@@ -137,6 +140,7 @@ pub fn session(app: AppHandle, state: State<'_, AppState>) -> Session {
         report_url: policy::current().report_target(s.report_url.clone()),
         crash_prompt: policy::current().crash_prompt(s.crash_prompt),
         donate_tag: policy::current().donate_tag(s.donate_tag),
+        usage_report: policy::current().usage_report(s.usage_report),
         server_url: s.server_url.clone(),
         signed_in: s.token.is_some(),
         skin: s.skin.clone().unwrap_or_else(|| "teamcraft".into()),
@@ -1464,6 +1468,23 @@ pub fn donate_tag_due(state: State<'_, AppState>) -> bool {
     donate_tag_due_once(enabled, &DONATE_TAG_SHOWN)
 }
 
+/// *Settings → Privacy → Send the anonymous usage report* (#473); refused
+/// while the policy `UsageStatistics` fixes it. Off clears the counts kept
+/// on this computer that were not sent yet.
+#[tauri::command]
+pub fn set_usage_report(state: State<'_, AppState>, enabled: bool) -> CmdResult<()> {
+    if policy::current().usage_statistics.is_some() {
+        return Err(ApiError::local(MANAGED));
+    }
+    update_settings(&state, |s| {
+        s.usage_report = Some(enabled);
+        if !enabled {
+            s.usage = crate::usage::Usage::default();
+        }
+    })?;
+    Ok(())
+}
+
 /// *Settings → Show the "Support us on Ko-fi" tag at start*; refused while a
 /// policy (`ShowDonateTag`) fixes it.
 #[tauri::command]
@@ -2759,8 +2780,9 @@ pub async fn workspace_add_files(
 /// never gets in the way.
 pub(crate) fn usage(state: &State<'_, AppState>, change: impl FnOnce(&mut crate::usage::Usage)) {
     let mut s = state.settings.lock().expect("settings lock");
-    // desktop policy UsageStatistics = 0 (#378): nothing is counted, kept or sent
-    if policy::current().usage_statistics == Some(false) {
+    // switched off – by the user or the policy UsageStatistics = 0 (#378,
+    // #473): nothing is counted, kept or sent
+    if !policy::current().usage_report(s.usage_report) {
         if s.usage != crate::usage::Usage::default() {
             s.usage = crate::usage::Usage::default();
             let _ = s.save(&state.config_dir);
@@ -2792,7 +2814,7 @@ pub fn usage_tick(state: State<'_, AppState>) {
 #[tauri::command]
 pub async fn usage_flush(state: State<'_, AppState>) -> CmdResult<()> {
     usage(&state, |_| {});
-    if policy::current().usage_statistics == Some(false) {
+    if !policy::current().usage_report(snapshot(&state).usage_report) {
         return Ok(());
     }
     let Some(pending) = snapshot(&state).usage.pending.clone() else {
