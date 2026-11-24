@@ -19,7 +19,7 @@ import { openSettings } from "./settings.js";
 import { formatKinds } from "./folder-import.js";
 import { markLock } from "./browser.js";
 import { lockMarks } from "./files-view.js";
-import { acceptSeq, takeSeq } from "./lock-rules.js";
+import { acceptSeq, dropPending, droppedAnswer, takeSeq } from "./lock-rules.js";
 import { locksChanged } from "./lock-overview.js";
 import { planNewFiles } from "./new-files.js";
 import { planLocalChanges } from "./local-changes.js";
@@ -731,11 +731,13 @@ function releaseClean(total, report, sent) {
  *  order – an older one must not replace a newer one. */
 var worklistOrder = {};
 
-/** Gets the worklist and shows its count on the rail (no redraw). */
+/** Gets the worklist and shows its count on the rail (no redraw). Resolves
+ *  to null when the answer came after a sign-out (forgetWorklist) and no
+ *  newer one arrived since – callers draw nothing then. */
 export function fetchWorklist() {
   var my = takeSeq(worklistOrder);
   return api("GET", "/worklist").then(function (w) {
-    if (!acceptSeq(worklistOrder, my)) return state.worklist || w;
+    if (!acceptSeq(worklistOrder, my)) return droppedAnswer(state.worklist);
     var before = state.worklist;
     state.worklist = w;
     showWorklistCount();
@@ -750,12 +752,18 @@ export function fetchWorklist() {
   });
 }
 
+/** The scans of the working folder are numbered per session: a scan that
+ *  finishes after forgetWorklist writes nothing. */
+var scanSession = 0;
+
 /** Forgets the worklist and the scans of the working folder of the user who
- *  signed out (settings.js), and drops the answers still on their way: the
- *  next user's Home and lock marks never start from them. */
+ *  signed out (settings.js), and drops the answers and scans still on their
+ *  way: the next user's Home and lock marks never start from them. */
 export function forgetWorklist() {
-  takeSeq(worklistOrder);
-  worklistOrder.applied = worklistOrder.seq;
+  dropPending(worklistOrder);
+  scanSession++;
+  newFilesScan = null;
+  localChangesScan = null;
   state.worklist = null;
   state.newFiles = null;
   state.localChanges = null;
@@ -789,20 +797,22 @@ export function scanNewFiles(force) {
   if (!canEdit()) { state.newFiles = null; return Promise.resolve(null); }
   if (!force && state.newFiles && Date.now() - state.newFiles.at < 15000) return Promise.resolve(state.newFiles);
   if (newFilesScan) return newFilesScan;
-  newFilesScan = Promise.all([call("new_files_scan"), formatKinds().catch(function () { return {}; })]).then(function (r) {
+  var session = scanSession, mine;
+  mine = newFilesScan = Promise.all([call("new_files_scan"), formatKinds().catch(function () { return {}; })]).then(function (r) {
+    if (newFilesScan === mine) newFilesScan = null;
+    if (session !== scanSession) return null; // signed out meanwhile
     var editable = function (code) {
       var wanted = (code || "").toLowerCase();
       return state.projects.some(function (p) { return p.active && canEditProject(p.id) && p.code.toLowerCase() === wanted; });
     };
     state.newFiles = { at: Date.now(), scan: r[0], plan: planNewFiles(r[0].files, r[1], editable) };
-    newFilesScan = null;
     showWorklistCount();
     return state.newFiles;
   }, function (err) {
-    newFilesScan = null;
+    if (newFilesScan === mine) newFilesScan = null;
     throw err;
   });
-  return newFilesScan;
+  return mine;
 }
 
 /** After files were created, ignored or turned into items: scan again and
@@ -822,7 +832,7 @@ export function rescanNewFiles() {
 export function refreshWorklistCount() {
   scanLocalChanges(false).catch(function () {});
   return fetchWorklist().then(function (w) {
-    if (state.view === "worklist") drawWorklist(w);
+    if (w && state.view === "worklist") drawWorklist(w);
     return w;
   });
 }
@@ -837,9 +847,11 @@ export function scanLocalChanges(force) {
   if (!state.me) { state.localChanges = null; return Promise.resolve(null); }
   if (!force && state.localChanges && Date.now() - state.localChanges.at < 15000) return Promise.resolve(state.localChanges);
   if (localChangesScan) return localChangesScan;
-  localChangesScan = call("local_changes_scan").then(function (scan) {
+  var session = scanSession, mine;
+  mine = localChangesScan = call("local_changes_scan").then(function (scan) {
+    if (localChangesScan === mine) localChangesScan = null;
+    if (session !== scanSession) return null; // signed out meanwhile
     state.localChanges = { at: Date.now(), scan: scan, plan: planLocalChanges(scan) };
-    localChangesScan = null;
     // the worklist draws this error in place on every redraw (navigator.js):
     // kept for the report's recent messages here, once per scan
     var errors = state.localChanges.plan.errors || [];
@@ -847,10 +859,10 @@ export function scanLocalChanges(force) {
     showWorklistCount();
     return state.localChanges;
   }, function (err) {
-    localChangesScan = null;
+    if (localChangesScan === mine) localChangesScan = null;
     throw err;
   });
-  return localChangesScan;
+  return mine;
 }
 
 /** After a check-in, Get or check-out: scan again (once the running scan is

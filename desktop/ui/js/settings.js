@@ -339,7 +339,7 @@ export function passwordDialog() {
 export function signOut(changeServer) {
   if (!state.session.signed_in) { finishSignOut(changeServer); return; }
   run("Looking for local changes in your check-outs", function () {
-    return refreshWorklistCount().then(function (w) { return checkoutsWithChanges(w.checkouts || []); });
+    return refreshWorklistCount().then(function (w) { return checkoutsWithChanges((w && w.checkouts) || []); });
   }).then(function (report) {
     if (!atRisk(report)) { finishSignOut(changeServer); return; }
     var what = changeServer ? "changing the server" : "signing out";

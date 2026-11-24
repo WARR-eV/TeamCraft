@@ -281,6 +281,7 @@ export function releaseImported(log, failed) {
   var numbers = Object.keys(log).map(function (k) { return loggedNumber(log[k]); });
   if (!numbers.length) return Promise.resolve();
   return refreshWorklistCount().then(function (w) {
+    if (!w) return; // signed out meanwhile (shell.js fetchWorklist)
     var ids = w.checkouts.filter(function (r) {
       return numbers.indexOf(r.item_number) >= 0 && r.checked_out_at === r.created_at;
     }).map(function (r) { return r.id; });
