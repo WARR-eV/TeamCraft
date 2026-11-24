@@ -437,6 +437,11 @@ half a state behind. Prefer tests that fail on a real regression over tests that
   0036, `tests/step_export_names.rs`; impacts, reviewers, readiness and the desktop working set still match the file
   name only); open: the scan (`src/cadrefs.rs`) is a heuristic that was not tested with real files of the CAD programs
   yet (see the CAD sections)
+- [x] Desktop: the highlighted next step of a fresh own check-out is *Open in CAD*, not *Release…* (#536, UI review
+  #513 T2) – pure rule `desktop/ui/js/next-step.js`, `scripts/desktop-next-step.test.mjs`. Left from T2: the web UI
+  still highlights *Check in…* on any own check-out (it cannot see the working folder) and neither client says *why*
+  in a "Next:" hint; the Lifecycle card's "through a change order" and the button *Release…* still use different
+  words for the same step
 
 **Tests with real data**
 
