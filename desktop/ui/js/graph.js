@@ -461,12 +461,17 @@ export function revGraph(tab, el) {
   // (#518), which the revision payload does not carry: the overview's
   // *At a glance* may have loaded it already, otherwise it is loaded here
   // before the first paint. Without it (an older server, an error) the graph
-  // shows the rest.
+  // shows the rest. Until it answers, a loading line stands above the empty
+  // canvas, so a slow server does not leave a blank pane.
   if (d.whereUsed) { drawGraph(); return; }
+  var loading = h("p.graph-note.graph-loading.loading", { text: "Loading the graph" });
+  el.insertBefore(loading, pane);
   api("GET", "/items/" + enc(d.rev.item_number) + "/where-used").then(function (list) {
     d.whereUsed = list;
   }, function () { /* drawn without the BOM parents */ }).then(function () {
-    if (live()) drawGraph();
+    if (!live()) return;
+    loading.remove();
+    drawGraph();
   });
 
   /** A note above the canvas, where it is in view (#519). */
