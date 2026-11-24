@@ -18,6 +18,7 @@ import { addLineDialog, quantityInput, removeLineButton } from "./bom-lines.js";
 import { cadTargetChip, groupDefault, mainCadFile, openWithCad } from "./cad-open.js";
 import { incompleteGet, notOpenedText } from "./get-rules.js";
 import { revisionInputs } from "./report-inputs.js";
+import { revisionNextStep } from "./next-step.js";
 
 /** Opens a revision tab; `viewerFile` (a file id) picks the file of its 3D viewer. */
 export function openRevision(number, code, sub, viewerFile) {
@@ -130,18 +131,9 @@ export function revisionReasons(d) {
   };
 }
 
-/**
- * The most likely next step on a revision – drawn as the toolbar's one
- * primary button: check out a free revision in work; check in what was
- * changed locally; release a clean check-out; revise a released revision.
- * Nothing while it is in review, obsolete or locked by someone else.
- */
-export function revisionNextStep(d, can) {
-  var mine = d.rev.checked_out_by === state.me.id;
-  if (mine) return d.localChanges === false && can.release ? "release" : "checkin";
-  if (can.checkout) return "checkout";
-  if (d.rev.state === "released" && can.revise) return "revise";
-  return null;
+/** The toolbar's next step on a revision tab (the pure rule: next-step.js). */
+function nextStepOf(d, can, cadFile) {
+  return revisionNextStep({ rev: d.rev, files: d.files, me: state.me.id, localChanges: d.localChanges, cadFile: !!cadFile, can: can });
 }
 
 /** Whether the user's working copy of a revision has changes to check in
@@ -157,7 +149,6 @@ export function localChanges(rev) {
 export function renderRevision(tab, body, toolbar) {
   var d = tab.data, rev = d.rev, can = revisionAbilities(d), why = revisionReasons(d);
   var latest = d.revisions[0];
-  var next = revisionNextStep(d, can);
   // Buttons keep their place in every state; only the next step is primary.
   function act(id, text, icon, onClick, title) {
     return tool(text, icon, onClick, { primary: next === id, disabled: !can[id], title: can[id] ? title : why[id] });
@@ -168,11 +159,12 @@ export function renderRevision(tab, body, toolbar) {
   // (the group's default CAD program, else the newest installed one that
   // fits the file) – the chip next to the button names that program.
   var cadFile = mainCadFile(d.files, groupDefault(rev).family);
+  var next = nextStepOf(d, can, cadFile);
   var mineLock = rev.checked_out_by === state.me.id;
   var noCadFile = "This revision has no native CAD file (part, assembly or drawing of one CAD program)";
   var openTool = mineLock
     ? tool("Open in CAD", "launch", function () { openCadFile(tab, cadFile); },
-      { disabled: !cadFile, title: cadFile ? "Open " + cadFile.filename + " from your workspace in the CAD program" : noCadFile })
+      { primary: next === "open", disabled: !cadFile, title: cadFile ? "Open " + cadFile.filename + " from your workspace in the CAD program" : noCadFile })
     : tool("Check out and open", "launch", function () { checkOutAndOpen(tab, cadFile); }, {
       primary: next === "checkout", disabled: !can.checkout || !cadFile,
       title: !can.checkout ? why.checkout : cadFile ? "Take the lock, copy the files into your workspace and open " + cadFile.filename + " in the CAD program" : noCadFile
@@ -196,15 +188,17 @@ export function renderRevision(tab, body, toolbar) {
   var releaseButton = act("release", "Release…", "release", function () { releaseDialog(tab); }, "Create a change order with reviewers and submit it");
   // The working copy changes while the tab stays open (the CAD program saves
   // into it): look again when the tab is shown from its cache or the window
-  // gets the focus back, so "Release…" is not highlighted over unsaved work.
+  // gets the focus back – work saved there moves the highlight from
+  // "Open in CAD" to "Check in…".
   tab.recheckLocal = null;
   if (rev.checked_out_by === state.me.id) {
     tab.recheckLocal = function () {
       localChanges(rev).then(function (changed) {
         if (changed === null || changed === d.localChanges || tab.data !== d) return;
         d.localChanges = changed;
-        var step = revisionNextStep(d, can);
+        var step = nextStepOf(d, can, cadFile);
         lock[0].classList.toggle("primary", step === "checkin");
+        openTool.classList.toggle("primary", step === "open");
         releaseButton.classList.toggle("primary", step === "release");
         lock[0].title = checkinTitle + (changed === false ? noChanges : "");
       });

@@ -96,6 +96,10 @@ jobs:
       # page, transfers that block the swap (#466, #468)
       - name: Test the update window rules
         run: node scripts/desktop-update-rules.test.mjs
+      # the one highlighted button of the revision toolbar: Open in CAD on a
+      # fresh check-out, Release… only once checked in (#536, #513 T2)
+      - name: Test the next-step rule of the revision toolbar
+        run: node scripts/desktop-next-step.test.mjs
       # the key inputs of a failed action in *Report…* (#381)
       - name: Test the report inputs
         run: node scripts/desktop-report-inputs.test.mjs

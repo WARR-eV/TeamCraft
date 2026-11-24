@@ -385,17 +385,22 @@ in; a button that does not apply right now is greyed out, and its tooltip
 says why (for example *Check out first* or *Already in change order
 CHG-000002*). The **one highlighted button is the most likely next step**:
 
-| Revision                                                                    | Highlighted                                                 |
-|-----------------------------------------------------------------------------|-------------------------------------------------------------|
-| in work, not checked out                                                    | *Check out and open*                                        |
-| checked out by you, with local changes (or the workspace could not be read) | *Check in…*                                                 |
-| checked out by you, no local changes                                        | *Release…* (when it can be released, otherwise *Check in…*) |
-| in review, obsolete, or checked out by somebody else                        | nothing                                                     |
-| released                                                                    | *Revise*                                                    |
+| Revision                                                                                                           | Highlighted          |
+|--------------------------------------------------------------------------------------------------------------------|----------------------|
+| checked out by you, no local changes yet                                                                           | *Open in CAD*        |
+| checked out by you, with local changes, versions parked since the check-out, or the workspace could not be read        | *Check in…*          |
+| checked out by you, no native CAD file to open                                                                     | *Check in…*          |
+| in work, not checked out, your own check-in was the last one and it can be released (no open change order)         | *Release…*           |
+| in work, not checked out, otherwise                                                                                | *Check out and open* |
+| in review, obsolete, or checked out by somebody else                                                               | nothing              |
+| released                                                                                                           | *Revise*             |
 
-The working folder of your check-out is looked at again whenever the tab is
+*Release…* is never the highlighted step while the revision is checked out:
+an unchanged revision is not sent to review – the CAD step comes first. The
+working folder of your check-out is looked at again whenever the tab is
 shown or the app window gets the focus back – save in the CAD program, switch
-back, and *Check in…* is highlighted.
+back, and the highlight moves from *Open in CAD* to *Check in…*. After the
+check-in, *Release…* is highlighted when the revision can be released.
 
 * revision tab: **Lock** (*Check out*, or *Check in…* and *Cancel check-out*
   / *Force unlock* while checked out; *Check out parts…* on an assembly) · **Open** (*Check out and open*, or *Open in CAD* for your own
