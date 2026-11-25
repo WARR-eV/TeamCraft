@@ -106,3 +106,5 @@
     - [3D preview of E57 point clouds](research/e57-preview.md)
     - [CAD add-ins: Inventor and Siemens NX first](research/cad-addins.md)
     - [The first start of the desktop app](research/first-start.md)
+    - [PostgreSQL row-level security as a second layer](research/postgres-row-level-security.md)
+    - [Opening a file in the running CAD program](research/open-in-running-cad.md)

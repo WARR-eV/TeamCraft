@@ -8,6 +8,9 @@
 //!   function that writes to the database (itself or through the service
 //!   functions it calls) also records an audit entry (itself or through them),
 //!   unless it is on the short list of documented exceptions below;
+//! * every read of items, revisions, files and the tables that copy their
+//!   content applies the visibility guard: in a service function that takes
+//!   an actor, and in one without an actor that a handler calls (#312);
 //! * every template file is in `TEMPLATES` and rendered by the
 //!   `every_template_renders` test (or extended/imported by one that is);
 //! * every `TEAMCRAFT_*` variable the code reads is documented in
@@ -433,16 +436,110 @@ fn the_audit_guard_follows_calls_between_services() {
 }
 
 // ---------------------------------------------------------------------------
-// (b2) every read of items, revisions and files for an actor is guarded (#312)
+// (b2) every read of items, revisions and files is guarded (#312)
 // ---------------------------------------------------------------------------
 
-/// Service functions that query items, revisions or files for an actor
-/// without a visibility guard in their own body, on purpose. Each entry names
-/// why it cannot leak what the actor may not read. Reviewed for #312.
+/// The tables of items, revisions and files.
+const ITEM_TABLES: &[&str] = &["items", "revisions", "files", "file_versions"];
+
+/// Tables that copy the content of items, revisions and files or link to
+/// them (#438, 0.2): a row belongs to the group of its item, so reading one
+/// for somebody needs the same guard. Not here: `shape_signatures` (shared
+/// per content hash by design, like the preview cache – see the admin guide),
+/// `counters` (numbering state, no content), and the change orders and
+/// requests themselves, which have guards of their own (`change_visible`,
+/// `request_visible`).
+const COPY_TABLES: &[&str] = &[
+    "bom_lines",
+    "item_references",
+    "file_references",
+    "item_alternates",
+    "item_supersessions",
+    "impacts",
+    "simulation_results",
+    "simulation_bases",
+    "result_proposals",
+    "model_annotations",
+    "as_built_records",
+    "as_built_deviations",
+    "revision_mass",
+    "file_mass_settings",
+    "change_items",
+    "change_request_items",
+    "notifications",
+    "access_log",
+    "audit_log",
+    "assistant_threads",
+    "assistant_messages",
+    "staged_imports",
+    "upload_sessions",
+    "webhook_deliveries",
+    "favorites",
+    "watches",
+    "item_idempotency",
+];
+
+/// Service functions the scanner lists ([`unguarded_reads`]) on purpose:
+/// they read items, revisions, files or a table of [`COPY_TABLES`] without a
+/// visibility guard in their own body, for an actor or for a handler. Each
+/// entry names why nothing of a hidden group reaches the client. Reviewed
+/// for #312 and its widening (#438, 0.2).
 const NOT_GUARDED: &[(&str, &str)] = &[
+    (
+        "access_log::project_of_file",
+        "returns only the group id of a file, for the read log; its one caller \
+         (web::revisions::log_file) runs after files::get / files::get_version loaded the file \
+         for the actor",
+    ),
+    (
+        "access_log::record",
+        "writes the read log; its only read is the collapse check over the actor's own entries \
+         (user_id = actor), and it returns nothing",
+    ),
     (
         "access_log::record_structure",
         "writes the read log for revision ids its callers have already read through guarded queries",
+    ),
+    (
+        "as_built::concession_review",
+        "two flags for a revision its caller (the revision page) loaded with revisions::get; the \
+         change_items query only asks whether the actor reviews a change in review that contains it",
+    ),
+    (
+        "assistant_threads::append",
+        "the actor's own conversation: every query is keyed by user_id = me.id; writes, returns \
+         nothing",
+    ),
+    (
+        "assistant_threads::load",
+        "the actor's own conversation (user_id = me.id); stored answers may name items the user \
+         has lost access to since – #438, Phase 1 (1.8)",
+    ),
+    (
+        "assistant_threads::reset",
+        "deletes the actor's own conversation (user_id = me.id)",
+    ),
+    (
+        "attributes::usage",
+        "administrators only (web::attributes::show requires the admin role): one count of the \
+         revisions that store the attribute, across groups – management data, no item content",
+    ),
+    (
+        "bom_references::apply_children",
+        "runs on a parent both callers (apply, apply_on_checkin) locked and checked with \
+         revisions::ensure_editable; the chosen children come from the plan, which names visible \
+         items only",
+    ),
+    (
+        "bom_references::compare_on",
+        "reads the BOM quantities of a revision both callers (plan, plan_on) checked with \
+         access::ensure_visible; it looks up visibly matched children only and counts hidden \
+         names through hidden_names",
+    ),
+    (
+        "bom_references::has_structure",
+        "one yes/no for a revision both callers (web::revisions::show, checkouts::file_status) \
+         loaded with revisions::get first",
     ),
     (
         "bom_references::load_files",
@@ -450,9 +547,19 @@ const NOT_GUARDED: &[(&str, &str)] = &[
          have checked that revision with access::ensure_visible first",
     ),
     (
+        "changes::remove_item",
+        "locks the change through changes::lock (change_visible) and requires its author; \
+         returns nothing – the revision's label goes only into the audit entry",
+    ),
+    (
         "changes::stands_in_for_author",
         "returns only whether the actor manages every group of a change the caller has loaded \
          visibly; nothing of the items leaves the function",
+    ),
+    (
+        "checkouts::released_from",
+        "reads the lock history (audit log) of a revision its caller (checkouts::file_status) \
+         loaded with revisions::get; returns only a forced release of the actor's own check-out",
     ),
     (
         "files::store_uploads",
@@ -460,9 +567,9 @@ const NOT_GUARDED: &[(&str, &str)] = &[
          revisions::ensure_editable",
     ),
     (
-        "impacts::record_flags",
-        "change propagation inside a release: writes one audit entry per project group, each \
-         naming only that group's items",
+        "files::versions_of_revision",
+        "both callers (web::revisions::show, checkouts::file_status) load the revision with \
+         revisions::get before they read its versions",
     ),
     (
         "impacts::notify_flagged",
@@ -470,26 +577,78 @@ const NOT_GUARDED: &[(&str, &str)] = &[
          sends the redacted text to those who may not see the source",
     ),
     (
+        "impacts::on_obsolete",
+        "change propagation inside the transaction that made the revision obsolete; returns \
+         nothing to the actor",
+    ),
+    (
         "impacts::on_release",
         "change propagation inside the releasing transaction; returns nothing to the actor",
     ),
     (
-        "impacts::on_obsolete",
-        "change propagation inside the transaction that made the revision obsolete; returns \
-         nothing to the actor",
+        "impacts::record_flags",
+        "change propagation inside a release: writes one audit entry per project group, each \
+         naming only that group's items",
+    ),
+    (
+        "imports::discard",
+        "the actor's own staged upload (user_id = actor.id); returns its options, which the \
+         actor chose",
+    ),
+    (
+        "imports::run_staged",
+        "the actor's own staged upload (user_id = actor.id); the import (run_tx → plan) checks \
+         the target revision with revisions::ensure_editable",
+    ),
+    (
+        "imports::staged",
+        "the actor's own staged upload (user_id = actor.id): the file they sent and their \
+         options; the preview checks the target through plan",
     ),
     (
         "interchange::tell_supersession_watchers",
         "notifications::notify filters the watchers with access::user_sees_project",
     ),
     (
+        "notifications::is_watching",
+        "yes/no from the caller's own watch list (keyed by the signed-in user's id): it tells \
+         only what the user marked themself",
+    ),
+    (
         "offboarding::idle_sso_users",
         "administrators only; returns counts per user (management data), no item content",
+    ),
+    (
+        "personal::is_favorite",
+        "yes/no from the caller's own favourites (keyed by the signed-in user's id): it tells \
+         only what the user marked themself",
+    ),
+    (
+        "projects::count_ungrouped_items",
+        "one count of the items without a group, which every user reads anyway; shown to \
+         administrators only (web::admin::projects)",
     ),
     (
         "projects::former_holders",
         "managers of the group only (require_manager); returns people and check-out counts, \
          no item content",
+    ),
+    (
+        "projects::members",
+        "members and their check-out counts (management data, no item content); both handlers \
+         load the group through projects::get_for_management / get_by_code_for_management (the \
+         web page in the same try_join!, whose error discards the list)",
+    ),
+    (
+        "requests::item_deleted",
+        "called by items::delete for the item it deletes, checked there with \
+         access::ensure_visible and the delete right; writes history entries and notices to \
+         each request's people, returns nothing to the deleter",
+    ),
+    (
+        "requests::remove_item",
+        "locks the request through requests::lock (request_visible) and checks the actor's edit \
+         right; returns nothing – the item number goes only into the audit entry",
     ),
     (
         "revisions::has_checked_in",
@@ -506,26 +665,102 @@ const NOT_GUARDED: &[(&str, &str)] = &[
         "the caller passes a basis revision it read through a guarded query; the function \
          only locks that item and its files",
     ),
+    (
+        "simulations::insert_result",
+        "inserts into a simulation revision its callers locked with lock_editable \
+         (ensure_visible, ensure_editable) or checked at upload and check-in; returns the new id",
+    ),
+    (
+        "simulations::write_results",
+        "writes into a simulation revision every caller locked with lock_editable \
+         (ensure_visible, ensure_editable) or, at upload and check-in, checked with \
+         revisions::ensure_editable; reads only that revision's values",
+    ),
+    (
+        "uploads::abort",
+        "the actor's own upload session (uploads::load answers other users' sessions like \
+         unknown ones); returns nothing",
+    ),
+    (
+        "uploads::forget",
+        "deletes upload sessions whose content the caller has just stored – the actor's own \
+         sessions, completed by take_session_uploads or uploads::finish; returns nothing",
+    ),
+    (
+        "webhooks::delete",
+        "administrators only; deletes the deliveries with their webhook and returns only the \
+         webhook's name",
+    ),
 ];
 
-/// Service functions that take an actor, query items, revisions or files
-/// and contain no guard in their own body (`module::function`, sorted).
+/// A query of [`ITEM_TABLES`] or [`COPY_TABLES`] (`FROM` or `JOIN`, the
+/// table name ending at a word boundary).
+fn item_read() -> Regex {
+    let tables: Vec<&str> = ITEM_TABLES.iter().chain(COPY_TABLES).copied().collect();
+    Regex::new(&format!(r"(FROM|JOIN) ({})\b", tables.join("|"))).unwrap()
+}
+
+/// A visibility guard: an SQL fragment of `services::access`, a Rust check,
+/// or a getter that loads the object for the actor and checks it (each one
+/// read: `files::get_version`, the `lock_editable` of `as_built` and
+/// `simulations`, `as_built::get_deviation`, `files::ensure_can_attach`, the
+/// `visible_ids` of `changes` and `requests`, `requests::only_visible`).
+fn visibility_guard() -> Regex {
+    Regex::new(concat!(
+        r"item_visible|project_visible|ensure_visible|hidden_projects|change_visible",
+        r"|request_visible|user_sees_project|can_see_project|ensure_editable",
+        r"|ensure_revision_visible|revisions::get\(|items::get\(|files::get\(",
+        r"| get\(pool, actor| list\(pool, actor|bom::tree\(pool, actor|lock_visible",
+        r"|lock_editable\(|get_version\(pool, actor|get_deviation\(pool, actor",
+        r"|ensure_can_attach\(|visible_ids\(pool, actor|only_visible\(pool, actor",
+    ))
+    .unwrap()
+}
+
+/// The code that answers requests: the web and REST handlers, the MCP tools
+/// and the assistant's tool loop.
+fn handler_sources() -> String {
+    let mut sources = Vec::new();
+    for dir in ["src/web", "src/api", "src/mcp"] {
+        sources.extend(rust_files(dir));
+    }
+    sources.push(root().join("src/assistant.rs"));
+    sources
+        .iter()
+        .map(|file| without_tests(&read(file)).to_string())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Whether `handlers` call the service function `module::name` – also as
+/// `crate::services::module::name`, or through an alias of the module
+/// (`mass_properties::{self as mass}`, `membership_conditions as mc`).
+fn handler_calls(handlers: &str, module: &str, name: &str) -> bool {
+    let alias = Regex::new(&format!(r"\b{module}(?:::\{{\s*self)?\s+as\s+(\w+)")).unwrap();
+    let mut prefixes = vec![module.to_string()];
+    prefixes.extend(alias.captures_iter(handlers).map(|c| c[1].to_string()));
+    Regex::new(&format!(r"\b(?:{})::{name}\b", prefixes.join("|")))
+        .unwrap()
+        .is_match(handlers)
+}
+
+/// Service functions that query [`ITEM_TABLES`] or [`COPY_TABLES`] without
+/// a guard in their own body (`module::function`, sorted), when they
+/// either take an actor (`actor`, `me` or `viewer: &Actor`) or take none – a
+/// `user_id: Uuid`, an id, nothing – and a handler calls them, so what they
+/// return goes to the client. An actor-less function no handler calls
+/// (background tasks, maintenance commands, helpers of other services) is
+/// left to its callers.
 ///
-/// Guards are the SQL fragments of `services::access`, the Rust checks
-/// (`ensure_visible`, `can_see_project`, `ensure_editable`) and the guarded
-/// getters that load the object for the actor (`revisions::get`,
-/// `get(pool, actor, …)`, `lock_visible`, …). Calls are not followed: a
+/// Guards are those of [`visibility_guard`]. Calls are not followed: a
 /// function that only hands data to a guarded one is listed, so each such
 /// case is looked at once and named in [`NOT_GUARDED`].
 fn unguarded_reads() -> Vec<String> {
     let item = Regex::new(r"(?m)^(pub(?:\([a-z]+\))? )?(?:async )?fn (\w+)").unwrap();
     let actor = Regex::new(r"(actor|me|viewer): &Actor").unwrap();
-    let touches =
-        Regex::new(r"(?m)(FROM|JOIN) (items|revisions|files|file_versions)( |$|\))").unwrap();
-    let guard = Regex::new(
-        r"item_visible|project_visible|ensure_visible|hidden_projects|change_visible|request_visible|user_sees_project|can_see_project|ensure_editable|revisions::get\(|items::get\(|files::get\(| get\(pool, actor|ensure_revision_visible|lock_visible| list\(pool, actor|bom::tree\(pool, actor",
-    )
-    .unwrap();
+    let reads = item_read();
+    let guard = visibility_guard();
+    let handlers = handler_sources();
     let mut found = Vec::new();
     for file in rust_files("src/services") {
         if file.ends_with("access.rs") {
@@ -541,7 +776,10 @@ fn unguarded_reads() -> Vec<String> {
         for (i, (start, name)) in starts.iter().enumerate() {
             let end = starts.get(i + 1).map_or(text.len(), |s| s.0);
             let body = &text[*start..end];
-            if actor.is_match(body) && touches.is_match(body) && !guard.is_match(body) {
+            if !reads.is_match(body) || guard.is_match(body) {
+                continue;
+            }
+            if actor.is_match(body) || handler_calls(&handlers, &module, name) {
                 found.push(format!("{module}::{name}"));
             }
         }
@@ -554,16 +792,22 @@ fn unguarded_reads() -> Vec<String> {
 fn every_read_for_an_actor_applies_the_visibility_guard() {
     let found = unguarded_reads();
     let exempt: BTreeMap<&str, &str> = NOT_GUARDED.iter().copied().collect();
+    assert_eq!(
+        exempt.len(),
+        NOT_GUARDED.len(),
+        "NOT_GUARDED names a function twice"
+    );
     let missing: Vec<&String> = found
         .iter()
         .filter(|name| !exempt.contains_key(name.as_str()))
         .collect();
     assert!(
         missing.is_empty(),
-        "these service functions query items, revisions or files for an actor without a \
-         visibility guard – add access::item_visible / project_visible to the SQL, check the \
+        "these service functions read items, revisions, files or a table that copies their \
+         content (COPY_TABLES) – for an actor, or without one for a handler – without a \
+         visibility guard: add access::item_visible / project_visible to the SQL, check the \
          loaded row with access::ensure_visible, load it through a guarded getter, or, when \
-         nothing of a hidden group can reach the actor, add them to NOT_GUARDED with the \
+         nothing of a hidden group can reach the client, add them to NOT_GUARDED with the \
          reason:\n{}",
         missing
             .iter()
@@ -583,18 +827,70 @@ fn every_read_for_an_actor_applies_the_visibility_guard() {
 
 #[test]
 fn the_visibility_guard_scanner_sees_reads_and_guards() {
+    // the patterns: a read of a content table, also at the end of a string,
+    // not a longer name; the guarded getters count as guards
+    let reads = item_read();
+    assert!(reads.is_match("SELECT quantity FROM bom_lines WHERE parent_revision_id = $1"));
+    assert!(reads.is_match(r#"query("SELECT id FROM files")"#));
+    assert!(reads.is_match("JOIN model_annotations a ON a.file_version_id = v.id"));
+    assert!(!reads.is_match("FROM bom_lines_archive"));
+    assert!(
+        !reads.is_match("FROM changes c"),
+        "change orders have their own guard"
+    );
+    let guard = visibility_guard();
+    assert!(guard.is_match("files::get_version(pool, actor, version_id)"));
+    assert!(guard.is_match("let rev = lock_editable(&mut tx, actor, revision_id)"));
+    assert!(!guard.is_match("files::get_version_unchecked(pool, version_id)"));
+    // a handler call, also through the full path, not a longer name
+    assert!(handler_calls(
+        "crate::services::files::versions_of_revision(&st.db, id)",
+        "files",
+        "versions_of_revision"
+    ));
+    assert!(!handler_calls(
+        "files::versions_of_revision_count(&st.db, id)",
+        "files",
+        "versions_of_revision"
+    ));
+    assert!(!handler_calls(
+        "myfiles::versions_of_revision(&st.db, id)",
+        "files",
+        "versions_of_revision"
+    ));
+    // … and through an alias of the module
+    assert!(handler_calls(
+        "use crate::services::mass_properties::{self as mass, MaterialInput};\nmass::rollup(st)",
+        "mass_properties",
+        "rollup"
+    ));
+    assert!(handler_calls(
+        "use crate::services::membership_conditions as mc;\nmc::apply(pool)",
+        "membership_conditions",
+        "apply"
+    ));
+
     let found = unguarded_reads();
-    // a guarded read is not listed (read_text checks through files::list)
-    assert!(
-        !found.contains(&"files::read_text".to_string()),
-        "{found:?}"
-    );
-    // the exceptions are found by the scanner, so it parses the services
-    assert!(
-        found.contains(&"impacts::notify_flagged".to_string()),
-        "{found:?}"
-    );
-    assert!(found.contains(&"season::members".to_string()), "{found:?}");
+    let has = |name: &str| found.iter().any(|f| f == name);
+    // a guarded read is not listed (read_text checks through files::list,
+    // annotations::list through files::get_version)
+    assert!(!has("files::read_text"), "{found:?}");
+    assert!(!has("annotations::list"), "{found:?}");
+    // the exceptions are found by the scanner, so it parses the services:
+    // reads of the item tables for an actor …
+    assert!(has("impacts::notify_flagged"), "{found:?}");
+    assert!(has("season::members"), "{found:?}");
+    // … of the tables that copy item content (simulation_results,
+    // assistant_threads) …
+    assert!(has("simulations::write_results"), "{found:?}");
+    assert!(has("assistant_threads::load"), "{found:?}");
+    // … and functions without an actor that handlers call
+    assert!(has("files::versions_of_revision"), "{found:?}");
+    assert!(has("projects::members"), "{found:?}");
+    // an actor-less function no handler calls is left to its callers
+    // (the maintenance command `rescan-references`, housekeeping)
+    assert!(!has("files::rescan_references"), "{found:?}");
+    assert!(!has("uploads::purge_expired"), "{found:?}");
 }
 
 // ---------------------------------------------------------------------------

@@ -72,7 +72,9 @@ From the research note:
 
 * **PostgreSQL row-level security** – RLS can only hide rows, while TeamCraft
   needs placeholders and counts; and per-request session state on a shared
-  connection pool is risky.
+  connection pool is risky. Evaluated again as a second layer behind the
+  guards in [PostgreSQL row-level security as a second layer](../../research/postgres-row-level-security.md)
+  (#312): not now.
 * **Per-object ACLs and field-level rules** (as in large PDM systems) – hard
   to audit, not needed for "not everybody may see every repository".
 * **403 for hidden objects** – would confirm that the object exists.
@@ -88,4 +90,4 @@ From the research note:
 | Handlers never call `*_unchecked`; nobody but `access` writes a guard | `tests/no_unchecked_in_handlers.rs`                                 |
 | Every web route, REST route and MCP tool leaks nothing to an outsider | `tests/read_permissions.rs` (routes read from the router sources)   |
 | Handlers never touch SQL themselves                                   | proposed in #96 (`tests/architecture_guards.rs`)                    |
-| Every service read of items, revisions and files for an actor is guarded | `tests/architecture_guards.rs` `every_read_for_an_actor_applies_the_visibility_guard` (#312; exceptions on `NOT_GUARDED`) |
+| Every service read of items, revisions, files and the tables that copy their content, for an actor or by a handler, is guarded | `tests/architecture_guards.rs` `every_read_for_an_actor_applies_the_visibility_guard` (#312; `COPY_TABLES`, exceptions on `NOT_GUARDED`) |

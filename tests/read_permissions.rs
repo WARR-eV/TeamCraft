@@ -5,11 +5,13 @@
 //! the restricted group may appear anywhere, hidden objects answer "not
 //! found", and nothing changes. The routes are read from the router sources,
 //! so a new route is exercised (or fails the test for want of a placeholder
-//! rule) without anybody having to remember it.
+//! rule) without anybody having to remember it. The same holds for a new
+//! router source, a new kind of object a route addresses by id, and a new
+//! argument of an MCP tool or prompt (#312).
 
 mod common;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use axum::http::{header, Method, StatusCode};
 use serde_json::{json, Value};
@@ -74,15 +76,50 @@ fn routes_of(source: &str, prefix: &str) -> Vec<(String, String)> {
     out
 }
 
-fn all_routes() -> Vec<(String, String)> {
+/// The router sources and the prefix their routes are served under
+/// (`src/lib.rs` nests the REST API at `/api/v1` and merges the web UI).
+/// `the_route_table_reads_every_router` fails for a router anywhere else.
+const ROUTER_SOURCES: [(&str, &str); 3] = [
+    ("src/web/mod.rs", ""),
+    ("src/api/mod.rs", "/api/v1"),
+    ("src/lib.rs", ""),
+];
+
+fn source(path: &str) -> String {
     let root = env!("CARGO_MANIFEST_DIR");
-    let read = |p: &str| std::fs::read_to_string(format!("{root}/{p}")).expect("router source");
-    let mut routes = routes_of(&read("src/web/mod.rs"), "");
-    routes.extend(routes_of(&read("src/api/mod.rs"), "/api/v1"));
-    routes.extend(routes_of(&read("src/lib.rs"), ""));
+    std::fs::read_to_string(format!("{root}/{path}"))
+        .unwrap_or_else(|e| panic!("{path}: {e}"))
+        .replace('\r', "")
+}
+
+fn all_routes() -> Vec<(String, String)> {
+    let mut routes = Vec::new();
+    for (path, prefix) in ROUTER_SOURCES {
+        routes.extend(routes_of(&source(path), prefix));
+    }
     routes.sort();
     routes.dedup();
     routes
+}
+
+/// Every Rust source below `dir`, relative to the crate root.
+fn rust_sources(dir: &str, out: &mut Vec<String>) {
+    let root = env!("CARGO_MANIFEST_DIR");
+    let entries =
+        std::fs::read_dir(format!("{root}/{dir}")).unwrap_or_else(|e| panic!("{dir}: {e}"));
+    for entry in entries {
+        let name = entry
+            .expect("entry")
+            .file_name()
+            .to_string_lossy()
+            .to_string();
+        let path = format!("{dir}/{name}");
+        if std::path::Path::new(&format!("{root}/{path}")).is_dir() {
+            rust_sources(&path, out);
+        } else if name.ends_with(".rs") {
+            out.push(path);
+        }
+    }
 }
 
 /// Routes that serve no repository data (or would end the session).
@@ -120,6 +157,16 @@ struct Hidden {
     notification_id: Uuid,
     /// A member's staged BOM import.
     import_id: Uuid,
+    /// A 3D note on the hidden file version.
+    annotation_id: Uuid,
+    /// A deviation recorded on the hidden revision.
+    deviation_id: Uuid,
+    /// The hidden simulation's basis link to the hidden revision.
+    basis_id: Uuid,
+    /// A member's unfinished upload into the hidden revision.
+    upload_id: Uuid,
+    /// A member of the group (for `/users/{id}`: what a user holds).
+    member: Uuid,
     /// The caller (for `{user_id}`).
     caller: Uuid,
 }
@@ -160,6 +207,12 @@ fn fill(path: &str, h: &Hidden) -> Option<String> {
             ("{id}", "simulation-proposals") => h.proposal_id.to_string(),
             ("{id}", "notifications") => h.notification_id.to_string(),
             ("{id}", "import") => h.import_id.to_string(),
+            ("{id}", "annotations") => h.annotation_id.to_string(),
+            ("{id}", "as-built-deviations") => h.deviation_id.to_string(),
+            ("{id}", "simulation-bases") => h.basis_id.to_string(),
+            ("{id}", "uploads") => h.upload_id.to_string(),
+            // accounts: the holdings report names what a member holds
+            ("{id}", "users") => h.member.to_string(),
             ("{revision_id}", _) => h.revision_id.to_string(),
             ("{item_id}", _) => h.item_id.to_string(),
             ("{user_id}", _) => h.caller.to_string(),
@@ -172,8 +225,19 @@ fn fill(path: &str, h: &Hidden) -> Option<String> {
             // an alternate: by number in the REST API, by id in the web UI
             ("{alternate}", _) if path.starts_with("/api/") => h.item_number.clone(),
             ("{alternate}", _) => h.item_id.to_string(),
-            // objects of no fixture: unknown ids must not reveal anything either
-            ("{id}", _) | ("{delivery_id}", _) | ("{review_id}", _) => random.clone(),
+            // objects that hold no item, revision or file data of a group, so
+            // no fixture: unknown ids must not reveal anything either.
+            // Attribute definitions and the material library belong to the
+            // instance, saved searches and tokens to their owner; webhooks and
+            // their deliveries are for administrators (403 for the outsiders);
+            // an access review is addressed below the hidden group's code. A
+            // new kind of id has no rule here and fails
+            // `every_route_has_a_placeholder_rule` until it gets a fixture or
+            // a place in this list.
+            ("{id}", "attributes" | "materials" | "searches" | "tokens")
+            | ("{id}", "webhooks" | "webhook-deliveries")
+            | ("{delivery_id}", "deliveries")
+            | ("{review_id}", "access-review") => random.clone(),
             _ => return None,
         };
         out.push(value);
@@ -208,6 +272,11 @@ fn every_route_has_a_placeholder_rule() {
         proposal_id: Uuid::nil(),
         notification_id: Uuid::nil(),
         import_id: Uuid::nil(),
+        annotation_id: Uuid::nil(),
+        deviation_id: Uuid::nil(),
+        basis_id: Uuid::nil(),
+        upload_id: Uuid::nil(),
+        member: Uuid::nil(),
         caller: Uuid::nil(),
     };
     let missing: Vec<String> = routes
@@ -217,9 +286,193 @@ fn every_route_has_a_placeholder_rule() {
         .collect();
     assert!(
         missing.is_empty(),
-        "routes with a placeholder the leak test cannot fill – add a rule to fill():\n{}",
+        "routes with a placeholder the leak test cannot fill – add a rule to fill() with a \
+         fixture of the hidden group (or, for objects that hold no item, revision or file \
+         data, to its list of random ids):\n{}",
         missing.join("\n")
     );
+    // the newer channels address hidden objects, not random ids …
+    let nil = Uuid::nil().to_string();
+    for path in [
+        "/api/v1/annotations/{id}",
+        "/as-built-deviations/{id}/delete",
+        "/api/v1/simulation-bases/{id}",
+        "/api/v1/uploads/{id}/finish",
+        "/users/{id}/holdings",
+    ] {
+        assert!(routes.iter().any(|(_, p)| p == path), "{path} is gone");
+        assert_eq!(
+            fill(path, &h).as_deref(),
+            Some(path.replace("{id}", &nil).as_str()),
+            "{path}"
+        );
+    }
+    // … and an unknown kind of id gets no random one
+    assert!(fill("/gadgets/{id}", &h).is_none());
+}
+
+#[test]
+fn the_route_table_reads_every_router() {
+    let mut sources = Vec::new();
+    rust_sources("src", &mut sources);
+    assert!(sources.len() > 50, "found the sources: {}", sources.len());
+    let known: Vec<&str> = ROUTER_SOURCES.iter().map(|(path, _)| *path).collect();
+    let builds_router = [
+        "Router::new(",
+        ".route(",
+        ".nest(",
+        ".nest_service(",
+        ".route_service(",
+        ".fallback_service(",
+    ];
+    let mut problems = Vec::new();
+    for path in &sources {
+        let text = source(path);
+        let found: Vec<&str> = builds_router
+            .iter()
+            .copied()
+            .filter(|m| text.contains(*m))
+            .collect();
+        if !found.is_empty() && !known.contains(&path.as_str()) {
+            problems.push(format!(
+                "{path} builds routes ({}) the leak test does not read – add it to \
+                 ROUTER_SOURCES with the prefix it is served under",
+                found.join(", ")
+            ));
+        }
+    }
+    // the one nested router is the REST API, under the prefix the table uses
+    for (path, _) in ROUTER_SOURCES {
+        let text = source(path);
+        for (at, _) in text.match_indices(".nest(") {
+            let prefix = text[at..].split('"').nth(1).unwrap_or("");
+            if prefix != "/api/v1" {
+                problems.push(format!(
+                    "{path} nests a router at {prefix:?} – give its source and prefix to \
+                     ROUTER_SOURCES"
+                ));
+            }
+        }
+    }
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+    // the scanner of the route table: methods of one call, the prefix
+    assert_eq!(
+        routes_of(
+            r#".route("/a/{id}", get(show).post(save)).route("/b", delete(gone))"#,
+            "/p"
+        ),
+        vec![
+            ("GET".to_string(), "/p/a/{id}".to_string()),
+            ("POST".to_string(), "/p/a/{id}".to_string()),
+            ("DELETE".to_string(), "/p/b".to_string()),
+        ]
+    );
+}
+
+/// The arguments the outsiders call every MCP tool and prompt with: a hidden
+/// object for every argument that names one.
+fn mcp_probe_args(item: &str, change: &str, request: &str, project: &str, file: &str) -> Value {
+    json!({
+        "item": item, "revision": "A", "with": "A", "change": change, "request": request,
+        "number": request, "q": "hidden", "query": "hidden", "items": [item], "title": "probe",
+        "body": "probe", "comment": "probe", "levels": 3, "project": project, "from": "A",
+        "to": "A", "file": file, "version": 1, "offset": 0,
+        "values": [{ "name": "probe", "value": 1.0, "file": file, "quote": "probe" }],
+    })
+}
+
+/// Arguments of MCP tools and prompts that name no repository object, so the
+/// probe leaves them out. Every other argument must be in
+/// [`mcp_probe_args`]: a new argument that names an item, a file or a change
+/// is then called with the hidden one.
+const MCP_PLAIN_ARGUMENTS: &[(&str, &str)] = &[
+    ("attr", "an attribute key the search filters by"),
+    ("changes_only", "a flag of the simulation comparison"),
+    (
+        "class",
+        "the classification filter of the search (make, purchased, standard)",
+    ),
+    ("description", "free text of a new change order or request"),
+    ("due_date", "the date a new change request is wanted by"),
+    ("ignore_scale", "a flag of the shape search"),
+    (
+        "include_dependencies",
+        "a flag: also add the BOM children and references",
+    ),
+    ("limit", "a page size"),
+    ("out_of_date_only", "a filter flag of the simulation list"),
+    ("priority", "the priority of a new change order or request"),
+    ("reason", "the reason category of a new change request"),
+    (
+        "reference",
+        "a point x,y,z the inertia tensor is taken about",
+    ),
+    (
+        "rule",
+        "the revision rule of the BOM lines (latest, released, as released)",
+    ),
+    (
+        "scope",
+        "a filter of the change request list (mine, assigned)",
+    ),
+    ("state", "a lifecycle state the search filters by"),
+    (
+        "status",
+        "a status the change order and request lists filter by",
+    ),
+    ("system", "a CAD program the search filters by"),
+    ("type", "an item type the search filters by"),
+    ("value", "an attribute value the search filters by"),
+];
+
+#[test]
+fn every_mcp_argument_has_a_probe_value() {
+    let probe = mcp_probe_args("X", "C", "R", "G", "f.txt");
+    let plain: BTreeMap<&str, &str> = MCP_PLAIN_ARGUMENTS.iter().copied().collect();
+    let mut taken = BTreeSet::new();
+    let mut problems = Vec::new();
+    let mut check = |owner: String, arg: &str| {
+        taken.insert(arg.to_string());
+        if probe.get(arg).is_none() && !plain.contains_key(arg) {
+            problems.push(format!("{owner}: argument `{arg}`"));
+        }
+    };
+    let tools = teamcraft::mcp::tools::definitions();
+    assert!(tools.len() >= 26, "found the tools: {}", tools.len());
+    for tool in &tools {
+        let name = tool["name"].as_str().unwrap_or_default();
+        for arg in tool["inputSchema"]["properties"]
+            .as_object()
+            .into_iter()
+            .flat_map(|props| props.keys())
+        {
+            check(format!("tool {name}"), arg.as_str());
+        }
+    }
+    for prompt in teamcraft::mcp::tools::prompts() {
+        let name = prompt["name"].as_str().unwrap_or_default();
+        for arg in prompt["arguments"].as_array().into_iter().flatten() {
+            check(
+                format!("prompt {name}"),
+                arg["name"].as_str().unwrap_or_default(),
+            );
+        }
+    }
+    assert!(
+        problems.is_empty(),
+        "MCP arguments the outsiders' probe does not fill – give them a hidden object in \
+         mcp_probe_args, or, when they name no repository object, add them to \
+         MCP_PLAIN_ARGUMENTS with the reason:\n{}",
+        problems.join("\n")
+    );
+    // the plain list names arguments that exist and are not probed
+    for (arg, why) in MCP_PLAIN_ARGUMENTS {
+        assert!(
+            taken.contains(*arg),
+            "MCP_PLAIN_ARGUMENTS names `{arg}` ({why}), which no tool or prompt takes any more"
+        );
+        assert!(probe.get(*arg).is_none(), "`{arg}` is probed and plain");
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -336,8 +589,10 @@ fn assert_clean_echoing(
     }
 }
 
-const COUNTED: [&str; 22] = [
+const COUNTED: [&str; 24] = [
     "simulation_results",
+    "model_annotations",
+    "as_built_deviations",
     "staged_imports",
     "items",
     "revisions",
@@ -727,6 +982,66 @@ async fn outsiders_see_nothing_of_a_restricted_group() {
     .execute(&app.pool)
     .await
     .unwrap();
+    // a 3D note on the hidden file version, a deviation and the simulation's
+    // basis link on the hidden revision, a member's unfinished upload into it
+    let version_id = id_of(
+        &app,
+        "SELECT id FROM file_versions WHERE file_id = $1::text::uuid",
+        &file_id.to_string(),
+    )
+    .await;
+    let annotation_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO model_annotations (id, file_version_id, x, y, z, body, author_id)
+         VALUES ($1, $2, 0, 0, 0, $3, $4)",
+    )
+    .bind(annotation_id)
+    .bind(version_id)
+    .bind(format!("note {m}"))
+    .bind(member_id)
+    .execute(&app.pool)
+    .await
+    .unwrap();
+    let deviation_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO as_built_deviations (id, revision_id, kind, feature, note, created_by)
+         VALUES ($1, $2, 'dimension', $3, $4, $5)",
+    )
+    .bind(deviation_id)
+    .bind(hid_rev_id)
+    .bind(format!("bore {m}"))
+    .bind(format!("deviation {m}"))
+    .bind(member_id)
+    .execute(&app.pool)
+    .await
+    .unwrap();
+    let basis_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO simulation_bases (id, revision_id, basis_revision_id, role, note, created_by)
+         SELECT $1, r.id, $2, 'geometry', $3, $4
+         FROM revisions r JOIN items i ON i.id = r.item_id WHERE i.number = $5",
+    )
+    .bind(basis_id)
+    .bind(hid_rev_id)
+    .bind(format!("basis {m}"))
+    .bind(member_id)
+    .bind(&sim)
+    .execute(&app.pool)
+    .await
+    .unwrap();
+    let upload_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO upload_sessions (id, user_id, revision_id, filename, content_type,
+                                      total_bytes, expires_at)
+         VALUES ($1, $2, $3, $4, 'application/octet-stream', 10, now() + interval '1 day')",
+    )
+    .bind(upload_id)
+    .bind(member_id)
+    .bind(hid_rev_id)
+    .bind(format!("{m}.step"))
+    .execute(&app.pool)
+    .await
+    .unwrap();
     // what the outsiders' calls must leave as it is (counts do not show it)
     let id_rows = || {
         let pool = app.pool.clone();
@@ -738,7 +1053,11 @@ async fn outsiders_see_nothing_of_a_restricted_group() {
                     (SELECT row_to_json(x)::text FROM result_templates x WHERE x.id = $5),
                     (SELECT row_to_json(x)::text FROM result_proposals x WHERE x.id = $6),
                     (SELECT row_to_json(x)::text FROM notifications x WHERE x.id = $3),
-                    (SELECT x.id::text FROM staged_imports x WHERE x.id = $4))",
+                    (SELECT x.id::text FROM staged_imports x WHERE x.id = $4),
+                    (SELECT row_to_json(ma)::text FROM model_annotations ma WHERE ma.id = $7),
+                    (SELECT row_to_json(x)::text FROM as_built_deviations x WHERE x.id = $8),
+                    (SELECT row_to_json(x)::text FROM simulation_bases x WHERE x.id = $9),
+                    (SELECT row_to_json(x)::text FROM upload_sessions x WHERE x.id = $10))",
             )
             .bind(impact_id)
             .bind(result_id)
@@ -746,6 +1065,10 @@ async fn outsiders_see_nothing_of_a_restricted_group() {
             .bind(import_id)
             .bind(template_id)
             .bind(proposal_id)
+            .bind(annotation_id)
+            .bind(deviation_id)
+            .bind(basis_id)
+            .bind(upload_id)
             .fetch_one(&pool)
             .await
             .unwrap()
@@ -764,12 +1087,7 @@ async fn outsiders_see_nothing_of_a_restricted_group() {
         )
         .await,
         file_id,
-        version_id: id_of(
-            &app,
-            "SELECT id FROM file_versions WHERE file_id = $1::text::uuid",
-            &file_id.to_string(),
-        )
-        .await,
+        version_id,
         line_id,
         reference_id,
         change_number: chg.clone(),
@@ -788,6 +1106,11 @@ async fn outsiders_see_nothing_of_a_restricted_group() {
         proposal_id,
         notification_id,
         import_id,
+        annotation_id,
+        deviation_id,
+        basis_id,
+        upload_id,
+        member: member_id,
         caller: Uuid::nil(),
     };
     // (the item number and the group code contain `m`)
@@ -809,6 +1132,10 @@ async fn outsiders_see_nothing_of_a_restricted_group() {
         proposal_id.to_string(),
         notification_id.to_string(),
         import_id.to_string(),
+        annotation_id.to_string(),
+        deviation_id.to_string(),
+        basis_id.to_string(),
+        upload_id.to_string(),
         sim.clone(),
     ];
 
@@ -965,7 +1292,7 @@ async fn outsiders_see_nothing_of_a_restricted_group() {
     let routes = all_routes();
     let before = counts(&app).await;
     let before_rows = id_rows().await;
-    assert_eq!(before_rows.matches(" | ").count(), 5, "{before_rows}");
+    assert_eq!(before_rows.matches(" | ").count(), 9, "{before_rows}");
     for (who, token, actor) in [
         ("outsider_editor", &out_editor, &out_editor_actor),
         ("outsider_viewer", &out_viewer, &out_viewer_actor),
@@ -999,7 +1326,8 @@ async fn outsiders_see_nothing_of_a_restricted_group() {
     assert_eq!(
         before_rows,
         id_rows().await,
-        "impact, result, notification and import unchanged"
+        "impact, result, template, proposal, notification, import, note, deviation, basis and \
+         upload unchanged"
     );
     // routes without a path parameter: lists, searches, forms, creation
     // (no count check here: tokens, saved searches and the like are created)
@@ -1088,13 +1416,7 @@ async fn outsiders_see_nothing_of_a_restricted_group() {
     }
 
     // --- MCP: every tool and prompt --------------------------------------------
-    let args = json!({
-        "item": hid, "revision": "A", "with": "A", "change": chg, "request": ecr,
-        "number": ecr, "q": "hidden", "query": "hidden", "items": [hid], "title": "probe",
-        "body": "probe", "comment": "probe", "levels": 3, "project": code, "from": "A",
-        "to": "A", "file": format!("{m}.txt"), "version": 1, "offset": 0,
-        "values": [{ "name": "probe", "value": 1.0, "file": format!("{m}.txt"), "quote": "probe" }],
-    });
+    let args = mcp_probe_args(&hid, &chg, &ecr, &code, &format!("{m}.txt"));
     let sent = vec![
         hid.clone(),
         chg.clone(),
@@ -1209,6 +1531,11 @@ fn clone_hidden(h: &Hidden) -> Hidden {
         proposal_id: h.proposal_id,
         notification_id: h.notification_id,
         import_id: h.import_id,
+        annotation_id: h.annotation_id,
+        deviation_id: h.deviation_id,
+        basis_id: h.basis_id,
+        upload_id: h.upload_id,
+        member: h.member,
         caller: h.caller,
     }
 }
@@ -1232,8 +1559,13 @@ fn targets_hidden(uri: &str, h: &Hidden) -> bool {
         h.template_id,
         h.proposal_id,
         h.notification_id,
+        h.annotation_id,
+        h.deviation_id,
+        h.basis_id,
+        h.upload_id,
         // (not the staged import: an import that cannot be opened sends the
-        // user back to the upload form with a message, like a gone one)
+        // user back to the upload form with a message, like a gone one; not
+        // the member: accounts are no hidden objects)
     ];
     let segments: Vec<&str> = uri.split('/').collect();
     ids.iter()
