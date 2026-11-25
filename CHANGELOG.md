@@ -122,6 +122,11 @@ Other changes:
   a vault (73 % of the items in the scale check); the results and the total
   are the same as before. Tested in `tests/search_listing.rs`
   (`a_format_name_matches_files_of_that_format`).
+- Release checklist: a manual test of the daily CAD loop without the guide
+  (#408) – someone who has not used TeamCraft before gets a project group,
+  opens an assembly in Inventor, changes one of its parts in the context of
+  the assembly and checks in both, and every step where they needed help is
+  written down as a finding.
 - Items without a project group (#310): `tests/ungrouped_items.rs` pins the
   rules the permissions guide describes – new items and master-data changes
   need a group (400), administrators see the count with the link to *Vault →

@@ -820,8 +820,11 @@ needs an issue with a reason first (see *Direction*).
   manager, #419 BOM components picked by search (number, name, file name) in web and desktop with Add line /
   quantity / remove in the desktop *Structure* tab, #420 thumbnails in the item list, search, vault explorer and
   the desktop Home views, #407 *Update the BOM from the CAD file* at check-in – and onboarding: #422 the first-start
-  wizard *Getting started*, #423 empty states that name the next step (web and desktop, by role, i18n catalogs).
-  Left: #424 new desktop screenshots; follow-ups – *Revise and check out* for released parts (#415), a list picture
+  wizard *Getting started*, #423 empty states that name the next step (web and desktop, by role, i18n catalogs),
+  #424 the desktop screenshots retaken (`scripts/screenshots.sh`), and the manual test of #408's *Done when* – someone
+  new gets a group, opens an assembly in Inventor, changes a part in its context and checks in both without the guide
+  – in the release checklist (*Desktop CAD loop without the guide*; to be run once on Windows with Inventor).
+  Left: follow-ups – *Revise and check out* for released parts (#415), a list picture
   for revisions with only STEP or mesh files (#420: a fallback rendered from the 3D preview needs
   `thumbnail::supports` and `cadformat` widened), the *Getting started* follow-ups (#422: the Home card is done; left:
   Get size preview, managers' CAD-setup view), the other empty states (detail tabs, admin pages; still in English only), a *Get…* hint for viewers and a check

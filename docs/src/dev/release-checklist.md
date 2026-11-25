@@ -88,6 +88,17 @@ mismatch.
   open* right after starting Inventor by hand, while its splash screen still
   shows – the file opens in that Inventor once it is ready. Paste the toast
   of any step that differs into #483.
+- [ ] Desktop CAD loop without the guide (#408), on Windows with Inventor and
+  someone who has not used TeamCraft before. They get a CAD editor account in
+  a group with an Inventor assembly (the screenshot seed data or a real
+  project), the installed desktop app and no other help. Without reading the
+  guide they (1) get the project group (*Getting started*, or *Tools → Get
+  Project Groups…*); (2) open the assembly in Inventor (*Check out and
+  open*); (3) change one of its parts in the context of the assembly
+  (*Check out parts…* on the assembly, edit the part in Inventor, save);
+  (4) check in both (*Check in all* in the Worklist, or *Check in…* on each).
+  Write down every step where they hesitated or asked, with the screen they
+  were on: a step that needed help is a finding for #408 (a new issue).
 - [ ] Note what was found in the soak in the changelog or in the release
   notes.
 
