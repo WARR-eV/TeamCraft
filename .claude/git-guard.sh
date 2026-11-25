@@ -34,7 +34,6 @@ case "$trimmed" in
     exit 0
     ;;
 "git pull") exit 0 ;;
-"git add --all") exit 0 ;;
 esac
 
-deny "Refused: only a bare \"git push\", \"git pull\" or \"git add --all\" is allowed. Got: ${trimmed}"
+deny "Refused: only a bare \"git push\" or \"git pull\" is allowed. Got: ${trimmed}"
