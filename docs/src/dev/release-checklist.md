@@ -74,6 +74,17 @@ mismatch.
   *Cancel check-out* the tip gives way to *This is your daily loop*;
   (3) *Settings → Connections → Add another account* and sign in – the
   wizard opens once more for that account, not again for the first one.
+- [ ] Desktop: a running Inventor is reused (#350, #483), on Windows with
+  Inventor started by hand and a part of a group without a default CAD
+  version: (1) *Check out and open* an Inventor part – it opens in that
+  Inventor, its window comes to the front and the toast ends with "(the
+  instance that was already running)"; (2) with two Inventor versions
+  installed and the **older** one running, the same – the toast names the
+  older version; (3) a group whose default CAD program pins the **other**
+  version – a new instance of that version starts and the toast says which
+  one is running; (4) Inventor started *as administrator* – a new instance
+  starts with the note that the running one did not answer. Paste the toast
+  of any step that differs into #483.
 - [ ] Note what was found in the soak in the changelog or in the release
   notes.
 
