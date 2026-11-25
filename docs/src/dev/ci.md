@@ -50,11 +50,14 @@ rule that was broken:
   `sqlx` in `src/web`, `src/api` or `src/mcp`; a public service function
   that writes without an audit entry (itself or through the services it
   calls – personal data, caches and housekeeping go on its `NOT_AUDITED`
-  list with a reason); a service function that takes an actor and queries
-  items, revisions or files without a visibility guard in its body (an
-  `access::*` fragment, `ensure_visible`, `ensure_editable` or a guarded
-  getter such as `revisions::get` – reviewed exceptions are on `NOT_GUARDED`
-  with a reason); a template that is not in `TEMPLATES` or not rendered by
+  list with a reason); a service function that queries items, revisions,
+  files or a table that copies their content (`COPY_TABLES`: BOM lines,
+  references, simulation values, notifications, the logs, assistant threads,
+  …) without a visibility guard in its body – one that takes an actor, or one
+  without an actor that a handler calls (an `access::*` fragment,
+  `ensure_visible`, `ensure_editable` or a guarded getter such as
+  `revisions::get` or `files::get_version` – reviewed exceptions are on
+  `NOT_GUARDED` with a reason, #312); a template that is not in `TEMPLATES` or not rendered by
   `every_template_renders`; a `TEAMCRAFT_*` variable missing from
   [Configuration](../admin/configuration.md); a language file of the desktop
   Group Policy template whose IDs differ from `en-US`.
@@ -63,7 +66,11 @@ rule that was broken:
   `src/web`, `src/api` or `src/mcp`. The leak test `tests/read_permissions.rs`
   reads the router sources and exercises every route and MCP tool; a route
   with a new kind of path parameter needs a placeholder rule in its
-  `fill()`.
+  `fill()` – a fixture of the hidden group, or a place on its list of ids
+  without repository data. It fails for a router built in a file it does not
+  read (`the_route_table_reads_every_router`) and for an MCP tool or prompt
+  argument the outsiders' probe does not fill or name in
+  `MCP_PLAIN_ARGUMENTS` (`every_mcp_argument_has_a_probe_value`, #312).
 * **One transaction:** `tests/atomic_processes.rs` puts a trigger on a table
   that makes one step of a multi-step mutation fail (an error or a lost
   connection), and the snapshot before and after must be equal – add a case

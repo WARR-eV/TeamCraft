@@ -121,5 +121,18 @@
   "onboarding.back": "Zurück",
   "onboarding.dismiss": "Nicht mehr zeigen",
   "onboarding.tip.loop": "Ein Check-out sperrt nur – „Cancel check-out“ macht es ohne neue Version rückgängig. Speichern Sie wie gewohnt in Ihrem CAD-Programm, dann „Check in…“ hier oder in Ihrer Arbeitsliste.",
-  "onboarding.tip.loop_done": "Das ist Ihr täglicher Ablauf: „Check out and open“ → in CAD speichern → „Check in…“"
+  "onboarding.tip.loop_done": "Das ist Ihr täglicher Ablauf: „Check out and open“ → in CAD speichern → „Check in…“",
+  "onboarding.card.lead": "Sie haben „Erste Schritte“ vorzeitig geschlossen – diese Schritte haken sich ab, während Sie arbeiten.",
+  "onboarding.card.progress": "{done} von {total} erledigt",
+  "onboarding.card.status.open": "offen",
+  "onboarding.card.status.active": "begonnen",
+  "onboarding.card.group.editor": "Die Dateien von {group} kommen mit Ihrem ersten Check-out nach {folder} – oder holen Sie die ganze Gruppe mit „Get…“ unter „Projects“.",
+  "onboarding.card.group.viewer": "„Get…“ unter „Projects“ kopiert die Dateien von {group} nach {folder}.",
+  "onboarding.card.open": "Öffnen Sie eine Baugruppe von {group} und wählen Sie „Check out and open“.",
+  "onboarding.card.complete": "Alle Schritte sind erledigt – diese Karte erscheint nicht wieder.",
+  "onboarding.card.open_wizard": "„Erste Schritte“ öffnen …",
+  "onboarding.card.hide": "Ausblenden",
+  "onboarding.card.hide.label": "„Erste Schritte“ ausblenden",
+  "onboarding.card.hide.title": "Diese Karte für diese Verbindung ausblenden – „Help → Getting Started…“ öffnet den Assistenten weiterhin.",
+  "onboarding.card.hidden": "„Erste Schritte“ ist ausgeblendet – „Help → Getting Started…“ öffnet es wieder."
 }

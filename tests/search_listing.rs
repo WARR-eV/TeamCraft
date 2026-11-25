@@ -141,3 +141,102 @@ async fn filters_paging_and_literal_wildcards() {
     assert_eq!(r.status, StatusCode::NOT_FOUND, "{}", r.text());
     app.teardown().await;
 }
+
+/// A query that names a file format ("step") matches the items whose latest
+/// revision has a file of that format, besides the usual text matches. The
+/// format is checked first for speed (#316); the rows, the total and the
+/// visibility guard stay the same.
+#[tokio::test]
+async fn a_format_name_matches_files_of_that_format() {
+    let app = app_or_skip!();
+    let (_, token) = app.user_in("erika", Role::Editor, &["SHOP"]).await;
+    let (_, other) = app.user_in("otto", Role::Editor, &["SHOP"]).await;
+    let mut made = Vec::new();
+    for name in ["Bracket", "Plate", "Step ladder"] {
+        made.push(
+            app.create_item(
+                &token,
+                json!({ "item_type": "part", "name": name, "project": "SHOP" }),
+            )
+            .await,
+        );
+    }
+    let (bracket, plate, ladder) = (made[0].clone(), made[1].clone(), made[2].clone());
+    for (number, filename, content) in [
+        (
+            &bracket,
+            "bracket.step",
+            &b"ISO-10303-21; HEADER; ENDSEC;"[..],
+        ),
+        (&plate, "plate.txt", &b"flat plate 2 mm"[..]),
+    ] {
+        let r = app
+            .api_upload(
+                &format!("/api/v1/items/{number}/revisions/A/files"),
+                &token,
+                filename,
+                content,
+            )
+            .await;
+        assert_eq!(r.status, StatusCode::CREATED, "{}", r.text());
+    }
+    // a STEP file in a restricted group otto is not a member of
+    let r = app
+        .api(
+            Method::POST,
+            "/api/v1/projects",
+            &token,
+            Some(json!({ "code": "NTK", "name": "Need to know", "visibility": "restricted" })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::CREATED, "{}", r.text());
+    let secret = app
+        .create_item(
+            &token,
+            json!({ "item_type": "part", "name": "Secret", "project": "NTK" }),
+        )
+        .await;
+    let r = app
+        .api_upload(
+            &format!("/api/v1/items/{secret}/revisions/A/files"),
+            &token,
+            "secret.stp",
+            b"ISO-10303-21; HEADER; /* secret */ ENDSEC;",
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::CREATED, "{}", r.text());
+
+    // the STEP file's item and the item named "Step …", nothing else
+    let r = app
+        .api(Method::GET, "/api/v1/items?q=step", &other, None)
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let mut expected = vec![bracket.clone(), ladder.clone()];
+    expected.sort();
+    assert_eq!(numbers(&r), expected, "{}", r.text());
+    assert_eq!(r.json()["total"], 2);
+    assert!(!numbers(&r).contains(&plate));
+    // the member of the restricted group finds its item too
+    let r = app
+        .api(Method::GET, "/api/v1/items?q=STEP", &token, None)
+        .await;
+    assert_eq!(r.json()["total"], 3, "{}", r.text());
+    assert!(numbers(&r).contains(&secret));
+    // paging keeps the total
+    let r = app
+        .api(Method::GET, "/api/v1/items?q=step&limit=1", &other, None)
+        .await;
+    assert_eq!(r.json()["total"], 2, "{}", r.text());
+    assert_eq!(r.json()["items"].as_array().map(Vec::len), Some(1));
+    // a format word combined with a filter that excludes everything
+    let r = app
+        .api(
+            Method::GET,
+            "/api/v1/items?q=step&type=assembly",
+            &other,
+            None,
+        )
+        .await;
+    assert_eq!(r.json()["total"], 0, "{}", r.text());
+    app.teardown().await;
+}

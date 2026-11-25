@@ -15,10 +15,15 @@
 // picks one with *Change…*, and the active group on the final click
 // (*Show <number>* or *Finish and show <group> in Home*). The navigator
 // switches to *Files* for this run only – the stored mode stays.
+//
+// The *Getting started* card on Home (homeStartCard, drawn by tabs.js) is
+// for users who closed the wizard early: the same three steps, ticked by
+// themselves (onboarding-rules.js startCard). It stores only `done` – when
+// every step is ticked, or on *Hide*.
 
 import { $, TAURI, api, call, dialog, errorText, h, invoke, state, toast } from "./core.js";
 import { t } from "/static/shared/js/i18n.js";
-import { ONBOARDING_DISMISSED, ONBOARDING_DONE, ONBOARDING_STEPS, STEP_NAMES, cadLine, chosenGroup, finishLabel, groupCadText, groupList, isFinal, nextStep, noAssemblyMessage, onDisk, openLine, pickAssemblies, roleMessage, shouldShow, showTitle, skipReason, stepPosition, stepSummary } from "./onboarding-rules.js";
+import { CARD_STATUS, ONBOARDING_DISMISSED, ONBOARDING_DONE, ONBOARDING_STEPS, STEP_NAMES, cadLine, chosenGroup, finishLabel, groupCadText, groupList, isFinal, nextStep, noAssemblyMessage, onDisk, openLine, pickAssemblies, roleMessage, shouldShow, showTitle, skipReason, startCard, stepPosition, stepSummary } from "./onboarding-rules.js";
 import { gotGroups } from "./group-sync.js";
 import { emptyHint, fetchStructureRoots, newProjectDialog, selectView, setActiveProject, setNavMode, typeIcon } from "./navigator.js";
 import { canEdit, canEditProject } from "./shell.js";
@@ -26,7 +31,7 @@ import { emptyGroupHint } from "./empty-rules.js";
 import { openRevision } from "./revision.js";
 import { cadFormats, groupOpenPlan, installedCad } from "./cad-open.js";
 import { thumbIco } from "./list-thumbs.js";
-import { renderActive, renderTabs } from "./tabs.js";
+import { activeTab, renderActive, renderTabs } from "./tabs.js";
 import { openWorkspaceFolder } from "./workspace.js";
 
 /** The open wizard: its dialog, the step, the group chosen in step 2 (kept
@@ -57,11 +62,13 @@ function onboardingFacts() {
   };
 }
 
-/** Stores `done` or `dismissed` on the active connection (src/profiles.rs). */
+/** Stores `done` or `dismissed` on the active connection (src/profiles.rs).
+ *  Resolves to whether it was stored (a failure is shown as a toast). */
 function saveOnboarding(value) {
   return call("set_onboarding", { value: value }).then(function () {
     if (state.session) state.session.onboarding = value;
-  }, function (err) { toast(errorText(err), "error", t("onboarding.title")); });
+    return true;
+  }, function (err) { toast(errorText(err), "error", t("onboarding.title")); return false; });
 }
 
 /** Whether the user already works on this server – asked directly (not from
@@ -341,4 +348,90 @@ function showStep(step) {
       : { label: t("onboarding.next"), primary: true, submit: true, onClick: function () { showStep(nextStep({ current: step }, onboardingFacts())); } }
   ].filter(Boolean);
   wizard.dialog = dialog(t("onboarding.title"), body, actions, { wide: true, modal: true });
+}
+
+// ---------------------------------------------------------------- the card on Home
+
+/** For whom (server and user) the card was shown with a step still open in
+ *  this run: only then does a finished loop say so once (startCard). */
+var startCardSeenOpen = "";
+
+function startCardOwner() {
+  return ((state.session && state.session.server_url) || "") + " " + ((state.me && state.me.username) || "");
+}
+
+/** The mark before a step; the status word next to it says the same in text. */
+var START_CARD_MARKS = { done: "✓", active: "◐", open: "○", skipped: "–" };
+
+/**
+ * The *Getting started* card of Home for a user who closed the wizard early
+ * – whether it shows and what is ticked is startCard's (onboarding-rules.js).
+ * `worklist` is the answer of GET /worklist Home already has; the stored
+ * value and whether the working folder exists are asked now (a Get or the
+ * wizard may have changed them since the start). Resolves to the card (a
+ * `section`) or null. A complete card stores `done`, so it says so once.
+ */
+export function homeStartCard(worklist) {
+  if (!worklist) return Promise.resolve(null);
+  return invoke("session").then(function (s) {
+    if (state.session) state.session.onboarding = s.onboarding;
+    var facts = onboardingFacts();
+    if (s.workspace_dir) facts.workspaceDir = s.workspace_dir;
+    facts.workspaceExists = !!s.workspace_exists;
+    facts.worklist = worklist;
+    var owner = startCardOwner();
+    var card = startCard(s, facts, { seenOpen: startCardSeenOpen === owner });
+    if (!card) return null;
+    if (card.store) saveOnboarding(card.store);
+    if (!card.show) return null;
+    if (!card.complete) startCardSeenOpen = owner;
+    return drawStartCard(card);
+  }).catch(function () { return null; });
+}
+
+/** The card: a section named by its heading, the steps as a list – each with
+ *  its status as a word, not only the mark – and *Open Getting started…* /
+ *  *Hide*. */
+function drawStartCard(card) {
+  var section = h("section.panel.home-start" + (card.complete ? ".complete" : ""), { "aria-labelledby": "home-start-title" });
+  section.appendChild(h("div.panel-head", null, [
+    h("h2", { id: "home-start-title" }, [t("onboarding.title") + " ", h("span.count", { text: msg(card.progress) })])
+  ]));
+  section.appendChild(h("p.home-start-lead", { role: card.complete ? "status" : null, text: card.lead.map(msg).join(" ") }));
+  section.appendChild(h("ol.home-start-steps", { "aria-label": t("onboarding.steps") }, card.steps.map(function (s) {
+    return h("li." + s.status, null, [
+      h("span.home-start-mark", { "aria-hidden": "true", text: START_CARD_MARKS[s.status] || "" }),
+      h("div.home-start-step", null, [
+        h("p.home-start-name", null, [h("strong", { text: t(s.name) }), " ", h("span.home-start-status", { text: "(" + t(CARD_STATUS[s.status]) + ")" })]),
+        s.text.length ? h("p.small", { text: s.text.map(msg).join(" ") }) : null,
+        s.note ? h("p.small.muted", { text: msg(s.note) }) : null
+      ])
+    ]);
+  })));
+  section.appendChild(h("div.row", null, [
+    card.complete ? null : h("button", { type: "button", on: { click: reopenFromStartCard } }, t("onboarding.card.open_wizard")),
+    h("button", { type: "button", "aria-label": t("onboarding.card.hide.label"), title: t("onboarding.card.hide.title"),
+      on: { click: function () { hideStartCard(section, card.complete); } } }, t("onboarding.card.hide"))
+  ]));
+  return section;
+}
+
+/** *Open Getting started…*: the same as *Help → Getting Started…*; Home is
+ *  drawn again once the wizard is closed (its answer may end the card). */
+function reopenFromStartCard() {
+  openOnboarding(true).then(function () { if (!activeTab()) renderActive(); });
+}
+
+/** *Hide*: stores `done` on the active connection – the card does not come
+ *  back there; the wizard stays in the Help menu. The focus goes to Home's
+ *  heading, not to the page. */
+function hideStartCard(section, complete) {
+  saveOnboarding(ONBOARDING_DONE).then(function (stored) {
+    if (!stored) return;
+    var welcome = section.closest(".welcome");
+    var heading = welcome && welcome.querySelector("h1");
+    section.remove();
+    if (heading) heading.focus();
+    if (!complete) toast(t("onboarding.card.hidden"));
+  });
 }

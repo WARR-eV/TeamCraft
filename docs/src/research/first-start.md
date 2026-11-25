@@ -39,9 +39,10 @@ It cites public design guidelines only; no product is taken as a model.
   up its CAD programs is an administrator page
   ([Set up CAD programs for a project group](../admin/cad-setup.md)), linked
   from step 3.
-* Follow-ups, not in the wizard: a self-ticking *Getting started* card on
-  Home for users who closed the wizard early, the size of a whole-group *Get*
-  before it starts, a read-only view of a group's CAD setup for managers.
+* Follow-ups, not in the wizard: the size of a whole-group *Get* before it
+  starts, a read-only view of a group's CAD setup for managers. The
+  self-ticking *Getting started* card on Home for users who closed the wizard
+  early is done (`startCard` in `desktop/ui/js/onboarding-rules.js`).
 
 ## Sources
 

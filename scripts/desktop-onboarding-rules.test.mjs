@@ -19,7 +19,8 @@ const R = await import("data:text/javascript;base64," + Buffer.from(src).toStrin
 const {
   ONBOARDING_STEPS, ONBOARDING_DONE, ONBOARDING_DISMISSED, ONBOARDING_MESSAGE_IDS, STEP_NAMES, MAX_ASSEMBLIES,
   shouldShow, skipReason, visibleSteps, nextStep, isFinal, stepPosition, stepSummary, startGroup, chosenGroup,
-  groupList, groupFolder, pickAssemblies, noAssemblyMessage, lockedByMe, cadLine, groupCadText, openLine, showTitle, finishLabel, roleMessage, loopTip, loopTipAfter
+  groupList, groupFolder, pickAssemblies, noAssemblyMessage, lockedByMe, cadLine, groupCadText, openLine, showTitle, finishLabel, roleMessage, loopTip, loopTipAfter,
+  startCard, CARD_STATUS
 } = R;
 const catalog = (lang) => JSON.parse(fs.readFileSync(path.join(root, "shared/i18n", lang + ".json"), "utf8"));
 const placeholders = (text) => new Set([...String(text).matchAll(/\{([A-Za-z0-9_]+)\}/g)].map((m) => m[1]));
@@ -307,6 +308,151 @@ test("the daily-loop tip: while the next step is in the loop, until the first ch
   assert.equal(loopTipAfter("done", "checkin"), "done");
 });
 
+// ---------------------------------------------------------------- the card on Home
+
+const DISMISSED = { onboarding: "dismissed" };
+// nothing done yet: an editor with two groups, an empty worklist, no folder
+const idle = { ...fresh, workspaceExists: false, worklist: { checkouts: [], has_checked_in: false } };
+const statuses = (card) => card.steps.map((s) => s.step + ":" + s.status);
+const idsOf = (list) => list.map((m) => m.id);
+
+test("the card: only after the wizard was dismissed", () => {
+  assert.ok(startCard(DISMISSED, idle), "closed early: the card");
+  assert.equal(startCard({ onboarding: "done" }, idle), null, "finished, hidden or completed");
+  assert.equal(startCard({ onboarding: null }, idle), null, "the wizard may still open by itself");
+  assert.equal(startCard({}, idle), null);
+  assert.equal(startCard({ onboarding: "later" }, idle), null, "an unknown value is no dismissal");
+});
+
+test("the card: nothing without settings or before the worklist answered", () => {
+  assert.equal(startCard(null, idle), null);
+  assert.equal(startCard(undefined, undefined, undefined), null);
+  assert.equal(startCard(DISMISSED, { ...idle, worklist: null }), null, "no worklist yet: nothing decided");
+  assert.equal(startCard(DISMISSED, { ...idle, worklist: undefined }), null);
+  assert.equal(startCard(DISMISSED, {}), null);
+});
+
+test("the card: the wizard's three steps in order, nothing ticked at first", () => {
+  const card = startCard(DISMISSED, idle);
+  assert.deepEqual(card.steps.map((s) => s.step), ONBOARDING_STEPS);
+  assert.deepEqual(card.steps.map((s) => s.name), ONBOARDING_STEPS.map((s) => STEP_NAMES[s]));
+  assert.deepEqual(statuses(card), ["folder:open", "group:open", "open:open"]);
+  assert.deepEqual(card.progress, { id: "onboarding.card.progress", params: { done: 0, total: 3 } });
+  assert.deepEqual(idsOf(card.lead), ["onboarding.card.lead"]);
+  assert.equal(card.show, true);
+  assert.equal(card.complete, false);
+  assert.equal(card.store, null, "an open card stores nothing");
+  // what each open step needs, in the wizard's words where it has them
+  assert.deepEqual(idsOf(card.steps[0].text), ["onboarding.folder.text", "onboarding.folder.missing"]);
+  assert.equal(card.steps[0].text[0].params.dir, "/home/u/TeamCraft");
+  assert.deepEqual(card.steps[1].text, [{ id: "onboarding.card.group.editor", params: { group: "ROVER", folder: "/home/u/TeamCraft/ROVER" } }]);
+  assert.deepEqual(card.steps[2].text, [{ id: "onboarding.card.open", params: { group: "ROVER" } }]);
+  for (const s of card.steps) assert.ok(CARD_STATUS[s.status], "a status word for " + s.status);
+});
+
+test("the card: the folder ticks when it is there, used or set by policy", () => {
+  assert.equal(startCard(DISMISSED, { ...idle, workspaceExists: true }).steps[0].status, "done");
+  assert.equal(startCard(DISMISSED, { ...idle, groupsOnDisk: ["arm"] }).steps[0].status, "done", "a Get used it");
+  const policy = startCard(DISMISSED, { ...idle, workspaceRootPolicy: true }).steps[0];
+  assert.equal(policy.status, "done", "policy-fixed: nothing to decide");
+  assert.deepEqual(policy.text, [{ id: "onboarding.folder.line", params: { dir: "/home/u/TeamCraft" } }]);
+  assert.deepEqual(policy.note, { id: "onboarding.skip.folder_policy", params: {} });
+  assert.equal(startCard(DISMISSED, { ...idle, workspaceExists: true }).steps[0].note, null, "no policy note without a policy");
+});
+
+test("the card: the group ticks once one of the user's groups is in the working folder", () => {
+  const got = startCard(DISMISSED, { ...idle, groupsOnDisk: ["arm"] });
+  assert.deepEqual(statuses(got), ["folder:done", "group:done", "open:open"]);
+  assert.deepEqual(got.steps[1].text, [{ id: "onboarding.group.one", params: { group: "ARM" } }], "the group on disk is named");
+  assert.deepEqual(got.steps[1].note, { id: "onboarding.group.on_disk", params: {} });
+  assert.deepEqual(got.steps[2].text, [{ id: "onboarding.card.open", params: { group: "ARM" } }]);
+  assert.deepEqual(got.progress.params, { done: 2, total: 3 });
+  // a group that is not the user's does not count for the group step
+  const other = startCard(DISMISSED, { ...idle, groupsOnDisk: ["pump"] });
+  assert.deepEqual(statuses(other), ["folder:done", "group:open", "open:open"]);
+});
+
+test("the card: an own check-out begins the last step and puts its group in the working folder", () => {
+  const wl = { checkouts: [{ item_number: "ASM-1", code: "A", project_code: "arm" }], has_checked_in: false };
+  const card = startCard(DISMISSED, { ...idle, worklist: wl });
+  assert.deepEqual(statuses(card), ["folder:done", "group:done", "open:active"]);
+  assert.equal(card.steps[1].text[0].params.group, "ARM", "the group of the check-out");
+  assert.deepEqual(idsOf(card.steps[2].text), ["onboarding.tip.loop"], "the daily-loop tip: save, then Check in…");
+  assert.deepEqual(card.progress.params, { done: 2, total: 3 }, "begun is not done");
+  assert.equal(card.complete, false);
+  // a check-out in a group the user is no member of (any more) ticks no group
+  const away = startCard(DISMISSED, { ...idle, worklist: { checkouts: [{ project_code: "PUMP" }] } });
+  assert.deepEqual(statuses(away), ["folder:done", "group:open", "open:active"]);
+});
+
+test("the card: the first check-in is the end of the loop – every step ticked, stored as done", () => {
+  const wl = { checkouts: [], has_checked_in: true };
+  const card = startCard(DISMISSED, { ...idle, worklist: wl }, { seenOpen: true });
+  assert.equal(card.complete, true);
+  assert.deepEqual(statuses(card), ["folder:done", "group:done", "open:done"], "earlier steps tick with it");
+  assert.equal(card.store, ONBOARDING_DONE, "it does not come back");
+  assert.deepEqual(card.progress.params, { done: 3, total: 3 });
+  assert.deepEqual(idsOf(card.lead), ["onboarding.card.complete", "onboarding.tip.loop_done"]);
+  for (const s of card.steps) {
+    assert.deepEqual(s.text, [], "a complete card has no texts: " + s.step);
+    assert.equal(s.note, null);
+  }
+  // also with a group the user lost since and a folder not on this computer
+  const elsewhere = startCard(DISMISSED, { ...idle, groups: [], worklist: wl }, { seenOpen: true });
+  assert.deepEqual(statuses(elsewhere), ["folder:done", "group:done", "open:done"]);
+});
+
+test("the card says it is complete once: only when it was seen open in this run", () => {
+  const wl = { checkouts: [], has_checked_in: true };
+  const seen = startCard(DISMISSED, { ...idle, worklist: wl }, { seenOpen: true });
+  assert.equal(seen.show, true, "the user watched it tick: it says so");
+  const silent = startCard(DISMISSED, { ...idle, worklist: wl }, { seenOpen: false });
+  assert.equal(silent.show, false, "finished elsewhere or before: no card");
+  assert.equal(silent.store, ONBOARDING_DONE, "but stored all the same");
+  assert.equal(startCard(DISMISSED, { ...idle, worklist: wl }).show, false, "no ctx counts as not seen");
+  // stored, the next Home has no card
+  assert.equal(startCard({ onboarding: seen.store }, { ...idle, worklist: wl }, { seenOpen: true }), null);
+  // an open card shows whether or not it was seen before
+  assert.equal(startCard(DISMISSED, idle, { seenOpen: true }).show, true);
+});
+
+test("the card for an editor without a group: how to get one, the assembly waits for it", () => {
+  const card = startCard(DISMISSED, { ...idle, groups: [] });
+  assert.deepEqual(statuses(card), ["folder:open", "group:open", "open:open"]);
+  assert.deepEqual(idsOf(card.steps[1].text), ["onboarding.group.none.editor"]);
+  assert.deepEqual(card.steps[2].text, []);
+  assert.deepEqual(card.steps[2].note, { id: "onboarding.skip.no_group", params: {} });
+  assert.equal(card.complete, false);
+});
+
+test("the card for a viewer: no check-out step, complete with folder and group", () => {
+  const viewer = { ...idle, editor: false };
+  const card = startCard(DISMISSED, viewer);
+  assert.deepEqual(statuses(card), ["folder:open", "group:open", "open:skipped"]);
+  assert.deepEqual(card.steps[1].text, [{ id: "onboarding.card.group.viewer", params: { group: "ROVER", folder: "/home/u/TeamCraft/ROVER" } }]);
+  assert.deepEqual(card.steps[2].note, { id: "onboarding.group.viewer", params: {} }, "checking out needs the CAD editor role");
+  assert.deepEqual(card.progress.params, { done: 0, total: 2 }, "a skipped step is not counted");
+  const got = startCard(DISMISSED, { ...viewer, groupsOnDisk: ["ROVER"] }, { seenOpen: true });
+  assert.equal(got.complete, true, "a viewer's loop ends with the group in the working folder");
+  assert.deepEqual(statuses(got), ["folder:done", "group:done", "open:skipped"]);
+  assert.deepEqual(idsOf(got.lead), ["onboarding.card.complete"], "no daily-loop line for a viewer");
+  assert.equal(got.store, ONBOARDING_DONE);
+});
+
+test("the card for a viewer without a group: ask a manager, with the user name", () => {
+  const card = startCard(DISMISSED, { ...idle, editor: false, groups: [], workspaceExists: true });
+  assert.deepEqual(statuses(card), ["folder:done", "group:open", "open:skipped"]);
+  assert.deepEqual(card.steps[1].text, [{ id: "onboarding.group.none.viewer", params: { login: "erika" } }]);
+  assert.deepEqual(card.progress.params, { done: 1, total: 2 });
+  assert.equal(card.complete, false);
+});
+
+test("the card: an older server without has_checked_in never completes by itself", () => {
+  const card = startCard(DISMISSED, { ...idle, worklist: { checkouts: [{ project_code: "ROVER" }] } });
+  assert.equal(card.complete, false);
+  assert.equal(card.steps[2].status, "active");
+});
+
 test("every message ID is in both catalogs with the placeholders of English", () => {
   const en = catalog("en"), de = catalog("de");
   const ids = new Set(ONBOARDING_MESSAGE_IDS);
@@ -327,6 +473,20 @@ test("every message ID is in both catalogs with the placeholders of English", ()
   answered.push(...["admin", "editor", "viewer"].map(roleMessage));
   answered.push(...["any", "program", "program_missing", "viewer"].map((k) => "onboarding.open." + k));
   answered.push(loopTip(null, "open").show, loopTip("learned", null).show);
+  // every message of the Home card, in every situation the tests above use
+  answered.push(...Object.values(CARD_STATUS));
+  const worklists = [{ checkouts: [] }, { checkouts: [{ project_code: "ROVER" }] }, { checkouts: [], has_checked_in: true }];
+  for (const facts of [idle, { ...idle, groups: [] }, { ...idle, editor: false }, { ...idle, editor: false, groups: [] },
+    { ...idle, workspaceRootPolicy: true, groupsOnDisk: ["ROVER"] }]) {
+    for (const worklist of worklists) {
+      const card = startCard(DISMISSED, { ...facts, worklist }, { seenOpen: true });
+      answered.push(card.progress.id, ...idsOf(card.lead));
+      for (const s of card.steps) {
+        answered.push(s.name, CARD_STATUS[s.status], ...idsOf(s.text));
+        if (s.note) answered.push(s.note.id);
+      }
+    }
+  }
   for (const id of answered) assert.ok(ids.has(id), id + " is in ONBOARDING_MESSAGE_IDS");
   for (const id of ONBOARDING_MESSAGE_IDS) {
     assert.equal(typeof en[id], "string", id + " is in en.json");

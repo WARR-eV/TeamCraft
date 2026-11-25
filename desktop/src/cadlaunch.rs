@@ -25,19 +25,29 @@
 //!
 //! **A running Inventor** ([`open_in_running`], Windows): when an Inventor
 //! the user started is already running and is the installation [`plan`]
-//! chose, the file opens there when that Inventor has the working folder's
+//! chose – or any installed version, when the project group asks for none
+//! ([`Wish::pins_version`]; with several versions installed the one the user
+//! runs is used instead of starting the newest, #483) –
+//! the file opens there when that Inventor has the working folder's
 //! Inventor project ([`project_file`]) active – or when the working folder
 //! has none: a new instance would start with the same, last active project
 //! anyway (#483). It opens there as a new document window instead of in a second
-//! instance (#350). Inventor is asked through its documented COM interface
+//! instance (#350), and the app brings that window to the front itself
+//! (`AllowSetForegroundWindow`, `SetForegroundWindow` on `MainFrameHWND`):
+//! Windows lets only the foreground process – TeamCraft, at the click –
+//! raise a window, not the background script (research page *Opening a file
+//! in the running CAD program*, #483). Inventor is asked through its documented COM interface
 //! (`GetActiveObject`, `InstallPath`,
 //! `DesignProjectManager.ActiveDesignProject`, `Documents.Open`) by a short
 //! Windows PowerShell script, like the STEP export (`cadexport.rs`); calls
 //! Inventor rejects while busy are asked again for up to 10 s (before the
 //! answer only until [`ASK_DEADLINE_SECS`]). Any other answer starts a new
 //! instance as before, with a note why – also an Inventor that runs in the
-//! user's own session but cannot be asked (started as administrator) or does
-//! not answer within [`ASK_LIMIT`]. An Inventor of another Windows session
+//! user's own session but cannot be asked, with the reason the script found
+//! (Constrained Language mode, TeamCraft or Inventor elevated, still
+//! starting – waited for until the deadline –, busy) or does not answer
+//! within [`ASK_LIMIT`], and a script that did not run at all (the first line
+//! of its error output). An Inventor of another Windows session
 //! (another user) does not count. When the running instance fails to open
 //! the file after it answered, the app is told on the side.
 //!
@@ -355,6 +365,19 @@ pub struct Wish {
     pub group_version: String,
 }
 
+impl Wish {
+    /// Whether the project group asks for one version of the file's
+    /// program (its default program is the file's, with a version). Only
+    /// then must a running Inventor be that installation; otherwise any
+    /// installed version the user already runs opens the file (#483) –
+    /// [`plan`] would choose the newest one, which is no better a guess.
+    pub fn pins_version(&self) -> bool {
+        !self.file_family.is_empty()
+            && self.group_family == self.file_family
+            && !self.group_version.is_empty()
+    }
+}
+
 /// How a file is opened.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct OpenPlan {
@@ -582,20 +605,31 @@ pub fn project_file(file: &Path, root: &Path) -> Option<PathBuf> {
 pub enum Running {
     /// No Inventor the user started runs.
     Nothing,
-    /// It opens the file as a new document window.
-    Opening,
+    /// It opens the file as a new document window. The install folder of
+    /// the running instance when it is another installation than the one
+    /// asked for (only when any version may open the file, see
+    /// [`Wish::pins_version`]); empty = the installation asked for.
+    Opening(String),
     /// Another installation runs (its install folder).
     OtherVersion(String),
     /// It has another project active (its project file; empty = none).
     OtherProject(String),
-    /// It runs, but did not answer: started as administrator (another
-    /// integrity level), still starting, or busy with a dialog – or it did
-    /// not answer within [`ASK_LIMIT`].
-    Unreachable,
+    /// It runs, but could not be asked, with the reason the script found
+    /// (see [`running_note`]): `constrained` (PowerShell in Constrained
+    /// Language mode), `self-elevated` (TeamCraft runs as administrator),
+    /// `elevated` (Inventor does), `starting` (not in the running object
+    /// table or not ready before the deadline), `busy` (it rejected the
+    /// questions, or did not answer within [`ASK_LIMIT`]); empty or unknown =
+    /// no reason known.
+    Unreachable(String),
+    /// The script could not run at all: the first line of its error output
+    /// (an execution policy set by the organization, for example).
+    Failed(String),
 }
 
-/// One line of [`INVENTOR_OPEN_SCRIPT`]'s answer: `none`, `opening`,
-/// `unreachable`, `version <install folder>` or `project <project file>`;
+/// One line of [`INVENTOR_OPEN_SCRIPT`]'s answer: `none`, `opening` (or
+/// `opening <install folder>` for another installation), `unreachable`
+/// (with a reason), `version <install folder>` or `project <project file>`;
 /// `None` for any other line.
 #[cfg_attr(not(windows), allow(dead_code))]
 pub fn parse_answer(line: &str) -> Option<Running> {
@@ -607,10 +641,10 @@ pub fn parse_answer(line: &str) -> Option<Running> {
     };
     match line {
         "none" => Some(Running::Nothing),
-        "opening" => Some(Running::Opening),
-        "unreachable" => Some(Running::Unreachable),
-        _ => rest("version")
-            .map(Running::OtherVersion)
+        _ => rest("opening")
+            .map(Running::Opening)
+            .or_else(|| rest("unreachable").map(Running::Unreachable))
+            .or_else(|| rest("version").map(Running::OtherVersion))
             .or_else(|| rest("project").map(Running::OtherProject)),
     }
 }
@@ -639,10 +673,20 @@ pub fn running_note(
     project: Option<&Path>,
 ) -> Option<String> {
     match running {
-        Running::Nothing | Running::Opening => None,
-        Running::Unreachable => Some(
-            "Inventor is running but did not answer (started as administrator, still starting, or busy with a dialog) – opened in a new instance.".into(),
+        Running::Nothing | Running::Opening(_) => None,
+        Running::Unreachable(why) => Some(match why.as_str() {
+            "constrained" => "Inventor is running, but Windows PowerShell may only run in Constrained Language mode on this computer (a policy of your organization), so TeamCraft cannot ask it – opened in a new instance.".into(),
+            "self-elevated" => "Inventor is running, but TeamCraft runs as administrator and cannot reach an Inventor started normally – start TeamCraft without “Run as administrator”. Opened in a new instance.".into(),
+            "elevated" => "Inventor is running as administrator, so TeamCraft cannot reach it – start Inventor normally. Opened in a new instance.".into(),
+            "starting" => "Inventor is still starting – opened in a new instance.".into(),
+            _ => "Inventor is running but did not answer (busy with a dialog, or started as administrator) – opened in a new instance.".into(),
+        }),
+        Running::Failed(why) if why.is_empty() => Some(
+            "TeamCraft could not ask the running Inventor – opened in a new instance.".into(),
         ),
+        Running::Failed(why) => Some(format!(
+            "TeamCraft could not ask the running Inventor ({why}) – opened in a new instance."
+        )),
         Running::OtherVersion(dir) => Some(format!(
             "{} is running, not {} – opened in a new instance.",
             last_part(dir),
@@ -666,17 +710,37 @@ pub fn running_note(
     }
 }
 
-/// Whether a `tasklist /FO CSV /NH` answer lists the program `image`
-/// (`"Inventor.exe","1234",…`; any other answer, a localised "no tasks"
-/// message too, does not).
+/// The process ids of the program `image` in a `tasklist /FO CSV /NH`
+/// answer (`"Inventor.exe","1234",…`); any other answer, a localised "no
+/// tasks" message too, gives none.
 #[cfg_attr(not(windows), allow(dead_code))]
-pub fn tasklist_has(answer: &str, image: &str) -> bool {
-    answer.lines().any(|line| {
-        line.trim()
-            .strip_prefix('"')
-            .and_then(|l| l.split('"').next())
-            .is_some_and(|name| name.eq_ignore_ascii_case(image))
-    })
+pub fn tasklist_pids(answer: &str, image: &str) -> Vec<u32> {
+    answer
+        .lines()
+        .filter_map(|line| {
+            let rest = line.trim().strip_prefix('"')?;
+            let (name, rest) = rest.split_once('"')?;
+            if !name.eq_ignore_ascii_case(image) {
+                return None;
+            }
+            let pid = rest.strip_prefix(",\"")?.split('"').next()?;
+            pid.parse().ok()
+        })
+        .collect()
+}
+
+/// The line [`INVENTOR_OPEN_SCRIPT`] prints after `opening` with the handle
+/// of Inventor's main window (`window <decimal>`), which the app brings to
+/// the front; `None` for any other line and for a null handle.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn parse_window(line: &str) -> Option<isize> {
+    line.trim()
+        .strip_prefix("window ")?
+        .trim()
+        .parse::<i64>()
+        .ok()
+        .filter(|h| *h != 0)
+        .and_then(|h| isize::try_from(h).ok())
 }
 
 /// Asks a running Inventor to open a file, and answers with one line (see
@@ -686,9 +750,15 @@ pub fn tasklist_has(answer: &str, image: &str) -> bool {
 /// STEP export, `cadexport.rs`), one in another session another user's.
 /// The questions before the answer are asked again only until
 /// [`ASK_DEADLINE_SECS`], so the answer comes within [`ASK_LIMIT`]. After
-/// `opening`, a failure to open the file is one more line ([`parse_failure`]).
+/// `opening`, the main window's handle is one more line ([`parse_window`]),
+/// raised by the app, and so is a failure to open the file
+/// ([`parse_failure`]).
 #[cfg_attr(not(windows), allow(dead_code))]
-pub const INVENTOR_OPEN_SCRIPT: &str = r#"param([Parameter(Mandatory = $true)][string]$Path, [Parameter(Mandatory = $true)][string]$InstallDir, [string]$Project = '')
+pub const INVENTOR_OPEN_SCRIPT: &str = r#"param([Parameter(Mandatory = $true)][string]$Path, [Parameter(Mandatory = $true)][string]$InstallDir, [string]$Project = '', [switch]$AnyVersion)
+# an organization's policy (AppLocker, WDAC) can run scripts in Constrained
+# Language mode: Inventor's COM object cannot be reached there and nothing
+# below would run - say so first, with a cmdlet that works in that mode
+if ($ExecutionContext.SessionState.LanguageMode -ne 'FullLanguage') { Write-Output 'unreachable constrained'; exit 0 }
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 function Say([string]$Line) { [Console]::Out.WriteLine($Line); [Console]::Out.Flush() }
@@ -710,26 +780,50 @@ function Ask([scriptblock]$Do, $Until = $null) {
         }
     }
 }
-try { $app = [Runtime.InteropServices.Marshal]::GetActiveObject('Inventor.Application') }
-catch {
-    # only a visible Inventor in this user's own session counts (#483): another
-    # session's (remote desktop, fast user switching), a hidden automation run
-    # (STEP export) or one shutting down is none for this user
-    $seen = @()
-    try {
-        $own = (Get-Process -Id $PID).SessionId
-        $seen = @(Get-Process -Name Inventor -ErrorAction SilentlyContinue |
-            Where-Object { $_.SessionId -eq $own -and $_.MainWindowHandle -ne [IntPtr]::Zero })
-    } catch { }
-    if ($seen.Count -gt 0) { Say 'unreachable'; exit 0 }
-    Say 'none'; exit 0
-}
 # the answer is due within the app's limit (ASK_LIMIT, PowerShell's start included)
 $deadline = [DateTime]::UtcNow.AddSeconds(14)
+# Inventor enters the running object table once it has started: a visible
+# Inventor of this session that is not there yet is asked again every 500 ms
+while ($true) {
+    try { $app = [Runtime.InteropServices.Marshal]::GetActiveObject('Inventor.Application'); break }
+    catch {
+        # only a visible Inventor in this user's own session counts (#483): another
+        # session's (remote desktop, fast user switching), a hidden automation run
+        # (STEP export) or one shutting down is none for this user
+        $seen = @()
+        try {
+            $own = (Get-Process -Id $PID).SessionId
+            $seen = @(Get-Process -Name Inventor -ErrorAction SilentlyContinue |
+                Where-Object { $_.SessionId -eq $own -and $_.MainWindowHandle -ne [IntPtr]::Zero })
+        } catch { }
+        if ($seen.Count -eq 0) { Say 'none'; exit 0 }
+        # the running object table is kept apart per integrity level: an elevated
+        # TeamCraft cannot reach an Inventor started normally, nor the reverse
+        $admin = $false
+        try { $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) } catch { }
+        if ($admin) { Say 'unreachable self-elevated'; exit 0 }
+        # the program path of an elevated process cannot be read from a normal one
+        if (@($seen | Where-Object { -not $_.Path }).Count -gt 0) { Say 'unreachable elevated'; exit 0 }
+        if ([DateTime]::UtcNow -ge $deadline) { Say 'unreachable starting'; exit 0 }
+        Start-Sleep -Milliseconds 500
+    }
+}
 try {
     if (-not (Ask { $app.Visible } $deadline)) { Say 'none'; exit 0 }
+    # Ready: Inventor has finished starting; without the property it counts as ready
+    while ($true) {
+        try {
+            $ready = [bool](Ask { $app.Ready } $deadline)
+        } catch { $ready = $true }
+        if ($ready) { break }
+        if ([DateTime]::UtcNow -ge $deadline) { Say 'unreachable starting'; exit 0 }
+        Start-Sleep -Milliseconds 500
+    }
     $dir = [string](Ask { $app.InstallPath } $deadline)
-    if (-not (Same $dir $InstallDir)) { Say "version $dir"; exit 0 }
+    # another installation only when the project group asks for no version
+    # (-AnyVersion): with several versions installed, the one the user runs
+    # opens the file instead of a second instance of the newest (#483)
+    if (-not $AnyVersion -and -not (Same $dir $InstallDir)) { Say "version $dir"; exit 0 }
     # without a project file in the working folder there is nothing to compare:
     # a new instance would start with the same (last active) project
     if ($Project) {
@@ -737,14 +831,20 @@ try {
         $active = [string](Ask { $app.DesignProjectManager.ActiveDesignProject.FullFileName } $deadline)
         if (-not (Same $active $Project)) { Say "project $active"; exit 0 }
     }
-} catch { Say 'unreachable'; exit 0 }
-Say 'opening'
-try {
-    $shell = New-Object -ComObject WScript.Shell
-    foreach ($p in @(Get-Process -Name Inventor -ErrorAction SilentlyContinue)) {
-        if ($p.Path -and (Same (Split-Path (Split-Path $p.Path)) $InstallDir)) { [void]$shell.AppActivate($p.Id); break }
-    }
-} catch { }
+    # its main window: the app raises it - the process the user just clicked
+    # in may bring a window to the front, a background script may not (#483)
+    $hwnd = 0
+    try {
+        $hwnd = [int64](Ask { $app.MainFrameHWND } $deadline)
+    } catch { }
+} catch { Say 'unreachable busy'; exit 0 }
+# the install folder is named only when it is another installation
+$where = ''
+if (-not (Same $dir $InstallDir)) { $where = " $dir" }
+Say "opening$where"
+if ($hwnd -ne 0) {
+    Say "window $hwnd"
+}
 # the app no longer waits: a failure is one more line. A document loaded only
 # as a reference of an open assembly has no window – Open shows it.
 try {
@@ -779,7 +879,9 @@ pub fn answer_after(
 ) -> (Running, bool) {
     match received {
         Ok(answer) => (answer, false),
-        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => (Running::Unreachable, true),
+        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+            (Running::Unreachable("busy".into()), true)
+        }
         Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => (Running::Nothing, false),
     }
 }
@@ -788,23 +890,39 @@ pub fn answer_after(
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(not(windows), allow(dead_code))] // `Opened` is only constructed on Windows
 pub enum Reuse {
-    /// The running instance opens the file.
-    Opened,
+    /// The running instance opens the file. The label of that instance
+    /// (`Inventor 2025`) when it is another installation than the one
+    /// [`plan`] chose; empty = the chosen one.
+    Opened(String),
     /// Start a new instance; the note says why a running one was not used
     /// (empty = none runs).
     NewInstance(String),
 }
 
+/// What a running instance's answer means for *Check out and open*: the
+/// note of a new instance (see [`running_note`]), or the file opened there –
+/// with the label of the running installation when it is not `wanted`.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn reuse_after(running: Running, wanted: &Installed, project: Option<&Path>) -> Reuse {
+    match running {
+        Running::Opening(dir) if dir.trim().is_empty() => Reuse::Opened(String::new()),
+        Running::Opening(dir) => Reuse::Opened(last_part(&dir)),
+        other => Reuse::NewInstance(running_note(&other, wanted, project).unwrap_or_default()),
+    }
+}
+
 /// Opens `file` in a running instance of `program` when that is the
-/// installation [`plan`] chose and has the working folder's project active
-/// (#350; Inventor on Windows – anywhere else nothing is asked and a new
-/// instance starts, as before). The answer comes before the file is open:
-/// when the running instance then fails to open it, `failed` gets the reason
-/// (on the side, later).
+/// installation [`plan`] chose – or any installed version when
+/// `any_version` (the project group pins none, [`Wish::pins_version`]) –
+/// and has the working folder's project active (#350; Inventor on Windows –
+/// anywhere else nothing is asked and a new instance starts, as before).
+/// The answer comes before the file is open: when the running instance then
+/// fails to open it, `failed` gets the reason (on the side, later).
 pub fn open_in_running(
     program: &Installed,
     file: &Path,
     root: &Path,
+    any_version: bool,
     failed: impl FnOnce(String) + Send + 'static,
 ) -> Reuse {
     if program.family != "inventor" {
@@ -813,17 +931,83 @@ pub fn open_in_running(
     #[cfg(windows)]
     {
         let project = project_file(file, root);
-        match running::ask(program, file, project.as_deref(), failed) {
-            Running::Opening => Reuse::Opened,
-            other => Reuse::NewInstance(
-                running_note(&other, program, project.as_deref()).unwrap_or_default(),
-            ),
-        }
+        let answer = running::ask(program, file, project.as_deref(), any_version, failed);
+        reuse_after(answer, program, project.as_deref())
     }
     #[cfg(not(windows))]
     {
-        let _ = (file, root, failed);
+        let _ = (file, root, any_version, failed);
         Reuse::NewInstance(String::new())
+    }
+}
+
+/// What a script that ended without an answer said on its error output: the
+/// first line that is not empty, cut at 160 characters ([`Running::Failed`]);
+/// nothing said – [`Running::Nothing`], a new instance without a note.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn script_failure(errors: &str) -> Running {
+    match errors.lines().map(str::trim).find(|l| !l.is_empty()) {
+        None => Running::Nothing,
+        Some(line) => {
+            let mut cut: String = line.chars().take(160).collect();
+            if cut.len() < line.len() {
+                cut.push('…');
+            }
+            Running::Failed(cut)
+        }
+    }
+}
+
+/// Bringing Inventor's window to the front (#483): Windows lets only the
+/// process the user works in – TeamCraft, at the click – set the foreground
+/// window, or a process it allowed; a background script cannot.
+#[cfg(windows)]
+mod foreground {
+    use std::ffi::c_void;
+
+    #[link(name = "user32")]
+    extern "system" {
+        fn AllowSetForegroundWindow(process_id: u32) -> i32;
+        fn GetWindowThreadProcessId(window: *mut c_void, process_id: *mut u32) -> u32;
+        fn IsWindow(window: *mut c_void) -> i32;
+        fn IsIconic(window: *mut c_void) -> i32;
+        fn ShowWindow(window: *mut c_void, command: i32) -> i32;
+        fn SetForegroundWindow(window: *mut c_void) -> i32;
+    }
+
+    /// `ShowWindow`: restore a minimized window.
+    const SW_RESTORE: i32 = 9;
+
+    /// Lets the process `pid` bring its own windows (and dialogs) to the
+    /// front.
+    pub fn allow(pid: u32) {
+        // SAFETY: a plain value argument; a refusal only leaves it behind.
+        unsafe {
+            AllowSetForegroundWindow(pid);
+        }
+    }
+
+    /// Restores (when minimized) and raises the window `handle` – only when
+    /// it belongs to one of `pids`, the Inventor processes seen running.
+    pub fn raise(handle: isize, pids: &[u32]) {
+        let window = handle as *mut c_void;
+        // SAFETY: the calls take a window handle and plain values; the handle
+        // is checked with IsWindow first, and a stale one only makes them fail.
+        unsafe {
+            if IsWindow(window) == 0 {
+                return;
+            }
+            let mut pid = 0u32;
+            GetWindowThreadProcessId(window, &mut pid);
+            if !pids.contains(&pid) {
+                return;
+            }
+            AllowSetForegroundWindow(pid);
+            if IsIconic(window) != 0 {
+                ShowWindow(window, SW_RESTORE);
+            }
+            SetForegroundWindow(window);
+        }
     }
 }
 
@@ -831,7 +1015,7 @@ pub fn open_in_running(
 mod running {
     use super::*;
     use std::{
-        io::BufRead,
+        io::{BufRead, Read},
         os::windows::process::CommandExt,
         process::{Command, Stdio},
         sync::mpsc,
@@ -839,28 +1023,57 @@ mod running {
 
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-    /// Whether an Inventor process runs at all – `tasklist` starts much
-    /// faster than PowerShell, which is then only started when one does.
-    fn inventor_runs() -> bool {
+    /// The ids of the running Inventor processes – `tasklist` starts much
+    /// faster than PowerShell, which is then only started when one runs.
+    fn inventor_pids() -> Vec<u32> {
         Command::new("tasklist")
             .args(["/FI", "IMAGENAME eq Inventor.exe", "/FO", "CSV", "/NH"])
             .creation_flags(CREATE_NO_WINDOW)
             .output()
-            .is_ok_and(|o| tasklist_has(&String::from_utf8_lossy(&o.stdout), "Inventor.exe"))
+            .map(|o| tasklist_pids(&String::from_utf8_lossy(&o.stdout), "Inventor.exe"))
+            .unwrap_or_default()
+    }
+
+    /// The first 4 KiB of the script's error output, read on the side so that
+    /// the script never blocks on a full pipe.
+    fn first_errors(err: std::process::ChildStderr) -> std::thread::JoinHandle<String> {
+        std::thread::spawn(move || {
+            const KEEP: usize = 4096;
+            let mut err = err;
+            let mut kept = Vec::new();
+            let mut buf = [0u8; 1024];
+            loop {
+                match err.read(&mut buf) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        let room = KEEP.saturating_sub(kept.len());
+                        kept.extend_from_slice(&buf[..n.min(room)]);
+                    }
+                }
+            }
+            String::from_utf8_lossy(&kept).into_owned()
+        })
     }
 
     pub fn ask(
         program: &Installed,
         file: &Path,
         project: Option<&Path>,
+        any_version: bool,
         failed: impl FnOnce(String) + Send + 'static,
     ) -> Running {
         // Bin\Inventor.exe → the install folder Inventor reports
         let Some(install) = program.path.parent().and_then(Path::parent) else {
             return Running::Nothing;
         };
-        if !inventor_runs() {
+        let pids = inventor_pids();
+        if pids.is_empty() {
             return Running::Nothing;
+        }
+        // TeamCraft has the foreground (the user just clicked): Inventor may
+        // bring its windows and dialogs to the front while it opens the file
+        for pid in &pids {
+            super::foreground::allow(*pid);
         }
         let script = std::env::temp_dir().join(format!(
             "teamcraft-open-in-inventor-{}-{}.ps1",
@@ -889,10 +1102,13 @@ mod running {
         if let Some(project) = project {
             command.arg("-Project").arg(project);
         }
+        if any_version {
+            command.arg("-AnyVersion");
+        }
         let mut child = match command
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .creation_flags(CREATE_NO_WINDOW)
             .spawn()
         {
@@ -902,8 +1118,10 @@ mod running {
                 return Running::Nothing;
             }
         };
+        let errors = child.stderr.take().map(first_errors);
         let (tx, rx) = mpsc::channel();
         if let Some(out) = child.stdout.take() {
+            let pids = pids.clone();
             std::thread::spawn(move || {
                 let mut answered = false;
                 let mut failed = Some(failed);
@@ -920,11 +1138,21 @@ mod running {
                         if let Some(report) = failed.take() {
                             report(why);
                         }
+                    } else if let Some(window) = parse_window(&line) {
+                        // after `opening`: Inventor's main window to the front
+                        super::foreground::raise(window, &pids);
                     }
                 }
             });
         }
-        let (answer, stuck) = answer_after(rx.recv_timeout(ASK_LIMIT));
+        let received = rx.recv_timeout(ASK_LIMIT);
+        let ended_silently = matches!(received, Err(mpsc::RecvTimeoutError::Disconnected));
+        let (mut answer, stuck) = answer_after(received);
+        if ended_silently {
+            // no answer at all (an execution policy, for example): say why
+            let said = errors.and_then(|e| e.join().ok()).unwrap_or_default();
+            answer = script_failure(&said);
+        }
         // the script goes on opening the file; collected on the side
         std::thread::spawn(move || {
             if stuck {
@@ -1188,8 +1416,35 @@ mod tests {
     #[test]
     fn the_running_inventor_answers_are_read() {
         assert_eq!(parse_answer("none\r"), Some(Running::Nothing));
-        assert_eq!(parse_answer(" opening "), Some(Running::Opening));
-        assert_eq!(parse_answer("unreachable"), Some(Running::Unreachable));
+        assert_eq!(
+            parse_answer(" opening "),
+            Some(Running::Opening(String::new()))
+        );
+        // another installation opens it (the group pins no version, #483)
+        assert_eq!(
+            parse_answer(r"opening C:\Program Files\Autodesk\Inventor 2025\"),
+            Some(Running::Opening(
+                r"C:\Program Files\Autodesk\Inventor 2025\".into()
+            ))
+        );
+        assert_eq!(parse_answer("openings"), None);
+        assert_eq!(
+            parse_answer("unreachable"),
+            Some(Running::Unreachable(String::new()))
+        );
+        // with the reason the script found (#483)
+        for why in [
+            "constrained",
+            "self-elevated",
+            "elevated",
+            "starting",
+            "busy",
+        ] {
+            assert_eq!(
+                parse_answer(&format!("unreachable {why}\r")),
+                Some(Running::Unreachable(why.into()))
+            );
+        }
         assert_eq!(
             parse_answer(r"version C:\Program Files\Autodesk\Inventor 2025\"),
             Some(Running::OtherVersion(
@@ -1210,9 +1465,11 @@ mod tests {
         assert_eq!(parse_answer("projects x"), None);
         assert_eq!(parse_answer("WARNING: something"), None);
         assert_eq!(parse_answer(""), None);
-        // the word alone, never a prefix of it
-        assert_eq!(parse_answer("unreachable \r"), Some(Running::Unreachable));
-        assert_eq!(parse_answer("unreachable x"), None);
+        // the word, never a prefix of it
+        assert_eq!(
+            parse_answer("unreachable \r"),
+            Some(Running::Unreachable(String::new()))
+        );
         assert_eq!(parse_answer("unreachables"), None);
         // a failure after `opening` is not an answer
         assert_eq!(parse_answer("failed The file is locked."), None);
@@ -1237,7 +1494,10 @@ mod tests {
         // tasklist saw Inventor, the script did not answer within ASK_LIMIT:
         // the script is stopped, and the note says why a new instance starts
         let (answer, stop) = answer_after(Err(RecvTimeoutError::Timeout));
-        assert_eq!((answer.clone(), stop), (Running::Unreachable, true));
+        assert_eq!(
+            (answer.clone(), stop),
+            (Running::Unreachable("busy".into()), true)
+        );
         assert!(running_note(&answer, &wanted, None)
             .unwrap()
             .starts_with("Inventor is running but did not answer"));
@@ -1247,8 +1507,8 @@ mod tests {
             (Running::Nothing, false)
         );
         assert_eq!(
-            answer_after(Ok(Running::Opening)),
-            (Running::Opening, false)
+            answer_after(Ok(Running::Opening(String::new()))),
+            (Running::Opening(String::new()), false)
         );
     }
 
@@ -1269,46 +1529,95 @@ mod tests {
         assert_eq!(
             says,
             vec![
-                // not in the ROT: a visible Inventor in this session, or none
-                "unreachable",
+                // not in the running object table: none in this session, or
+                // why a visible one of this session cannot be reached (#483)
                 "none",
+                "unreachable self-elevated",
+                "unreachable elevated",
+                "unreachable starting",
+                // asked: not visible, not ready in time, another version or
+                // project, busy
                 "none",
+                "unreachable starting",
                 "version $dir",
                 "project $active",
-                "unreachable",
-                "opening",
+                "unreachable busy",
+                "opening$where",
+                // after the answer: the window to raise, a failure to open
+                "window $hwnd",
                 "failed $why"
             ]
         );
-        let (answers, after) = says.split_at(says.len() - 1);
+        let (answers, after) = says.split_at(says.len() - 2);
         for said in answers {
-            let line = said
-                .replace("$dir", r"C:\x")
-                .replace("$active", r"C:\p.ipj");
-            assert!(parse_answer(&line).is_some(), "{line}");
+            for place in ["", r" C:\x"] {
+                let line = said
+                    .replace("$dir", r"C:\x")
+                    .replace("$active", r"C:\p.ipj")
+                    .replace("$where", place);
+                assert!(parse_answer(&line).is_some(), "{line}");
+            }
         }
+        // Constrained Language mode is told first, with a cmdlet that works
+        // there, before anything that would fail in that mode (#483)
+        let constrained = INVENTOR_OPEN_SCRIPT
+            .find("if ($ExecutionContext.SessionState.LanguageMode -ne 'FullLanguage') { Write-Output 'unreachable constrained'; exit 0 }")
+            .unwrap();
+        assert!(constrained < INVENTOR_OPEN_SCRIPT.find("[Console]::").unwrap());
+        assert_eq!(
+            parse_answer("unreachable constrained"),
+            Some(Running::Unreachable("constrained".into()))
+        );
+        // another installation is used only when the group pins no version
+        // (#483), and it is named in the answer
+        assert!(INVENTOR_OPEN_SCRIPT.contains(
+            "if (-not $AnyVersion -and -not (Same $dir $InstallDir)) { Say \"version $dir\""
+        ));
+        assert!(INVENTOR_OPEN_SCRIPT
+            .contains("if (-not (Same $dir $InstallDir)) { $where = \" $dir\" }"));
+        // the window is raised by the app, not by the background script
+        // (Windows lets only the foreground process do it, #483)
+        assert!(INVENTOR_OPEN_SCRIPT.contains("Ask { $app.MainFrameHWND } $deadline"));
+        assert!(!INVENTOR_OPEN_SCRIPT.contains("AppActivate"));
+        assert!(!INVENTOR_OPEN_SCRIPT.contains("WScript.Shell"));
+        let window = after[0].replace("$hwnd", "132456");
+        assert_eq!(parse_answer(&window), None);
+        assert_eq!(parse_failure(&window), None);
+        assert_eq!(parse_window(&window), Some(132456));
         // the failure after `opening` is its own line, never an answer
-        let failed = after[0].replace("$why", "Locked.");
+        let failed = after[1].replace("$why", "Locked.");
         assert_eq!(parse_answer(&failed), None);
+        assert_eq!(parse_window(&failed), None);
         assert_eq!(parse_failure(&failed).as_deref(), Some("Locked."));
         // the answer comes before the file is opened (a large assembly loads
         // for minutes), and only the user's visible instance is used
-        let opening = INVENTOR_OPEN_SCRIPT.find("Say 'opening'").unwrap();
+        let opening = INVENTOR_OPEN_SCRIPT.find("Say \"opening$where\"").unwrap();
+        assert!(INVENTOR_OPEN_SCRIPT.find("Say \"window $hwnd\"").unwrap() > opening);
         assert!(INVENTOR_OPEN_SCRIPT.find("Documents.Open").unwrap() > opening);
         assert!(INVENTOR_OPEN_SCRIPT.contains("if (-not (Ask { $app.Visible } $deadline))"));
         assert!(!INVENTOR_OPEN_SCRIPT.contains("New-Object -ComObject 'Inventor.Application'"));
         // not in the ROT (#483): only a visible Inventor of this user's own
-        // Windows session is one that did not answer – another session's or
-        // a hidden automation run is none
+        // Windows session is one that cannot be reached – another session's
+        // or a hidden automation run is none; a starting one is asked again
+        // until the deadline, which is set before the first question
         let rot = INVENTOR_OPEN_SCRIPT.find("GetActiveObject").unwrap();
-        let first_catch =
-            &INVENTOR_OPEN_SCRIPT[rot..INVENTOR_OPEN_SCRIPT.find("$deadline =").unwrap()];
+        assert!(INVENTOR_OPEN_SCRIPT.find("$deadline =").unwrap() < rot);
+        let guarded = INVENTOR_OPEN_SCRIPT
+            .find("try {\n    if (-not (Ask { $app.Visible }")
+            .unwrap();
+        let first_catch = &INVENTOR_OPEN_SCRIPT[rot..guarded];
         assert!(
             first_catch.contains("$_.SessionId -eq $own"),
             "{first_catch}"
         );
         assert!(first_catch.contains("MainWindowHandle -ne [IntPtr]::Zero"));
-        assert!(first_catch.contains("Say 'none'"));
+        assert!(first_catch.contains("if ($seen.Count -eq 0) { Say 'none'; exit 0 }"));
+        assert!(first_catch
+            .contains("IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)"));
+        assert!(first_catch.contains(
+            "if ([DateTime]::UtcNow -ge $deadline) { Say 'unreachable starting'; exit 0 }"
+        ));
+        assert!(first_catch.contains("Start-Sleep -Milliseconds 500"));
         // after `opening` every failure is caught and reported, and only a
         // document with a window is activated
         let open = &INVENTOR_OPEN_SCRIPT[opening..];
@@ -1334,9 +1643,9 @@ mod tests {
 
     /// Every question to Inventor goes through `Ask` (asked again while
     /// busy), and every one before the answer is inside the `try` that
-    /// answers `unreachable` and stops at the deadline. Inventor's objects
-    /// are held only in `$app`, `$d` and `$doc`: every member access on them
-    /// is inside an `Ask { … }` on its line.
+    /// answers `unreachable busy` and stops at the deadline. Inventor's
+    /// objects are held only in `$app`, `$d` and `$doc`: every member access
+    /// on them is inside an `Ask { … }` on its line.
     #[test]
     fn every_question_to_inventor_is_asked_again_and_answered() {
         let script = INVENTOR_OPEN_SCRIPT;
@@ -1353,22 +1662,24 @@ mod tests {
                 }
             }
         }
-        // no other variable keeps one of Inventor's objects
+        // no other variable keeps one of Inventor's objects ($ready and
+        // $hwnd hold a yes/no and a number)
         for line in script[rot..].lines() {
             let held = line.trim_start().split_once(" = ").map(|(v, _)| v);
             if let Some(var) = held.filter(|_| line.contains("Ask {")) {
                 assert!(
-                    ["$dir", "$active", "$doc"].contains(&var),
+                    ["$dir", "$active", "$doc", "$ready", "$hwnd"].contains(&var),
                     "an object of Inventor kept in {var}: {line}"
                 );
             }
         }
-        let opening = script.find("Say 'opening'").unwrap();
-        let guarded = script.find("$deadline =").unwrap();
-        let start = guarded + script[guarded..].find("try {").unwrap();
-        let end = guarded
-            + script[guarded..]
-                .find("} catch { Say 'unreachable'")
+        let opening = script.find("Say \"opening$where\"").unwrap();
+        let start = script
+            .find("try {\n    if (-not (Ask { $app.Visible }")
+            .unwrap();
+        let end = start
+            + script[start..]
+                .find("} catch { Say 'unreachable busy'")
                 .unwrap();
         assert!(end < opening);
         let mut asked = 0;
@@ -1380,7 +1691,8 @@ mod tests {
             asked += 1;
             assert!(line.contains("} $deadline"), "no deadline: {line}");
         }
-        assert_eq!(asked, 3);
+        // Visible, Ready, InstallPath, the active project, the main window
+        assert_eq!(asked, 5);
     }
 
     /// The questions before the answer stop at the deadline, which leaves
@@ -1401,7 +1713,10 @@ mod tests {
     fn notes_say_why_a_new_instance_starts() {
         let wanted = inst("inventor", "2026");
         assert_eq!(running_note(&Running::Nothing, &wanted, None), None);
-        assert_eq!(running_note(&Running::Opening, &wanted, None), None);
+        assert_eq!(
+            running_note(&Running::Opening(String::new()), &wanted, None),
+            None
+        );
         let other = Running::OtherVersion(r"C:\Program Files\Autodesk\Inventor 2025\".into());
         assert_eq!(
             running_note(&other, &wanted, None).unwrap(),
@@ -1431,28 +1746,101 @@ mod tests {
             running_note(&none, &wanted, None).unwrap(),
             "Inventor is running with no project – opened in a new instance."
         );
-        let note = running_note(&Running::Unreachable, &wanted, None).unwrap();
+        let note = running_note(&Running::Unreachable(String::new()), &wanted, None).unwrap();
         assert!(
             note.starts_with("Inventor is running but did not answer"),
             "{note}"
         );
         assert!(note.contains("administrator"), "{note}");
+        // each reason the script found has its own note (#483)
+        let note =
+            |why: &str| running_note(&Running::Unreachable(why.into()), &wanted, None).unwrap();
+        assert!(note("constrained").contains("Constrained Language mode"));
+        assert!(note("self-elevated").contains("TeamCraft runs as administrator"));
+        assert!(note("elevated").contains("Inventor is running as administrator"));
+        assert!(note("starting").contains("still starting"));
+        assert!(note("busy").starts_with("Inventor is running but did not answer"));
+        assert!(note("anything else").starts_with("Inventor is running but did not answer"));
+        for why in [
+            "constrained",
+            "self-elevated",
+            "elevated",
+            "starting",
+            "busy",
+        ] {
+            assert!(
+                note(why).ends_with("opened in a new instance.")
+                    || note(why).ends_with("Opened in a new instance."),
+                "{why}"
+            );
+        }
+        // a script that could not run says why
+        assert_eq!(
+            running_note(&Running::Failed("Scripts are disabled.".into()), &wanted, None).unwrap(),
+            "TeamCraft could not ask the running Inventor (Scripts are disabled.) – opened in a new instance."
+        );
+        assert_eq!(
+            running_note(&Running::Failed(String::new()), &wanted, None).unwrap(),
+            "TeamCraft could not ask the running Inventor – opened in a new instance."
+        );
+    }
+
+    #[test]
+    fn a_script_that_did_not_run_says_why() {
+        // the first line of the error output, cut at 160 characters
+        let policy = "\r\nFile C:\\t\\x.ps1 cannot be loaded because running scripts is disabled on this system.\r\nAt line:1 char:1\r\n";
+        assert_eq!(
+            script_failure(policy),
+            Running::Failed(
+                r"File C:\t\x.ps1 cannot be loaded because running scripts is disabled on this system."
+                    .into()
+            )
+        );
+        let long = "x".repeat(400);
+        match script_failure(&long) {
+            Running::Failed(cut) => {
+                assert_eq!(cut.chars().count(), 161);
+                assert!(cut.ends_with('…'));
+            }
+            other => panic!("{other:?}"),
+        }
+        // nothing said: nothing to tell (a new instance without a note)
+        assert_eq!(script_failure(""), Running::Nothing);
+        assert_eq!(script_failure(" \r\n\n"), Running::Nothing);
+    }
+
+    #[test]
+    fn the_window_line_is_read() {
+        assert_eq!(parse_window("window 132456\r"), Some(132456));
+        assert_eq!(parse_window(" window  987 "), Some(987));
+        // a null or broken handle raises nothing
+        assert_eq!(parse_window("window 0"), None);
+        assert_eq!(parse_window("window"), None);
+        assert_eq!(parse_window("window x"), None);
+        assert_eq!(parse_window("windows 5"), None);
+        assert_eq!(parse_window("opening"), None);
     }
 
     #[test]
     fn tasklist_answers_are_read() {
         let running = "\"Inventor.exe\",\"10244\",\"Console\",\"1\",\"1.234.567 K\"\r\n";
-        assert!(tasklist_has(running, "Inventor.exe"));
-        assert!(tasklist_has(&running.to_lowercase(), "Inventor.exe"));
-        assert!(!tasklist_has(
+        assert_eq!(tasklist_pids(running, "Inventor.exe"), vec![10244]);
+        assert_eq!(
+            tasklist_pids(&running.to_lowercase(), "Inventor.exe"),
+            vec![10244]
+        );
+        // two instances (two versions side by side)
+        let two =
+            format!("{running}\"Inventor.exe\",\"5120\",\"Console\",\"1\",\"2,345,678 K\"\r\n");
+        assert_eq!(tasklist_pids(&two, "Inventor.exe"), vec![10244, 5120]);
+        assert!(tasklist_pids(
             "INFORMATION: Es werden keine Aufgaben mit den angegebenen Kriterien ausgeführt.\r\n",
             "Inventor.exe"
-        ));
-        assert!(!tasklist_has(
-            "\"InventorHelper.exe\",\"1\"",
-            "Inventor.exe"
-        ));
-        assert!(!tasklist_has("", "Inventor.exe"));
+        )
+        .is_empty());
+        assert!(tasklist_pids("\"InventorHelper.exe\",\"1\"", "Inventor.exe").is_empty());
+        assert!(tasklist_pids("\"Inventor.exe\",\"x\"", "Inventor.exe").is_empty());
+        assert!(tasklist_pids("", "Inventor.exe").is_empty());
     }
 
     #[test]
@@ -1460,13 +1848,64 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("a.sldprt");
         assert_eq!(
-            open_in_running(&inst("solidworks", "2025"), &file, dir.path(), |_| {}),
+            open_in_running(&inst("solidworks", "2025"), &file, dir.path(), true, |_| {}),
             Reuse::NewInstance(String::new())
         );
         #[cfg(not(windows))]
         assert_eq!(
-            open_in_running(&inst("inventor", "2026"), &file, dir.path(), |_| {}),
+            open_in_running(&inst("inventor", "2026"), &file, dir.path(), true, |_| {}),
             Reuse::NewInstance(String::new())
+        );
+    }
+
+    #[test]
+    fn only_a_group_with_a_version_pins_the_running_installation() {
+        let wish = |file: &str, group: &str, version: &str| Wish {
+            file_family: file.into(),
+            group_family: group.into(),
+            group_version: version.into(),
+        };
+        // the group's default program with a version: that installation only
+        assert!(wish("inventor", "inventor", "2025").pins_version());
+        // no default, a default without a version, another program's file or
+        // a neutral file: any version the user already runs (#483)
+        assert!(!wish("inventor", "", "").pins_version());
+        assert!(!wish("inventor", "inventor", "").pins_version());
+        assert!(!wish("inventor", "solidworks", "2024").pins_version());
+        assert!(!wish("", "", "").pins_version());
+    }
+
+    #[test]
+    fn a_running_instance_of_another_version_is_named() {
+        let wanted = inst("inventor", "2026");
+        // the chosen installation opened it: nothing more to say
+        assert_eq!(
+            reuse_after(Running::Opening(String::new()), &wanted, None),
+            Reuse::Opened(String::new())
+        );
+        // another installation opened it (the group pins no version)
+        assert_eq!(
+            reuse_after(
+                Running::Opening(r"C:\Program Files\Autodesk\Inventor 2025\".into()),
+                &wanted,
+                None
+            ),
+            Reuse::Opened("Inventor 2025".into())
+        );
+        // any other answer starts a new instance, with the note why
+        assert_eq!(
+            reuse_after(Running::Nothing, &wanted, None),
+            Reuse::NewInstance(String::new())
+        );
+        assert_eq!(
+            reuse_after(
+                Running::OtherVersion(r"C:\Program Files\Autodesk\Inventor 2025".into()),
+                &wanted,
+                None
+            ),
+            Reuse::NewInstance(
+                "Inventor 2025 is running, not Inventor 2026 – opened in a new instance.".into()
+            )
         );
     }
 }

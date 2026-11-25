@@ -91,6 +91,13 @@ async fn attribute_binds(pool: &PgPool, filter: &ItemFilter) -> AppResult<Attrib
 /// the latest revision are checked afterwards), and the total comes from the
 /// same query (`COUNT(*) OVER ()`). Without such a filter only the requested
 /// page of items (by number) is looked up, and the total is a plain count.
+///
+/// Every candidate branch is index-backed (trigram GIN on number, name,
+/// description, material, attribute values and file name; GIN on both
+/// search vectors; `files_format_idx`), so the cost grows with the number of
+/// matches, not with the vault. A query that names a file format can match
+/// most of the vault; for those rows the format is checked before the text
+/// conditions (#316).
 pub async fn search(
     pool: &PgPool,
     actor: &Actor,
@@ -141,8 +148,18 @@ pub async fn search(
           AND ($11::text IS NULL OR i.classification = $11)
           AND {visible}"
     );
+    // A query that names a file format ("solidworks", "step") matches most
+    // of a vault through that format (#316: 73 % of the items of the scale
+    // check). The format of a file of the latest revision is therefore
+    // checked first: PostgreSQL evaluates the arms of an OR in order and
+    // stops at the first true one, so such rows skip the substring and
+    // full-text checks. The arm is implied by FILE_MATCH below, so the rows
+    // and the total stay exactly the same; without a named format it is
+    // skipped by its first condition.
     let where_ = format!(
         "($1::text IS NULL
+               OR (cardinality($6::text[]) > 0 AND EXISTS (
+                     SELECT 1 FROM files nf WHERE nf.revision_id = lr.id AND nf.format = ANY($6::text[])))
                OR i.number ILIKE $1 OR lr.name ILIKE $1 OR lr.description ILIKE $1 OR lr.material ILIKE $1
                OR jsonb_path_query_array(lr.attributes, '$.*')::text ILIKE $1
                OR ($5::text IS NOT NULL AND lr.search_vector @@ to_tsquery('simple', $5))

@@ -7,7 +7,7 @@ import { tabInputs } from "./report-inputs.js";
 import { loadLocks, renderLocks } from "./lock-overview.js";
 import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
 import { canEdit, refreshWorklistCount } from "./shell.js";
-import { emptyHint, selectView, serverUrl } from "./navigator.js";
+import { selectView, serverUrl } from "./navigator.js";
 import { rememberRecent, worklistSummary } from "./home-rules.js";
 import { t } from "/static/shared/js/i18n.js";
 import { assistantContextChanged } from "./assistant.js";
@@ -17,6 +17,7 @@ import { disposeViewer } from "./workspace.js";
 import { loadChange, openChange, renderChange } from "./change.js";
 import { loadRequest, openRequest, renderRequest } from "./requests.js";
 import { newItemDialog } from "./dialogs.js";
+import { homeStartCard } from "./onboarding.js";
 import { dropSlot, keysToClose, moveBy, moveItem, stepIndex } from "./tab-order.js";
 
 // ======================================================================
@@ -470,6 +471,8 @@ function openRecent(e) {
  * show – the worklist only as counts that open the Worklist, the product
  * counts, the objects opened lately on this computer and the recent activity
  * on the server (GET /activity). The worklist itself is the Worklist view.
+ * Once the worklist is known, the *Getting started* card for users who
+ * closed the wizard early goes above the counts (onboarding.js homeStartCard).
  */
 export function renderWelcome(body, toolbar) {
   append(toolbar, [
@@ -481,7 +484,8 @@ export function renderWelcome(body, toolbar) {
   var files = /Mac/.test(navigator.platform) ? "⌘1" : "Ctrl+1";
   var summary = h("p.home-summary", { role: "status" });
   var welcome = h("div.welcome", null, [
-    h("h1", { text: "Home" }),
+    // focusable from code: *Hide* on the Getting started card leaves the focus here
+    h("h1", { text: "Home", tabindex: "-1" }),
     h("p.muted", { text: "Find your files in Files (" + files + ") or press " + search + " to search." }),
     // why a viewer account has no editing buttons, like the web dashboard (#423)
     canEdit() ? null : h("p.small.dim.viewer-note", { text: t("empty.viewer_note") }),
@@ -495,7 +499,7 @@ export function renderWelcome(body, toolbar) {
       var open = function () { openRecent(e); };
       return { cells: [recordLink(e.title, open), e.kind === "change" ? "Change order" : e.kind === "request" ? "Change request" : "Revision"],
         open: open, single: true };
-    })) : emptyHint("What you open here – revisions, changes, requests – is listed for a quick way back.")]));
+    })) : h("p.empty", { text: "What you open here – revisions, changes, requests – is listed for a quick way back." })]));
   var activity = h("section.panel", null, [h("div.panel-head", null, [h("h2", { text: "Recent activity" })]),
     h("p.small.dim", { text: "Loading…" })]);
   append(columns, activity);
@@ -505,7 +509,7 @@ export function renderWelcome(body, toolbar) {
     append(activity, entries && entries.length ? table(["When", "Who", "What"], entries.map(function (a) {
       return { cells: [h("span.nowrap", { text: fmtDate(a.at) }),
         h("span", { title: a.username, text: a.user_display_name || a.username }), a.summary] };
-    })) : emptyHint("No activity yet."));
+    })) : h("p.empty", { text: "No activity yet." }));
   }, function () {
     // an older server has no /activity: Home goes without
     activity.remove();
@@ -524,6 +528,10 @@ export function renderWelcome(body, toolbar) {
       stat(s.items, "Items"), stat(s.revisions_in_work, "WIP"), stat(s.revisions_in_review, "In Review"),
       stat(s.revisions_released, "Released"), stat(s.open_changes, "Open changes"), stat(fmtSize(s.stored_bytes), s.files + " files in the vault")
     ]), columns);
+    // a Home drawn again meanwhile has its own card
+    homeStartCard(wl).then(function (card) {
+      if (card && welcome.isConnected) welcome.insertBefore(card, welcome.querySelector(".stats") || columns);
+    });
   };
   append(welcome, columns);
   if (w) fill(w);

@@ -121,5 +121,18 @@
   "onboarding.back": "Back",
   "onboarding.dismiss": "Don't show again",
   "onboarding.tip.loop": "A check-out only locks it – Cancel check-out undoes it without a new version. Save in your CAD program as usual, then Check in… here or in your worklist.",
-  "onboarding.tip.loop_done": "This is your daily loop: Check out and open → save in CAD → Check in…"
+  "onboarding.tip.loop_done": "This is your daily loop: Check out and open → save in CAD → Check in…",
+  "onboarding.card.lead": "You closed Getting started early – these steps tick themselves as you work.",
+  "onboarding.card.progress": "{done} of {total} done",
+  "onboarding.card.status.open": "to do",
+  "onboarding.card.status.active": "begun",
+  "onboarding.card.group.editor": "The files of {group} come into {folder} with your first check-out – or get the whole group with Get… under Projects.",
+  "onboarding.card.group.viewer": "Get… under Projects copies the files of {group} into {folder}.",
+  "onboarding.card.open": "Open an assembly of {group} and choose Check out and open.",
+  "onboarding.card.complete": "Every step is done – this card does not come back.",
+  "onboarding.card.open_wizard": "Open Getting started…",
+  "onboarding.card.hide": "Hide",
+  "onboarding.card.hide.label": "Hide Getting started",
+  "onboarding.card.hide.title": "Hide this card for this connection – Help → Getting Started… still opens the wizard.",
+  "onboarding.card.hidden": "Getting started is hidden – Help → Getting Started… opens it again."
 }

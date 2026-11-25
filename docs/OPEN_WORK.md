@@ -241,10 +241,16 @@ Requested by the user as the current top priority (before sections 1 and 2).
 - [x] Desktop: a running Inventor with the working folder's project (`.ipj`) opens the file as a new window instead
   of a second instance (#350, COM through Windows PowerShell); no opening after a cancelled or failed Get (#348); the
   worklist navigator follows actions in the tabs (#347).
-- [ ] Left: try the reuse of a running Inventor (#350) with real Inventor installations – `InstallPath`,
-  `ActiveDesignProject`, `Documents.VisibleDocuments`, `Documents.Open` and bringing the window to the front are
-  untested here, and so are the session/window check of an Inventor missing from the ROT and the `failed` report
-  after `opening` (#483, #508).
+- [x] Desktop: a running Inventor of any installed version opens the file when the group names no version; the app
+  raises Inventor's window itself (`AllowSetForegroundWindow`, `MainFrameHWND`); a starting Inventor is waited for;
+  the note says why a running one could not be asked (constrained PowerShell, elevation, starting, busy, a script that
+  did not run) – research page *Opening a file in the running CAD program* (#483)
+- [ ] Left: try the reuse of a running Inventor (#350) with real Inventor installations – `InstallPath`, `Ready`,
+  `ActiveDesignProject`, `MainFrameHWND`, `Documents.VisibleDocuments`, `Documents.Open` and the raised window are
+  untested here, and so are the session/window check of an Inventor missing from the ROT, the elevation reasons and
+  the `failed` report after `opening` – the manual test in the release checklist (#483, #508). Open decisions from the
+  research page: no second instance behind a busy or starting Inventor (R4), switching the project of an Inventor
+  without open documents (R5), the shell association as a fallback (R7), direct COM from Rust (R8)
 - [ ] Left: try it on Windows with real installations (Inventor 2025/2026 side by side, SOLIDWORKS – the registry
   keys, Solid Edge, NX, Creo, CATIA) and on macOS; the install folders and the SOLIDWORKS registry keys are the
   installers' usual defaults, untested here. Versions of other programs than Inventor are not read from the files
@@ -716,7 +722,7 @@ real files and belong to section 3 once such files are at hand.
 - [x] First-start wizard (#422): *Getting started* in the desktop app is a read-only, CAD-neutral hand-over – where
   your files go, your project group, your first assembly (*Show* opens its revision tab with *Check out and open*
   highlighted); it creates no file or folder, remembered per saved connection (research page *The first start of the
-  desktop app*). Follow-ups: a self-ticking *Getting started* card on Home for users who closed the wizard early,
+  desktop app*). Follow-ups: the self-ticking *Getting started* card on Home for users who closed the wizard early is done (`startCard`); left:
   the size and file count of a whole-group *Get* before it starts (`group-sync.js`), a read-only view of a group's
   CAD setup for its managers on the Projects page
 - [ ] CAD project setup without generated files (#478): team-owned project and configuration files of the CAD
@@ -817,7 +823,7 @@ needs an issue with a reason first (see *Direction*).
   wizard *Getting started*, #423 empty states that name the next step (web and desktop, by role, i18n catalogs).
   Left: #424 new desktop screenshots; follow-ups – *Revise and check out* for released parts (#415), a list picture
   for revisions with only STEP or mesh files (#420: a fallback rendered from the 3D preview needs
-  `thumbnail::supports` and `cadformat` widened), the *Getting started* follow-ups (#422: Home checklist card,
+  `thumbnail::supports` and `cadformat` widened), the *Getting started* follow-ups (#422: the Home card is done; left:
   Get size preview, managers' CAD-setup view), the other empty states (detail tabs, admin pages; still in English only), a *Get…* hint for viewers and a check
   whether the working folder really lacks the active group's files (#423)
 - [ ] Responsive pages on large data (1M files, 100k items, 10k-line BOMs – see the scale targets)
@@ -987,6 +993,17 @@ needs an issue with a reason first (see *Direction*).
   `every_template_renders`; every `TEAMCRAFT_*` variable in `docs/src/admin/configuration.md` (found:
   `TEAMCRAFT_ENV_FILE`
   and the build-time `TEAMCRAFT_SYSTEM_CONFIG` were undocumented). A mutation check per rule made each guard fail once.
+- [x] Read-permission guard test, wider (#312): the scanner also covers the tables that copy item content and
+  actor-less service functions that handlers call (27 new reviewed `NOT_GUARDED` entries, no leak); the leak test has a
+  fixture or a reason for every kind of id, reads every router source and probes every MCP argument; PostgreSQL
+  row-level security evaluated (research page) – not now. Left: the scanner sees only top-level functions in
+  `src/services`, follows no calls, counts a guard anywhere in a body, and misses SQL in constants and in the workers
+  (`src/delivery.rs`, `src/webhooks.rs`, `src/assistant.rs`)
+- [x] Item search with a format name (#316): the candidate branches were already index-backed (trigram and GIN
+  indexes, `TEXT_CANDIDATES`); a query that names a file format now checks the format of the latest revision's files
+  before the text conditions, same rows and total (`tests/search_listing.rs`)
+- [x] Items without a project group (#310): new items and moves need a group, administrators see the count with a
+  link on *Project groups*, the permissions guide warns; pinned by `tests/ungrouped_items.rs`
 - [x] **Backup / restore** proofed (`tests/backup_proofing.rs`, `tests/backup_errors.rs`): a corrupt or missing vault
   object refuses the backup and nothing is left (two fixes: the backup now checks every object against its name and
   every content the database refers to, and a failed backup removes what it wrote; the manifest is renamed into

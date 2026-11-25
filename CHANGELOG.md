@@ -20,6 +20,32 @@ see the notices in the README.
   first, 1–50 entries. The desktop Home tab shows it (#513 T9).
 - Audit entries carry `user_display_name` (the user's current display name)
   next to `username` in the REST API and the CSV export's JSON (#513 T25).
+- Guard test for read permissions, wider (#312): `tests/architecture_guards.rs`
+  also scans the tables that copy item, revision and file content
+  (`COPY_TABLES`: BOM lines, references, impacts, simulation values, bases
+  and proposals, 3D notes, as-built data, change and request items,
+  notifications, audit and access log, assistant threads, staged imports,
+  upload sessions, webhook deliveries, favourites, watches, …) and service
+  functions without an actor that a handler calls; guarded getters such as
+  `files::get_version` and `lock_editable` count as guards. The 27 new
+  findings were reviewed and are on `NOT_GUARDED` with their reasons; none
+  leaked. `tests/read_permissions.rs` gives every kind of id a fixture of the
+  hidden group or a listed reason (new: a 3D note, a deviation, a simulation
+  basis, a member's upload session, a member for `/users/{id}`), and fails
+  for a router source it does not read and for an MCP tool or prompt
+  argument the outsiders' probe does not fill. PostgreSQL row-level security
+  as a second layer is evaluated on a research page: not now.
+- **Getting started card on Home** (desktop, #422): after the wizard was
+  closed with *Don't show again*, Home shows its three steps as a card that
+  ticks itself – *Where your files go* once the working folder exists, is set
+  by the organization or a Get or own check-out used it; *Your project group*
+  once one of your groups is in the working folder, with how to get a group
+  when you have none; *Your first assembly* begun with your first check-out
+  and done with your first check-in, which ends the loop (skipped for
+  viewers). When everything is ticked it says so once and stays away on that
+  connection; *Open Getting started…* reopens the wizard, *Hide* removes the
+  card. Read-only, no new endpoint: it stores only the wizard's `done` mark
+  per saved connection.
 
 ### Changed
 
@@ -72,6 +98,35 @@ UI review #513 – the decided themes:
   or *Offline*; the bell shows a dot for unread notifications and is pressed
   while they are open; the Worklist badge's tooltip says what it counts
   (T21).
+- Desktop, *Check out and open* with Inventor already running (#483): with
+  several Inventor versions installed and a project group that names no
+  version, the Inventor you run opens the file – before, a second instance
+  of the newest version started; the message names the version. The app now
+  brings Inventor's window to the front itself (restored when minimized),
+  because Windows lets only the program you clicked in raise a window, not
+  the background script; an Inventor that is still starting is waited for;
+  when the running Inventor cannot be asked, the message says why (Inventor
+  or TeamCraft running as administrator, PowerShell restricted by a policy,
+  still starting, busy, or the reason PowerShell gave for not running the
+  script). Research page *Opening a file in the running CAD program*.
+- Desktop Home draws again when nothing was opened on the computer yet or
+  the server has no recent activity: a first sign-in no longer ends on the
+  connect screen with "Cannot read properties of undefined (reading
+  'filter')" (T9, #422).
+
+Other changes:
+
+- Item search: a query that names a file format (`solidworks`, `step`)
+  checks the format of the latest revision's files first, before the
+  substring and full-text conditions (#316). Such a query can match most of
+  a vault (73 % of the items in the scale check); the results and the total
+  are the same as before. Tested in `tests/search_listing.rs`
+  (`a_format_name_matches_files_of_that_format`).
+- Items without a project group (#310): `tests/ungrouped_items.rs` pins the
+  rules the permissions guide describes – new items and master-data changes
+  need a group (400), administrators see the count with the link to *Vault →
+  Without group* on *Project groups*, other users do not, and such an item is
+  readable by every user until it is moved into a group.
 
 ## [0.2.14] - 2026-11-24
 

@@ -744,6 +744,22 @@ details.nav-empty + .nav-section > .row:first-child .section-title { margin-top:
 .home-summary { margin: -8px 0 16px; font-size: 13px; color: var(--text-muted); }
 .home-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: 16px; align-items: start; }
 .home-columns > .panel { margin: 0; }
+/* Home: the Getting started card for users who closed the wizard early
+   (#422, js/onboarding.js homeStartCard) – one row per step: a mark, the
+   step's name with its status word, what the step needs */
+.welcome h1:focus { outline: none; }
+.home-start { max-width: 48rem; }
+.home-start-lead { margin: 0 0 10px; color: var(--text-muted); }
+.home-start.complete .home-start-lead { color: var(--text); }
+.home-start-steps { margin: 0 0 12px; padding: 0; list-style: none; display: grid; gap: 8px; }
+.home-start-steps li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 6px; align-items: start; }
+.home-start-mark { text-align: center; color: var(--text-dim); }
+.home-start-steps li.done .home-start-mark { color: var(--st-ok-fg); }
+.home-start-steps li.active .home-start-mark { color: var(--accent); }
+.home-start-steps li.skipped { color: var(--text-dim); }
+.home-start-step p { margin: 0; overflow-wrap: anywhere; }
+.home-start-step p + p { margin-top: 2px; }
+.home-start-status { color: var(--text-muted); font-size: 12px; }
 
 .object-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
 .object-head h1 { font-size: 18px; line-height: 24px; }

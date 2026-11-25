@@ -96,7 +96,7 @@ measure of quality. The CI numbers in the tables above are still from
 | CAD readers, previews, results   | `cad_fixtures` (13), `parser_robustness` (16), `parser_corpus` (2), `step_export_names` (2), `similar_parts` (2), `result_values` (4), `result_proposals` (3) |
 | Custom attributes                | `attributes` (2)                                                                                                                                              |
 | Suggested reviewers              | `reviewers` (1)                                                                                                                                               |
-| Login, SSO, access control       | `oidc_flow` (9), `read_permissions` (8), `no_unchecked_in_handlers` (2), `web_security` (7)                                                                   |
+| Login, SSO, access control       | `oidc_flow` (9), `read_permissions` (10), `ungrouped_items` (2), `no_unchecked_in_handlers` (2), `web_security` (7)                                                                   |
 | Outgoing webhooks                | `webhooks` (8), `webhook_ssrf` (4), `web_webhooks` (3)                                                                                                        |
 | Error notifications              | `notify` (1)                                                                                                                                                  |
 | Backup, restore, migrations      | `backup_restore` (1), `backup_errors` (7), `backup_proofing` (5), `migrations` (6)                                                                            |
@@ -104,7 +104,7 @@ measure of quality. The CI numbers in the tables above are still from
 | Web UI                           | `web_ui` (16)                                                                                                                                                 |
 | Command line                     | `cli` (4)                                                                                                                                                     |
 | Desktop app and server versions  | `desktop_compat` (4, the version handshake rules, no database)                                                                                                |
-| Architecture rules               | `architecture_guards` (9, reads the sources, no database)                                                                                                     |
+| Architecture rules               | `architecture_guards` (11, reads the sources, no database)                                                                                                     |
 | Scale check                      | `scale.rs` (0 active, one `#[ignore]` test; `scale/seed.sql`)                                                                                                 |
 | Shared helpers and data          | `common/mod.rs` (test database per test), `fixtures/` (NIST CAD files, v0.1.0 seed)                                                                           |
 
