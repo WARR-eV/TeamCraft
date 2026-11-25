@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
 // TeamCraft Desktop – pure rules of the first-start wizard *Getting
 // started* (#422): which steps there are, which are skipped, when the wizard
-// shows, which assemblies step 3 offers and the messages of each step.
+// shows, which assemblies step 3 offers and the messages of each step – and
+// the *Getting started* card on Home for users who closed it early
+// (startCard).
 // The wizard has one job: bring a CAD user who has just signed in to a real
 // assembly of their group, with *Check out and open* in front of them. It is
 // read-only and shaped around no CAD program (docs/src/research/first-start.md).
@@ -348,6 +350,109 @@ export function stepSummary(step, facts) {
   }
 }
 
+/** The status word of a step on the Home card (startCard): `open` = not yet,
+ *  `active` = begun (an own check-out, not checked in yet). */
+export var CARD_STATUS = {
+  done: "onboarding.status.done",
+  skipped: "onboarding.status.skipped",
+  open: "onboarding.card.status.open",
+  active: "onboarding.card.status.active"
+};
+
+/**
+ * The *Getting started* card on Home for a user who closed the wizard early
+ * (*Don't show again*: stored `dismissed`): the wizard's three steps, each
+ * ticked by itself from what the app already knows. `settings` as for
+ * shouldShow; `facts` as for skipReason plus `workspaceDir`, `editor`,
+ * `login`, `workspaceExists` (the working folder is there – a Get, a
+ * check-out or *Change…* made or picked it; `workspace_exists` of the
+ * session) and `worklist`, the answer of GET /worklist (own `checkouts` with
+ * their `project_code`, `has_checked_in`). `ctx.seenOpen`: the card was
+ * shown with a step still open earlier in this run of the app, for this
+ * connection.
+ *
+ * * No card unless the stored value is `dismissed`: not while the wizard may
+ *   still open by itself (none), not once it was finished or the card hidden
+ *   or completed (`done`) – and not before the worklist answered: nothing is
+ *   decided from facts that are missing.
+ * * **Where your files go** ticks when the working folder is settled: set by
+ *   the organization, there, or used by a Get or an own check-out.
+ * * **Your project group** ticks when one of the user's groups is in the
+ *   working folder: a Get fetched it or an own check-out copied files into
+ *   it. Without a group it says how to get one, by role.
+ * * **Your first assembly** is begun with an own check-out and done with the
+ *   first check-in (`has_checked_in`) – the end of the loop, which ticks
+ *   every step. A viewer cannot check out: the step is skipped for them, and
+ *   their card is complete with the first two steps.
+ * * Complete: `store` is `done`, so the card does not come back on this
+ *   connection. It says so once (`show`) when the user saw it with a step
+ *   open earlier in this run; a loop finished elsewhere (another computer,
+ *   the web UI, before the card existed) ends it without a word.
+ *
+ * Returns null (no card, nothing to store) or `{show, complete, store,
+ * progress, lead: [messages], steps: [{step, name, status, text: [messages],
+ * note}]}`; `status` is a key of CARD_STATUS, a complete card has no texts.
+ */
+export function startCard(settings, facts, ctx) {
+  ctx = ctx || {};
+  facts = facts || {};
+  if (!settings || settings.onboarding !== ONBOARDING_DISMISSED) return null;
+  var wl = facts.worklist;
+  if (!wl || typeof wl !== "object") return null;
+  var mine = groupList(facts.groups);
+  var dir = facts.workspaceDir || "";
+  var editor = !!facts.editor;
+  var policy = !!facts.workspaceRootPolicy;
+  var rows = (Array.isArray(wl.checkouts) ? wl.checkouts : []).filter(Boolean);
+  var checkedOut = rows.length > 0;
+  var loopEnded = !!wl.has_checked_in;
+  // the group the card names: one of the user's in the working folder (a
+  // Get, else an own check-out), else the one the wizard starts with
+  var held = rows.map(function (r) { return String(r.project_code || "").toLowerCase(); });
+  var here = mine.filter(function (g) { return onDisk(g.code, facts); })[0] ||
+    mine.filter(function (g) { return held.indexOf(g.code.toLowerCase()) !== -1; })[0] || null;
+  var group = here || chosenGroup(facts, null);
+  var none = {};
+  function step(name, status, text, note) {
+    return { step: name, name: STEP_NAMES[name], status: status, text: text || [], note: note || null };
+  }
+  function m(id, params) { return { id: id, params: params || none }; }
+
+  var folderDone = loopEnded || checkedOut || policy || !!facts.workspaceExists || codes(facts.groupsOnDisk).length > 0;
+  var steps = [
+    folderDone
+      ? step("folder", "done", [m("onboarding.folder.line", { dir: dir })], policy ? m("onboarding.skip.folder_policy") : null)
+      : step("folder", "open", [m("onboarding.folder.text", { dir: dir }), m("onboarding.folder.missing")]),
+    !mine.length
+      ? step("group", "open", [editor ? m("onboarding.group.none.editor") : m("onboarding.group.none.viewer", { login: facts.login || "" })])
+      : here || loopEnded
+        ? step("group", "done", [m("onboarding.group.one", { group: group.code })], m("onboarding.group.on_disk"))
+        : step("group", "open", [m(editor ? "onboarding.card.group.editor" : "onboarding.card.group.viewer",
+          { group: group.code, folder: groupFolder(dir, group.code) })]),
+    !editor ? step("open", "skipped", [], m("onboarding.group.viewer"))
+      : loopEnded ? step("open", "done")
+        : checkedOut ? step("open", "active", [m("onboarding.tip.loop")])
+          : !mine.length ? step("open", "open", [], m("onboarding.skip.no_group"))
+            : step("open", "open", [m("onboarding.card.open", { group: group.code })])
+  ];
+  var shown = steps.filter(function (s) { return s.status !== "skipped"; });
+  var complete = loopEnded || shown.every(function (s) { return s.status === "done"; });
+  if (complete) {
+    shown.forEach(function (s) { s.status = "done"; s.text = []; s.note = null; });
+  }
+  var done = shown.filter(function (s) { return s.status === "done"; }).length;
+  return {
+    show: complete ? !!ctx.seenOpen : true,
+    complete: complete,
+    store: complete ? ONBOARDING_DONE : null,
+    progress: m("onboarding.card.progress", { done: done, total: shown.length }),
+    lead: complete
+      ? [m("onboarding.card.complete")].concat(loopEnded ? [m("onboarding.tip.loop_done")] : [])
+      : [m("onboarding.card.lead")],
+    steps: steps
+  };
+}
+
 /** Every message ID these rules and onboarding.js use (the test checks
  *  both catalogs and their placeholders). */
 export var ONBOARDING_MESSAGE_IDS = [
@@ -368,5 +473,9 @@ export var ONBOARDING_MESSAGE_IDS = [
   "onboarding.open.show.viewer_title", "onboarding.open.loading",
   "onboarding.open.failed", "onboarding.open.none", "onboarding.open.none_free", "onboarding.open.cad_setup", "onboarding.open.cad_setup.link",
   "onboarding.finish", "onboarding.finish_home", "onboarding.next", "onboarding.back", "onboarding.dismiss",
-  "onboarding.tip.loop", "onboarding.tip.loop_done"
+  "onboarding.tip.loop", "onboarding.tip.loop_done",
+  "onboarding.card.lead", "onboarding.card.progress", "onboarding.card.status.open", "onboarding.card.status.active",
+  "onboarding.card.group.editor", "onboarding.card.group.viewer", "onboarding.card.open", "onboarding.card.complete",
+  "onboarding.card.open_wizard", "onboarding.card.hide", "onboarding.card.hide.label", "onboarding.card.hide.title",
+  "onboarding.card.hidden"
 ];

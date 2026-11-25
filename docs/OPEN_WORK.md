@@ -716,7 +716,7 @@ real files and belong to section 3 once such files are at hand.
 - [x] First-start wizard (#422): *Getting started* in the desktop app is a read-only, CAD-neutral hand-over – where
   your files go, your project group, your first assembly (*Show* opens its revision tab with *Check out and open*
   highlighted); it creates no file or folder, remembered per saved connection (research page *The first start of the
-  desktop app*). Follow-ups: a self-ticking *Getting started* card on Home for users who closed the wizard early,
+  desktop app*). Follow-ups: the self-ticking *Getting started* card on Home for users who closed the wizard early is done (`startCard`); left:
   the size and file count of a whole-group *Get* before it starts (`group-sync.js`), a read-only view of a group's
   CAD setup for its managers on the Projects page
 - [ ] CAD project setup without generated files (#478): team-owned project and configuration files of the CAD
@@ -817,7 +817,7 @@ needs an issue with a reason first (see *Direction*).
   wizard *Getting started*, #423 empty states that name the next step (web and desktop, by role, i18n catalogs).
   Left: #424 new desktop screenshots; follow-ups – *Revise and check out* for released parts (#415), a list picture
   for revisions with only STEP or mesh files (#420: a fallback rendered from the 3D preview needs
-  `thumbnail::supports` and `cadformat` widened), the *Getting started* follow-ups (#422: Home checklist card,
+  `thumbnail::supports` and `cadformat` widened), the *Getting started* follow-ups (#422: the Home card is done; left:
   Get size preview, managers' CAD-setup view), the other empty states (detail tabs, admin pages; still in English only), a *Get…* hint for viewers and a check
   whether the working folder really lacks the active group's files (#423)
 - [ ] Responsive pages on large data (1M files, 100k items, 10k-line BOMs – see the scale targets)
@@ -987,6 +987,17 @@ needs an issue with a reason first (see *Direction*).
   `every_template_renders`; every `TEAMCRAFT_*` variable in `docs/src/admin/configuration.md` (found:
   `TEAMCRAFT_ENV_FILE`
   and the build-time `TEAMCRAFT_SYSTEM_CONFIG` were undocumented). A mutation check per rule made each guard fail once.
+- [x] Read-permission guard test, wider (#312): the scanner also covers the tables that copy item content and
+  actor-less service functions that handlers call (27 new reviewed `NOT_GUARDED` entries, no leak); the leak test has a
+  fixture or a reason for every kind of id, reads every router source and probes every MCP argument; PostgreSQL
+  row-level security evaluated (research page) – not now. Left: the scanner sees only top-level functions in
+  `src/services`, follows no calls, counts a guard anywhere in a body, and misses SQL in constants and in the workers
+  (`src/delivery.rs`, `src/webhooks.rs`, `src/assistant.rs`)
+- [x] Item search with a format name (#316): the candidate branches were already index-backed (trigram and GIN
+  indexes, `TEXT_CANDIDATES`); a query that names a file format now checks the format of the latest revision's files
+  before the text conditions, same rows and total (`tests/search_listing.rs`)
+- [x] Items without a project group (#310): new items and moves need a group, administrators see the count with a
+  link on *Project groups*, the permissions guide warns; pinned by `tests/ungrouped_items.rs`
 - [x] **Backup / restore** proofed (`tests/backup_proofing.rs`, `tests/backup_errors.rs`): a corrupt or missing vault
   object refuses the backup and nothing is left (two fixes: the backup now checks every object against its name and
   every content the database refers to, and a failed backup removes what it wrote; the manifest is renamed into

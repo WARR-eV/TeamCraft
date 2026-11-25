@@ -12,8 +12,10 @@ check-outs and reviews, and a **local working folder**:
   Worklist, the product counts, **Recently opened** (the revisions, changes
   and requests you opened on this computer, per server) and the server's
   **Recent activity** (`GET /api/v1/activity`, the same entries as on the web
-  dashboard). The rail entry for the files of the active group is **Files**
-  (`Ctrl/Cmd+1`, *View → Files*);
+  dashboard). After *Getting started* was closed with *Don't show again*, a
+  **Getting started** card above the counts ticks its steps as you work
+  ([The card on Home](#getting-started)). The rail entry for the files of the
+  active group is **Files** (`Ctrl/Cmd+1`, *View → Files*);
 * the **Worklist** navigator lists the sections with something in them
   first; an empty section is one line (*My open changes 0 ⓘ*) whose
   explanation – and its action, such as *Get…* – opens on a click (#513);
@@ -898,6 +900,34 @@ that already has check-outs or has checked in (or uploaded) a file on that
 server before (a new computer, an expired sign-in). The update
 notice, the *Support us* tag and the keychain warning wait until it is
 closed; the question to move a workspace of the old layout comes first.
+
+**The card on Home.** If you close the wizard with *Don't show again*, Home
+shows a *Getting started* card above the counts instead: the same three
+steps, each with a mark and a word – *done*, *to do*, *begun* or
+*skipped* – and one line on what it still needs. The steps tick by
+themselves as you work:
+
+* **Where your files go** – once the working folder exists, your
+  organization set it, or a *Get* or a check-out of yours used it;
+* **Your project group** – once one of your groups is in the working
+  folder: fetched with *Get…* under *Projects*, or through a check-out of
+  yours in it. Without a group the step says how to get one (CAD editors
+  create one, viewers ask a group manager, with their user name);
+* **Your first assembly** – *begun* with a check-out of yours (the line is
+  the daily-loop tip: save in your CAD program, then *Check in…*), done with
+  your first check-in. That is the end of the loop and ticks all three
+  steps. Viewers cannot check out: for them the step is skipped, and their
+  card is done with the first two.
+
+When every step is ticked, the card says so once and does not come back on
+this connection; a loop finished before or elsewhere (another computer, the
+web UI) ends it without a card. *Open Getting started…* opens the wizard, as
+*Help → Getting Started…* does – finishing it ends the card too. *Hide*
+removes the card for this connection; the wizard stays in the Help menu.
+The card reads only what the app already knows (the working folder, the
+groups fetched into it, your groups, your check-outs and whether you have
+checked in before – `GET /worklist`) and stores only the same *finished*
+mark as the wizard, per saved connection; it writes nothing to the server.
 
 **The daily loop, where it happens.** While a revision's next step is
 *Check out and open*, *Open in CAD* or *Check in…*, its tab shows one tip: a

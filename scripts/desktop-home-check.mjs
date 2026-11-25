@@ -35,6 +35,9 @@
 //   * New item starts with the active group and the folder last opened; the
 //     + of a folder row (New item here) fills in that folder;
 //   * the All items and Structure modes are still there;
+//   * the Getting started card (#422) shows on Home only after the wizard
+//     was dismissed: a section with a heading, a status word per step,
+//     named buttons; Hide stores `done` and leaves the focus on Home;
 //   * no page errors.
 import fs from "node:fs";
 import http from "node:http";
@@ -163,10 +166,20 @@ function fakeBackend() {
     if (method === "GET" && p === "/items") return Promise.resolve({ total: 0, limit: 500, offset: 0, items: [] });
     return notFound(p);
   }
+  // *Getting started* of this connection: none, or `?onboarding=dismissed`
+  // in the page address (the Home card, #422); set_onboarding is recorded
+  window.__onboarding = new URLSearchParams(location.search).get("onboarding");
+  window.__savedOnboarding = [];
   function invoke(cmd, args) {
     if (cmd === "session") {
       return Promise.resolve({ server_url: "https://plm.example.org", signed_in: true, workspace_dir: "/home/erika/TeamCraft",
+        workspace_exists: false, onboarding: window.__onboarding,
         skin: "teamcraft", zoom: 1, update_check: false, token_storage: "keychain" });
+    }
+    if (cmd === "set_onboarding") {
+      window.__onboarding = args.value;
+      window.__savedOnboarding.push(args.value);
+      return Promise.resolve(null);
     }
     if (cmd === "api") return api(args.method, args.path, args.body);
     if (cmd === "crash_reports") return Promise.resolve(null);
@@ -386,7 +399,8 @@ async function check(browserType, name) {
   // Import CAD folder… and New item
   same("an empty group", await page.locator(top + " .empty").allTextContents(),
     ["This project group has no items yet. Import an existing CAD folder or create a new item."]);
-  same("the next steps of an empty group", await page.locator(top + " .empty-hint button").allTextContents(), ["Import CAD folder…", "New item"]);
+  // the hint is the tree's <li> itself (emptyHint with tag "li")
+  same("the next steps of an empty group", await page.locator(top + ".empty-hint button").allTextContents(), ["Import CAD folder…", "New item"]);
 
   // New item starts with the active group, not with the first one of the list
   await page.locator(".rail button[data-view='projects']").click();
@@ -428,6 +442,39 @@ async function check(browserType, name) {
   await page.locator("#navigator .chip", { hasText: "Files" }).click();
   await home("ROVER");
   await page.waitForSelector("#navigator .node.file");
+
+  // the Getting started card on Home (#422): not without a dismissed wizard;
+  // with one, a section named by its heading, the three steps with a status
+  // word each (not only a mark), buttons with names; Hide stores `done`
+  await page.locator("#tabs .home-tab").click();
+  await page.waitForSelector(".welcome .stats");
+  await page.waitForTimeout(300); // the card is decided after the session answered
+  same("no Getting started card on a connection that did not dismiss the wizard", await page.locator("section.home-start").count(), 0);
+  const cardPage = await context.newPage();
+  cardPage.on("pageerror", (e) => errors.push(String(e)));
+  await cardPage.goto(base + "/?onboarding=dismissed");
+  await cardPage.waitForSelector("section.home-start", { timeout: 15000 });
+  const card = await cardPage.evaluate(() => {
+    const s = document.querySelector("section.home-start");
+    const head = document.getElementById(s.getAttribute("aria-labelledby"));
+    return {
+      heading: head && head.tagName + " " + head.textContent,
+      above: s.nextElementSibling.className,
+      steps: Array.from(s.querySelectorAll("li")).map((li) => li.querySelector(".home-start-name").textContent),
+      buttons: Array.from(s.querySelectorAll("button")).map((b) => b.getAttribute("aria-label") || b.textContent)
+    };
+  });
+  same("the Getting started card", card, {
+    heading: "H2 Getting started 0 of 3 done", above: "stats",
+    steps: ["Where your files go (to do)", "Your project group (to do)", "Your first assembly (to do)"],
+    buttons: ["Open Getting started…", "Hide Getting started"]
+  });
+  await cardPage.screenshot({ path: path.join(shots, `home-check-start-card-${name}.png`) });
+  await cardPage.locator("section.home-start button", { hasText: "Hide" }).click();
+  await cardPage.waitForFunction(() => !document.querySelector("section.home-start"));
+  same("Hide stores done", await cardPage.evaluate(() => window.__savedOnboarding), ["done"]);
+  same("the focus after Hide", await cardPage.evaluate(() => document.activeElement.tagName + " " + document.activeElement.textContent), "H1 Home");
+  await cardPage.close();
 
   if (errors.length) fail("page errors: " + errors.join(" | "));
   await browser.close();

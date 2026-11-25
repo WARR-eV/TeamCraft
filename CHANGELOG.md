@@ -20,6 +20,32 @@ see the notices in the README.
   first, 1–50 entries. The desktop Home tab shows it (#513 T9).
 - Audit entries carry `user_display_name` (the user's current display name)
   next to `username` in the REST API and the CSV export's JSON (#513 T25).
+- Guard test for read permissions, wider (#312): `tests/architecture_guards.rs`
+  also scans the tables that copy item, revision and file content
+  (`COPY_TABLES`: BOM lines, references, impacts, simulation values, bases
+  and proposals, 3D notes, as-built data, change and request items,
+  notifications, audit and access log, assistant threads, staged imports,
+  upload sessions, webhook deliveries, favourites, watches, …) and service
+  functions without an actor that a handler calls; guarded getters such as
+  `files::get_version` and `lock_editable` count as guards. The 27 new
+  findings were reviewed and are on `NOT_GUARDED` with their reasons; none
+  leaked. `tests/read_permissions.rs` gives every kind of id a fixture of the
+  hidden group or a listed reason (new: a 3D note, a deviation, a simulation
+  basis, a member's upload session, a member for `/users/{id}`), and fails
+  for a router source it does not read and for an MCP tool or prompt
+  argument the outsiders' probe does not fill. PostgreSQL row-level security
+  as a second layer is evaluated on a research page: not now.
+- **Getting started card on Home** (desktop, #422): after the wizard was
+  closed with *Don't show again*, Home shows its three steps as a card that
+  ticks itself – *Where your files go* once the working folder exists, is set
+  by the organization or a Get or own check-out used it; *Your project group*
+  once one of your groups is in the working folder, with how to get a group
+  when you have none; *Your first assembly* begun with your first check-out
+  and done with your first check-in, which ends the loop (skipped for
+  viewers). When everything is ticked it says so once and stays away on that
+  connection; *Open Getting started…* reopens the wizard, *Hide* removes the
+  card. Read-only, no new endpoint: it stores only the wizard's `done` mark
+  per saved connection.
 
 ### Changed
 
@@ -72,6 +98,10 @@ UI review #513 – the decided themes:
   or *Offline*; the bell shows a dot for unread notifications and is pressed
   while they are open; the Worklist badge's tooltip says what it counts
   (T21).
+- Desktop Home draws again when nothing was opened on the computer yet or
+  the server has no recent activity: a first sign-in no longer ends on the
+  connect screen with "Cannot read properties of undefined (reading
+  'filter')" (T9, #422).
 
 Other changes:
 

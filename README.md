@@ -245,7 +245,8 @@ backups are described under [Enterprise management](#enterprise-management).
   folder:
     - **Getting started** – a read-only wizard after the first sign-in that
       ends on a real assembly of your group with *Check out and open* in
-      front of you (it creates no files and works for every CAD program),
+      front of you (it creates no files and works for every CAD program;
+      closed early, its steps stay on *Home* as a card that ticks itself),
       *Get* of whole assemblies and an import wizard.
     - ***Home*** tab with what waits, what you opened lately and the recent
       activity, and a one-row toolbar with *Check out and open ▾*.
