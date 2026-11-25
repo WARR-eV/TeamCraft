@@ -138,6 +138,16 @@ are withdrawn and submitted again.
 
 ### Signing off a decision
 
+The evidence comes before the signature (#513): on the change page the
+reviewer's *Your review* card (comment, meaning, *Approve change*, *Reject*)
+is after the details, the reviewers, the affected revisions, the release
+readiness and the impact analysis; a notice at the top says the review is
+pending and links down to it (*Open review* on the dashboard goes straight
+there). The desktop app has the same form under the comment of its change
+tab, *Approve change* and *Reject* also in the toolbar. A change request is
+decided the same way: its *Decision* card follows the details, the affected
+items and the discussion.
+
 A reviewer may state what their approval means (*Meaning of your sign-off*,
 e.g. *approved as design owner*; `meaning` in `POST /api/v1/changes/{number}/review`).
 When the server asks for a fresh sign-in (`TEAMCRAFT_APPROVAL_REAUTH`, see
@@ -192,6 +202,11 @@ assign anybody.
 
 The bell lists review requests, decisions, releases, checks needed, change
 requests and news about **watched** items, changes and change requests (*Watch* on any of their pages).
+The page *Notifications* groups them by day; an entry is marked read by
+opening it, with its own *Mark as read*, or all at once. A review request is
+marked read by itself once you have decided, or once the change has left
+review (approved, rejected or withdrawn) – it no longer keeps the bell count
+up (#513).
 Optionally TeamCraft sends them by e-mail (SMTP) and to Mattermost (a direct
 message from the TeamCraft bot to you, never into a channel). Every user chooses channels and mutes kinds on the
 account page; delivery runs from an outbox, so a slow mail server never

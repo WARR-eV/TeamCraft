@@ -6,6 +6,7 @@
 {% import "macros.html" as m %}
 <div class="page-head">
   <div>
+    {{ m.vault_views("list") }}
     <h1>Items</h1>
   </div>
   {% if me.can_edit %}

@@ -35,6 +35,9 @@ export function selectView(view) {
   document.querySelectorAll(".rail button[data-view]").forEach(function (b) {
     b.classList.toggle("active", b.getAttribute("data-view") === view);
   });
+  // the bell has no rail button: it shows itself pressed instead (#513 T21)
+  var bell = $("open-notifications");
+  if (bell) { bell.classList.toggle("active", view === "notifications"); bell.setAttribute("aria-pressed", view === "notifications" ? "true" : "false"); }
   var nav = $("navigator");
   clear(nav);
   nav.appendChild(h("p.loading", { text: "Loading" }));
@@ -116,7 +119,7 @@ export function setActiveProject(code) {
  *  the app restarts or the user goes back to the favourite). */
 var showGroupTop = {};
 
-function serverUrl() {
+export function serverUrl() {
   return (state.session && state.session.server_url) || "";
 }
 
@@ -404,30 +407,63 @@ export function drawWorklist(w) {
   ]));
   // why a viewer account has no editing buttons (#423)
   if (!canEdit()) nav.appendChild(h("p.small.dim.viewer-note", { text: t("empty.viewer_note") }));
-  nav.appendChild(sectionTitle("Checked out by me", w.checkouts.length));
-  nav.appendChild(w.checkouts.length ? h("ul.tree", null, w.checkouts.map(function (r) {
-    return h("li", null, h("div.node", { title: "Checked out " + fmtDate(r.checked_out_at), "data-item": r.item_number, "data-rev": r.code, on: { click: function () { openRevision(r.item_number, r.code); } } }, [
-      h("span.twisty"), h("span.ico", null, lockIcon(true)),
-      h("span.label", null, [h("span.mono", { text: r.item_number + "/" + r.code }), " ", r.name]),
-      h("span.meta.small.dim", { text: lockAge(r.checked_out_at) })
-    ]));
-  })) : emptyHint(worklistHint("checkouts", canEdit())));
-  localChangesSection(nav);
-  if (canEdit()) newFilesSection(nav);
-  nav.appendChild(sectionTitle("Waiting for my review", w.reviews.length));
-  nav.appendChild(w.reviews.length ? h("ul.tree", null, w.reviews.map(changeNode)) : emptyHint(worklistHint("reviews", canEdit())));
+  // #513 T10: the sections with something in them come first; an empty one
+  // is a single line whose explanation (and its action, e.g. *Get…*) opens
+  // on a click – the same text every day is not in the way
+  var sections = [];
+  var add = function (title, n, fill) { sections.push(navSection(title, n, fill)); };
+  add("Checked out by me", w.checkouts.length, function (box) {
+    box.appendChild(sectionTitle("Checked out by me", w.checkouts.length));
+    box.appendChild(w.checkouts.length ? h("ul.tree", null, w.checkouts.map(function (r) {
+      return h("li", null, h("div.node", { title: "Checked out " + fmtDate(r.checked_out_at), "data-item": r.item_number, "data-rev": r.code, on: { click: function () { openRevision(r.item_number, r.code); } } }, [
+        h("span.twisty"), h("span.ico", null, lockIcon(true)),
+        h("span.label", null, [h("span.mono", { text: r.item_number + "/" + r.code }), " ", r.name]),
+        h("span.meta.small.dim", { text: lockAge(r.checked_out_at) })
+      ]));
+    })) : emptyHint(worklistHint("checkouts", canEdit())));
+  });
+  if (state.localChanges) add("Local changes", state.localChanges.plan.count, localChangesSection);
+  if (canEdit() && state.newFiles) add("New on this computer", state.newFiles.plan.suggestions.length, newFilesSection);
+  add("Waiting for my review", w.reviews.length, function (box) {
+    box.appendChild(sectionTitle("Waiting for my review", w.reviews.length));
+    box.appendChild(w.reviews.length ? h("ul.tree", null, w.reviews.map(changeNode)) : emptyHint(worklistHint("reviews", canEdit())));
+  });
   var groups = impactGroups(w);
-  nav.appendChild(sectionTitle("Dependents to check", groups.length));
-  nav.appendChild(groups.length ? h("ul.tree", null, groups.map(dependentNode)) : h("p.empty", { text: "Nothing to check." }));
-  nav.appendChild(sectionTitle("My open changes", w.my_changes.length));
-  nav.appendChild(w.my_changes.length ? h("ul.tree", null, w.my_changes.map(changeNode)) : emptyHint(worklistHint("changes", canEdit())));
+  add("Dependents to check", groups.length, function (box) {
+    box.appendChild(sectionTitle("Dependents to check", groups.length));
+    box.appendChild(groups.length ? h("ul.tree", null, groups.map(dependentNode)) : h("p.empty", { text: "Nothing to check." }));
+  });
+  add("My open changes", w.my_changes.length, function (box) {
+    box.appendChild(sectionTitle("My open changes", w.my_changes.length));
+    box.appendChild(w.my_changes.length ? h("ul.tree", null, w.my_changes.map(changeNode)) : emptyHint(worklistHint("changes", canEdit())));
+  });
   // change requests (older servers: none)
   var assigned = w.requests_assigned || [], mine = w.my_requests || [];
-  nav.appendChild(sectionTitle("Requests assigned to me", assigned.length));
-  nav.appendChild(assigned.length ? h("ul.tree", null, assigned.map(requestNode)) : h("p.empty", { text: "No change requests assigned to you." }));
-  nav.appendChild(sectionTitle("My open requests", mine.length));
-  nav.appendChild(mine.length ? h("ul.tree", null, mine.map(requestNode)) : h("p.empty", { text: "Found a problem? Use “Request change…” on a revision or a workspace file." }));
+  add("Requests assigned to me", assigned.length, function (box) {
+    box.appendChild(sectionTitle("Requests assigned to me", assigned.length));
+    box.appendChild(assigned.length ? h("ul.tree", null, assigned.map(requestNode)) : h("p.empty", { text: "No change requests assigned to you." }));
+  });
+  add("My open requests", mine.length, function (box) {
+    box.appendChild(sectionTitle("My open requests", mine.length));
+    box.appendChild(mine.length ? h("ul.tree", null, mine.map(requestNode)) : h("p.empty", { text: "Found a problem? Use “Request change…” on a revision or a workspace file." }));
+  });
+  sections.filter(function (s) { return s.full; }).concat(sections.filter(function (s) { return !s.full; }))
+    .forEach(function (s) { nav.appendChild(s.el); });
   nav.scrollTop = top;
+}
+
+/** One worklist section (#513 T10): `fill` draws it into a box – its title
+ *  line first. With nothing in it (`n` 0) the title becomes the summary of a
+ *  closed <details>, so the explanation and its buttons are one click away. */
+function navSection(title, n, fill) {
+  var box = h("div.nav-section");
+  fill(box);
+  if (n > 0) return { el: box, full: true };
+  if (box.firstChild) box.removeChild(box.firstChild);
+  var fold = h("details.nav-empty", null, [h("summary", { title: "Empty – open for what this section is for" },
+    [title + " ", h("span.count", { text: "0" })])]);
+  while (box.firstChild) fold.appendChild(box.firstChild);
+  return { el: fold, full: false };
 }
 
 // ------------------------------------------------ Local changes (#416)
@@ -489,13 +525,8 @@ function localChangesSection(nav) {
   if (notes.length) nav.appendChild(h("p.small.dim", { text: notes.join(" · ") }));
   // drawn on every redraw: remembered for the report once per scan (shell.js scanLocalChanges)
   if (plan.errors.length) nav.appendChild(errorNotice("p.small.notice.error", "Could not compare with the server: " + plan.errors.join("; "), "Comparing the working folder with the server", [["errors", String(plan.errors.length)]], { remember: false }));
-  if (editor) {
-    nav.appendChild(h("p.small.dim", null, ["Files that belong to no item yet: ",
-      h("button.link.small", { type: "button", on: { click: function () {
-        var target = $("worklist-new-files");
-        if (target) target.scrollIntoView({ block: "start" });
-      } } }, "New on this computer")]));
-  }
+  // (no link to *New on this computer* here any more: it is a section of the
+  // same list, #513 T10)
 }
 
 /** One revision of *Local changes*: its line (opens the Workspace tab) and its files. */

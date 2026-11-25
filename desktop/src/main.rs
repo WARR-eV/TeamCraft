@@ -138,7 +138,7 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         .item(&item("refresh", "Refresh", Some("F5"))?)
         .item(&item("search", "Search", Some("CmdOrCtrl+F"))?)
         .separator()
-        .item(&item("go-home", "Home", Some("CmdOrCtrl+1"))?)
+        .item(&item("go-home", "Files", Some("CmdOrCtrl+1"))?)
         .item(&item("go-worklist", "My Worklist", Some("CmdOrCtrl+2"))?)
         .item(&item("go-changes", "Changes", Some("CmdOrCtrl+3"))?)
         .item(&item("go-agent", "Agent", Some("CmdOrCtrl+4"))?)

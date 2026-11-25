@@ -2,7 +2,7 @@
 // TeamCraft Desktop – The main window: rail, navigator, status bar, update notice, notifications, long operations.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, ICONS, api, badge, call, clear, confirmDialog, dialog, enc, errorText, h, invoke, rememberError, reportLink, run, setStatus, state, svgIcon, toast, tool, transfer } from "./core.js";
+import { $, ICONS, api, append, badge, call, clear, confirmDialog, dialog, enc, errorText, h, invoke, rememberError, reportLink, run, setStatus, state, svgIcon, toast, tool, transfer } from "./core.js";
 import { checkInAllFailure } from "./report-inputs.js";
 import { installText, misfitQuestion, releasePageArgs, releasePageLabel, serverNote, transferBusy, updateAction } from "./update-rules.js";
 import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
@@ -120,7 +120,7 @@ export function enterShell() {
   return reloadProjects().then(function () {
     $("connect").classList.add("hidden");
     $("shell").classList.remove("hidden");
-    $("status-server").textContent = state.session.server_url;
+    showConnection(true);
     $("status-ws").textContent = "Workspace: " + state.session.workspace_dir;
     checkServerVersion();
     // usage statistics for the own server (#383): a finished day goes now
@@ -501,11 +501,38 @@ export function initSplitter() {
   });
 }
 
+// ---------------------------------------------------------------- connection
+
+/**
+ * The server indicator of the status bar (#513 T21): a word for the state
+ * before the address – *Connected*, *Unencrypted* (plain http:// to another
+ * computer) or *Offline* (the last poll did not reach the server). Plain
+ * http:// to this computer (a local server) counts as connected.
+ */
+export function connectionState(url, online) {
+  if (!online) return { word: "Offline", cls: "offline", title: "The server did not answer the last request – TeamCraft keeps trying." };
+  var plain = /^http:\/\//i.test(url || "");
+  var local = /^http:\/\/(localhost|127\.\d+\.\d+\.\d+|\[::1\])(:\d+)?(\/|$)/i.test(url || "");
+  if (plain && !local) return { word: "Unencrypted", cls: "plain", title: "Plain http:// – your token and all data cross the network unencrypted. Ask for an https:// address." };
+  return { word: "Connected", cls: "ok", title: local ? "Connected to the server on this computer" : "Connected over https://" };
+}
+
+export function showConnection(online) {
+  var el = $("status-server");
+  if (!el || !state.session) return;
+  var s = connectionState(state.session.server_url, online);
+  el.className = "status-server conn-" + s.cls;
+  el.title = s.title;
+  clear(el);
+  append(el, [h("strong", { text: s.word }), " " + state.session.server_url]);
+}
+
 // ---------------------------------------------------------------- notifications
 
 /** Updates the bell; on later polls new unread notifications show as a toast. */
 export function pollNotifications(first) {
   return api("GET", "/notifications?unread=true&limit=20").then(function (r) {
+    showConnection(true);
     var el = $("bell-count");
     el.textContent = r.unread > 99 ? "99+" : String(r.unread);
     el.classList.toggle("hidden", !r.unread);
@@ -524,7 +551,11 @@ export function pollNotifications(first) {
       if (state.view === "notifications") selectView("notifications");
     }
     return r;
-  }).catch(function () { return null; });
+  }).catch(function (e) {
+    // no HTTP status: the server was not reached (desktop/src/api.rs)
+    if (e && typeof e === "object" && e.status === 0) showConnection(false);
+    return null;
+  });
 }
 
 /** Opens what a notification is about (and marks it as read). */
@@ -866,6 +897,9 @@ export function showWorklistCount() {
   var rail = el.closest("button");
   if (rail) {
     rail.setAttribute("aria-label", n ? "Worklist, " + n + " open" : "Worklist");
+    // what the number counts (#513 T21): work to do, unlike the bell's dot
+    rail.setAttribute("title", "My worklist (Ctrl+2)" + (n ? " – " + n + " to do: check-outs, reviews, dependents to check, " +
+      "requests assigned to you and files on this computer" : " – nothing to do"));
   }
 }
 

@@ -288,8 +288,8 @@ async function check(browserType, name) {
 
   // a file opens its revision in a tab
   await page.locator("#navigator .node.file", { hasText: "Rover.iam" }).click();
-  await page.waitForSelector("#tabs .tab");
-  same("the opened tab", await page.locator("#tabs .tab .tab-label").textContent(), "ASM-0000001/A");
+  await page.waitForSelector("#tabs .tab:not(.home-tab)");
+  same("the opened tab", await page.locator("#tabs .tab:not(.home-tab) .tab-label").textContent(), "ASM-0000001/A");
 
   // the chosen group survives a reload
   await page.reload();
@@ -302,7 +302,7 @@ async function check(browserType, name) {
   const barText = () => page.locator(bar).textContent();
   await page.waitForSelector(bar + ".hint");
   same("the suggestion", await page.locator(bar + " p").textContent(),
-    "The Inventor project file of this group is in Chassis/brackets. Start Home in that folder?");
+    "The Inventor project file of this group is in Chassis/brackets. Start Files in that folder?");
   await page.locator(bar + " button", { hasText: "Start there" }).click();
   await page.waitForSelector(bar + ".on");
   await home("ROVER");

@@ -172,19 +172,25 @@ export function toolGroup(name, buttons) {
 
 /**
  * "More ▾": the rare actions of a tab in a menu at the end of the toolbar.
- * items: { label, icon, run, disabled, title, danger, shortcut }.
+ * items: { label, icon, run, disabled, title, danger, shortcut, sync }; `sync(button)`
+ * is called each time the menu opens, to refresh an entry from the page.
+ * `opts.split`: the drop-down half of a split button (#513 T8) – a chevron
+ * only, named by `opts.label`, placed right after its main button.
  * Keyboard: Enter, Space or ↓ open it on the first item, ↑ on the last;
  * ↑/↓/Home/End move, Enter/Space run, Esc or Tab close – the focus goes
  * back to the button. A click outside closes it too.
  */
-export function moreMenu(items) {
+export function moreMenu(items, opts) {
+  opts = opts || {};
   items = items.filter(function (i) { return i; });
-  var wrap = h("div.more");
+  var wrap = h(opts.split ? "div.more.split-more" : "div.more");
   var menuId = "more-menu-" + (++moreMenu.seq);
-  var trigger = h("button.tool.more-trigger", {
+  var trigger = opts.split ? h("button.tool.more-trigger.split-trigger", {
+    type: "button", title: opts.label, "aria-label": opts.label, "aria-haspopup": "menu", "aria-expanded": "false", "aria-controls": menuId
+  }, [svgIcon(ICONS.chevron)]) : h("button.tool.more-trigger", {
     type: "button", title: "More actions", "aria-haspopup": "menu", "aria-expanded": "false", "aria-controls": menuId
   }, [h("span", { text: "More" }), svgIcon(ICONS.chevron)]);
-  var menu = h("div.menu.hidden", { id: menuId, role: "menu", "aria-label": "More actions" });
+  var menu = h("div.menu.hidden", { id: menuId, role: "menu", "aria-label": opts.label || "More actions" });
   var entries = items.map(function (it) {
     var b = h("button.menu-item" + (it.danger && !it.disabled ? ".danger" : ""), {
       type: "button", role: "menuitem", tabindex: "-1", title: it.title || it.label,
@@ -204,6 +210,7 @@ export function moreMenu(items) {
   function onDoc(e) { if (!wrap.contains(e.target)) close(false); }
   function open(focusIndex, instant) {
     if (isOpen()) return;
+    items.forEach(function (it, k) { if (it.sync) it.sync(entries[k], it); });
     menu.classList.toggle("instant", !!instant);
     menu.classList.remove("hidden");
     trigger.setAttribute("aria-expanded", "true");
@@ -244,6 +251,23 @@ export function moreMenu(items) {
   return wrap;
 }
 moreMenu.seq = 0;
+
+/** A split button (#513 T8): the main action and, right beside it, a
+ *  chevron with the related choices (moreMenu items). */
+export function splitTool(main, items, label) {
+  var list = items.filter(function (i) { return i; });
+  if (!list.length) return main;
+  return h("div.split-tool", null, [main, moreMenu(list, { split: true, label: label })]);
+}
+
+/** A toolbar button as a More ▾ entry (#513 T8: fewer buttons in the row);
+ *  the entry clicks the button, so it does exactly what the button did. */
+export function asMenuItem(button) {
+  if (!button) return null;
+  var icon = (Array.prototype.filter.call(button.classList, function (c) { return c.indexOf("tool-") === 0; })[0] || "tool-plus").slice(5);
+  return { label: button.textContent, icon: icon, title: button.title, disabled: button.disabled,
+    run: function () { button.click(); } };
+}
 
 export function badge(value, text) {
   var icon = null;

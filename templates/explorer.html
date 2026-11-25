@@ -6,6 +6,7 @@
 {% import "macros.html" as m %}
 <div class="page-head">
   <div>
+    {{ m.vault_views("folders") }}
     <p class="crumbs"><a href="/vault">Vault</a>{% for f in folders %}{% if f.id == folder %}<span>{{ f.code }}</span>{% endif %}{% endfor %}</p>
     <h1>{% if folder == "mine" %}My check-outs{% elif folder == "favorites" %}Favorites{% elif folder == "locked" %}All check-outs{% elif folder == "none" %}Items without project group{% elif folder == "search" %}Search{% else %}{% for f in folders %}{% if f.id == folder %}{{ f.name }}{% endif %}{% endfor %}{% endif %}</h1>
   </div>

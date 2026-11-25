@@ -100,6 +100,10 @@ jobs:
       # fresh check-out, Release… only once checked in (#536, #513 T2)
       - name: Test the next-step rule of the revision toolbar
         run: node scripts/desktop-next-step.test.mjs
+      # the pinned Home tab: recently opened objects, the worklist as counts
+      # (#513 T1, T9)
+      - name: Test the Home tab rules
+        run: node scripts/desktop-home-rules.test.mjs
       # the key inputs of a failed action in *Report…* (#381)
       - name: Test the report inputs
         run: node scripts/desktop-report-inputs.test.mjs

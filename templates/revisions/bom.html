@@ -86,7 +86,7 @@
         <td>{% if n.revision %}{{ m.revbox(n.revision.code) }}{% endif %}</td>
         <td class="nowrap">{% if n.restricted %}{% elif n.revision %}{{ m.badge(n.revision.state) }}{% else %}<span class="badge badge-in_review"><span class="glyph" aria-hidden="true">○</span>no {{ rule|replace("_", " ") }} revision</span>{% endif %}</td>
         <td class="ellipsis" title="{% if n.revision %}{{ n.revision.name }}{% endif %}">{% if n.revision %}{{ n.revision.name }}{% endif %}</td>
-        <td class="nowrap">{% if row.project_code %}<a class="mono" href="/projects/{{ n.project_id }}">{{ row.project_code }}</a>{% endif %}</td>
+        <td class="nowrap">{% if row.project_code %}<a class="link-quiet" href="/projects/{{ n.project_id }}">{{ row.project_code }}</a>{% endif %}</td>
         <td class="num">{{ n.quantity|num(6) }}{% if n.unit and n.unit != "each" %} <span class="dim">{{ n.unit }}</span>{% endif %}</td>
         {% if n.restricted %}
         <td class="num dim" title="Not included in the totals">–</td>

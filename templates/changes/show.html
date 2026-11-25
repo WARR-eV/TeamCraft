@@ -69,34 +69,9 @@
 {% endif %}
 
 {% if can.review %}
-<section class="card" id="decision">
-  <h2>Your review</h2>
-  <form class="stack" method="post" action="/changes/{{ change.id }}/review">
-    <label>Comment
-      <textarea name="comment" maxlength="4000" aria-describedby="decision-hint"></textarea>
-      <span class="hint" id="decision-hint">A rejection needs a comment: what has to change.</span>
-    </label>
-    <label>Meaning of your sign-off <span class="hint">optional, e.g. approved as design owner</span>
-      <input type="text" name="meaning" maxlength="200">
-    </label>
-    {% if sign_off is defined and sign_off.reauth != "off" %}
-      {% if sign_off.reauthenticated %}
-      <p class="hint">You signed in again – your decision is confirmed with single sign-on (for {{ sign_off.window_minutes }} minutes).</p>
-      {% elif sign_off.sso %}
-      <p class="notice">This server asks for a fresh sign-in to {% if sign_off.rejections_too %}decide{% else %}approve{% endif %}.
-        <a class="button" href="/auth/oidc/reauth?next=/changes/{{ change.id }}%23decision">Sign in again</a></p>
-      {% else %}
-      <label>Your password <span class="hint">this server asks for it to {% if sign_off.rejections_too %}approve or reject{% else %}approve{% endif %}</span>
-        <input type="password" name="password" autocomplete="current-password">
-      </label>
-      {% endif %}
-    {% endif %}
-    <div class="actions">
-      <button class="primary" type="submit" name="decision" value="approve">Approve change</button>
-      <button class="danger" type="submit" name="decision" value="reject">Reject</button>
-    </div>
-  </form>
-</section>
+{#- the evidence comes before the signature (#513 T3): the decision card is
+    after the impact analysis; this notice says it is waiting -#}
+<div class="notice review-pending" role="note"><strong>Your review is pending.</strong> Read the details, the affected revisions and the impact below, then <a href="#decision">decide</a>.</div>
 {% endif %}
 
 <div class="grid grid-2">
@@ -338,6 +313,37 @@
   {% elif not hidden_dependents %}<p class="empty">No other item uses or references the revisions of this change.</p>{% endif %}
   {{ m.hidden_count(hidden_dependents, "dependents") }}
 </section>
+
+{% if can.review %}
+<section class="card" id="decision">
+  <h2>Your review</h2>
+  <form class="stack" method="post" action="/changes/{{ change.id }}/review">
+    <label>Comment
+      <textarea name="comment" maxlength="4000" aria-describedby="decision-hint"></textarea>
+      <span class="hint" id="decision-hint">A rejection needs a comment: what has to change.</span>
+    </label>
+    <label>Meaning of your sign-off <span class="hint">optional, e.g. approved as design owner</span>
+      <input type="text" name="meaning" maxlength="200">
+    </label>
+    {% if sign_off is defined and sign_off.reauth != "off" %}
+      {% if sign_off.reauthenticated %}
+      <p class="hint">You signed in again – your decision is confirmed with single sign-on (for {{ sign_off.window_minutes }} minutes).</p>
+      {% elif sign_off.sso %}
+      <p class="notice">This server asks for a fresh sign-in to {% if sign_off.rejections_too %}decide{% else %}approve{% endif %}.
+        <a class="button" href="/auth/oidc/reauth?next=/changes/{{ change.id }}%23decision">Sign in again</a></p>
+      {% else %}
+      <label>Your password <span class="hint">this server asks for it to {% if sign_off.rejections_too %}approve or reject{% else %}approve{% endif %}</span>
+        <input type="password" name="password" autocomplete="current-password">
+      </label>
+      {% endif %}
+    {% endif %}
+    <div class="actions">
+      <button class="primary" type="submit" name="decision" value="approve">Approve change</button>
+      <button class="danger" type="submit" name="decision" value="reject">Reject</button>
+    </div>
+  </form>
+</section>
+{% endif %}
 
 <section class="card">
   <h2>History</h2>

@@ -579,6 +579,26 @@
     var field = document.querySelector("[data-filter]") || document.querySelector(".quicksearch input");
     if (field) { event.preventDefault(); field.focus(); field.select(); }
   });
+  // Phones (#513 T7): the bottom bar's Search focuses the search field of the
+  // top bar instead of leaving the page; the field gets a short placeholder.
+  var quick = document.querySelector(".quicksearch input");
+  document.querySelectorAll("a[data-focus-search]").forEach(function (a) {
+    a.addEventListener("click", function (event) {
+      if (!quick) return;
+      event.preventDefault();
+      window.scrollTo(0, 0);
+      quick.focus();
+    });
+  });
+  if (quick && window.matchMedia) {
+    var phone = window.matchMedia("(max-width: 600px)");
+    var longHint = quick.getAttribute("placeholder");
+    var shortHint = (document.querySelector("a[data-focus-search]") || {}).textContent;
+    var hint = function () { quick.setAttribute("placeholder", phone.matches && shortHint ? shortHint + " …" : longHint); };
+    hint();
+    if (phone.addEventListener) phone.addEventListener("change", hint);
+  }
+
   document.querySelectorAll("input[data-slash-pref]").forEach(function (box) {
     var wrap = box.closest(".hidden");
     if (wrap) wrap.classList.remove("hidden");
@@ -877,12 +897,103 @@
     btn.addEventListener("click", function () { window.print(); });
   });
 
-  // Section nav of the revision page (#421): the first section in view (in
-  // page order) gets aria-current; without IntersectionObserver the links
-  // simply jump.
+  // Tabs of the revision page (#421; real tabs since #513 T5). Every link of
+  // the nav points at a section; its panel is the top-level block of the page
+  // that holds it (the Overview panel also holds the Lifecycle and Revisions
+  // cards). One panel is shown at a time, everything else on the page (head,
+  // notices, the check-in form) stays. The #hash picks the tab, so links and
+  // redirects such as /revisions/7#bom open it, and an anchor inside a panel
+  // (#lifecycle) opens its tab and scrolls to it. Without JavaScript the page
+  // shows every section, as before.
   (function () {
     var nav = document.querySelector("[data-section-nav]");
     if (!nav) return;
+    var page = nav.parentElement;
+    var list = nav.querySelector("ul");
+    var links = Array.prototype.slice.call(nav.querySelectorAll('a[href^="#"]'));
+    var panelOf = function (el) {
+      while (el && el.parentElement !== page) el = el.parentElement;
+      return el;
+    };
+    var tabs = [];
+    links.forEach(function (a) {
+      var target = document.getElementById(a.getAttribute("href").slice(1));
+      var panel = target && panelOf(target);
+      if (panel && panel !== nav) {
+        tabs.push({ link: a, panel: panel });
+        panel.setAttribute("data-tab-panel", "");
+      }
+    });
+    if (!tabs.length) return;
+    nav.classList.add("tabs-on");
+    // "More ▾" (#513 T5): links that do not fit in one row move into a menu;
+    // the active one always stays in the row
+    var more = document.createElement("details");
+    more.className = "menu section-more";
+    more.innerHTML = '<summary>More <span class="chev" aria-hidden="true"></span></summary><ul class="menu-pop menu-right"></ul>';
+    var pop = more.querySelector(".menu-pop");
+    // beside the list, not in it: the list scrolls and would clip the menu
+    nav.appendChild(more);
+    var layout = function () {
+      // every link back into the row in page order, then the last ones that
+      // do not fit into the menu – never the active one
+      tabs.forEach(function (t) { list.appendChild(t.link.parentElement); });
+      more.hidden = true;
+      if (list.scrollWidth <= list.clientWidth + 1) return;
+      more.hidden = false;
+      var row = tabs.slice();
+      while (row.length > 1 && list.scrollWidth > list.clientWidth + 1) {
+        var i = row.length - 1;
+        if (row[i].link.hasAttribute("aria-current")) i -= 1;
+        row.splice(i, 1);
+        // the menu lists the moved links in page order
+        tabs.forEach(function (t) { if (row.indexOf(t) === -1) pop.appendChild(t.link.parentElement); });
+      }
+    };
+    var targetOf = function (tab) { return document.getElementById(tab.link.getAttribute("href").slice(1)); };
+    var show = function (tab, target) {
+      tabs.forEach(function (t) {
+        // several links may share a panel (none do today): each shows it
+        t.panel.hidden = t.panel !== tab.panel;
+        if (t === tab) t.link.setAttribute("aria-current", "page");
+        else t.link.removeAttribute("aria-current");
+      });
+      more.removeAttribute("open");
+      layout();
+      if (target && target !== targetOf(tab)) { target.scrollIntoView(); return; }
+      // a tab opened further down the page starts right under the nav
+      if (tab.panel.getBoundingClientRect().top < nav.getBoundingClientRect().bottom) targetOf(tab).scrollIntoView();
+    };
+    var current = null;
+    // `first`: the page load – without a usable #hash the first tab
+    // (Overview); later an anchor outside every panel (#checkin-form) keeps
+    // the tab that is open
+    var fromHash = function (first) {
+      var id = "";
+      try { id = decodeURIComponent(location.hash.slice(1)); } catch (e) { id = ""; }
+      var target = id ? document.getElementById(id) : null;
+      var panel = target && panelOf(target);
+      var tab = tabs.filter(function (t) { return t.link.getAttribute("href") === "#" + id; })[0] ||
+        tabs.filter(function (t) { return t.panel === panel; })[0];
+      if (!tab) {
+        if (first || !current) { current = tabs[0]; show(current, null); }
+        return;
+      }
+      current = tab;
+      show(tab, target);
+    };
+    links.forEach(function (a) {
+      a.addEventListener("click", function (event) {
+        if (event.ctrlKey || event.metaKey || event.shiftKey || event.button) return;
+        event.preventDefault();
+        if (location.hash !== a.getAttribute("href")) history.pushState(null, "", a.getAttribute("href"));
+        fromHash(false);
+      });
+    });
+    window.addEventListener("hashchange", function () { fromHash(false); });
+    window.addEventListener("popstate", function () { fromHash(false); });
+    fromHash(true);
+    window.addEventListener("resize", layout);
     // Anchors clear the nav by --section-nav-h (#523). The stylesheet's value
     // is a fallback; the nav's real height differs with fonts, zoom and a
     // classic scrollbar under its overflowing list, so it is measured here.
@@ -894,24 +1005,6 @@
     measure();
     if ("ResizeObserver" in window) new ResizeObserver(measure).observe(nav);
     else window.addEventListener("resize", measure);
-    if (!("IntersectionObserver" in window)) return;
-    var links = Array.prototype.slice.call(nav.querySelectorAll('a[href^="#"]'));
-    var inView = {};
-    var observer = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) { inView[e.target.id] = e.isIntersecting; });
-      var current = null;
-      links.forEach(function (a) {
-        if (!current && inView[a.getAttribute("href").slice(1)]) current = a;
-      });
-      links.forEach(function (a) {
-        if (a === current) a.setAttribute("aria-current", "true");
-        else a.removeAttribute("aria-current");
-      });
-    }, { rootMargin: "-120px 0px -55% 0px" });
-    links.forEach(function (a) {
-      var section = document.getElementById(a.getAttribute("href").slice(1));
-      if (section) observer.observe(section);
-    });
   })();
 
   // Copy buttons: <button data-copy="id"> copies the element's text,

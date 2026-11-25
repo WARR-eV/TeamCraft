@@ -42,15 +42,18 @@
       {%- endif %}
     </a>
     <nav class="nav" aria-label="Main">
-      {%- set nav_cur %}{% block nav_home %}{% endblock %}{% endset %}
+      {%- set cur_home %}{% block nav_home %}{% endblock %}{% endset %}{% set nav_cur = cur_home %}
       <a href="/" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %}>{{ t("nav.dashboard") }}</a>
-      {%- set nav_cur %}{% block nav_vault %}{% endblock %}{% endset %}
-      <a href="/vault" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %} title="{{ t("nav.vault.title") }}">{{ t("nav.vault") }}</a>
-      {%- set nav_cur %}{% block nav_items %}{% endblock %}{% endset %}
-      <a href="/items" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %}>{{ t("nav.items") }}</a>
-      {%- set nav_cur %}{% block nav_requests %}{% endblock %}{% endset %}
+      {#- one entry for the vault (#513 T13): the folder explorer (/vault) and
+          the item list (/items) are two views of the same items, switched on
+          the pages themselves (macro vault_views) -#}
+      {%- set nav_folders %}{% block nav_vault %}{% endblock %}{% endset %}
+      {%- set nav_list %}{% block nav_items %}{% endblock %}{% endset %}
+      {%- set nav_cur = "active" if (nav_folders|trim == "active" or nav_list|trim == "active") else "" %}
+      <a href="/vault" class="{{ nav_cur }}"{% if nav_cur == "active" %} aria-current="page"{% endif %} title="{{ t("nav.vault.title") }}">{{ t("nav.vault") }}</a>
+      {%- set cur_requests %}{% block nav_requests %}{% endblock %}{% endset %}{% set nav_cur = cur_requests %}
       <a href="/requests" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %} title="{{ t("nav.requests.title") }}">{{ t("nav.requests") }}</a>
-      {%- set nav_cur %}{% block nav_changes %}{% endblock %}{% endset %}
+      {%- set cur_changes %}{% block nav_changes %}{% endblock %}{% endset %}{% set nav_cur = cur_changes %}
       <a href="/changes" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %}>{{ t("nav.changes") }}</a>
       {%- set nav_cur %}{% block nav_projects %}{% endblock %}{% endset %}
       <a href="/projects" class="{{ nav_cur }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %}>{{ t("nav.projects") }}</a>
@@ -104,6 +107,13 @@
         </div>
         <a href="/account">Account</a>
         <a href="/account#notifications">Notification settings</a>
+        {#- phones: the sections the bottom bar leaves out (#513 T7) -#}
+        <a class="show-phone" href="/vault">{{ t("nav.vault") }}</a>
+        <a class="show-phone" href="/projects">{{ t("nav.projects") }}</a>
+        {%- if desktop_download_url %}
+        {#- the desktop app's download, here rather than on the dashboard (#513 T9) -#}
+        <a class="hide-phone" href="{{ desktop_download_url }}" rel="noopener" title="{{ t("nav.desktop.title") }}">{{ t("nav.desktop") }}</a>
+        {%- endif %}
         <div class="menu-sep" role="separator"></div>
         <p class="menu-label">Appearance</p>
         <div class="menu-scheme">
@@ -121,6 +131,18 @@
     </details>
   </div>
 </header>
+{#- phones (under 600 px): the sections a reviewer needs as a bar at the
+    bottom instead of the sideways-scrolling row (#513 T7); Vault and
+    Projects are in the account menu there -#}
+<nav class="bottom-nav" aria-label="{{ t("nav.phone") }}">
+  {%- set nav_cur = cur_home|trim %}
+  <a href="/" class="{{ nav_cur|trim }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %}>{{ t("nav.dashboard") }}</a>
+  {%- set nav_cur = cur_changes|trim %}
+  <a href="/changes" class="{{ nav_cur|trim }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %}>{{ t("nav.changes") }}</a>
+  {%- set nav_cur = cur_requests|trim %}
+  <a href="/requests" class="{{ nav_cur|trim }}"{% if nav_cur|trim == "active" %} aria-current="page"{% endif %}>{{ t("nav.requests") }}</a>
+  <a href="/items" data-focus-search>{{ t("nav.search.short") }}</a>
+</nav>
 {% endif %}
 <main id="main" {% block tc_context %}{% endblock %}>
   {% if demo %}<div class="demo-banner" role="note"><strong>Live demo</strong> – read-only sample data (openly licensed NIST CAD models), reset regularly. Look around as much as you like; changes are refused. <a href="https://github.com/WARR-eV/TeamCraft#quick-start">Install your own TeamCraft</a></div>{% endif %}

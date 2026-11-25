@@ -75,25 +75,23 @@
     source. `on_revision`: shown on the dependent's own page (no Open/Revise). -#}
 {% macro impact_group(g, back, can_ack, on_revision=false) -%}
 {% set n = g.impacts|length %}
+{#- the fix is to revise the dependent: that is the group's button; a single
+    row is dismissed through its row menu, so the default is to look at the
+    assembly, not to dismiss (#513 T24) -#}
+{% set can_revise = can_ack and not on_revision and g.revision_state == "released" %}
 <article class="impact-group" aria-labelledby="ig-{{ g.revision_id }}">
   <header class="impact-group-head">
     <h3 id="ig-{{ g.revision_id }}">
       {%- if on_revision %}Check needed: <span class="mono">{{ g.item_number }}/{{ g.revision_code }}</span>
       {%- else %}<a class="mono" href="/revisions/{{ g.revision_id }}">{{ g.item_number }}/{{ g.revision_code }}</a> <span class="impact-group-name">{{ g.item_name }}</span>{% endif -%}
     </h3>
-    <span class="impact-count">{{ n }} change{% if n != 1 %}s{% endif %} to check</span>
+    <span class="impact-count">{{ n }} change{% if n != 1 %}s{% endif %} to check{% if g.latest_at %} · {{ time(g.latest_at) }}{% endif %}</span>
     <div class="actions">
       {% if not on_revision %}
       <a class="button small ghost" href="/revisions/{{ g.revision_id }}#references">Open</a>
-      {% if can_ack and g.revision_state == "released" %}
-      <form method="post" action="/revisions/{{ g.revision_id }}/revise"
-            data-confirm="Create a new revision of {{ g.item_number }} based on {{ g.revision_code }}?">
-        <button class="small ghost" type="submit">Revise</button>
-      </form>
-      {% endif %}
       {% endif %}
       {% if can_ack and n > 1 %}
-      <button class="small" type="button" data-toggle="ack-all-{{ g.revision_id }}" aria-controls="ack-all-{{ g.revision_id }}" aria-expanded="false">Acknowledge all…</button>
+      <button class="small ghost" type="button" data-toggle="ack-all-{{ g.revision_id }}" aria-controls="ack-all-{{ g.revision_id }}" aria-expanded="false">Acknowledge all…</button>
       {% endif %}
     </div>
   </header>
@@ -113,11 +111,17 @@
         {%- else %}<a class="mono" href="/revisions/{{ i.source_revision_id }}">{{ i.source_number }}/{{ i.source_code }}</a>
         <span class="impact-source-name">{{ i.source_name }}</span>{% endif %}</span>
       <span class="impact-event">{% if i.event == "released" %}released{% else %}<span class="badge badge-obsolete">obsolete</span>{% endif %}
-        {%- if i.change_number %} via <a class="mono" href="/changes/{{ i.change_id }}">{{ i.change_number }}</a>{% endif %}</span>
+        {%- if i.change_number %} via <a class="mono link-quiet" href="/changes/{{ i.change_id }}">{{ i.change_number }}</a>{% endif %}</span>
       <span class="impact-relation">{{ relation_short(i.relation) }}{% if i.detail %} <span class="impact-detail">· {{ i.detail }}</span>{% endif %}</span>
-      <span class="impact-when">{{ time(i.created_at) }}</span>
+      {#- the group's head shows the latest time; a row only when it differs -#}
+      <span class="impact-when">{% if i.created_at != g.latest_at %}{{ time(i.created_at) }}{% endif %}</span>
       {% if can_ack %}
-      <button class="small ghost" type="button" data-toggle="ack-{{ i.id }}" aria-controls="ack-{{ i.id }}" aria-expanded="false">Acknowledge…</button>
+      <details class="menu impact-menu">
+        <summary class="button xs ghost" aria-label="Actions for {{ i.source_number }}/{{ i.source_code }}" title="Actions">⋯</summary>
+        <div class="menu-pop menu-right">
+          <button class="menu-item" type="button" data-toggle="ack-{{ i.id }}" aria-controls="ack-{{ i.id }}" aria-expanded="false">Acknowledge only this one…</button>
+        </div>
+      </details>
       <form class="impact-ack hidden" id="ack-{{ i.id }}" method="post" action="/impacts/{{ i.id }}/acknowledge">
         <input type="hidden" name="back" value="{{ back }}">
         <input type="text" name="note" maxlength="2000" required aria-label="Why no change is needed for {{ i.source_number }}/{{ i.source_code }}"
@@ -128,7 +132,15 @@
     </li>
     {% endfor %}
   </ul>
-  <p class="hint">Revising and releasing {{ g.item_number }} resolves {% if n == 1 %}it{% else %}all {{ n }}{% endif %} as well.</p>
+  {% if can_revise %}
+  <form class="impact-resolve" method="post" action="/revisions/{{ g.revision_id }}/revise"
+        data-confirm="Create a new revision of {{ g.item_number }} based on {{ g.revision_code }}?">
+    <button class="small" type="submit">Revise {{ g.item_number }}…</button>
+    <span class="hint">Revising and releasing {{ g.item_number }} resolves {% if n == 1 %}it{% else %}all {{ n }}{% endif %} as well.</span>
+  </form>
+  {% else %}
+  <p class="hint">{% if g.revision_state == "released" %}Revising and releasing{% else %}Releasing{% endif %} {{ g.item_number }} resolves {% if n == 1 %}it{% else %}all {{ n }}{% endif %} as well.</p>
+  {% endif %}
 </article>
 {%- endmacro %}
 
@@ -176,15 +188,17 @@
 <span class="lock{% if mine %} lock-mine{% endif %}" title="Checked out by {% if mine %}you{% else %}{{ name }}{% endif %}"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>{{ name }}{% if mine %} <span class="dim">(you)</span>{% endif %}</span>
 {%- endmacro %}
 
+{#- The What of a history row: the sentence with only its record number as
+    the link (#513 T25, filter link_number). -#}
 {% macro entity_link(e) -%}
 {%- if e.entity_type == "item" and e.entity_id -%}
-<a href="/items/{{ e.entity_id }}">{{ e.summary }}</a>
+{{ e.summary|link_number("/items/" ~ e.entity_id) }}
 {%- elif e.entity_type == "revision" and e.entity_id -%}
-<a href="/revisions/{{ e.entity_id }}">{{ e.summary }}</a>
+{{ e.summary|link_number("/revisions/" ~ e.entity_id) }}
 {%- elif e.entity_type == "change" and e.entity_id -%}
-<a href="/changes/{{ e.entity_id }}">{{ e.summary }}</a>
+{{ e.summary|link_number("/changes/" ~ e.entity_id) }}
 {%- elif e.entity_type == "change_request" and e.entity_id -%}
-<a href="/requests/{{ e.entity_id }}">{{ e.summary }}</a>
+{{ e.summary|link_number("/requests/" ~ e.entity_id) }}
 {%- else -%}
 {{ e.summary }}
 {%- endif -%}
@@ -199,7 +213,7 @@
   {% for e in entries %}
     <tr>
       <td class="nowrap small">{{ time(e.at) }}</td>
-      <td class="nowrap">{{ e.username }}</td>
+      <td class="nowrap">{% if e.user_display_name %}<span title="{{ e.username }}">{{ e.user_display_name }}</span>{% else %}{{ e.username }}{% endif %}</td>
       <td>{{ entity_link(e) }}</td>
     </tr>
   {% endfor %}
@@ -269,4 +283,14 @@
 {%- endmacro %}
 {% macro version_help() -%}
 {{ help("Every check-in or park stores a new version (v1, v2 …) of a file – the history inside a revision.") }}
+{%- endmacro %}
+
+{#- The two views of the vault (#513 T13): folders (/vault, by project group)
+    and the list (/items, search and filters). One nav entry leads to both;
+    this switch sits in the head of either page. -#}
+{% macro vault_views(current) -%}
+<nav class="view-switch" aria-label="Vault view">
+  <a href="/vault"{% if current == "folders" %} aria-current="page"{% endif %} title="Browse by project group, with a detail panel">Folders</a>
+  <a href="/items"{% if current == "list" %} aria-current="page"{% endif %} title="Every item as a list – search and filter by type, project, state">List</a>
+</nav>
 {%- endmacro %}

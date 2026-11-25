@@ -232,11 +232,15 @@ depends on there; the change's own revisions are not listed.
 
 *Dependents to check* on the dashboard (and in the desktop app) groups the
 open checks by the dependent revision: one header per assembly, drawing or
-simulation (*ASM-000002/A Electronics enclosure – 4 changes to check*) with **Open**, **Revise** and **Acknowledge
-all…**, and one compact row per source
-below it – the item that changed, *released* or *obsolete* via which change,
-and the link (BOM line, CAD file reference, drawing, specification, reference,
-simulation basis) – each with its own **Acknowledge…**. **Acknowledge all…**
+simulation (*ASM-000002/A Electronics enclosure – 4 changes to check* and
+when the newest came in) with **Open** and **Acknowledge all…**, and one
+compact row per source below it – the item that changed, *released* or
+*obsolete* via which change, and the link (BOM line, CAD file reference,
+drawing, specification, reference, simulation basis). The fix comes first:
+**Revise ASM-000002…** under the rows (for a released dependent) starts the
+new revision whose release resolves them all. A single row is dismissed with
+**Acknowledge only this one…** in its row menu (⋯), so the default is to
+look at the assembly, not to dismiss (#513). **Acknowledge all…**
 resolves exactly the checks shown with one note, in one step; checks resolved
 by someone else in the meantime are skipped, and every acknowledged check is
 recorded in the item's history. The revision page shows its open checks the

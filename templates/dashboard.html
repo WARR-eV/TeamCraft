@@ -21,7 +21,6 @@
     </p>
   </div>
   <div class="actions">
-    {% if desktop_download_url %}<a class="button ghost" href="{{ desktop_download_url }}" rel="noopener" title="The desktop app for CAD work: a working folder per project group, Check out and open in your CAD program, Check in">Get TeamCraft Desktop</a>{% endif %}
     {% if me.can_edit %}
     {#- New item is the primary action on Home, in the desktop app as well -#}
     <a class="button" href="/changes/new">New change</a>
@@ -31,15 +30,6 @@
     {% endif %}
   </div>
 </div>
-
-<ul class="stat-strip" aria-label="Product data">
-  <li><a href="/items"><span class="value">{{ stats.items }}</span><span class="label">Items</span></a></li>
-  <li><a href="/items?state=in_work"><span class="value">{{ stats.revisions_in_work }}</span><span class="label">WIP</span></a></li>
-  <li><a href="/items?state=in_review"><span class="value">{{ stats.revisions_in_review }}</span><span class="label">In Review</span></a></li>
-  <li><a href="/items?state=released"><span class="value">{{ stats.revisions_released }}</span><span class="label">Released</span></a></li>
-  <li><a href="/changes"><span class="value">{{ stats.open_changes }}</span><span class="label">Open changes</span></a></li>
-  <li><a href="/vault"><span class="value">{{ stats.stored_bytes|filesize }}</span><span class="label">{{ stats.files }} files in the vault</span></a></li>
-</ul>
 
 {% if not me.can_edit %}
 {#- why the editing buttons are missing (#423) -#}
@@ -51,7 +41,7 @@
   {% if reviews %}
   <div class="table-wrap">
   <table>
-    <thead><tr><th scope="col">Change</th><th scope="col">Title</th><th scope="col" class="hide-narrow">Priority</th><th scope="col" class="hide-narrow">Author</th><th scope="col" class="hide-narrow"><span class="visually-hidden">Actions</span></th></tr></thead>
+    <thead><tr><th scope="col">Change</th><th scope="col">Title</th><th scope="col" class="hide-narrow">Priority</th><th scope="col" class="hide-narrow">Author</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
     <tbody>
     {% for c in reviews %}
       <tr>
@@ -59,7 +49,7 @@
         <td class="ellipsis" title="{{ c.title }}">{{ c.title }}<span class="show-narrow">{{ m.badge(c.priority) }}</span></td>
         <td class="nowrap hide-narrow">{{ m.badge(c.priority) }}</td>
         <td class="muted nowrap hide-narrow">{{ c.created_by_name }}</td>
-        <td class="row-actions hide-narrow"><a class="button small" href="/changes/{{ c.id }}#decision">Open review</a></td>
+        <td class="row-actions"><a class="button small" href="/changes/{{ c.id }}#decision">Open review</a></td>
       </tr>
     {% endfor %}
     </tbody>
@@ -198,6 +188,17 @@
     {% else %}<p class="empty">Found a problem? Raise a change request – the CAD editors of the item take it from there.</p>{% endif %}
   </section>
 </div>
+
+{#- the product counts change rarely: one slim line below the personal work,
+    not a strip above it (#513 T9) -#}
+<ul class="stat-line" aria-label="Product data">
+  <li><a href="/items"><strong>{{ stats.items }}</strong> items</a></li>
+  <li><a href="/items?state=in_work"><strong>{{ stats.revisions_in_work }}</strong> WIP</a></li>
+  <li><a href="/items?state=in_review"><strong>{{ stats.revisions_in_review }}</strong> in review</a></li>
+  <li><a href="/items?state=released"><strong>{{ stats.revisions_released }}</strong> released</a></li>
+  <li><a href="/changes"><strong>{{ stats.open_changes }}</strong> open change{% if stats.open_changes != 1 %}s{% endif %}</a></li>
+  <li><a href="/vault"><strong>{{ stats.files }}</strong> files, {{ stats.stored_bytes|filesize }}</a></li>
+</ul>
 
 <section class="card">
   <div class="card-head"><h2>Recent activity</h2></div>

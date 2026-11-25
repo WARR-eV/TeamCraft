@@ -661,6 +661,10 @@ pub struct AuditEntry {
     pub at: DateTime<Utc>,
     pub user_id: Option<Uuid>,
     pub username: String,
+    /// The user's current display name (#513 T25: history shows people by
+    /// name, the login name as the tooltip); none for deleted users.
+    #[sqlx(default)]
+    pub user_display_name: Option<String>,
     pub action: String,
     pub entity_type: String,
     pub entity_id: Option<Uuid>,
