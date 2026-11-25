@@ -73,6 +73,20 @@ UI review #513 – the decided themes:
   while they are open; the Worklist badge's tooltip says what it counts
   (T21).
 
+Other changes:
+
+- Item search: a query that names a file format (`solidworks`, `step`)
+  checks the format of the latest revision's files first, before the
+  substring and full-text conditions (#316). Such a query can match most of
+  a vault (73 % of the items in the scale check); the results and the total
+  are the same as before. Tested in `tests/search_listing.rs`
+  (`a_format_name_matches_files_of_that_format`).
+- Items without a project group (#310): `tests/ungrouped_items.rs` pins the
+  rules the permissions guide describes – new items and master-data changes
+  need a group (400), administrators see the count with the link to *Vault →
+  Without group* on *Project groups*, other users do not, and such an item is
+  readable by every user until it is moved into a group.
+
 ## [0.2.14] - 2026-11-24
 
 ### Security

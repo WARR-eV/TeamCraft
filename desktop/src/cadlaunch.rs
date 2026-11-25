@@ -25,7 +25,10 @@
 //!
 //! **A running Inventor** ([`open_in_running`], Windows): when an Inventor
 //! the user started is already running and is the installation [`plan`]
-//! chose, the file opens there when that Inventor has the working folder's
+//! chose – or any installed version, when the project group asks for none
+//! ([`Wish::pins_version`]; with several versions installed the one the user
+//! runs is used instead of starting the newest, #483) –
+//! the file opens there when that Inventor has the working folder's
 //! Inventor project ([`project_file`]) active – or when the working folder
 //! has none: a new instance would start with the same, last active project
 //! anyway (#483). It opens there as a new document window instead of in a second
@@ -355,6 +358,19 @@ pub struct Wish {
     pub group_version: String,
 }
 
+impl Wish {
+    /// Whether the project group asks for one version of the file's
+    /// program (its default program is the file's, with a version). Only
+    /// then must a running Inventor be that installation; otherwise any
+    /// installed version the user already runs opens the file (#483) –
+    /// [`plan`] would choose the newest one, which is no better a guess.
+    pub fn pins_version(&self) -> bool {
+        !self.file_family.is_empty()
+            && self.group_family == self.file_family
+            && !self.group_version.is_empty()
+    }
+}
+
 /// How a file is opened.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct OpenPlan {
@@ -582,8 +598,11 @@ pub fn project_file(file: &Path, root: &Path) -> Option<PathBuf> {
 pub enum Running {
     /// No Inventor the user started runs.
     Nothing,
-    /// It opens the file as a new document window.
-    Opening,
+    /// It opens the file as a new document window. The install folder of
+    /// the running instance when it is another installation than the one
+    /// asked for (only when any version may open the file, see
+    /// [`Wish::pins_version`]); empty = the installation asked for.
+    Opening(String),
     /// Another installation runs (its install folder).
     OtherVersion(String),
     /// It has another project active (its project file; empty = none).
@@ -594,9 +613,10 @@ pub enum Running {
     Unreachable,
 }
 
-/// One line of [`INVENTOR_OPEN_SCRIPT`]'s answer: `none`, `opening`,
-/// `unreachable`, `version <install folder>` or `project <project file>`;
-/// `None` for any other line.
+/// One line of [`INVENTOR_OPEN_SCRIPT`]'s answer: `none`, `opening` (or
+/// `opening <install folder>` for another installation), `unreachable`,
+/// `version <install folder>` or `project <project file>`; `None` for any
+/// other line.
 #[cfg_attr(not(windows), allow(dead_code))]
 pub fn parse_answer(line: &str) -> Option<Running> {
     let line = line.trim();
@@ -607,10 +627,10 @@ pub fn parse_answer(line: &str) -> Option<Running> {
     };
     match line {
         "none" => Some(Running::Nothing),
-        "opening" => Some(Running::Opening),
         "unreachable" => Some(Running::Unreachable),
-        _ => rest("version")
-            .map(Running::OtherVersion)
+        _ => rest("opening")
+            .map(Running::Opening)
+            .or_else(|| rest("version").map(Running::OtherVersion))
             .or_else(|| rest("project").map(Running::OtherProject)),
     }
 }
@@ -639,7 +659,7 @@ pub fn running_note(
     project: Option<&Path>,
 ) -> Option<String> {
     match running {
-        Running::Nothing | Running::Opening => None,
+        Running::Nothing | Running::Opening(_) => None,
         Running::Unreachable => Some(
             "Inventor is running but did not answer (started as administrator, still starting, or busy with a dialog) – opened in a new instance.".into(),
         ),
@@ -688,7 +708,7 @@ pub fn tasklist_has(answer: &str, image: &str) -> bool {
 /// [`ASK_DEADLINE_SECS`], so the answer comes within [`ASK_LIMIT`]. After
 /// `opening`, a failure to open the file is one more line ([`parse_failure`]).
 #[cfg_attr(not(windows), allow(dead_code))]
-pub const INVENTOR_OPEN_SCRIPT: &str = r#"param([Parameter(Mandatory = $true)][string]$Path, [Parameter(Mandatory = $true)][string]$InstallDir, [string]$Project = '')
+pub const INVENTOR_OPEN_SCRIPT: &str = r#"param([Parameter(Mandatory = $true)][string]$Path, [Parameter(Mandatory = $true)][string]$InstallDir, [string]$Project = '', [switch]$AnyVersion)
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 function Say([string]$Line) { [Console]::Out.WriteLine($Line); [Console]::Out.Flush() }
@@ -729,7 +749,10 @@ $deadline = [DateTime]::UtcNow.AddSeconds(14)
 try {
     if (-not (Ask { $app.Visible } $deadline)) { Say 'none'; exit 0 }
     $dir = [string](Ask { $app.InstallPath } $deadline)
-    if (-not (Same $dir $InstallDir)) { Say "version $dir"; exit 0 }
+    # another installation only when the project group asks for no version
+    # (-AnyVersion): with several versions installed, the one the user runs
+    # opens the file instead of a second instance of the newest (#483)
+    if (-not $AnyVersion -and -not (Same $dir $InstallDir)) { Say "version $dir"; exit 0 }
     # without a project file in the working folder there is nothing to compare:
     # a new instance would start with the same (last active) project
     if ($Project) {
@@ -738,11 +761,14 @@ try {
         if (-not (Same $active $Project)) { Say "project $active"; exit 0 }
     }
 } catch { Say 'unreachable'; exit 0 }
-Say 'opening'
+# the install folder is named only when it is another installation
+$where = ''
+if (-not (Same $dir $InstallDir)) { $where = " $dir" }
+Say "opening$where"
 try {
     $shell = New-Object -ComObject WScript.Shell
     foreach ($p in @(Get-Process -Name Inventor -ErrorAction SilentlyContinue)) {
-        if ($p.Path -and (Same (Split-Path (Split-Path $p.Path)) $InstallDir)) { [void]$shell.AppActivate($p.Id); break }
+        if ($p.Path -and (Same (Split-Path (Split-Path $p.Path)) $dir)) { [void]$shell.AppActivate($p.Id); break }
     }
 } catch { }
 # the app no longer waits: a failure is one more line. A document loaded only
@@ -788,23 +814,39 @@ pub fn answer_after(
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(not(windows), allow(dead_code))] // `Opened` is only constructed on Windows
 pub enum Reuse {
-    /// The running instance opens the file.
-    Opened,
+    /// The running instance opens the file. The label of that instance
+    /// (`Inventor 2025`) when it is another installation than the one
+    /// [`plan`] chose; empty = the chosen one.
+    Opened(String),
     /// Start a new instance; the note says why a running one was not used
     /// (empty = none runs).
     NewInstance(String),
 }
 
+/// What a running instance's answer means for *Check out and open*: the
+/// note of a new instance (see [`running_note`]), or the file opened there –
+/// with the label of the running installation when it is not `wanted`.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn reuse_after(running: Running, wanted: &Installed, project: Option<&Path>) -> Reuse {
+    match running {
+        Running::Opening(dir) if dir.trim().is_empty() => Reuse::Opened(String::new()),
+        Running::Opening(dir) => Reuse::Opened(last_part(&dir)),
+        other => Reuse::NewInstance(running_note(&other, wanted, project).unwrap_or_default()),
+    }
+}
+
 /// Opens `file` in a running instance of `program` when that is the
-/// installation [`plan`] chose and has the working folder's project active
-/// (#350; Inventor on Windows – anywhere else nothing is asked and a new
-/// instance starts, as before). The answer comes before the file is open:
-/// when the running instance then fails to open it, `failed` gets the reason
-/// (on the side, later).
+/// installation [`plan`] chose – or any installed version when
+/// `any_version` (the project group pins none, [`Wish::pins_version`]) –
+/// and has the working folder's project active (#350; Inventor on Windows –
+/// anywhere else nothing is asked and a new instance starts, as before).
+/// The answer comes before the file is open: when the running instance then
+/// fails to open it, `failed` gets the reason (on the side, later).
 pub fn open_in_running(
     program: &Installed,
     file: &Path,
     root: &Path,
+    any_version: bool,
     failed: impl FnOnce(String) + Send + 'static,
 ) -> Reuse {
     if program.family != "inventor" {
@@ -813,16 +855,12 @@ pub fn open_in_running(
     #[cfg(windows)]
     {
         let project = project_file(file, root);
-        match running::ask(program, file, project.as_deref(), failed) {
-            Running::Opening => Reuse::Opened,
-            other => Reuse::NewInstance(
-                running_note(&other, program, project.as_deref()).unwrap_or_default(),
-            ),
-        }
+        let answer = running::ask(program, file, project.as_deref(), any_version, failed);
+        reuse_after(answer, program, project.as_deref())
     }
     #[cfg(not(windows))]
     {
-        let _ = (file, root, failed);
+        let _ = (file, root, any_version, failed);
         Reuse::NewInstance(String::new())
     }
 }
@@ -853,6 +891,7 @@ mod running {
         program: &Installed,
         file: &Path,
         project: Option<&Path>,
+        any_version: bool,
         failed: impl FnOnce(String) + Send + 'static,
     ) -> Running {
         // Bin\Inventor.exe → the install folder Inventor reports
@@ -888,6 +927,9 @@ mod running {
             .arg(install);
         if let Some(project) = project {
             command.arg("-Project").arg(project);
+        }
+        if any_version {
+            command.arg("-AnyVersion");
         }
         let mut child = match command
             .stdin(Stdio::null())
@@ -1188,7 +1230,18 @@ mod tests {
     #[test]
     fn the_running_inventor_answers_are_read() {
         assert_eq!(parse_answer("none\r"), Some(Running::Nothing));
-        assert_eq!(parse_answer(" opening "), Some(Running::Opening));
+        assert_eq!(
+            parse_answer(" opening "),
+            Some(Running::Opening(String::new()))
+        );
+        // another installation opens it (the group pins no version, #483)
+        assert_eq!(
+            parse_answer(r"opening C:\Program Files\Autodesk\Inventor 2025\"),
+            Some(Running::Opening(
+                r"C:\Program Files\Autodesk\Inventor 2025\".into()
+            ))
+        );
+        assert_eq!(parse_answer("openings"), None);
         assert_eq!(parse_answer("unreachable"), Some(Running::Unreachable));
         assert_eq!(
             parse_answer(r"version C:\Program Files\Autodesk\Inventor 2025\"),
@@ -1247,8 +1300,8 @@ mod tests {
             (Running::Nothing, false)
         );
         assert_eq!(
-            answer_after(Ok(Running::Opening)),
-            (Running::Opening, false)
+            answer_after(Ok(Running::Opening(String::new()))),
+            (Running::Opening(String::new()), false)
         );
     }
 
@@ -1276,24 +1329,35 @@ mod tests {
                 "version $dir",
                 "project $active",
                 "unreachable",
-                "opening",
+                "opening$where",
                 "failed $why"
             ]
         );
         let (answers, after) = says.split_at(says.len() - 1);
         for said in answers {
-            let line = said
-                .replace("$dir", r"C:\x")
-                .replace("$active", r"C:\p.ipj");
-            assert!(parse_answer(&line).is_some(), "{line}");
+            for place in ["", r" C:\x"] {
+                let line = said
+                    .replace("$dir", r"C:\x")
+                    .replace("$active", r"C:\p.ipj")
+                    .replace("$where", place);
+                assert!(parse_answer(&line).is_some(), "{line}");
+            }
         }
+        // another installation is used only when the group pins no version
+        // (#483), and it is named in the answer; its window comes to the front
+        assert!(INVENTOR_OPEN_SCRIPT.contains(
+            "if (-not $AnyVersion -and -not (Same $dir $InstallDir)) { Say \"version $dir\""
+        ));
+        assert!(INVENTOR_OPEN_SCRIPT
+            .contains("if (-not (Same $dir $InstallDir)) { $where = \" $dir\" }"));
+        assert!(INVENTOR_OPEN_SCRIPT.contains("(Same (Split-Path (Split-Path $p.Path)) $dir)"));
         // the failure after `opening` is its own line, never an answer
         let failed = after[0].replace("$why", "Locked.");
         assert_eq!(parse_answer(&failed), None);
         assert_eq!(parse_failure(&failed).as_deref(), Some("Locked."));
         // the answer comes before the file is opened (a large assembly loads
         // for minutes), and only the user's visible instance is used
-        let opening = INVENTOR_OPEN_SCRIPT.find("Say 'opening'").unwrap();
+        let opening = INVENTOR_OPEN_SCRIPT.find("Say \"opening$where\"").unwrap();
         assert!(INVENTOR_OPEN_SCRIPT.find("Documents.Open").unwrap() > opening);
         assert!(INVENTOR_OPEN_SCRIPT.contains("if (-not (Ask { $app.Visible } $deadline))"));
         assert!(!INVENTOR_OPEN_SCRIPT.contains("New-Object -ComObject 'Inventor.Application'"));
@@ -1363,7 +1427,7 @@ mod tests {
                 );
             }
         }
-        let opening = script.find("Say 'opening'").unwrap();
+        let opening = script.find("Say \"opening$where\"").unwrap();
         let guarded = script.find("$deadline =").unwrap();
         let start = guarded + script[guarded..].find("try {").unwrap();
         let end = guarded
@@ -1401,7 +1465,10 @@ mod tests {
     fn notes_say_why_a_new_instance_starts() {
         let wanted = inst("inventor", "2026");
         assert_eq!(running_note(&Running::Nothing, &wanted, None), None);
-        assert_eq!(running_note(&Running::Opening, &wanted, None), None);
+        assert_eq!(
+            running_note(&Running::Opening(String::new()), &wanted, None),
+            None
+        );
         let other = Running::OtherVersion(r"C:\Program Files\Autodesk\Inventor 2025\".into());
         assert_eq!(
             running_note(&other, &wanted, None).unwrap(),
@@ -1460,13 +1527,64 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("a.sldprt");
         assert_eq!(
-            open_in_running(&inst("solidworks", "2025"), &file, dir.path(), |_| {}),
+            open_in_running(&inst("solidworks", "2025"), &file, dir.path(), true, |_| {}),
             Reuse::NewInstance(String::new())
         );
         #[cfg(not(windows))]
         assert_eq!(
-            open_in_running(&inst("inventor", "2026"), &file, dir.path(), |_| {}),
+            open_in_running(&inst("inventor", "2026"), &file, dir.path(), true, |_| {}),
             Reuse::NewInstance(String::new())
+        );
+    }
+
+    #[test]
+    fn only_a_group_with_a_version_pins_the_running_installation() {
+        let wish = |file: &str, group: &str, version: &str| Wish {
+            file_family: file.into(),
+            group_family: group.into(),
+            group_version: version.into(),
+        };
+        // the group's default program with a version: that installation only
+        assert!(wish("inventor", "inventor", "2025").pins_version());
+        // no default, a default without a version, another program's file or
+        // a neutral file: any version the user already runs (#483)
+        assert!(!wish("inventor", "", "").pins_version());
+        assert!(!wish("inventor", "inventor", "").pins_version());
+        assert!(!wish("inventor", "solidworks", "2024").pins_version());
+        assert!(!wish("", "", "").pins_version());
+    }
+
+    #[test]
+    fn a_running_instance_of_another_version_is_named() {
+        let wanted = inst("inventor", "2026");
+        // the chosen installation opened it: nothing more to say
+        assert_eq!(
+            reuse_after(Running::Opening(String::new()), &wanted, None),
+            Reuse::Opened(String::new())
+        );
+        // another installation opened it (the group pins no version)
+        assert_eq!(
+            reuse_after(
+                Running::Opening(r"C:\Program Files\Autodesk\Inventor 2025\".into()),
+                &wanted,
+                None
+            ),
+            Reuse::Opened("Inventor 2025".into())
+        );
+        // any other answer starts a new instance, with the note why
+        assert_eq!(
+            reuse_after(Running::Nothing, &wanted, None),
+            Reuse::NewInstance(String::new())
+        );
+        assert_eq!(
+            reuse_after(
+                Running::OtherVersion(r"C:\Program Files\Autodesk\Inventor 2025".into()),
+                &wanted,
+                None
+            ),
+            Reuse::NewInstance(
+                "Inventor 2025 is running, not Inventor 2026 – opened in a new instance.".into()
+            )
         );
     }
 }

@@ -2506,6 +2506,8 @@ pub async fn workspace_open_cad(
             "{file} is not in the working folder – check out or use “Get files” first."
         )));
     };
+    // a group that pins no version lets any running installation open it (#483)
+    let any_version = !wish.pins_version();
     let mut plan =
         tokio::task::spawn_blocking(move || cadlaunch::plan(cadlaunch::installed(), &wish))
             .await
@@ -2524,13 +2526,21 @@ pub async fn workspace_open_cad(
             );
         };
         let reuse = tokio::task::spawn_blocking(move || {
-            cadlaunch::open_in_running(&asked, &file_path, &root, failed)
+            cadlaunch::open_in_running(&asked, &file_path, &root, any_version, failed)
         })
         .await
         .unwrap_or(cadlaunch::Reuse::NewInstance(String::new()));
         match reuse {
-            cadlaunch::Reuse::Opened => {
+            cadlaunch::Reuse::Opened(other) => {
                 plan.reused = true;
+                if !other.is_empty() {
+                    // another installed version the user runs opened it
+                    plan.reason = format!(
+                        "{other} was already running – it opened the file (the project group asks for no version; {} would have started otherwise).",
+                        plan.label
+                    );
+                    plan.label = other;
+                }
                 return Ok(plan);
             }
             cadlaunch::Reuse::NewInstance(note) => plan.note = note,
