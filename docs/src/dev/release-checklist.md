@@ -83,7 +83,10 @@ mismatch.
   older version; (3) a group whose default CAD program pins the **other**
   version – a new instance of that version starts and the toast says which
   one is running; (4) Inventor started *as administrator* – a new instance
-  starts with the note that the running one did not answer. Paste the toast
+  starts with the note that Inventor runs as administrator; (5) Inventor
+  **minimized** – it is restored and comes to the front; (6) *Check out and
+  open* right after starting Inventor by hand, while its splash screen still
+  shows – the file opens in that Inventor once it is ready. Paste the toast
   of any step that differs into #483.
 - [ ] Note what was found in the soak in the changelog or in the release
   notes.

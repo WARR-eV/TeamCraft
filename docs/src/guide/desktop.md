@@ -649,19 +649,28 @@ setting in the web UI.
   (FreeCAD, Rhino, SketchUp, Fusion); on Linux FreeCAD on the `PATH`. The
   app looks once per start – restart it after installing a CAD program.
 * **A running Inventor is reused** (Windows): when Inventor is already
-  running – the installation chosen above – the file opens there as a new
-  document window, and Inventor comes to the front, instead of starting a
-  second instance. If the working folder has an Inventor project file
+  running – the installation chosen above, or any installed version when
+  the project group's default CAD program names no version (with Inventor
+  2025 and 2026 installed and 2025 running, 2025 opens the file; the message
+  names it, #483) – the file opens there as a new document window, and the
+  app brings Inventor's window to the front (restored when it was
+  minimized), instead of starting a second instance. If the working folder has an Inventor project file
   (`.ipj`: the one in the nearest folder from the file's own up to the
   working folder root; a folder with several makes it unknown), the running
   Inventor must have that project active. Without one it is reused whatever
   project it has – a new instance would start with that same, last active
-  project anyway (#483). A new instance starts when no Inventor runs, when
-  another version runs, when the running one has another project active, or
-  when it does not answer (started as administrator, or busy with a dialog –
-  the app waits at most 20 seconds); the message after opening says which
-  (*Inventor is running with the project Default, not Graksler 4.3 – opened
-  in a new instance*). Only a visible Inventor in your own Windows session
+  project anyway (#483). An Inventor that is still starting is waited for
+  (up to about 14 seconds). A new instance starts when no Inventor runs, when
+  another version runs and the group asks for a version, when the running
+  one has another project active, or when it cannot be asked; the message
+  after opening says which – *Inventor is running with the project Default,
+  not Graksler 4.3*, *Inventor is running as administrator* (start it
+  normally), *TeamCraft runs as administrator* (start TeamCraft without *Run
+  as administrator*), *Windows PowerShell may only run in Constrained
+  Language mode* (a policy of your organization), *Inventor is still
+  starting*, *did not answer* (busy with a dialog; the app waits at most 20
+  seconds), or the reason Windows PowerShell gave for not running the script
+  at all (an execution policy, for example). Only a visible Inventor in your own Windows session
   counts: another user's on the same computer (remote desktop, fast user
   switching) or a hidden one of a STEP export is not asked. Inventor is
   asked through its COM interface by a short Windows PowerShell script, as

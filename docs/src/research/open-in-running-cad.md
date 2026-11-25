@@ -464,10 +464,21 @@ the mechanisms the sources above document.
   `.ipj` (#483), retries of busy calls, the session filter, the `unreachable`
   note, the answer before `Documents.Open` and the `failed` report; a running
   Inventor of any installed version is reused when the project group pins no
-  version (#483).
-* **Not implemented:** the recommendations of section 7 – the window raised
-  by the desktop app, precise reasons, waiting for a starting Inventor, the
-  project switch, the shell fallback and direct COM from Rust.
-* **Verified:** the answer parsing, notes and script structure by unit tests
-  only. **Nothing has been run on a Windows machine with Inventor**; the
+  version (#483). From section 7: R1 – the desktop app grants Inventor's
+  processes the foreground (`AllowSetForegroundWindow`) before it asks, and
+  raises the main window (`MainFrameHWND`, restored when minimized, only a
+  window of an `Inventor.exe` process `tasklist` listed) instead of
+  `AppActivate` (`foreground::raise`); R2 – the reasons `constrained`,
+  `self-elevated`, `elevated`, `starting` and `busy`, each with its own note,
+  and the first line of PowerShell's error output when the script did not
+  run (`script_failure`); R3 – a visible Inventor that is not yet in the ROT,
+  or not `Ready`, is asked again every 500 ms until the deadline.
+* **Not implemented:** R4 (no second instance behind a busy or starting
+  Inventor – a product decision), R5 (switching the project of an Inventor
+  without open documents – to be decided after the manual test), R6 (naming
+  the instance among several), R7 (the shell fallback) and R8 (direct COM
+  from Rust, the add-in's `open` message).
+* **Verified:** the answer parsing, notes, process ids, the window line and
+  the script structure by unit tests, the Windows-only code by `cargo clippy
+  --target x86_64-pc-windows-gnu` (type check, not run). **Nothing has been run on a Windows machine with Inventor**; the
   *Manual test* above lists what must be confirmed there.

@@ -241,10 +241,16 @@ Requested by the user as the current top priority (before sections 1 and 2).
 - [x] Desktop: a running Inventor with the working folder's project (`.ipj`) opens the file as a new window instead
   of a second instance (#350, COM through Windows PowerShell); no opening after a cancelled or failed Get (#348); the
   worklist navigator follows actions in the tabs (#347).
-- [ ] Left: try the reuse of a running Inventor (#350) with real Inventor installations – `InstallPath`,
-  `ActiveDesignProject`, `Documents.VisibleDocuments`, `Documents.Open` and bringing the window to the front are
-  untested here, and so are the session/window check of an Inventor missing from the ROT and the `failed` report
-  after `opening` (#483, #508).
+- [x] Desktop: a running Inventor of any installed version opens the file when the group names no version; the app
+  raises Inventor's window itself (`AllowSetForegroundWindow`, `MainFrameHWND`); a starting Inventor is waited for;
+  the note says why a running one could not be asked (constrained PowerShell, elevation, starting, busy, a script that
+  did not run) – research page *Opening a file in the running CAD program* (#483)
+- [ ] Left: try the reuse of a running Inventor (#350) with real Inventor installations – `InstallPath`, `Ready`,
+  `ActiveDesignProject`, `MainFrameHWND`, `Documents.VisibleDocuments`, `Documents.Open` and the raised window are
+  untested here, and so are the session/window check of an Inventor missing from the ROT, the elevation reasons and
+  the `failed` report after `opening` – the manual test in the release checklist (#483, #508). Open decisions from the
+  research page: no second instance behind a busy or starting Inventor (R4), switching the project of an Inventor
+  without open documents (R5), the shell association as a fallback (R7), direct COM from Rust (R8)
 - [ ] Left: try it on Windows with real installations (Inventor 2025/2026 side by side, SOLIDWORKS – the registry
   keys, Solid Edge, NX, Creo, CATIA) and on macOS; the install folders and the SOLIDWORKS registry keys are the
   installers' usual defaults, untested here. Versions of other programs than Inventor are not read from the files

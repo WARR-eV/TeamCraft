@@ -98,6 +98,17 @@ UI review #513 – the decided themes:
   or *Offline*; the bell shows a dot for unread notifications and is pressed
   while they are open; the Worklist badge's tooltip says what it counts
   (T21).
+- Desktop, *Check out and open* with Inventor already running (#483): with
+  several Inventor versions installed and a project group that names no
+  version, the Inventor you run opens the file – before, a second instance
+  of the newest version started; the message names the version. The app now
+  brings Inventor's window to the front itself (restored when minimized),
+  because Windows lets only the program you clicked in raise a window, not
+  the background script; an Inventor that is still starting is waited for;
+  when the running Inventor cannot be asked, the message says why (Inventor
+  or TeamCraft running as administrator, PowerShell restricted by a policy,
+  still starting, busy, or the reason PowerShell gave for not running the
+  script). Research page *Opening a file in the running CAD program*.
 - Desktop Home draws again when nothing was opened on the computer yet or
   the server has no recent activity: a first sign-in no longer ends on the
   connect screen with "Cannot read properties of undefined (reading
