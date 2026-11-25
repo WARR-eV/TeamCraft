@@ -2,21 +2,20 @@
 // TeamCraft Desktop – Object tabs and the toolbar.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, ICONS, append, clear, errorNotice, errorText, h, state, svgIcon, tool } from "./core.js";
+import { $, api, append, clear, errorNotice, errorText, h, state, tool } from "./core.js";
 import { tabInputs } from "./report-inputs.js";
 import { loadLocks, renderLocks } from "./lock-overview.js";
 import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
-import { CHECK_IN_ALL_TITLE, canEdit, checkInAll, refreshWorklistCount } from "./shell.js";
-import { emptyHint, selectView } from "./navigator.js";
-import { worklistHint } from "./empty-rules.js";
+import { canEdit, refreshWorklistCount } from "./shell.js";
+import { emptyHint, selectView, serverUrl } from "./navigator.js";
+import { rememberRecent, worklistSummary } from "./home-rules.js";
 import { t } from "/static/shared/js/i18n.js";
 import { assistantContextChanged } from "./assistant.js";
 import { agent, renderAgentTab, schedulePaint } from "./agent.js";
 import { loadRevision, openRevision, renderRevision, revisionTitle } from "./revision.js";
-import { impactGroup, impactGroups } from "./references.js";
-import { disposeViewer, lockAge } from "./workspace.js";
+import { disposeViewer } from "./workspace.js";
 import { loadChange, openChange, renderChange } from "./change.js";
-import { loadRequest, renderRequest } from "./requests.js";
+import { loadRequest, openRequest, renderRequest } from "./requests.js";
 import { newItemDialog } from "./dialogs.js";
 import { dropSlot, keysToClose, moveBy, moveItem, stepIndex } from "./tab-order.js";
 
@@ -27,6 +26,7 @@ import { dropSlot, keysToClose, moveBy, moveItem, stepIndex } from "./tab-order.
 export function findTab(key) { return state.tabs.filter(function (t) { return t.key === key; })[0]; }
 
 export function openTab(tab) {
+  noteRecent(tab.kind ? tab : findTab(tab.key));
   var existing = findTab(tab.key);
   if (!existing) state.tabs.push(tab);
   else {
@@ -64,6 +64,7 @@ export function retargetTab(tab, data, sub) {
 }
 
 export function activate(key) {
+  if (key === HOME_KEY) { showHome(); return; }
   state.active = key;
   var t = findTab(key);
   if (t && (t.kind === "revision" || t.kind === "change" || t.kind === "request")) agent.contextKey = key;
@@ -97,6 +98,18 @@ export function closeTab(key) {
   renderActive();
 }
 
+/** The key of the pinned Home tab (#513 T1): the dashboard. It is no entry
+ *  of state.tabs – Home is active whenever no object tab is. */
+export var HOME_KEY = "home";
+
+/** Brings the pinned Home tab (the dashboard) to the front. */
+export function showHome() {
+  state.active = null;
+  renderTabs();
+  renderActive();
+  markSelection();
+}
+
 export function renderTabs() {
   var bar = $("tabs");
   wireTabStrip(bar);
@@ -105,7 +118,16 @@ export function renderTabs() {
     ? document.activeElement.dataset.key : null;
   clear(bar);
   // roving tabindex: one tab is a tab stop, the arrow keys move between them
-  var stop = findTab(state.active) ? state.active : (state.tabs[0] && state.tabs[0].key);
+  var homeActive = !findTab(state.active);
+  var stop = homeActive ? HOME_KEY : state.active;
+  // the pinned Home tab (#513 T1): always first, cannot be closed or moved
+  var home = h("div.tab.home-tab" + (homeActive ? ".active" : ""), {
+    role: "tab", "aria-selected": homeActive ? "true" : "false", title: "Home – your overview",
+    tabindex: stop === HOME_KEY ? "0" : "-1", "data-key": HOME_KEY,
+    on: { click: function () { if (!homeActive) showHome(); } }
+  }, [h("span.ico", { "aria-hidden": "true", text: "⌂" }), h("span.tab-label", { text: "Home" })]);
+  bar.appendChild(home);
+  if (focused === HOME_KEY) home.focus({ preventScroll: true });
   state.tabs.forEach(function (t) {
     var isActive = t.key === state.active;
     var el = h("div.tab" + (isActive ? ".active" : ""), {
@@ -125,7 +147,12 @@ export function renderTabs() {
 
 // ---------------------------------------------------------------- order of the tabs
 
-function tabElements() { return Array.prototype.slice.call($("tabs").querySelectorAll(".tab")); }
+/** The object tabs in the strip – without the pinned Home tab, which is not
+ *  moved, dropped on or closed. */
+function tabElements() { return Array.prototype.slice.call($("tabs").querySelectorAll(".tab:not(.home-tab)")); }
+
+/** Every tab of the strip, Home first: the order of the arrow keys. */
+function allTabElements() { return Array.prototype.slice.call($("tabs").querySelectorAll(".tab")); }
 
 function tabElement(key) {
   return tabElements().filter(function (el) { return el.dataset.key === key; })[0] || null;
@@ -228,7 +255,7 @@ function endDrag(apply) {
 function onTabPointerDown(e) {
   if (e.button !== 0 || e.isPrimary === false) return;
   var el = e.target.closest(".tab");
-  if (!el || e.target.closest(".close")) return;
+  if (!el || el.classList.contains("home-tab") || e.target.closest(".close")) return;
   closeTabMenu();
   drag = { id: e.pointerId, key: el.dataset.key, x0: e.clientX, x: e.clientX, moving: false, slot: -1, raf: 0 };
 }
@@ -253,7 +280,7 @@ function onTabKeyDown(e) {
   if (e.key === "Escape" && drag) { e.preventDefault(); endDrag(false); return; }
   var el = e.target.closest ? e.target.closest(".tab") : null;
   if (!el || e.target !== el) return;
-  var els = tabElements();
+  var els = allTabElements();
   var i = els.indexOf(el);
   var to = -1;
   if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
@@ -288,11 +315,11 @@ function wireTabStrip(bar) {
     // the tab that has the focus is the tab stop
     var el = e.target.closest ? e.target.closest(".tab") : null;
     if (!el) return;
-    tabElements().forEach(function (t) { t.setAttribute("tabindex", t === el ? "0" : "-1"); });
+    allTabElements().forEach(function (t) { t.setAttribute("tabindex", t === el ? "0" : "-1"); });
   });
   bar.addEventListener("contextmenu", function (e) {
     var el = e.target.closest(".tab");
-    if (!el) return;
+    if (!el || el.classList.contains("home-tab")) return;
     e.preventDefault();
     var x = e.clientX, y = e.clientY;
     // the context-menu key reports no position: open under the tab
@@ -413,48 +440,92 @@ export function reloadActive() {
   renderActive();
 }
 
+// ---------------------------------------------------------------- recently opened
+
+function recentKey() { return "tc.recent:" + serverUrl(); }
+
+/** The objects opened lately on this computer, for this server (Home). */
+export function recentList() {
+  var list = [];
+  try { list = JSON.parse(window.localStorage.getItem(recentKey()) || "[]"); } catch (e) { list = []; }
+  return rememberRecent(list, null);
+}
+
+function noteRecent(tab) {
+  if (!tab) return;
+  var next = rememberRecent(recentList(), tab);
+  try { window.localStorage.setItem(recentKey(), JSON.stringify(next)); } catch (e) { /* storage off: no list */ }
+}
+
+function openRecent(e) {
+  if (e.kind === "change") openChange(e.number);
+  else if (e.kind === "request") openRequest(e.number);
+  else openRevision(e.number, e.code);
+}
+
+// ---------------------------------------------------------------- Home
+
+/**
+ * The pinned Home tab (#513 T1, T9): what the navigator beside it cannot
+ * show – the worklist only as counts that open the Worklist, the product
+ * counts, the objects opened lately on this computer and the recent activity
+ * on the server (GET /activity). The worklist itself is the Worklist view.
+ */
 export function renderWelcome(body, toolbar) {
   append(toolbar, [
     canEdit() ? tool("New item", "plus", function () { newItemDialog(); }, { primary: true }) : null,
     tool("Refresh", "refresh", function () { selectView(state.view); refreshWorklistCount(); renderActive(); })
   ]);
   var w = state.worklist;
+  var search = /Mac/.test(navigator.platform) ? "⌘F" : "Ctrl+F";
+  var files = /Mac/.test(navigator.platform) ? "⌘1" : "Ctrl+1";
+  var summary = h("p.home-summary", { role: "status" });
   var welcome = h("div.welcome", null, [
     h("h1", { text: "Home" }),
-    h("p.muted", { text: "Open an item from the navigator, or press " + (/Mac/.test(navigator.platform) ? "⌘F" : "Ctrl+F") + " to search." }),
+    h("p.muted", { text: "Find your files in Files (" + files + ") or press " + search + " to search." }),
     // why a viewer account has no editing buttons, like the web dashboard (#423)
-    canEdit() ? null : h("p.small.dim.viewer-note", { text: t("empty.viewer_note") })
+    canEdit() ? null : h("p.small.dim.viewer-note", { text: t("empty.viewer_note") }),
+    summary
   ]);
   body.appendChild(welcome);
+  var columns = h("div.home-columns");
+  var recent = recentList();
+  append(columns, h("section.panel", null, [h("div.panel-head", null, [panelTitle("Recently opened", recent.length)]),
+    recent.length ? table(["Opened", "Kind"], recent.map(function (e) {
+      var open = function () { openRecent(e); };
+      return { cells: [recordLink(e.title, open), e.kind === "change" ? "Change order" : e.kind === "request" ? "Change request" : "Revision"],
+        open: open, single: true };
+    })) : emptyHint("What you open here – revisions, changes, requests – is listed for a quick way back.")]));
+  var activity = h("section.panel", null, [h("div.panel-head", null, [h("h2", { text: "Recent activity" })]),
+    h("p.small.dim", { text: "Loading…" })]);
+  append(columns, activity);
+  api("GET", "/activity?limit=12").then(function (entries) {
+    clear(activity);
+    append(activity, h("div.panel-head", null, [h("h2", { text: "Recent activity" })]));
+    append(activity, entries && entries.length ? table(["When", "Who", "What"], entries.map(function (a) {
+      return { cells: [h("span.nowrap", { text: fmtDate(a.at) }),
+        h("span", { title: a.username, text: a.user_display_name || a.username }), a.summary] };
+    })) : emptyHint("No activity yet."));
+  }, function () {
+    // an older server has no /activity: Home goes without
+    activity.remove();
+  });
   var fill = function (wl) {
     if (!wl) return;
+    clear(summary);
+    var parts = worklistSummary(wl);
+    if (!parts.length) summary.appendChild(document.createTextNode("Nothing waits for you right now."));
+    parts.forEach(function (p, i) {
+      if (i) summary.appendChild(document.createTextNode(" · "));
+      summary.appendChild(h("button.link", { type: "button", title: "Open the Worklist", on: { click: function () { selectView("worklist"); } } }, p.text));
+    });
     var s = wl.stats;
-    append(welcome, h("div.stats", null, [
+    welcome.insertBefore(h("div.stats", null, [
       stat(s.items, "Items"), stat(s.revisions_in_work, "WIP"), stat(s.revisions_in_review, "In Review"),
       stat(s.revisions_released, "Released"), stat(s.open_changes, "Open changes"), stat(fmtSize(s.stored_bytes), s.files + " files in the vault")
-    ]));
-    // the same cards in the same order as the web dashboard: the review
-    // queue, the dependents to check, then the own check-outs
-    append(welcome, h("section.panel", null, [h("div.panel-head", null, [panelTitle("Waiting for my review", wl.reviews.length)]),
-      wl.reviews.length ? table(["Change", "Title", "Submitted"], wl.reviews.map(function (c) {
-        var open = function () { openChange(c.number); };
-        return { cells: [recordLink(c.number, open), c.title, fmtDate(c.submitted_at)], open: open };
-      })) : emptyHint(worklistHint("reviews", canEdit()))]));
-    var groups = impactGroups(wl);
-    if (groups.length) {
-      append(welcome, h("section.panel", null, [h("div.panel-head", null, [panelTitle("Dependents to check", groups.length)]),
-        h("p.hint", { text: "Something these items use or reference was released in a new revision or made obsolete. Acknowledge what needs no change, or revise the item." })
-      ].concat(groups.map(function (g) { return impactGroup(g, false); }))));
-    }
-    append(welcome, h("section.panel", null, [h("div.panel-head", null, [panelTitle("Checked out by me", wl.checkouts.length),
-      wl.checkouts.length ? h("button.small", { type: "button", title: CHECK_IN_ALL_TITLE,
-        on: { click: function () { checkInAll(); } } }, [svgIcon(ICONS.checkin), " Check in all"]) : null]),
-      wl.checkouts.length ? table(["Revision", "Name", "Since"], wl.checkouts.map(function (r) {
-        var open = function () { openRevision(r.item_number, r.code); };
-        return { cells: [recordLink(r.item_number + "/" + r.code, open), r.name,
-          h("span", { title: fmtDate(r.checked_out_at), text: lockAge(r.checked_out_at) })], open: open };
-      })) : emptyHint(worklistHint("checkouts", canEdit()))]));
+    ]), columns);
   };
+  append(welcome, columns);
   if (w) fill(w);
   else refreshWorklistCount().then(function (wl) { if (wl) fill(wl); }, function () {});
 }

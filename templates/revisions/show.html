@@ -40,7 +40,7 @@
       <button class="primary" type="submit">Revise</button>
     </form>
     {% endif %}
-    {% if can.edit %}<a class="button" href="/revisions/{{ rev.id }}/edit">Edit attributes</a>{% endif %}
+    {% if can.edit %}<a class="button" href="/revisions/{{ rev.id }}/edit" title="Name, description, material, mass, cost and custom attributes of this revision ({{ rev.code }})">Edit revision attributes</a>{% endif %}
     {% if can.revise and (can.checkin or can.checkout or (open_change and rev.state == "in_review")) %}
     <form method="post" action="/revisions/{{ rev.id }}/revise"
           data-confirm="Create a new revision of {{ rev.item_number }} based on {{ rev.code }}?">
@@ -155,17 +155,18 @@
 </section>
 {% endif %}
 
-{#- Section nav (#421): every card one click from the top, in page order; the
-    optional sections share their condition with the card itself. app.js marks
-    the section in view (aria-current). -#}
+{#- Tabs of the revision page (#421, real tabs since #513 T5): app.js shows
+    one panel at a time – the top-level block that holds the link's target –
+    and follows the #hash, so /revisions/{id}#files or #bom open that tab;
+    without JavaScript the page shows every section. The optional tabs share
+    their condition with the card itself. Lifecycle and Revisions are the
+    cards beside the attributes on Overview. -#}
 {% set show_similar = similar and similar.status != "no_shape_file" %}
 {% set show_bom = not simulation or lines %}
 {% set show_simulations = not simulation and (based_simulations or rev.item_type in ["part", "assembly"]) %}
 <nav class="section-nav" aria-label="Sections of {{ rev.item_number }}/{{ rev.code }}" data-section-nav>
   <ul>
     <li><a href="#overview">Overview</a></li>
-    <li><a href="#lifecycle">Lifecycle</a></li>
-    <li><a href="#revisions">Revisions <span class="count">{{ revisions|length }}</span></a></li>
     <li><a href="#files">Files <span class="count">{{ files|length }}</span></a></li>
     {% if show_similar %}<li><a href="#similar">Similar parts</a></li>{% endif %}
     {% if simulation %}<li><a href="#simulation-basis">Based on</a></li><li><a href="#simulation-results">Results</a></li>{% endif %}
@@ -200,7 +201,7 @@
   <section class="card">
     <div class="card-head">
       <h2>Item master data</h2>
-      {% if can.master %}<button class="small" type="button" data-toggle="master-form">Edit</button>{% endif %}
+      {% if can.master %}<button class="small" type="button" data-toggle="master-form" title="Project group, folder, unit and classification of the item – the same for every revision">Edit item</button>{% endif %}
     </div>
     <dl class="props">
       <dt>Item number</dt><dd class="mono">{{ item.number }}</dd>
@@ -209,7 +210,7 @@
       <dt>Classification</dt><dd>{% for c in classifications %}{% if c.value == item.classification %}{{ c.label }}{% endif %}{% endfor %}</dd>
       <dt>Project group</dt><dd>{% if item.project_id %}<a href="/projects/{{ item.project_id }}">{{ item.project_code }}</a>{% else %}—{% endif %}</dd>
       <dt>Created</dt><dd>{{ m.time(item.created_at) }} by {{ item.created_by_name }}</dd>
-      <dt>Owner</dt><dd>{{ item.owner_name }}{% if can.owner and owner_candidates %} <button class="small" type="button" data-toggle="owner-form">Change</button>{% endif %}</dd>
+      <dt>Owner</dt><dd>{{ item.owner_name }}{% if can.owner and owner_candidates %} <button class="small" type="button" data-toggle="owner-form">Change owner</button>{% endif %}</dd>
       <dt>Short link</dt><dd class="mono small"><a href="/i/{{ item.number }}">/i/{{ item.number }}</a></dd>
     </dl>
     {% if can.owner and owner_candidates %}
@@ -1076,7 +1077,7 @@
 </section>
 {% endif %}
 
-<div class="grid grid-2">
+{#- Where used and Changes -#}
   <section class="card" id="where-used">
     <h2>Where used</h2>
     {% if where_used %}
@@ -1125,7 +1126,7 @@
     </form>
     {% endif %}
   </section>
-</div>
+{#- (was a two-column grid; each is a tab of its own now, #513 T5) -#}
 
 {% if interchange %}
 <section class="card" id="interchange">

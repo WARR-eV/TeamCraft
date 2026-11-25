@@ -182,10 +182,14 @@ async fn revision_page_has_a_section_nav_and_says_the_web_check_out_copies_no_fi
 
     let html = app.get_page(&page, Some(&leo)).await.text();
     assert!(html.contains("data-section-nav"), "{html}");
+    // Lifecycle and Revisions are the cards beside the attributes on the
+    // Overview tab, not tabs of their own (#513 T5)
+    for id in ["lifecycle", "revisions"] {
+        assert!(!html.contains(&format!("href=\"#{id}\"")), "no tab #{id}");
+        assert!(html.contains(&format!("id=\"{id}\"")), "card #{id}");
+    }
     for id in [
         "overview",
-        "lifecycle",
-        "revisions",
         "files",
         "bom",
         "references",

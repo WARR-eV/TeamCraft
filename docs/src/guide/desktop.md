@@ -2,9 +2,27 @@
 
 TeamCraft Desktop (`desktop/`, Tauri 2) is a rich client for Linux, macOS and
 Windows: a navigator tree of the project groups, object tabs (overview,
-files, structure, where used, references, graph, changes, history, 3D viewer), a worklist with
+files, structure, references, where used, changes, history – in the web UI's order – then graph, 3D viewer and workspace), a worklist with
 check-outs and reviews, and a **local working folder**:
 
+* **Home** is the pinned first tab (#513): it cannot be closed or moved, and
+  a click on it (or closing the last tab) brings it back. It shows what the
+  navigator beside it cannot – the worklist as one line of counts (*1
+  check-out · 2 reviews waiting · 1 dependent to check*) that opens the
+  Worklist, the product counts, **Recently opened** (the revisions, changes
+  and requests you opened on this computer, per server) and the server's
+  **Recent activity** (`GET /api/v1/activity`, the same entries as on the web
+  dashboard). The rail entry for the files of the active group is **Files**
+  (`Ctrl/Cmd+1`, *View → Files*);
+* the **Worklist** navigator lists the sections with something in them
+  first; an empty section is one line (*My open changes 0 ⓘ*) whose
+  explanation – and its action, such as *Get…* – opens on a click (#513);
+* the **status bar** names the connection in a word before the address:
+  *Connected*, *Unencrypted* (plain `http://` to another computer) or
+  *Offline* (the last poll did not reach the server). The bell shows a dot
+  for unread notifications (the number is in its tooltip) and stays pressed
+  while the notifications are in the navigator; the number on the
+  *Worklist* rail button counts work to do, its tooltip says what (#513);
 * *New* (`Ctrl/Cmd+N`) creates an item together with its files: choose the
   CAD files first, name and type follow from the first one. Files in the
   working folder bring their place (#359): a part saved in the CAD program as
@@ -34,7 +52,7 @@ check-outs and reviews, and a **local working folder**:
   locked; parts you changed locally, or whose place is taken by another file,
   are never overwritten and are listed in the report (*Settings → Workspace*
   switches this off);
-* *Check out parts…* on an assembly (revision toolbar, group **Lock**, and
+* *Check out parts…* on an assembly (revision toolbar: the drop-down of *Check out and open*, or group **Lock** while checked out; and
   the *Structure* tab) checks out several of its parts at once, to change
   them in the context of the assembly – see
   [Check out parts of an assembly](#check-out-parts-of-an-assembly);
@@ -241,12 +259,12 @@ check-outs and reviews, and a **local working folder**:
   manager of the group with a reason), the Workspace tab says *Released by
   X; your local changes are kept and need a new check-out*, with the date
   and the reason – until the revision is checked out again;
-* *Dependents to check* (worklist and home) shows one line per dependent
-  revision with the number of changes it has to be checked against; the
-  arrow lists them (a click opens the item that changed). On the home page
-  every dependent has **Open**, **Revise** and **Acknowledge all…** (one note
-  for all of them, see [Change propagation](structure.md#change-propagation))
-  and an **Acknowledge…** per change;
+* *Dependents to check* (worklist) shows one line per dependent revision
+  with the number of changes it has to be checked against; the arrow lists
+  them (a click opens the item that changed). The revision tab of a
+  dependent shows its checks with **Acknowledge all…** (one note for all of
+  them, see [Change propagation](structure.md#change-propagation)) and an
+  **Acknowledge…** per change;
 * *Request change…* on a revision tab and *Request…* on a file (Files and
   Workspace tabs) raise a [change request](changes.md) with the item,
   revision and file name filled in and an optional screenshot or PDF; the
@@ -415,20 +433,28 @@ previous revision keep their old uploader and time, so a revision you revised
 and left unchanged – also after a cancelled check-out – highlights *Check out
 and open*, not *Release…*.
 
-* revision tab: **Lock** (*Check out*, or *Check in…* and *Cancel check-out*
-  / *Force unlock* while checked out; *Check out parts…* on an assembly) · **Open** (*Check out and open*, or *Open in CAD* for your own
-  check-out, with the CAD program that will open the file next to it – see
-  [Check out and open](#check-out-and-open)) · **Work** (*Edit attributes*, *Get…*, *Open
-  folder*) · **Lifecycle** (*Release…*, *Revise*) · **Collaborate**
-  (*Request change…*, *Watch*, *Agent*);
-* change tab: **Review** (*Approve change* highlighted, *Reject* – the comment field
-  of *Your review* goes with it, required for a rejection) while your review
-  is pending · **Lifecycle** (*Submit for review*, highlighted on your draft –
-  disabled with the reason as tooltip while the draft has no revision or no
-  reviewer –, *Withdraw* on your change in review, *Cancel change* for a draft
-  or rejected change, at once) · **Collaborate**. An administrator who did not
-  create the change finds *Withdraw (administrator)* in **More ▾** instead –
-  never next to *Approve change* – and confirms it first. On your draft the *Reviewers* panel has *Add
+The revision toolbar fits in one row at 1440 px (#513):
+
+* revision tab: **Lock** (*Check in…* and *Cancel check-out* / *Force
+  unlock* while checked out; *Check out parts…* on an assembly) · **Open**:
+  one split button – *Check out and open ▾* with *Check out without opening*,
+  *Check out parts…* (assembly) and the CAD program in its drop-down, or
+  *Open in CAD ▾* for your own check-out, whose drop-down names the program
+  that will open the file (*Opens with Inventor 2025*) and leads to the
+  group's default CAD program – see [Check out and open](#check-out-and-open)
+  · **Work** (*Edit attributes*, *Get…*, *Show in folder*) · **Lifecycle**
+  (*Release…*, *Revise*) · **More ▾**, starting with *Request change…*,
+  *Watch* and *Agent*;
+* change tab: **Review** (*Approve change* highlighted, *Reject*) while your
+  review is pending – the same two buttons are under the comment in *Your
+  review*, with *Meaning of your sign-off* as on the web; the comment is
+  required for a rejection · **Lifecycle** (*Submit for review*, highlighted
+  on your draft – disabled with the reason as tooltip while the draft has no
+  revision or no reviewer –, *Withdraw* on your change in review, *Cancel
+  change* for a draft or rejected change, at once) · **Collaborate**. An
+  administrator who did not create the change finds *Withdraw
+  (administrator)* in **More ▾** instead – never next to *Approve change* –
+  and confirms it first. On your draft the *Reviewers* panel has *Add
   reviewer* (user names, any CAD editor or administrator – not you), *Remove*
   per reviewer and the suggested reviewers;
 * change request tab: **Triage** (*Start triage* or *Create change order*
@@ -455,7 +481,7 @@ explains the two levels in one sentence, on hover and on keyboard focus
 is in the tooltip of its version.
 
 **Right-click menu** (#417): a right-click on an item or file – in the
-navigator, Home *Files* / *All items* / *Structure*, the worklist's
+navigator, the *Files* view (*Files* / *All items* / *Structure*), the worklist's
 check-outs and the cards of the *Graph* tab – opens *Check out and open*
 (for your own check-out *Open in CAD* and *Check in…*), *Check out*, *Get…*,
 *Show in folder*, *Copy number*, *Where used*, *Request change…* and *Open in
@@ -465,7 +491,7 @@ rules: one that does not apply is greyed out and its tooltip says why
 key opens it on the row that has the focus; the arrow keys move, `Esc`
 closes.
 
-Rare actions are in **More ▾** at the end: *Pack and Go…*, *Open in browser*, *Refresh* (`F5`) and *Mark obsolete…*. The
+Rare actions are in **More ▾** at the end: on a revision *Request change…*, *Watch* and *Agent* first, then *Pack and Go…*, *Add files…*, *Park…*, *Import BOM…*, *Quantities from CAD…*, *Open in browser*, *Refresh* (`F5`) and *Mark obsolete…*. The
 menu works with the keyboard:
 `Enter`, `Space` or `↓` opens it, `↑`/`↓`, `Home`/`End` move, `Enter` runs
 the action, `Esc` closes it and returns to the button; a click outside closes
@@ -504,9 +530,9 @@ when no item has a released revision), or *Finished with problems* /
 overwritten), and *Open working folder* next to *Close*. The choice of the
 group is kept on this computer.
 
-**Home** is a file browser of the active group, in three views:
+**Files** (the rail entry, `Ctrl/Cmd+1`; called *Home* before #513) is a file browser of the active group, in three views:
 
-* *Files* (the view Home starts with): the **folders** of the group and the **files** in them, as in its working
+* *Files* (the view it starts with): the **folders** of the group and the **files** in them, as in its working
   folder – folders first, then the files
   by name the way a file manager orders them (without regard to case, `Part2`
   before `Part10`), each with the state and the lock of its item. A checked-out file is marked
@@ -542,13 +568,13 @@ type icon.
 
 **Favourite folder.** When your work is several folders down, make that
 folder the group's favourite: point at the folder in *Files* and click its
-☆. Home then starts in that folder instead of at the top of the group. A
+☆. *Files* then starts in that folder instead of at the top of the group. A
 banner in the accent colour above the list shows where you are
 (`ROVER / Design / Rover`) and that it is *not the top of the group*;
 *Whole group* shows the top (*Back to the favourite folder* returns), and
-*Remove favourite* (or the filled ★ of the folder) lets Home start at the
+*Remove favourite* (or the filled ★ of the folder) lets *Files* start at the
 top again. If the group holds an Inventor project file (`.ipj`) in a
-folder, Home suggests that folder – *Start there*, or *No, thanks* to stop
+folder, *Files* suggests that folder – *Start there*, or *No, thanks* to stop
 the suggestion for this group. The favourite is kept on this computer, for
 each server and group; the count next to the order then counts the rows
 below the favourite folder.
@@ -559,15 +585,15 @@ Folder…* start with the active group. *New* (and `Ctrl/Cmd+N`) also starts
 with the folder you last opened or clicked in in *Files*; its *Folder* field
 (e.g. `chassis/brackets`, empty = the top) is where the item and the files
 chosen in the dialog go – type a new path to start a new folder. With a
-server older than the *Files* view, Home shows *All items* instead.
+server older than the *Files* view, *Files* shows *All items* instead.
 
-*Home*, *Projects*, *Refresh* and the dialogs that offer project groups (*New*, *Get Project Groups…*, *Import CAD
+*Files*, *Projects*, *Refresh* and the dialogs that offer project groups (*New*, *Get Project Groups…*, *Import CAD
 Folder…*) load the groups and your
 memberships from the server again, so a group created or joined in the web UI
 shows without restarting the app.
 
 Keyboard: `Ctrl/Cmd+N` new item, `Ctrl/Cmd+F` search, `F5` refresh,
-`Ctrl/Cmd+1/2/3/4/5` Home, Worklist, Changes, Agent, Projects, `Ctrl/Cmd+W` close the tab,
+`Ctrl/Cmd+1/2/3/4/5` Files, Worklist, Changes, Agent, Projects, `Ctrl/Cmd+W` close the tab,
 `Ctrl/Cmd` + `+` / `-` / `0` (or `Ctrl` + mouse wheel) zoom.
 
 ## Check out parts of an assembly
@@ -846,7 +872,7 @@ most three steps:
    free, the largest first – with their picture and **Show** *number*. A
    released, in-review or checked-out assembly is not offered (one you hold
    already is in your worklist); when none is free and in work, the step
-   says so – open one in Home and revise it to work on it. An empty group shows *Import CAD folder…* and
+   says so – open one in *Files* and revise it to work on it. An empty group shows *Import CAD folder…* and
    *New item* (see [Empty views](#empty-views)); a viewer reads that
    *Get…* copies an item with its parts and gets the group's assemblies in
    any state, with no check-out promise. A link leads to
@@ -856,8 +882,8 @@ most three steps:
 **Show** *number* makes that group your active one, closes the wizard and
 opens the revision tab of the assembly, where – for a CAD editor – **Check
 out and open** is the highlighted next step: your next click is real work. *Finish and show
-<group> in Home* instead makes the group active and shows its files in the
-navigator and *Home*. The group you pick in step 2 only counts with one of
+<group> in Files* instead makes the group active and shows its files in the
+navigator (*Files*). The group you pick in step 2 only counts with one of
 these clicks: *Back* and *Don't show again* change nothing.
 
 The wizard **creates no file or folder**, gets and checks out nothing and
@@ -865,7 +891,7 @@ writes nothing to the server; it is the same whichever CAD program you use.
 It stores only that you finished it (or chose *Don't show again*) – **per
 saved connection**, so a second server or account offers it once more – the
 working folder if you pick one with *Change…*, and the active group. Other
-preferences stay as they are: *Finish and show <group> in Home* switches the
+preferences stay as they are: *Finish and show <group> in Files* switches the
 navigator to *Files* for this run only. It does not open by itself for an
 app that starts already signed in (an update, a reload), nor for an account
 that already has check-outs or has checked in (or uploaded) a file on that
@@ -888,7 +914,7 @@ An empty list says what to do next, and the answer depends on your role
 * **No project group yet** – CAD editors get *Create a project group* (you
   become its manager and add the others); viewers are asked to have a
   manager of a group add them.
-* **An empty project group** on *Home* (*Files*, *All items* and
+* **An empty project group** in *Files* (*Files*, *All items* and
   *Structure*) – *Import CAD folder…* and *New item*, for CAD editors who may
   create items in the group; CAD editors who are not members of it are asked
   to have a manager of the group add them; viewers learn that the group's CAD
@@ -897,8 +923,8 @@ An empty list says what to do next, and the answer depends on your role
   copies the files of a project group into your working folder; the dialog
   starts with the active group ticked.
 * **Checked out by me**, **Waiting for my review** and **My open changes**
-  say in one line how work gets there – in the worklist and on the *Home*
-  tab.
+  say in one line how work gets there – in the worklist, where an empty
+  section is one line that opens this explanation (#513).
 * A **viewer account** sees a note at the top of the worklist and of the
   *Home* tab: editing –
   items, check-outs, changes – needs the CAD editor role; ask an

@@ -13,6 +13,66 @@ see the notices in the README.
 
 ## [Unreleased]
 
+### Added
+
+- `GET /api/v1/activity?limit=`: the recent activity the caller may see
+  (the web dashboard's *Recent activity*, redacted the same way), newest
+  first, 1–50 entries. The desktop Home tab shows it (#513 T9).
+- Audit entries carry `user_display_name` (the user's current display name)
+  next to `username` in the REST API and the CSV export's JSON (#513 T25).
+
+### Changed
+
+UI review #513 – the decided themes:
+
+- Web: one *Vault* entry in the main nav for the folder explorer and the
+  item list; both pages switch between *Folders* and *List* above their
+  title (T13).
+- Web on phones (under 600 px): a bottom bar with *Dashboard*, *Changes*,
+  *Requests* and *Search* replaces the sideways-scrolling nav; *Vault* and
+  *Projects* are in the account menu, the primary action comes first and
+  *Open review* stays on the review rows (T7).
+- Web dashboard: the product counts are one slim line below the personal
+  cards; *Get TeamCraft Desktop* moved into the account menu (T9).
+- Web change page: the *Your review* card comes after the details, the
+  affected revisions and the impact analysis, with a "Your review is pending"
+  notice at the top; the request page decides after the discussion (T3).
+- Web revision page: the section row is real tabs – one section at a time,
+  linkable by `#hash` (`/revisions/{id}#bom` opens the Structure tab), links
+  that do not fit move into *More ▾*; Lifecycle and Revisions are the cards
+  beside the attributes on Overview, no tabs of their own (T5).
+- Web revision page: *Edit revision attributes*, *Edit item* and *Change
+  owner* say what they edit (T23).
+- *Dependents to check*: the fix is a button (*Revise ASM-…*); dismissing a
+  single row is *Acknowledge only this one…* in its row menu; the time shows
+  once per group (T24).
+- History tables show people by display name (login name as tooltip) and
+  link only the record number in the sentence; review requests are marked
+  read once the reviewer has decided or the change left review; a
+  notification can be marked read on its own; notifications are grouped by
+  day (T25).
+- Secondary links (the BOM's group column, the change that released a
+  dependent's source) are plain text-coloured links (T17).
+- Desktop: the rail entry *Home* is now *Files* (Ctrl+1); *Home* is a pinned
+  first tab that cannot be closed – the worklist as counts that open the
+  Worklist, the product counts, *Recently opened* on this computer and the
+  server's *Recent activity* (T1, T9).
+- Desktop Worklist: sections with something in them come first, an empty
+  one is one line that opens its explanation; the link from *Local changes*
+  to the section below it is gone (T10).
+- Desktop revision toolbar in one row: *Check out and open ▾* holds plain
+  *Check out* and *Check out parts…*, *Open in CAD ▾* names the program and
+  leads to the group's default; *Request change…*, *Watch* and *Agent* are in
+  *More ▾*; the folder button is labelled *Show in folder* (T8).
+- Desktop revision sub-tabs in the web UI's order, Graph, 3D viewer and
+  Workspace last (T15).
+- Desktop change tab: *Approve change* and *Reject* under the comment in
+  *Your review*, with the meaning of the sign-off as on the web (T3).
+- Desktop status bar: the server indicator says *Connected*, *Unencrypted*
+  or *Offline*; the bell shows a dot for unread notifications and is pressed
+  while they are open; the Worklist badge's tooltip says what it counts
+  (T21).
+
 ## [0.2.14] - 2026-11-24
 
 ### Security

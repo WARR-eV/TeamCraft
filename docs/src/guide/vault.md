@@ -8,7 +8,13 @@ changes.
 
 ## The vault explorer
 
-*Vault* in the top bar opens a three-pane explorer:
+*Vault* in the top bar opens the vault in one of two views, switched by
+*Folders* and *List* above the title (#513): **Folders** is the three-pane
+explorer below, **List** the item list with search and filters (type,
+project group, state, result values) – the stat counts of the dashboard open
+it filtered. The top-bar search lands in the list as well.
+
+The folder view:
 
 | Pane    | Shows                                                                                                            |
 |---------|------------------------------------------------------------------------------------------------------------------|

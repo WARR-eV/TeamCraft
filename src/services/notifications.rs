@@ -530,6 +530,29 @@ pub async fn mark_read(pool: &PgPool, actor: &Actor, ids: Option<&[Uuid]>) -> Ap
     unread_count(pool, actor).await
 }
 
+/// Marks the review requests of a change as read once they are answered
+/// (#513 T25): those of `reviewer` when they have decided, or everybody's
+/// (`None`) when the change leaves review – approved, rejected or withdrawn.
+/// A resolved request no longer keeps the bell count up. Runs in the
+/// transaction of the decision.
+pub(crate) async fn resolve_review_requests(
+    conn: &mut PgConnection,
+    change_id: Uuid,
+    reviewer: Option<Uuid>,
+) -> AppResult<()> {
+    sqlx::query(
+        "UPDATE notifications SET read_at = now()
+         WHERE read_at IS NULL AND kind = $1 AND subject_kind = 'change' AND subject_id = $2
+           AND ($3::uuid IS NULL OR user_id = $3)",
+    )
+    .bind(NotificationKind::ReviewRequested.as_str())
+    .bind(change_id)
+    .bind(reviewer)
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
 /// Marks one notification of the actor as read and returns it (for its link).
 pub async fn open(pool: &PgPool, actor: &Actor, id: Uuid) -> AppResult<Notification> {
     sqlx::query_as::<_, Notification>(&format!(

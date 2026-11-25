@@ -2488,6 +2488,16 @@ async fn notifications_for_reviews_watches_and_delivery() {
         1,
         "the deciding reviewer is not notified"
     );
+    // the answered review request no longer counts as unread (#513 T25)
+    let r = call(
+        Method::GET,
+        "/api/v1/notifications?unread=true".into(),
+        rolf.clone(),
+        None,
+    )
+    .await
+    .json();
+    assert_eq!(r["unread"], 0, "{r}");
 
     // Reading
     let r = call(

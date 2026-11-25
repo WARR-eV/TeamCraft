@@ -2,7 +2,7 @@
 // TeamCraft Desktop – Revision tab: overview, files, structure, where used.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, ICONS, api, append, badge, call, dialog, enc, errorNotice, errorText, h, invoke, lockBadge, moreMenu, run, state, svgIcon, toast, tool, toolGroup } from "./core.js";
+import { $, ICONS, api, append, badge, call, dialog, enc, errorNotice, errorText, h, invoke, asMenuItem, lockBadge, moreMenu, run, splitTool, state, svgIcon, toast, tool, toolGroup } from "./core.js";
 import { fmtDate, fmtNum, fmtSize, label } from "/static/shared/js/format.js";
 import { canEdit, canEditProject, savePackage, watchTool } from "./shell.js";
 import { typeIcon } from "./navigator.js";
@@ -187,22 +187,41 @@ export function renderRevision(tab, body, toolbar) {
       primary: next === "checkout", disabled: !can.checkout || !cadFile,
       title: !can.checkout ? why.checkout : cadFile ? "Take the lock, copy the files into your workspace and open " + cadFile.filename + " in the CAD program" : noCadFile
     });
-  var cadOpen = [openTool, cadTargetChip(rev, cadFile)];
+  // the program the file opens with: no chip of its own any more, it is the
+  // first entry of the split button's menu (#513 T8)
+  var chip = cadTargetChip(rev, cadFile);
+  var programItems = !cadFile ? [] : [
+    { label: "Opens with …", icon: "launch", disabled: true,
+      sync: function (b, it) {
+        b.querySelector(".menu-label").textContent = "Opens with " + chip.textContent;
+        b.title = chip.title;
+        it.title = chip.title;
+      } },
+    { label: "Default CAD program of the group…", icon: "web", disabled: !rev.project_id,
+      run: function () { chip.click(); }, title: "The project group's default CAD program (web UI)" }
+  ];
   if (next === "checkout") next = "checkout-open";
+  var plainCheckout = rev.checked_out_by ? null
+    : act("checkout", "Check out", "checkout", function () { doCheckout(tab); }, "Take the lock and copy the files into your workspace – without opening anything");
+  // an assembly: check out several of its parts in one step (#415)
+  var isAssembly = rev.item_type === "assembly" || d.bom.length > 0;
+  var partsTool = isAssembly && canEdit() ? tool("Check out parts…", "checkout", function () { checkoutPartsDialog(tab); },
+    { title: "Pick parts of this assembly and check them out together – their files become writable, so you can change them in the context of the assembly" }) : null;
+  // one visible check-out button (#513 T8): *Check out and open*; plain
+  // *Check out* and *Check out parts…* are in its drop-down
+  var cadOpen = mineLock
+    ? [splitTool(openTool, programItems, "Open in CAD – which program")]
+    : [splitTool(openTool, [
+      plainCheckout ? Object.assign(asMenuItem(plainCheckout), { label: "Check out without opening" }) : null,
+      asMenuItem(partsTool)
+    ].concat(programItems.map(function (it, i) { return i === 0 ? Object.assign({ separated: true }, it) : it; })), "Check out – more choices")];
   var lock = rev.checked_out_by ? [
     act("checkin", "Check in…", "checkin", function () { checkinDialog(tab); },
       checkinTitle + (d.localChanges === false ? noChanges : "")),
     act("cancel", rev.checked_out_by !== state.me.id ? "Force unlock" : "Cancel check-out", "cancel", function () { doCancelCheckout(tab); },
-      rev.checked_out_by !== state.me.id ? "Take the lock away from " + rev.checked_out_by_name + " (administrator)" : "End your check-out without uploading anything")
-  ] : [
-    act("checkout", "Check out", "checkout", function () { doCheckout(tab); }, "Take the lock and copy the files into your workspace")
-  ];
-  // an assembly: check out several of its parts in one step (#415)
-  var isAssembly = rev.item_type === "assembly" || d.bom.length > 0;
-  if (isAssembly && canEdit()) {
-    lock.push(tool("Check out parts…", "checkout", function () { checkoutPartsDialog(tab); },
-      { title: "Pick parts of this assembly and check them out together – their files become writable, so you can change them in the context of the assembly" }));
-  }
+      rev.checked_out_by !== state.me.id ? "Take the lock away from " + rev.checked_out_by_name + " (administrator)" : "End your check-out without uploading anything"),
+    partsTool
+  ] : [];
   var releaseButton = act("release", "Release…", "release", function () { releaseDialog(tab); }, "Create a change order with reviewers and submit it");
   // The working copy changes while the tab stays open (the CAD program saves
   // into it): look again when the tab is shown from its cache or the window
@@ -230,20 +249,21 @@ export function renderRevision(tab, body, toolbar) {
     toolGroup("Work", [
       act("edit", "Edit attributes", "edit", function () { editDialog(tab); }, "Edit the attributes (name, description, material, mass …) under your check-out"),
       tool("Get…", "download", function () { getStructureDialog(rev); }, { title: "Copy this item and everything it consists of (BOM, referenced CAD files) into your working folder" }),
-      tool("Open folder", "folder", function () { openWorkspaceFolder(tab); }, { title: "Open the working folder of this revision" })
+      // a visible label, the same as the right-click menu's (#513 T8)
+      tool("Show in folder", "folder", function () { openWorkspaceFolder(tab); }, { title: "Open the working folder of this revision" })
     ]),
     toolGroup("Lifecycle", [
       releaseButton,
       act("revise", "Revise", "revise", function () { doRevise(tab); }, "Create the next revision")
     ]),
-    toolGroup("Collaborate", [
-      tool("Request change…" + (d.requests.length ? " (" + d.requests.length + ")" : ""), "request", function () { requestChangeDialog(rev, null); },
-        { title: "Report a problem or propose a change to " + rev.item_number + "/" + rev.code + " (change request)" }),
-      watchTool(tab, "items", rev.item_number, d.watching),
-      agentButton(tab)
-    ]),
+    // one row at 1440 px (#513 T8): Request change, Watch and Agent are the
+    // first entries of More ▾
     moreMenu([
-      { label: "Pack and Go…", icon: "package", run: function () { savePackage(rev, null); }, title: "Save this revision with all files of its structure as ZIP (bom.csv, manifest.json) – for sending, not for working" },
+      asMenuItem(tool("Request change…" + (d.requests.length ? " (" + d.requests.length + ")" : ""), "request", function () { requestChangeDialog(rev, null); },
+        { title: "Report a problem or propose a change to " + rev.item_number + "/" + rev.code + " (change request)" })),
+      asMenuItem(watchTool(tab, "items", rev.item_number, d.watching)),
+      asMenuItem(agentButton(tab)),
+      Object.assign({ separated: true }, { label: "Pack and Go…", icon: "package", run: function () { savePackage(rev, null); }, title: "Save this revision with all files of its structure as ZIP (bom.csv, manifest.json) – for sending, not for working" }),
       { label: "Add files…", icon: "plus", run: function () { addFilesDialog(tab); }, disabled: !filesHint(d).ok, title: filesHint(d).text },
       { label: "Park…", icon: "upload", run: function () { checkinDialog(tab, true); }, disabled: !can.checkin || rev.checked_out_by !== state.me.id,
         title: rev.checked_out_by === state.me.id ? "Upload your changes as new versions and keep the check-out – safe on the server if this computer is lost" : "Check out first – parking keeps your check-out" },
@@ -290,19 +310,21 @@ export function renderRevision(tab, body, toolbar) {
   }
 
   var files3d = d.files.filter(function (f) { return previewFormat(f); });
+  // the tabs both clients share, in the web UI's order; the desktop's own
+  // (Graph, 3D viewer, Workspace) at the end (#513 T15)
   var subs = [
     { id: "overview", label: "Overview" },
     { id: "files", label: "Files", count: d.files.length },
     { id: "structure", label: "Structure", count: d.bom.length },
-    { id: "whereused", label: "Where used" },
     {
       id: "references", label: "References",
       count: d.refs.outgoing.length + d.refs.incoming.length + d.refs.file_referrers.length +
         d.refs.files.reduce(function (n, f) { return n + f.references.length; }, 0)
     },
-    { id: "graph", label: "Graph" },
+    { id: "whereused", label: "Where used" },
     { id: "changes", label: "Changes", count: d.changes.length },
     { id: "history", label: "History" },
+    { id: "graph", label: "Graph" },
     { id: "viewer", label: "3D viewer", count: files3d.length, hide: !files3d.length },
     { id: "workspace", label: "Workspace" }
   ];

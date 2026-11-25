@@ -2041,6 +2041,14 @@ pub async fn review(
     let voters: Vec<Uuid> = votes.iter().map(|(u, _)| *u).collect();
     let requirement = domain::attainable(&requirement, &voters);
     let outcome = domain::review_outcome_with(&votes, &requirement);
+    // the decider's review request is answered; all of them once the change
+    // leaves review (#513 T25)
+    let answered = if outcome == ReviewOutcome::Pending {
+        Some(actor.id)
+    } else {
+        None
+    };
+    notifications::resolve_review_requests(&mut tx, change_id, answered).await?;
     match outcome {
         ReviewOutcome::Pending => {
             touch(&mut tx, change_id).await?;
@@ -2254,6 +2262,8 @@ pub async fn withdraw(pool: &PgPool, actor: &Actor, change_id: Uuid) -> AppResul
     ensure_status(&change, &[ChangeStatus::InReview])?;
     let labels = transition_items(&mut tx, change_id, LifecycleState::InWork).await?;
     reset_reviews(&mut tx, change_id).await?;
+    // nobody has to review it any more (#513 T25)
+    notifications::resolve_review_requests(&mut tx, change_id, None).await?;
     sqlx::query(
         "UPDATE changes SET status = 'draft', submitted_at = NULL, updated_at = now() WHERE id = $1",
     )

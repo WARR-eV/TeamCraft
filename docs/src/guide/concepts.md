@@ -13,11 +13,21 @@ is kept in **revisions** `A, B, …, Y, AA, …` (I, O, Q, S, X and Z are
 skipped, as in ASME Y14.35). A revision carries the attributes (name,
 description, material, mass, unit cost), the files and the bill of materials.
 
-Under the title block of the revision page, a bar of links jumps to each
-card – *Overview*, *Lifecycle*, *Revisions*, *Files*, *Structure* (the BOM),
-*References*, *Where used*, *Changes*, *History* and the cards only some items
-have (similar parts, simulation results, as-built records, alternates). It
-stays at the top while you scroll and marks the card in view (#421).
+Under the title block of the revision page, a row of tabs shows one part of
+the revision at a time – *Overview* (the attributes, the item master data,
+and beside them the *Lifecycle* and *Revisions* cards), *Files*, *Structure*
+(the BOM), *References*, *Where used*, *Changes*, *History* and the tabs only
+some items have (similar parts, simulation basis and results, as-built
+records, built units, simulations, alternates). Each tab has its own link:
+`/revisions/{id}#bom` opens *Structure*, `#lifecycle` opens *Overview* at the
+*Lifecycle* card. Tabs that do not fit in one row move into *More ▾*; the row
+stays at the top while you scroll (#421, #513). Without JavaScript the page
+shows every section one below the other.
+
+The buttons say what they edit: *Edit revision attributes* (name,
+description, material, mass, cost and custom attributes of this revision),
+*Edit item* on *Item master data* (project group, folder, unit and
+classification – the same for every revision) and *Change owner*.
 
 Next to the number on the revision page, *Copy number* puts the item number
 on the clipboard (the item list has a small copy button per row), and *Label* opens a printable label with a QR code.

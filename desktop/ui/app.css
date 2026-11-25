@@ -419,7 +419,13 @@ tr.row-conflict td:first-child, tr.row-clash td:first-child { box-shadow: inset 
 .status-get progress { width: 8rem; height: 6px; accent-color: var(--primary); }
 .status-get-text { overflow: hidden; text-overflow: ellipsis; max-width: 34rem; }
 .status-get button { height: 18px; font-size: 12px; padding: 0 6px; }
+/* the server indicator says its state in a word (#513 T21) */
 .status-server::before { content: '●'; color: var(--st-ok-fg); margin-right: 6px; }
+.status-server strong { font-weight: 600; color: var(--text-muted); }
+.status-server.conn-plain::before { color: var(--st-impact-fg); }
+.status-server.conn-plain strong { color: var(--st-impact-fg); }
+.status-server.conn-offline::before { content: '○'; color: var(--st-danger-fg); }
+.status-server.conn-offline strong { color: var(--st-danger-fg); }
 /* Notices in the status bar as pills: one rounded shape around the label and
    its ×. They sit in the bar's flex row with its gap, so they never overlap –
    when both show they line up side by side, and in a narrow window they
@@ -570,6 +576,24 @@ tr.row-conflict td:first-child, tr.row-clash td:first-child { box-shadow: inset 
 .navigator > .section-title:first-of-type { margin-top: 6px; }
 .section-title .count { color: var(--text-dim); font-weight: 500; }
 .navigator > .hint, .navigator > .small { margin: 0 8px 8px; }
+/* worklist sections (#513 T10): the ones with something in them first; an
+   empty one is one line that opens its explanation on a click */
+.nav-section > .small, .nav-section > .hint { margin: 0 8px 8px; }
+details.nav-empty { margin: 0; }
+details.nav-empty > summary {
+  display: flex; align-items: center; gap: 4px;
+  margin: 6px 8px 0; padding: 2px 0;
+  font-size: 12px; line-height: 16px; font-weight: 600; color: var(--text-dim);
+  cursor: pointer; list-style: none;
+}
+details.nav-empty > summary::-webkit-details-marker { display: none; }
+details.nav-empty > summary::after { content: "ⓘ"; font-weight: 400; }
+details.nav-empty > summary .count { font-weight: 500; }
+details.nav-empty > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+details.nav-empty[open] > summary { color: var(--text-muted); }
+details.nav-empty > :not(summary) { margin-left: 8px; margin-right: 8px; }
+details.nav-empty + .nav-section > .section-title:first-child,
+details.nav-empty + .nav-section > .row:first-child .section-title { margin-top: 14px; }
 
 /* ---------------------------------------------------------------- toolbar & tabs */
 
@@ -613,6 +637,13 @@ tr.row-conflict td:first-child, tr.row-clash td:first-child { box-shadow: inset 
 .tool svg { width: 16px; height: 16px; }
 
 .more { position: relative; margin-left: auto; }
+/* split buttons (#513 T8): the main action and its chevron as one control */
+.split-tool { display: inline-flex; align-items: stretch; }
+.split-tool > .tool { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.more.split-more { margin-left: 0; display: inline-flex; }
+.split-trigger { min-width: 0; padding: 0 4px; border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: 1px solid var(--border); }
+.split-tool > .tool.primary + .split-more > .split-trigger { color: var(--on-primary); background: var(--primary); border-color: var(--primary); border-left-color: color-mix(in srgb, var(--on-primary) 35%, transparent); }
+.split-more .menu { left: auto; right: 0; }
 .more-trigger[aria-expanded="true"] { background: var(--surface-2); border-color: transparent; }
 .more-trigger svg { width: 14px; height: 14px; }
 .menu {
@@ -704,6 +735,15 @@ tr.row-conflict td:first-child, tr.row-clash td:first-child { box-shadow: inset 
 /* Home: work first, left-aligned, full width */
 .welcome { max-width: 1280px; }
 .welcome > .muted { margin: 2px 0 16px; }
+/* the pinned Home tab (#513 T1): first, no close button; it sticks to the
+   left edge while the strip scrolls */
+.tab.home-tab { position: sticky; left: 0; z-index: 1; padding-right: 10px; background: var(--surface-2); }
+.tab.home-tab.active { background: var(--surface); }
+/* Home (#513 T9): the worklist as one line of counts that open the Worklist,
+   then what the navigator cannot show, side by side */
+.home-summary { margin: -8px 0 16px; font-size: 13px; color: var(--text-muted); }
+.home-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: 16px; align-items: start; }
+.home-columns > .panel { margin: 0; }
 
 .object-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
 .object-head h1 { font-size: 18px; line-height: 24px; }
@@ -799,6 +839,10 @@ tr.row-conflict td:first-child, tr.row-clash td:first-child { box-shadow: inset 
 /* the review and decision comment: a label, the field at reading width, the hint below – as on the web */
 label:has(> textarea.review-comment) { max-width: 72ch; }
 textarea.review-comment { width: 100%; }
+/* the decision under the comment (#513 T3) */
+label:has(> input.review-meaning) { display: block; max-width: 72ch; margin-bottom: var(--space-2); }
+input.review-meaning { width: 100%; }
+.review-actions { gap: var(--space-2); }
 
 /* Lifecycle stepper: done ✓, current in weight 600, future as an outline. */
 .lifecycle-track { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; list-style: none; padding: 0; margin: 0 0 8px; }
@@ -1133,12 +1177,21 @@ ul.plain li { margin: 2px 0; }
 button.bell { position: relative; }
 button.bell svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 button.bell.has-unread { color: var(--text); }
-/* the house yellow: only the unread count (and the logo) */
+/* the house yellow: only the unread mark (and the logo). A dot, not a count
+   (#513 T21): the Worklist's number counts work to do, the bell only says
+   that something is unread – the number is in its tooltip and name */
 .bell-count {
-  position: absolute; top: 0; right: -2px;
-  min-width: 16px; height: 16px; padding: 0 4px;
-  font-size: 11px; line-height: 16px; font-weight: 600; text-align: center;
-  color: var(--count-fg); background: var(--count-bg); border-radius: 999px;
+  position: absolute; top: 3px; right: 3px;
+  width: 9px; height: 9px; padding: 0;
+  font-size: 0; line-height: 0; overflow: hidden;
+  color: transparent; background: var(--count-bg); border-radius: 999px;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+/* the bell is pressed while the notifications are in the navigator */
+button.bell.active { color: var(--text); background: var(--selected); }
+@media (forced-colors: active) {
+  .bell-count { forced-color-adjust: none; background: Highlight; }
+  button.bell.active { outline: 1px solid CanvasText; }
 }
 ul.notifications { list-style: none; margin: 0; padding: 0; }
 ul.notifications li { border-bottom: 1px solid var(--border); }

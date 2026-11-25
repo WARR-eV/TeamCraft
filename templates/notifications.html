@@ -20,13 +20,21 @@
 
 <section class="card">
   {% if notifications %}
+  {#- grouped by day; one entry is marked read without opening it (#513 T25) -#}
   <ul class="notification-list">
     {% for n in notifications %}
+    {% if loop.changed(n.created_at[:10]) %}<li class="n-day">{{ m.day(n.created_at[:10]) }}</li>{% endif %}
     <li class="{% if not n.read_at %}unread{% endif %}">
       <a href="/notifications/{{ n.id }}/open">
         <span class="n-title">{% if not n.read_at %}<span class="visually-hidden">Unread: </span>{% endif %}{{ n.title }}</span>
         {% if n.body %}<span class="n-body">{{ n.body }}</span>{% endif %}
       </a>
+      {% if not n.read_at %}
+      <form class="n-read" method="post" action="/notifications/{{ n.id }}/read">
+        <input type="hidden" name="back" value="/notifications">
+        <button class="small ghost" type="submit" title="Mark as read without opening it" aria-label="Mark as read: {{ n.title }}">Mark as read</button>
+      </form>
+      {% endif %}
       <span class="n-meta small muted">{{ n.actor_name }} · {{ m.time(n.created_at) }}
         {% if n.email_state == "sent" %} · e-mailed{% elif n.email_state == "failed" %} · <span class="badge badge-rejected">e-mail failed</span>{% endif %}
         {% if n.chat_state == "sent" %} · sent to Mattermost{% elif n.chat_state == "failed" %} · <span class="badge badge-rejected">Mattermost failed</span>{% if n.chat_error %} <span class="chat-error">{{ n.chat_error }}</span>{% endif %}{% endif %}

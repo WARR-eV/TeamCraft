@@ -118,8 +118,8 @@ function drawBar(p, opts, level) {
   if (!suggested.length) return;
   bar.className = "home-root hint";
   bar.appendChild(h("p", { text: suggested.length === 1
-    ? "The Inventor project file of this group is in " + suggested[0] + ". Start Home in that folder?"
-    : "This group has Inventor project files in several folders. Start Home in one of them?" }));
+    ? "The Inventor project file of this group is in " + suggested[0] + ". Start Files in that folder?"
+    : "This group has Inventor project files in several folders. Start Files in one of them?" }));
   bar.appendChild(h("div.row", null, suggested.map(function (path) {
     return h("button.small", { type: "button", title: "Make " + path + " the favourite folder: Home starts there (on this computer)",
       on: { click: function () { act.favour(path); } } }, suggested.length === 1 ? "Start there" : path);

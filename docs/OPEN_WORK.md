@@ -442,6 +442,19 @@ half a state behind. Prefer tests that fail on a real regression over tests that
   still highlights *Check in…* on any own check-out (it cannot see the working folder) and neither client says *why*
   in a "Next:" hint; the Lifecycle card's "through a change order" and the button *Release…* still use different
   words for the same step
+- [x] UI review #513 – the themes the user decided (branch `ui-review-513`): T1 desktop *Files* rail + pinned *Home*
+  tab; T3 decision after the evidence (web change and request pages; desktop buttons and sign-off meaning under the
+  comment); T5 real tabs on the web revision page (`#hash`, *More ▾*); T7 phone bottom bar; T8 one-row desktop
+  toolbar with split buttons; T9 dashboards (desktop Home: counts, *Recently opened*, `GET /activity`; web: slim stat
+  line, *Get TeamCraft Desktop* in the account menu); T10 empty worklist sections folded, sorted last; T13 one *Vault*
+  nav entry with *Folders* / *List*; T15 desktop sub-tabs in the web order; T17 quiet secondary links; T21 labelled
+  connection, bell dot, worklist badge tooltip; T23 scope-named edit buttons; T24 *Revise …* button, per-row
+  acknowledge in a row menu; T25 display names and number-only links in history, review requests read once answered,
+  per-row *Mark as read*, notifications by day. **Left:** T19, T26, T27, T28, T29 (no decision yet), T22 (kept as it
+  is); from the decided themes – T7 hiding *Get TeamCraft Desktop* by "used the app" (it is in the account menu
+  now), T9 a getting-started block on desktop Home, T13 the explorer's number link that opens (not chosen), T17 the
+  amber of priority and impact (not chosen), T21 the Ko-fi pill (not chosen); screenshots of the new layouts
+  (`scripts/screenshots.sh`) and a visual check of the desktop app (no Node.js or desktop build here)
 
 **Tests with real data**
 

@@ -2,7 +2,7 @@
 // TeamCraft Desktop – Change tab.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { api, append, badge, call, clear, confirmDialog, enc, errorNotice, errorText, h, lockBadge, moreMenu, priorityBadge, run, state, toast, tool, toolGroup } from "./core.js";
+import { ICONS, api, append, badge, call, clear, confirmDialog, enc, errorNotice, errorText, h, lockBadge, moreMenu, priorityBadge, run, state, svgIcon, toast, tool, toolGroup } from "./core.js";
 import { fmtDate, label } from "/static/shared/js/format.js";
 import { canEdit, refreshWorklistCount, watchTool } from "./shell.js";
 import { openTab, recordLink, reloadActive, renderTabs, table } from "./tabs.js";
@@ -132,9 +132,12 @@ export function renderChange(tab, body, toolbar) {
     });
   }
   var canCancel = owner && (isDraft || c.status === "rejected");
-  // The review decision lives in the toolbar – the comment field below goes with it.
+  // The decision is under the comment in *Your review* (#513 T3), with the
+  // meaning of the sign-off as on the web; the toolbar keeps the two buttons
+  // as shortcuts in their fixed place.
   // A visible label and hint as in the web review form (a placeholder would vanish once you type).
   var comment = canReview ? h("textarea.review-comment", { id: "review-comment", maxlength: "4000", "aria-describedby": "review-comment-hint" }) : null;
+  var meaning = canReview ? h("input.review-meaning", { id: "review-meaning", type: "text", maxlength: "200", placeholder: "e.g. approved as design owner" }) : null;
   function decide(decision) {
     if (decision === "reject" && !comment.value.trim()) {
       toast("Write in the comment why you reject " + c.number, "error");
@@ -142,7 +145,7 @@ export function renderChange(tab, body, toolbar) {
       return;
     }
     run(decision === "approve" ? "Approving" : "Rejecting", function () {
-      return api("POST", "/changes/" + enc(c.number) + "/review", { decision: decision, comment: comment.value });
+      return api("POST", "/changes/" + enc(c.number) + "/review", { decision: decision, comment: comment.value, meaning: meaning.value.trim() });
     }, changeInputs(c, [["decision", decision]])).then(function (r) {
       toast(c.number + " – " + (decision === "approve" ? "approved" : "rejected") + "; status " + label(r.change.status));
       reloadActive(); refreshWorklistCount();
@@ -189,9 +192,14 @@ export function renderChange(tab, body, toolbar) {
   if (hints[c.status]) body.appendChild(h("p.notice.info", { text: hints[c.status] }));
 
   if (canReview) {
-    body.appendChild(h("section.panel", null, [h("h2", { text: "Your review" }),
+    body.appendChild(h("section.panel.review-panel", null, [h("h2", { text: "Your review" }),
       h("label", { for: "review-comment" }, ["Comment", comment]),
-      h("p.hint.review-hint", { id: "review-comment-hint", text: "A rejection needs a comment: what has to change. Approve change and Reject are in the toolbar above." })]));
+      h("p.hint.review-hint", { id: "review-comment-hint", text: "A rejection needs a comment: what has to change." }),
+      h("label", { for: "review-meaning" }, ["Meaning of your sign-off ", h("span.hint", { text: "optional" }), meaning]),
+      h("div.row.review-actions", null, [
+        h("button.primary", { type: "button", on: { click: function () { decide("approve"); } } }, [svgIcon(ICONS.approve), " Approve change"]),
+        h("button.danger", { type: "button", title: "The comment above says why; the revisions go back to WIP", on: { click: function () { decide("reject"); } } }, [svgIcon(ICONS.cancel), " Reject"])
+      ])]));
   }
 
   append(body, h("div.grid-2", null, [

@@ -102,6 +102,7 @@ pub fn environment(instance_name: &str) -> Result<Environment<'static>, minijinj
     });
     env.add_filter("urlencode", |value: String| util::pct_encode(&value));
     env.add_filter("age", filter_age);
+    env.add_filter("link_number", filter_link_number);
     env.add_global("instance_name", instance_name.to_string());
     env.add_global("version", env!("CARGO_PKG_VERSION"));
     // cache busting of the embedded stylesheets, scripts and logos
@@ -122,6 +123,90 @@ fn filter_dt(value: Option<String>) -> String {
         },
         None => "—".to_string(),
     }
+}
+
+/// `{{ e.summary|link_number(href) }}`: the sentence as text with only its
+/// first record number (`PRT-000009`, `PRT-000009/A`, `CHG-000002`) as the
+/// link (#513 T25: history rows were one full-width link each). Without a
+/// number the whole sentence is the link, as before. Text and href are
+/// escaped here, so the result is marked safe.
+fn filter_link_number(summary: String, href: String) -> minijinja::Value {
+    let link = |text: &str| {
+        format!(
+            "<a href=\"{}\">{}</a>",
+            html_escape(&href),
+            html_escape(text)
+        )
+    };
+    let html = match find_record_number(&summary) {
+        Some((start, end)) => format!(
+            "{}{}{}",
+            html_escape(&summary[..start]),
+            link(&summary[start..end]),
+            html_escape(&summary[end..])
+        ),
+        None => link(&summary),
+    };
+    minijinja::Value::from_safe_string(html)
+}
+
+/// Byte range of the first record number in `text`: a prefix of two or more
+/// ASCII capitals or digits starting with a capital, `-`, three or more
+/// digits, optionally `/` and a revision code of up to four capitals or
+/// digits. Pure; at word boundaries only.
+fn find_record_number(text: &str) -> Option<(usize, usize)> {
+    let b = text.as_bytes();
+    let word = |c: u8| c.is_ascii_alphanumeric() || c == b'_';
+    let mut i = 0;
+    while i < b.len() {
+        if b[i].is_ascii_uppercase() && (i == 0 || !word(b[i - 1])) {
+            let mut j = i;
+            while j < b.len() && (b[j].is_ascii_uppercase() || b[j].is_ascii_digit()) {
+                j += 1;
+            }
+            if j - i >= 2 && j < b.len() && b[j] == b'-' {
+                let mut k = j + 1;
+                while k < b.len() && b[k].is_ascii_digit() {
+                    k += 1;
+                }
+                if k - (j + 1) >= 3 && (k == b.len() || !word(b[k])) {
+                    let mut end = k;
+                    if k < b.len() && b[k] == b'/' {
+                        let mut r = k + 1;
+                        while r < b.len()
+                            && r - (k + 1) < 4
+                            && (b[r].is_ascii_uppercase() || b[r].is_ascii_digit())
+                        {
+                            r += 1;
+                        }
+                        if r > k + 1 && (r == b.len() || !word(b[r])) {
+                            end = r;
+                        }
+                    }
+                    return Some((i, end));
+                }
+            }
+            i = j.max(i + 1);
+        } else {
+            i += 1;
+        }
+    }
+    None
+}
+
+fn html_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#x27;"),
+            _ => out.push(c),
+        }
+    }
+    out
 }
 
 /// RFC 3339 timestamp → its age now (`3 days`, `5 h`, `just now`), e.g.
@@ -360,7 +445,7 @@ mod tests {
         let html = render(&env, "admin/branding.html", data);
         assert!(html.contains("<html lang=\"de\""), "{html}");
         assert!(
-            html.contains(">Artikel<")
+            html.contains(">Anträge<")
                 && html.contains("placeholder=\"Nummern, Namen, Dateien suchen …\"")
         );
         assert!(html.contains("1 ungelesene Benachrichtigung\""));
@@ -369,7 +454,7 @@ mod tests {
             "admin/branding.html",
             with_common(json!({ "slots": [], "max_kib": 512, "max_pixels": 4096 })),
         );
-        assert!(html.contains("<html lang=\"en\"") && html.contains(">Items<"));
+        assert!(html.contains("<html lang=\"en\"") && html.contains(">Requests<"));
     }
 
     /// The main nav marks the current section with `aria-current="page"`
@@ -392,8 +477,14 @@ mod tests {
             dashboard.contains("<a href=\"/\" class=\"active\" aria-current=\"page\">"),
             "{dashboard}"
         );
-        assert_eq!(dashboard.matches("aria-current=\"page\"").count(), 1);
-        assert!(dashboard.contains("<a href=\"/items\" class=\"\">"));
+        // the main nav and the phones' bottom bar (#513 T7) mark the same page
+        assert_eq!(dashboard.matches("aria-current=\"page\"").count(), 2);
+        assert!(dashboard
+            .contains("<a href=\"/\" class=\"active\" aria-current=\"page\">Dashboard</a>"));
+        // one vault entry for the folders and the list (#513 T13)
+        assert!(dashboard.contains("<a href=\"/vault\" class=\"\" title="));
+        assert!(!dashboard.contains("<a href=\"/items\" class=\""));
+        assert!(dashboard.contains("<a href=\"/items\" data-focus-search>Search</a>"));
 
         let assistant = render(
             &env,
@@ -660,7 +751,9 @@ mod tests {
             "/revisions/22222222-2222-4222-8222-222222222222/impacts/acknowledge",
             "BOM line",
             "CAD file reference",
-            "via <a class=\"mono\" href=\"/changes/",
+            "via <a class=\"mono link-quiet\" href=\"/changes/",
+            // one row is dismissed through its row menu (#513 T24)
+            "Acknowledge only this one…",
             "badge-obsolete",
             "resolves all 2 as well",
             "/revise",
@@ -2790,6 +2883,39 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// History rows link only the record number (#513 T25); the rest of the
+    /// sentence is text, everything escaped.
+    #[test]
+    fn link_number_links_only_the_record_number() {
+        let html = |s: &str| filter_link_number(s.into(), "/revisions/7".into()).to_string();
+        assert_eq!(
+            html("Released CHG-000002"),
+            "Released <a href=\"/revisions/7\">CHG-000002</a>"
+        );
+        assert_eq!(
+            html("Checked in PRT-000009/A (3 files)"),
+            "Checked in <a href=\"/revisions/7\">PRT-000009/A</a> (3 files)"
+        );
+        // no number: the whole sentence is the link, as before
+        assert_eq!(
+            html("Created <x>"),
+            "<a href=\"/revisions/7\">Created &lt;x&gt;</a>"
+        );
+        // the text around the number is escaped
+        assert_eq!(
+            html("<b>PRT-000001</b> & co"),
+            "&lt;b&gt;<a href=\"/revisions/7\">PRT-000001</a>&lt;/b&gt; &amp; co"
+        );
+        // not a number: lowercase prefix, too few digits, glued to a word
+        assert_eq!(find_record_number("prt-000001"), None);
+        assert_eq!(find_record_number("PRT-12"), None);
+        assert_eq!(find_record_number("XPRT-000001x"), None);
+        assert_eq!(find_record_number("aPRT-000001"), None);
+        assert_eq!(find_record_number("Ü PRT-000001"), Some((3, 13)));
+        // a revision code of more than four characters is not one
+        assert_eq!(find_record_number("PRT-000001/ABCDE"), Some((0, 10)));
     }
 
     #[test]

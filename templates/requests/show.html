@@ -48,22 +48,6 @@
 <div class="notice">Withdrawn by the requester {{ m.time(request.closed_at) }}.</div>
 {% endif %}
 
-{% if can.decide %}
-<section class="card">
-  <h2>Decision</h2>
-  <form class="stack" method="post" action="/requests/{{ request.id }}/decide">
-    <label>Comment <span class="hint">required when deferring or rejecting – the requester reads it</span>
-      <textarea name="comment" maxlength="4000"></textarea>
-    </label>
-    <div class="actions">
-      <button class="primary" type="submit" name="decision" value="accept">Accept</button>
-      {% if request.status != "deferred" %}<button type="submit" name="decision" value="defer">Defer</button>{% endif %}
-      <button class="danger" type="submit" name="decision" value="reject">Reject</button>
-    </div>
-  </form>
-</section>
-{% endif %}
-
 {% if can.implement %}
 <section class="card">
   <h2>Change order</h2>
@@ -225,6 +209,23 @@
   </form>
   {% endif %}
 </section>
+
+{#- the decision after the problem, the affected items and the discussion (#513 T3) -#}
+{% if can.decide %}
+<section class="card" id="decision">
+  <h2>Decision</h2>
+  <form class="stack" method="post" action="/requests/{{ request.id }}/decide">
+    <label>Comment <span class="hint">required when deferring or rejecting – the requester reads it</span>
+      <textarea name="comment" maxlength="4000"></textarea>
+    </label>
+    <div class="actions">
+      <button class="primary" type="submit" name="decision" value="accept">Accept</button>
+      {% if request.status != "deferred" %}<button type="submit" name="decision" value="defer">Defer</button>{% endif %}
+      <button class="danger" type="submit" name="decision" value="reject">Reject</button>
+    </div>
+  </form>
+</section>
+{% endif %}
 
 <section class="card" id="attachments">
   <h2>Attachments</h2>

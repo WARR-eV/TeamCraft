@@ -82,6 +82,7 @@ pub fn router(state: &AppState) -> Router<AppState> {
         .route("/users/{id}/holdings", get(user_holdings))
         .route("/users/{id}/offboard", post(user_offboard))
         .route("/worklist", get(worklist))
+        .route("/activity", get(activity))
         .route("/worklist/checkin-all", post(checkin_all))
         .route("/checkouts", post(checkout_many))
         .route("/mcp", post(crate::mcp::http).get(crate::mcp::http_get))
@@ -517,6 +518,7 @@ async fn index() -> Json<Value> {
             "GET    /api/v1/me                                        the caller, its groups and token_scope",
             "GET    /api/v1/audit?entity_type=&username=&action=&format=json|csv   audit log export (admins)",
             "POST   /api/v1/me/password                            {current_password, new_password} – change own password (throttled; ends web sessions)",
+            "GET    /api/v1/activity?limit=                           recent activity I may see (audit entries, newest first, 1–50, default 15) – the desktop Home tab",
             "GET    /api/v1/worklist                                  my check-outs, has_checked_in (a file version of mine stored before), reviews waiting for me, my open changes, change requests assigned to me and raised by me, dependents to check (impacts, and grouped by dependent revision as impact_groups), statistics",
             "POST   /api/v1/desktop/token                             {code, verifier} – desktop sign-in, no token needed",
             "GET    /api/v1/tokens                                    your personal access tokens (name, prefix, scope, expiry; never the value)",
@@ -932,6 +934,25 @@ async fn worklist(State(st): State<AppState>, ApiUser(me): ApiUser) -> AppResult
         "my_requests": my_requests,
         "stats": stats,
     })))
+}
+
+#[derive(Deserialize)]
+struct ActivityQuery {
+    limit: Option<i64>,
+}
+
+/// `GET /api/v1/activity?limit=`: the recent activity the caller may see –
+/// the web dashboard's *Recent activity*, for the desktop Home tab (#513 T9).
+/// Newest first, 1–50 entries (default 15); entries that name something the
+/// caller may not see are redacted like everywhere else (`audit::recent`).
+async fn activity(
+    State(st): State<AppState>,
+    ApiUser(me): ApiUser,
+    Query(q): Query<ActivityQuery>,
+) -> AppResult<Json<Value>> {
+    let limit = q.limit.unwrap_or(15).clamp(1, 50);
+    let entries = audit::recent(&st.db, &me, limit).await?;
+    Ok(Json(json!(entries)))
 }
 
 /// The file formats TeamCraft recognises, grouped by CAD program.

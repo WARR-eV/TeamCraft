@@ -313,6 +313,7 @@ pub fn router(state: &AppState) -> Router<AppState> {
         .route("/notifications", get(notifications::page))
         .route("/notifications/read-all", post(notifications::read_all))
         .route("/notifications/{id}/open", get(notifications::open))
+        .route("/notifications/{id}/read", post(notifications::read_one))
         .route("/items/{id}/watch", post(notifications::watch_item))
         .route("/changes/{id}/watch", post(notifications::watch_change))
         .route(

@@ -430,7 +430,9 @@ fn visible_clause(hidden: usize, admin: usize, actor: usize) -> String {
 /// = the actor's id.
 fn columns(n: usize, actor: usize) -> String {
     format!(
-        "a.id, a.at, a.user_id, a.username, a.action, a.entity_type, a.entity_id, a.summary,
+        "a.id, a.at, a.user_id, a.username,
+         (SELECT du.display_name FROM users du WHERE du.id = a.user_id) AS user_display_name,
+         a.action, a.entity_type, a.entity_id, a.summary,
          a.details,
          (a.related_item_id IS NOT NULL AND EXISTS (
              SELECT 1 FROM items ri WHERE ri.id = a.related_item_id AND NOT {related}))
@@ -526,6 +528,7 @@ mod tests {
             at: "2026-11-10T08:00:00Z".parse().unwrap(),
             user_id: None,
             username: "erika".into(),
+            user_display_name: None,
             action: "change.approve".into(),
             entity_type: "change".into(),
             entity_id: Some(Uuid::nil()),

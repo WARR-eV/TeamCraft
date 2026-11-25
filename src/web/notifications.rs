@@ -55,6 +55,21 @@ pub async fn read_all(
     })
 }
 
+/// `POST /notifications/{id}/read`: marks one notification of the user as
+/// read without opening it (#513 T25). Someone else's id changes nothing.
+pub async fn read_one(
+    State(st): State<AppState>,
+    ctx: WebCtx,
+    Path(id): Path<Uuid>,
+    Form(form): Form<super::items::BackForm>,
+) -> AppResult<Response> {
+    let back = util::safe_redirect_target(form.back.as_deref());
+    let result = notifications::mark_read(&st.db, &ctx.me, Some(&[id])).await;
+    finish(&st, result, &back, |_| {
+        (back.clone(), "Marked as read".to_string())
+    })
+}
+
 #[derive(Deserialize)]
 pub struct WatchForm {
     #[serde(default)]
