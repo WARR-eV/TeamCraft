@@ -150,7 +150,7 @@ test("keys ignore case and an empty scan plans nothing", () => {
   assert.deepEqual(LOCAL_STATES, ["conflict", "modified", "new", "outdated", "missing"]);
 });
 
-test("a modified file shows a wrench, never hidden behind a long name; without a check-out it says so", () => {
+test("a modified file shows a wrench; without a check-out a warning triangle explains it", () => {
   const mine = localStateMark(file({ without_checkout: false }));
   assert.equal(mine.kind, "wrench");
   assert.equal(mine.label, "Modified");
@@ -159,8 +159,9 @@ test("a modified file shows a wrench, never hidden behind a long name; without a
   const loose = localStateMark(file({ name: "Synchrone Riemenscheibe12 Planetengetriebe.ipt", without_checkout: true }));
   assert.equal(loose.kind, "wrench");
   assert.equal(loose.notCheckedOut, true);
-  assert.match(loose.title, /not checked it out/);
-  assert.match(loose.title, /Check out keeps your file/);
+  assert.match(loose.warning, /not checked it out/);
+  assert.match(loose.warning, /Check out keeps your file/);
+  assert.equal(mine.warning, null);
 });
 
 test("the other states keep their badge and label", () => {
@@ -173,7 +174,8 @@ test("the other states keep their badge and label", () => {
   const unknown = localStateMark(file({ state: "renamed" }));
   assert.equal(unknown.kind, "badge");
   assert.equal(unknown.label, "renamed");
-  assert.match(localStateMark(file({ state: "new", without_checkout: true })).title, /not checked it out/);
+  assert.match(localStateMark(file({ state: "new", without_checkout: true })).warning, /not checked it out/);
+  assert.equal(localStateMark(file({ state: "outdated" })).warning, null);
 });
 
 console.log(passed + " tests passed");

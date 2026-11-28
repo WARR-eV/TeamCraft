@@ -33,21 +33,24 @@ export var LOCAL_LABEL = {
 /**
  * How a row shows its state, outside the file name so a long name never hides
  * it: a modified file is a wrench in the colour of local changes (never the
- * lock colour – the file is not checked out unless the row says so), the other
- * states keep their badge. `notCheckedOut` adds the words "not checked out";
- * `title` is the tooltip, `label` what a screen reader says.
+ * lock colour), the other states keep their badge. `notCheckedOut` adds a
+ * small warning triangle: the file was changed although it is locked here
+ * (not checked out) – a warning, not a state, so neither a lock nor words
+ * that take the name's room. `title` is the tooltip, `label` what a screen
+ * reader says; `warning` is both for the triangle.
  */
+export var WITHOUT_CHECKOUT_WARNING = "Changed although you have not checked it out – your CAD program saved it anyway. Check out keeps your file.";
+
 export function localStateMark(file) {
   var label = LOCAL_LABEL[file.state] || file.state;
   var title = label;
   if (file.state === "modified") {
-    title = file.without_checkout
-      ? "Modified on this computer, but you have not checked it out – Check out keeps your file"
-      : "Modified on this computer – check it in to store it on the server";
-  } else if (file.without_checkout) {
-    title = label + " – you have not checked it out; Check out keeps your file";
+    title = file.without_checkout ? "Modified on this computer" : "Modified on this computer – check it in to store it on the server";
   }
-  return { kind: file.state === "modified" ? "wrench" : "badge", label: label, title: title, notCheckedOut: !!file.without_checkout };
+  return {
+    kind: file.state === "modified" ? "wrench" : "badge", label: label, title: title,
+    notCheckedOut: !!file.without_checkout, warning: file.without_checkout ? WITHOUT_CHECKOUT_WARNING : null
+  };
 }
 
 /** One file's key: unique over the whole scan (selection, ticks). */

@@ -1246,7 +1246,10 @@ ul.file-picks li .mono { overflow: hidden; text-overflow: ellipsis; white-space:
    buttons spilled over the next rows); the name gives way instead */
 .node.local-change .row { flex-wrap: nowrap; flex: none; gap: 4px; }
 .local-modified { display: inline-flex; color: var(--st-local-fg); }
-.local-modified svg {
+/* changed without a check-out: a warning, in the muted text colour – never the
+   amber of a check-out, never the red of a conflict */
+.local-warning { display: inline-flex; color: var(--text-muted); }
+.local-modified svg, .local-warning svg {
   width: 14px; height: 14px;
   fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;
 }

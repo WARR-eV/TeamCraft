@@ -560,14 +560,18 @@ function localRevisionNode(rev, ticked, updateBar, editor) {
 }
 
 /** The state of a *Local changes* row (`localStateMark`): a wrench for a
- *  modified file, else the state's badge, then "not checked out". */
+ *  modified file, else the state's badge, then a warning triangle when it
+ *  was changed without a check-out. */
 function localStateNode(r) {
   var m = localStateMark(r);
   var mark = m.kind === "wrench"
     ? h("span.local-modified", { role: "img", "aria-label": m.label, title: m.title }, svgIcon(ICONS.wrench))
     : badge(r.state, m.label);
   if (m.kind !== "wrench") mark.title = m.title;
-  return h("span.local-state", null, [mark, m.notCheckedOut ? h("span.small.dim", { text: "not checked out" }) : null]);
+  var warn = m.warning
+    ? h("span.local-warning", { role: "img", "aria-label": m.warning, title: m.warning }, svgIcon(ICONS.warning))
+    : null;
+  return h("span.local-state", null, [mark, warn]);
 }
 
 function localRef(rev) { return { project: rev.project || null, item: rev.item, code: rev.code }; }
