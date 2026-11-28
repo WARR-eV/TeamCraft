@@ -15,6 +15,15 @@ see the notices in the README.
 
 ### Added
 
+- Desktop worklist, *Local changes*: **Discard my changes** (#559) – a small
+  ↶ beside a modified file (and *Discard changes* for the ticked rows) puts
+  back the server version the file was copied from. A byte-identical copy in
+  the CAD program's backup folder (Inventor's `OldVersions`) is used first,
+  otherwise that version is downloaded; the user's copies move to
+  `.teamcraft/recovered/<date>`, and the restored file is read-only again
+  unless it is checked out. A confirmation explains it in plain words – also
+  why a file can change without a check-out (Inventor's *Save All*).
+  `desktop/src/discard.rs`, command `workspace_discard`.
 - `GET /api/v1/activity?limit=`: the recent activity the caller may see
   (the web dashboard's *Recent activity*, redacted the same way), newest
   first, 1–50 entries. The desktop Home tab shows it (#513 T9).

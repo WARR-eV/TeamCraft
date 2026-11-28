@@ -1249,7 +1249,17 @@ ul.file-picks li .mono { overflow: hidden; text-overflow: ellipsis; white-space:
 /* changed without a check-out: a warning, in the muted text colour – never the
    amber of a check-out, never the red of a conflict */
 .local-warning { display: inline-flex; color: var(--text-muted); }
-.local-modified svg, .local-warning svg {
+/* Discard my changes: a small ↶ icon button beside the state (#559) */
+button.local-discard {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 20px; height: 20px; min-height: 0; padding: 0; margin-left: 2px;
+  border: 1px solid transparent; border-radius: var(--radius-xs);
+  background: transparent; color: var(--text-muted); cursor: pointer;
+}
+button.local-discard:hover, button.local-discard:focus-visible {
+  color: var(--text); border-color: var(--border-strong); background: var(--surface-hover);
+}
+.local-modified svg, .local-warning svg, button.local-discard svg {
   width: 14px; height: 14px;
   fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;
 }

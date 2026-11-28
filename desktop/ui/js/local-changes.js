@@ -20,6 +20,10 @@
 //   changed file of a revision, since the check-in releases its check-out;
 // * Merge – a conflict (changed here and on the server) is opened in its
 //   Workspace tab, a check-in would be refused;
+// * Discard my changes (↶, #559) – a modified file: `workspace_discard` puts
+//   the server version it was copied from back (from the CAD program's backup
+//   folder when a copy there matches byte for byte, else downloaded) and moves
+//   the user's copy to `.teamcraft/recovered/<date>`;
 // * Open folder – every row.
 
 /** The states the list shows, in the order of their urgency. */
@@ -72,6 +76,7 @@ export function localRowActions(rev, file) {
   if (changed && !rev.checked_out) out.push("checkout");
   if (changed && rev.checked_out) out.push("checkin");
   if (file.state === "outdated" || file.state === "missing") out.push("get");
+  if (file.state === "modified") out.push("discard");
   out.push("folder");
   return out;
 }
@@ -164,7 +169,7 @@ export function revisionCheckin(rev, chosen) {
  * every changed file of its revision along).
  */
 export function selectionActions(plan, ticked) {
-  var out = { checkout: [], get: [], checkin: { changed: [], unreadable: [] }, rows: 0 };
+  var out = { checkout: [], get: [], checkin: { changed: [], unreadable: [] }, discard: [], rows: 0 };
   plan.items.forEach(function (it) {
     it.revisions.forEach(function (rev) {
       var chosen = rev.rows.filter(function (r) { return ticked && ticked[r.key]; });
@@ -173,6 +178,7 @@ export function selectionActions(plan, ticked) {
       var ref = { project: rev.project || null, item: rev.item, code: rev.code };
       if (chosen.some(function (r) { return r.actions.indexOf("checkout") >= 0; })) out.checkout.push(ref);
       if (chosen.some(function (r) { return r.actions.indexOf("get") >= 0; })) out.get.push(ref);
+      chosen.forEach(function (r) { if (r.actions.indexOf("discard") >= 0) out.discard.push(r); });
       var c = revisionCheckin(rev, chosen);
       if (c) out.checkin.changed.push(c);
     });
@@ -187,4 +193,36 @@ export function localSummaryText(plan) {
   });
   if (plan.withoutCheckout) parts.push(plan.withoutCheckout + " changed without a check-out");
   return parts.join(" · ");
+}
+
+/** The tooltip of the ↶ button of a modified row. */
+export var DISCARD_TITLE = "Discard my changes – put back the version from the server (your copy is kept)";
+
+/**
+ * The confirmation of *Discard my changes* for `rows` (rows of the plan):
+ * what happens, in words for someone who has never seen it. `{ title, lines,
+ * names, more, button }` – at most 8 names, `more` counts the rest.
+ */
+export function discardPrompt(rows) {
+  var n = rows.length, loose = rows.filter(function (r) { return r.without_checkout; }).length;
+  var lines = [
+    "This puts back the version from the server for " + (n === 1 ? "this file" : "these " + n + " files") +
+      " – exactly the version you got, byte for byte."
+  ];
+  if (loose) {
+    lines.push((loose === n ? (n === 1 ? "It was" : "They were") : loose + " of them were") +
+      " saved although you had not checked " + (loose === 1 ? "it" : "them") + " out – usually by your CAD program " +
+      "(Inventor's Save All saves every file it considers changed).");
+  }
+  lines.push("Nothing is lost: your current " + (n === 1 ? "copy moves" : "copies move") +
+    " to the folder .teamcraft/recovered in your working folder.");
+  lines.push("Close " + (n === 1 ? "the file" : "these files") + " in your CAD program first, or it may save " +
+    (n === 1 ? "it" : "them") + " again.");
+  return {
+    title: n === 1 ? "Discard your changes?" : "Discard your changes to " + n + " files?",
+    lines: lines,
+    names: rows.slice(0, 8).map(function (r) { return r.name; }),
+    more: Math.max(0, n - 8),
+    button: n === 1 ? "Discard changes" : "Discard changes to " + n + " files"
+  };
 }

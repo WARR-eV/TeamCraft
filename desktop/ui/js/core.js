@@ -135,6 +135,8 @@ export var ICONS = {
   edit: "M4 20h4L19 9l-4-4L4 16z",
   // changed on this computer (Local changes): an open-end wrench
   wrench: "M15.5 3.5V7.5L16.5 8.5H20.5A5 5 0 0 1 12.2 12.3L5.5 19A1.6 1.6 0 0 1 3.2 16.7L10.6 9.6A5 5 0 0 1 15.5 3.5Z",
+  // discard my changes (back to the server version): an arrow turning back
+  undo: "M9 14L4 9l5-5|M4 9h10.5a5.5 5.5 0 0 1 0 11H11",
   // a warning that needs the user (changed without a check-out): a triangle with "!"
   warning: "M12 3.5L21.5 20H2.5Z|M12 9.5v5|M12 17.2v.1",
   obsolete: "M5 5l14 14|M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18",

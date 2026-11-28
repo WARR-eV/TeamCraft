@@ -821,7 +821,9 @@ needs an issue with a reason first (see *Direction*).
   quantity / remove in the desktop *Structure* tab, #420 thumbnails in the item list, search, vault explorer and
   the desktop Home views, #407 *Update the BOM from the CAD file* at check-in – and onboarding: #422 the first-start
   wizard *Getting started*, #423 empty states that name the next step (web and desktop, by role, i18n catalogs),
-  #424 the desktop screenshots retaken (`scripts/screenshots.sh`), and the manual test of #408's *Done when* – someone
+  #424 the desktop screenshots retaken (`scripts/screenshots.sh`), #559 *Discard my changes* in *Local changes* (the
+  base version back from Inventor's `OldVersions` or the server, the user's copy kept – left: a notice right after
+  a CAD save changed files without a check-out, instead of only on the next scan), and the manual test of #408's *Done when* – someone
   new gets a group, opens an assembly in Inventor, changes a part in its context and checks in both without the guide
   – in the release checklist (*Desktop CAD loop without the guide*; to be run once on Windows with Inventor).
   Left: follow-ups – *Revise and check out* for released parts (#415), a list picture

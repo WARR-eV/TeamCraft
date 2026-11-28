@@ -881,6 +881,20 @@ pub async fn workspace_download(
     .await
 }
 
+/// *Discard my changes* (#559): puts the server version (the base the file
+/// was copied from) back in place of local changes – from the CAD program's
+/// backup folder when a copy there matches byte for byte, else downloaded;
+/// the user's copies go to `.teamcraft/recovered/<date>`.
+#[tauri::command]
+pub async fn workspace_discard(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    paths: Vec<String>,
+) -> CmdResult<crate::discard::Discarded> {
+    let api = signed_in_api(&state)?;
+    crate::discard::discard(&api, &workspace_root(&app, &state), &paths).await
+}
+
 /// "Get": a revision with its structure (BOM under the revision rule
 /// `latest` or `released`) and the CAD files it references – only missing
 /// and outdated files are downloaded, with progress events and cancel.
