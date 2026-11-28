@@ -264,7 +264,12 @@ check-outs and reviews, and a **local working folder**:
   changes (modified or new files) and offers to **check them in first**
   with their files; *Only the others* checks in just the check-outs without
   local changes. Check-outs with a conflict always stay checked out – merge
-  them in their Workspace tab. *Sign out* (and *Change server*) asks the
+  them in their Workspace tab. When one of them checks in an assembly file,
+  the dialog shows **Update the BOM from the CAD file** with the assembly
+  names, ticked by default every time (the same box as in *Check in…*;
+  *Check in selected* has it too, *Check in and sign out* uses the
+  default), and the result lists what changed in each BOM. Create items for
+  new parts first (*New on this computer*), so the BOM finds them. *Sign out* (and *Change server*) asks the
   same before it signs you out: *Check in and sign out*, *Park and sign
   out* or *Sign out anyway*;
 * **Park…** (Workspace tab, *More ▾*, and a button of the check-in dialog)
@@ -587,8 +592,10 @@ type icon.
 **Favourite folder.** When your work is several folders down, make that
 folder the group's favourite: point at the folder in *Files* and click its
 ☆. *Files* then starts in that folder instead of at the top of the group. A
-banner in the accent colour above the list shows where you are
-(`ROVER / Design / Rover`) and that it is *not the top of the group*;
+one-line banner in the accent colour above the list shows where you are
+(★ `ROVER / Design / Rover` – the last folder always visible, the way there
+shortened with "…" when the list is narrow); its tooltip says that this is
+*not the top of the group*;
 *Whole group* shows the top (*Back to the favourite folder* returns), and
 *Remove favourite* (or the filled ★ of the folder) lets *Files* start at the
 top again. If the group holds an Inventor project file (`.ipj`) in a

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
 // TeamCraft Desktop – *Update the BOM from the CAD file* at check-in (#407):
 // the pure part (no DOM, no server calls), so it can be checked on its own.
-// workspace.js (the *Check in…* dialog) uses it.
+// workspace.js (the *Check in…* dialog) and shell.js (*Check in all*, *Check in
+// selected*, check-in before signing out) use it.
 //
 // The server updates the BOM from the references of the checked-in version
 // (new lines added, counted quantities corrected, nothing removed). The box
@@ -64,4 +65,27 @@ export function checkinBomText(bom) {
   if ((bom.not_in_teamcraft || []).length) parts.push("not in TeamCraft: " + bom.not_in_teamcraft.join(", "));
   if ((bom.kept_not_in_cad || []).length) parts.push("no longer in the CAD file: " + bom.kept_not_in_cad.join(", ") + " (kept)");
   return parts.join(" · ");
+}
+
+/** The check-ins of a *Check in all* / *Check in selected* report (`changed`:
+ *  `{item, code, upload, conflicts}`) whose BOM can be updated from the CAD
+ *  file: an uploaded file is a structure file (an assembly) and the revision
+ *  has no conflict (it is not checked in at all then). `kinds` is the
+ *  extension → format kind map of GET /formats. */
+export function bomCheckins(changed, kinds) {
+  return (changed || []).filter(function (c) {
+    return !(c.conflicts || []).length && bomStructureFile(c.upload, kinds);
+  });
+}
+
+/** The label of *Update the BOM from the CAD file* in *Check in all* and
+ *  *Check in selected* – it names the assembly files, so the user sees which
+ *  BOMs change. */
+export function bomBoxLabel(checkins, kinds) {
+  var names = [];
+  checkins.forEach(function (c) {
+    c.upload.forEach(function (n) { if (bomStructureFile([n], kinds) && names.indexOf(n) < 0) names.push(n); });
+  });
+  var shown = names.slice(0, 4).join(", ") + (names.length > 4 ? " and " + (names.length - 4) + " more" : "");
+  return "Update the BOM from the CAD file (" + shown + ") – adds the parts the assembly uses and corrects counted quantities, never removes a line";
 }

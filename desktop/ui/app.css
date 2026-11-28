@@ -480,14 +480,17 @@ tr.row-conflict td:first-child, tr.row-clash td:first-child { box-shadow: inset 
 .home-root:empty { display: none; }
 .home-root p { margin: 0; line-height: 18px; }
 .home-root .row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+/* one line: ★ path … [Whole group] [Remove favourite] – the path gives way */
 .home-root.on {
-  padding: 6px 8px 8px 10px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 6px 3px 10px; border-radius: var(--radius-sm);
   border: 1px solid var(--accent); box-shadow: inset 3px 0 0 var(--accent);
   background: var(--accent-soft); color: var(--text);
 }
-.home-root.on .home-root-title { color: var(--accent); }
-.home-root.on .home-root-title strong { color: inherit; }
-.home-root-path { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.home-root.on button { flex: none; }
+.home-root-path { display: flex; flex: 1 1 auto; min-width: 0; white-space: nowrap; font-weight: 600; }
+.home-root-via { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); font-weight: 400; }
+.home-root-leaf { flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .home-root-star { color: var(--accent); margin-right: 4px; }
 .home-root.hint { padding: 6px 8px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2); }
 .home-root-back { display: inline-flex; align-items: center; }
