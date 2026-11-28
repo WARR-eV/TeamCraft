@@ -238,7 +238,15 @@ check-outs and reviews, and a **local working folder**:
   of the revision along – the dialog names the ones you did not tick, and
   **Park** uploads them instead and keeps the check-out;
   **Merge…** opens the Workspace tab of a conflict; **Folder** opens the
-  folder. A click on a revision (a button, also by keyboard) opens its Workspace tab. The count is part of
+  folder. **Discard my changes** – the small ↶ beside the wrench, or
+  *Discard changes* above the list for the ticked rows (#559) – puts back
+  exactly the version you got from the server. It first looks in your CAD
+  program's backup folder (Inventor's *OldVersions*): a copy there that
+  matches the server version byte for byte is used, otherwise that version is
+  downloaded – the version your copy came from, not a newer one. Nothing is
+  lost: your current copies move to `.teamcraft/recovered/<date>` in the
+  working folder, and the confirmation says so before anything happens. Close
+  the files in your CAD program first, or it may save them again. A click on a revision (a button, also by keyboard) opens its Workspace tab. The count is part of
   the worklist count on the rail. Files that belong to no item yet stay in
   *New on this computer* (the link under the list jumps there). The list is
   made in two steps: the working folder is compared with what TeamCraft

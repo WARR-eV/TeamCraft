@@ -11,7 +11,7 @@ import { agent, renderAgentView } from "./agent.js";
 import { openRevision } from "./revision.js";
 import { impactGroups, relationShort, relationText } from "./references.js";
 import { getting, lockAge, reportDownload } from "./workspace.js";
-import { localStateMark, localSummaryText, localVersionText, revisionCheckin, selectionActions } from "./local-changes.js";
+import { DISCARD_TITLE, discardPrompt, localStateMark, localSummaryText, localVersionText, revisionCheckin, selectionActions } from "./local-changes.js";
 import { openChange } from "./change.js";
 import { openRequest } from "./requests.js";
 import { checkNewItemFiles, createItemFromFiles, editableGroupOfFolder, newItemDialog } from "./dialogs.js";
@@ -496,15 +496,18 @@ function localChangesSection(nav) {
     on: { click: function () { localGet(selectionActions(plan, ticked).get); } } }, "Get latest");
   var checkinBtn = h("button.small", { type: "button", title: "Check in your check-outs of the ticked files – every changed file of each revision goes along",
     on: { click: function () { localCheckin(selectionActions(plan, ticked).checkin); } } }, "Check in selected");
+  var discardBtn = h("button.small", { type: "button", title: "Put back the server version of the ticked modified files – your copies are kept in .teamcraft/recovered",
+    on: { click: function () { localDiscard(selectionActions(plan, ticked).discard); } } }, "Discard changes");
   function updateBar() {
     var sel = selectionActions(plan, ticked);
     checkoutBtn.disabled = !sel.checkout.length;
     getBtn.disabled = !sel.get.length;
     checkinBtn.disabled = !sel.checkin.changed.length;
+    discardBtn.disabled = !sel.discard.length;
   }
   updateBar();
   nav.appendChild(h("div.row", null, [sectionTitle("Local changes", plan.count),
-    plan.count ? h("span.row", null, [editor ? checkoutBtn : null, getBtn, editor ? checkinBtn : null]) : null]));
+    plan.count ? h("span.row", null, [editor ? checkoutBtn : null, getBtn, editor ? checkinBtn : null, discardBtn]) : null]));
   if (!plan.count) {
     nav.appendChild(h("p.empty", { text: "No modified, outdated or missing files in your working folder." }));
   } else {
@@ -542,7 +545,8 @@ function localRevisionNode(rev, ticked, updateBar, editor) {
   return h("li", null, [head, h("ul.tree", null, rev.rows.map(function (r) {
     var box = h("input", { type: "checkbox", "aria-label": "Tick " + r.name, checked: !!ticked[r.key],
       on: { click: function (ev) { ev.stopPropagation(); }, change: function () { ticked[r.key] = box.checked; updateBar(); } } });
-    var buttons = r.actions.filter(function (a) { return editor || (a !== "checkout" && a !== "checkin"); }).map(function (a) {
+    // Discard is the small ↶ beside the state (localStateNode), not a text button
+    var buttons = r.actions.filter(function (a) { return a !== "discard" && (editor || (a !== "checkout" && a !== "checkin")); }).map(function (a) {
       return h("button.small", { type: "button", title: LOCAL_ACTION_TITLE[a], on: { click: function (ev) {
         ev.stopPropagation();
         localRowAction(a, rev, r);
@@ -561,7 +565,7 @@ function localRevisionNode(rev, ticked, updateBar, editor) {
 
 /** The state of a *Local changes* row (`localStateMark`): a wrench for a
  *  modified file, else the state's badge, then a warning triangle when it
- *  was changed without a check-out. */
+ *  was changed without a check-out, then the small ↶ *Discard my changes*. */
 function localStateNode(r) {
   var m = localStateMark(r);
   var mark = m.kind === "wrench"
@@ -571,7 +575,41 @@ function localStateNode(r) {
   var warn = m.warning
     ? h("span.local-warning", { role: "img", "aria-label": m.warning, title: m.warning }, svgIcon(ICONS.warning))
     : null;
-  return h("span.local-state", null, [mark, warn]);
+  var undo = r.actions.indexOf("discard") >= 0
+    ? h("button.local-discard", { type: "button", title: DISCARD_TITLE, "aria-label": "Discard my changes to " + r.name,
+      on: { click: function (ev) { ev.stopPropagation(); localDiscard([r]); } } }, svgIcon(ICONS.undo))
+    : null;
+  return h("span.local-state", null, [mark, warn, undo]);
+}
+
+/** *Discard my changes* (#559): a confirmation in plain words, then
+ *  `workspace_discard` – the server version back in place, the user's copies
+ *  kept in `.teamcraft/recovered/<date>`. */
+function localDiscard(rows) {
+  if (!rows.length) return;
+  var p = discardPrompt(rows);
+  dialog(p.title, h("div.stack", null, [
+    h("ul.small", null, p.names.map(function (n) { return h("li", { text: n }); }).concat(
+      p.more ? [h("li.dim", { text: "and " + p.more + " more" })] : [])),
+    p.lines.map(function (t) { return h("p", { text: t }); })
+  ]), [
+    { label: "Cancel", onClick: function (d) { d.close(); } },
+    { label: p.button, primary: true, submit: true, onClick: function (d) {
+      d.close();
+      setStatus("Putting back the server version …");
+      call("workspace_discard", { paths: rows.map(function (r) { return r.path; }) }).then(function (res) {
+        setStatus("");
+        toast(res.summary + (res.skipped.length ? ". Not changed: " + res.skipped.map(function (s) { return s.path.split("/").pop() + " (" + s.reason + ")"; }).join("; ") : "."),
+          res.skipped.length && !res.restored.length ? "error" : null);
+        state.localTicked = {};
+        refreshWorklistCount();
+        rescanLocalChanges();
+      }, function (err) {
+        setStatus("");
+        toast("Could not discard the changes: " + errorText(err), "error");
+      });
+    } }
+  ]);
 }
 
 function localRef(rev) { return { project: rev.project || null, item: rev.item, code: rev.code }; }

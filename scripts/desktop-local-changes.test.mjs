@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 const source = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../desktop/ui/js/local-changes.js");
 const {
-  LOCAL_STATES, localRevKey, localRowActions, localRowKey, localStateMark, localSummaryText, localVersionText, planLocalChanges, revisionCheckin, selectionActions
+  LOCAL_STATES, discardPrompt, localRevKey, localRowActions, localRowKey, localStateMark, localSummaryText, localVersionText, planLocalChanges, revisionCheckin, selectionActions
 } = await import("data:text/javascript;base64," + fs.readFileSync(source).toString("base64"));
 
 let passed = 0;
@@ -34,7 +34,7 @@ test("a file modified without a check-out offers Check out (keep my file)", () =
   assert.equal(plan.count, 1);
   assert.equal(plan.withoutCheckout, 1);
   const row = plan.items[0].revisions[0].rows[0];
-  assert.deepEqual(row.actions, ["checkout", "folder"]);
+  assert.deepEqual(row.actions, ["checkout", "discard", "folder"]);
   assert.match(localSummaryText(plan), /1 modified/);
   assert.match(localSummaryText(plan), /1 changed without a check-out/);
 });
@@ -48,7 +48,7 @@ test("a conflict is merged in the Workspace tab, never checked in", () => {
   const rows = plan.items[0].revisions[0].rows;
   assert.deepEqual(rows.map((x) => x.state), ["conflict", "modified"], "conflicts first");
   assert.deepEqual(rows[0].actions, ["merge", "folder"]);
-  assert.deepEqual(rows[1].actions, ["checkin", "folder"]);
+  assert.deepEqual(rows[1].actions, ["checkin", "discard", "folder"]);
   assert.equal(localVersionText(rows[0]), "v4 on the server, yours v2");
   // ticking both: only the modified file is checked in, the conflict keeps the revision checked out
   const ticked = {};
@@ -86,7 +86,8 @@ test("own check-outs: modified and new files are checked in", () => {
   const plan = planLocalChanges({ revisions: [r] });
   const rows = plan.items[0].revisions[0].rows;
   assert.deepEqual(rows.map((x) => x.state), ["modified", "new"]);
-  rows.forEach((x) => assert.deepEqual(x.actions, ["checkin", "folder"]));
+  assert.deepEqual(rows[0].actions, ["checkin", "discard", "folder"], "a modified file can be discarded");
+  assert.deepEqual(rows[1].actions, ["checkin", "folder"], "a new file has no server version to go back to");
   const ticked = {};
   ticked[rows[0].key] = true;
   ticked[rows[1].key] = true;
@@ -176,6 +177,42 @@ test("the other states keep their badge and label", () => {
   assert.equal(unknown.label, "renamed");
   assert.match(localStateMark(file({ state: "new", without_checkout: true })).warning, /not checked it out/);
   assert.equal(localStateMark(file({ state: "outdated" })).warning, null);
+});
+
+test("Discard my changes: ticked modified rows, with a prompt for someone who never saw it", () => {
+  const r = rev({ files: [
+    file({ name: "Bolzen.ipt", path: "ROVER/PRT-1/Bolzen.ipt", without_checkout: true }),
+    file({ name: "a.step", path: "ROVER/PRT-1/a.step", state: "new" }),
+    file({ name: "b.prt", path: "ROVER/PRT-1/b.prt", state: "outdated", server_version: 4 })
+  ] });
+  const plan = planLocalChanges({ revisions: [r] });
+  const rows = plan.items[0].revisions[0].rows;
+  const ticked = {};
+  rows.forEach((x) => { ticked[x.key] = true; });
+  const sel = selectionActions(plan, ticked);
+  assert.deepEqual(sel.discard.map((x) => x.path), ["ROVER/PRT-1/Bolzen.ipt"], "only modified files");
+  const one = discardPrompt(sel.discard);
+  assert.equal(one.title, "Discard your changes?");
+  assert.equal(one.button, "Discard changes");
+  assert.deepEqual(one.names, ["Bolzen.ipt"]);
+  assert.match(one.lines.join(" "), /version from the server/);
+  assert.match(one.lines.join(" "), /saved although you had not checked it out/);
+  assert.match(one.lines.join(" "), /Save All/);
+  assert.match(one.lines.join(" "), /\.teamcraft\/recovered/);
+  assert.match(one.lines.join(" "), /Close the file in your CAD program first/);
+});
+
+test("Discard prompt for many files: counts, at most 8 names, the without-check-out line only when it applies", () => {
+  const many = Array.from({ length: 31 }, (_, i) => ({ name: "p" + i + ".ipt", without_checkout: i < 29 }));
+  const p = discardPrompt(many);
+  assert.equal(p.title, "Discard your changes to 31 files?");
+  assert.equal(p.button, "Discard changes to 31 files");
+  assert.equal(p.names.length, 8);
+  assert.equal(p.more, 23);
+  assert.match(p.lines.join(" "), /29 of them were saved although you had not checked them out/);
+  const mine = discardPrompt([{ name: "a.ipt", without_checkout: false }, { name: "b.ipt", without_checkout: false }]);
+  assert.ok(!/had not checked/.test(mine.lines.join(" ")), "own check-outs: no Save All line");
+  assert.match(mine.lines.join(" "), /your current copies move/);
 });
 
 console.log(passed + " tests passed");

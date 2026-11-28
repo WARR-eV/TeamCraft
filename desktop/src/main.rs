@@ -18,6 +18,7 @@ mod cadlock;
 mod commands;
 mod compat;
 mod crash;
+mod discard;
 mod folderimport;
 mod layout;
 mod localchanges;
@@ -282,6 +283,7 @@ fn main() {
             commands::workspace_checkout,
             commands::workspace_checkout_many,
             commands::workspace_download,
+            commands::workspace_discard,
             commands::workspace_get,
             commands::workspace_cancel,
             commands::workspace_migration_plan,

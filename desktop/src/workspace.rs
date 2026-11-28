@@ -1698,7 +1698,7 @@ pub async fn migration_plan(api: &Api, root: &Path) -> Result<MigrationPlan, Api
     Ok(plan)
 }
 
-fn now_utc() -> String {
+pub(crate) fn now_utc() -> String {
     layout::format_utc(
         std::time::SystemTime::now()
             .duration_since(UNIX_EPOCH)
