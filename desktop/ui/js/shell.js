@@ -919,7 +919,7 @@ export function showWorklistCount() {
   if (!w) return;
   // dependents count once, however many changes they have to be checked against
   var n = w.checkouts.length + w.reviews.length + impactGroups(w).length + (w.requests_assigned || []).length +
-    (state.newFiles ? state.newFiles.plan.suggestions.length : 0) +
+    (state.newFiles ? state.newFiles.plan.suggestions.length + (state.newFiles.plan.additions || []).length : 0) +
     (state.localChanges ? state.localChanges.plan.count : 0);
   var el = $("worklist-count");
   el.textContent = String(n);

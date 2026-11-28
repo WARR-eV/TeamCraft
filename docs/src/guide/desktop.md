@@ -208,6 +208,19 @@ check-outs and reviews, and a **local working folder**:
   a tracked model goes into that item's check-in), lock, backup and
   temporary files, `OldVersions` and hidden folders, files directly in the
   working folder and other files than CAD models (under *Other new files*).
+  **Supplier downloads** (#564): a STEP, IGES, Parasolid, ACIS or JT file
+  you downloaded and saved a native part from goes **with that part** – one
+  item for both, the download kept as the supplier's original – also when the
+  part is one folder up or down or the download has a time stamp in its name
+  (`ISWB25-64_20261128191413491.step`). The app knows they belong together
+  when the part names the download (a CAD program keeps the import source in
+  the part) or by the same name without download additions; hover a
+  suggestion to see why. When the part is an item already, the download is
+  listed under *Belong to an item already* with **Add to item**: it is added
+  to that item in its own folder – checked out for this and checked in again
+  right after, unless you hold the check-out – after a confirmation that
+  says which item and why. A part saved from a download that is an item
+  already is offered the same way.
   The folder is looked at when the worklist opens or is refreshed and when
   the app window gets the focus back (at most every 15 s); one scan visits at
   most 50 000 entries and reports at most 2 000 files, so a huge folder never

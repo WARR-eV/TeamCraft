@@ -31,7 +31,9 @@
 //! the server stores them. The walk stops after [`MAX_ENTRIES`] directory
 //! entries or [`MAX_FILES`] new files and says so (`truncated`), so a huge
 //! folder never blocks the app. Grouping a drawing with its model and telling
-//! CAD files from other files is left to the user interface.
+//! CAD files from other files is left to the user interface. Supplier downloads
+//! (STEP …) next to the native part saved from them get a hint
+//! ([`companions::link`], #564).
 
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
@@ -47,6 +49,7 @@ use crate::{
     addfiles,
     api::ApiError,
     commands::workspace_root,
+    companions,
     folderimport::SKIPPED_DIRS,
     layout::{self, STATE_DIR},
     AppState,
@@ -86,6 +89,17 @@ pub struct NewFile {
     pub size: u64,
     /// Last change, milliseconds since 1970 (0 if unknown).
     pub modified_ms: u64,
+    /// A supplier download (STEP …) that belongs to this new native part
+    /// (`rel`): one item for both (#564, [`companions::link`]).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub companion_of: Option<String>,
+    /// A supplier download that belongs to the item of a tracked native part:
+    /// *Add to item* (#564).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub belongs_to: Option<companions::Owner>,
+    /// Why `companion_of` / `belongs_to` was set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<companions::Reason>,
 }
 
 /// Result of [`new_files_scan`].
@@ -194,7 +208,9 @@ pub(crate) fn scan_workspace(root: &Path) -> NewFilesScan {
         .map(|p| layout::key_of(&p.rel))
         .collect();
     let ignored: HashSet<String> = load_ignored(root).into_iter().collect();
-    let scan = scan_root(root, &state, &pending, &ignored, Limits::default());
+    let mut scan = scan_root(root, &state, &pending, &ignored, Limits::default());
+    // supplier downloads next to the part saved from them (#564)
+    companions::link(root, &state, &mut scan);
     if scan.complete {
         let gone: Vec<String> = ignored
             .iter()
@@ -301,6 +317,9 @@ pub(crate) fn scan_root(
                 name,
                 size: meta.as_ref().map_or(0, |m| m.len()),
                 modified_ms: meta.as_ref().map_or(0, modified_ms_of),
+                companion_of: None,
+                belongs_to: None,
+                reason: None,
             });
         }
         if result.truncated {

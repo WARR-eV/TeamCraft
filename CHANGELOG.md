@@ -15,6 +15,17 @@ see the notices in the README.
 
 ### Added
 
+- Desktop, *New on this computer*: **supplier downloads** (#564). A STEP,
+  IGES, Parasolid, ACIS or JT file goes with the native part saved from it –
+  one item for both – also one folder apart or with a download time stamp in
+  its name; matched when the part names the download (the import source a
+  CAD program keeps, searched as ASCII and UTF-16LE) or by the same name
+  without download additions, exactly one candidate. A download whose part
+  is an item already is offered as **Add to item** (checked out for this
+  and checked in again, after a confirmation that says which item and why);
+  so is a new part saved from a download that is an item already.
+  `desktop/src/companions.rs`.
+
 - Desktop worklist, *Local changes*: **Discard my changes** (#559) – a small
   ↶ beside a modified file (and *Discard changes* for the ticked rows) puts
   back the server version the file was copied from. A byte-identical copy in

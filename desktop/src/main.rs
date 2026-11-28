@@ -16,6 +16,7 @@ mod cadexport;
 mod cadlaunch;
 mod cadlock;
 mod commands;
+mod companions;
 mod compat;
 mod crash;
 mod discard;
