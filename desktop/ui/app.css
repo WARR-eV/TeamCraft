@@ -1242,6 +1242,9 @@ ul.file-picks li .mono { overflow: hidden; text-overflow: ellipsis; white-space:
 /* worklist: Local changes – only the file name is cut with "…"; the state
    (a wrench for Modified, else the badge) and "not checked out" never shrink */
 .local-state { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+/* the buttons stay on the row's one line (a tree row is one line high: wrapped
+   buttons spilled over the next rows); the name gives way instead */
+.node.local-change .row { flex-wrap: nowrap; flex: none; gap: 4px; }
 .local-modified { display: inline-flex; color: var(--st-local-fg); }
 .local-modified svg {
   width: 14px; height: 14px;
