@@ -2,7 +2,7 @@
 // TeamCraft Desktop – Navigator views: home, worklist, changes, search.
 // Part of the desktop UI (ES modules, no build step; js/main.js starts it).
 
-import { $, ICONS, api, append, badge, call, clear, dialog, enc, errorNotice, errorText, field, h, lockIcon, setStatus, state, svgIcon, toast } from "./core.js";
+import { $, ICONS, api, append, badge, call, clear, dialog, enc, errorNotice, errorText, field, h, lockIcon, setStatus, state, svgIcon, toast, transfer } from "./core.js";
 import { fmtDate, label } from "/static/shared/js/format.js";
 import { canSeeLocks, openLockOverview } from "./lock-overview.js";
 import { CHECK_IN_ALL_TITLE, bomChoiceBox, canEdit, canEditProject, checkInAll, fetchWorklist, refreshWorklistCount, reloadProjects, renderNotifications, rescanLocalChanges, rescanNewFiles, scanLocalChanges, scanNewFiles, sendLocalChanges, showWorklistCount } from "./shell.js";
@@ -18,7 +18,7 @@ import { checkNewItemFiles, createItemFromFiles, editableGroupOfFolder, newItemD
 import { getProjectsDialog } from "./group-sync.js";
 import { formatKinds, importFolderDialog } from "./folder-import.js";
 import { renderFiles } from "./browser.js";
-import { ageText, batchSummary, newItemFindings, newItemPlacement } from "./new-files.js";
+import { additionPrompt, ageText, batchSummary, companionNote, newItemFindings, newItemPlacement } from "./new-files.js";
 import { checkedOutClass, favouriteKey, isMineLock, normalizeFavourite, suggestionKey } from "./files-view.js";
 import { cutLevel, describeNode, normalizeMode, pathKey, quantityText, rootNodes, usageBadge } from "./structure.js";
 import { thumbIco } from "./list-thumbs.js";
@@ -423,7 +423,7 @@ export function drawWorklist(w) {
     })) : emptyHint(worklistHint("checkouts", canEdit())));
   });
   if (state.localChanges) add("Local changes", state.localChanges.plan.count, localChangesSection);
-  if (canEdit() && state.newFiles) add("New on this computer", state.newFiles.plan.suggestions.length, newFilesSection);
+  if (canEdit() && state.newFiles) add("New on this computer", state.newFiles.plan.suggestions.length + (state.newFiles.plan.additions || []).length, newFilesSection);
   add("Waiting for my review", w.reviews.length, function (box) {
     box.appendChild(sectionTitle("Waiting for my review", w.reviews.length));
     box.appendChild(w.reviews.length ? h("ul.tree", null, w.reviews.map(changeNode)) : emptyHint(worklistHint("reviews", canEdit())));
@@ -740,8 +740,9 @@ function newFilesSection(nav) {
         } } });
       var where = s.project + (s.folder ? " / " + s.folder : "");
       var files = s.files.map(function (f) { return f.name; }).join(", ");
+      var along = companionNote(s);
       return h("li", null, h("div.node.new-file", {
-        title: "Create an item from " + files + " in " + where,
+        title: "Create an item from " + files + " in " + where + (along ? " (" + along + ")" : ""),
         on: { click: function () { createOne(s); } }
       }, [
         box, h("span.ico", { text: s.type === "assembly" ? "▣" : "◇" }),
@@ -749,6 +750,21 @@ function newFilesSection(nav) {
         h("span.meta.small.dim", { text: (s.files.length > 1 ? s.files.length + " files · " : "") + ageText(s.modified_ms) }),
         h("button.icon.small", { type: "button", title: "Ignore " + files + " – not suggested again", "aria-label": "Ignore " + s.name,
           on: { click: function (ev) { ev.stopPropagation(); ignoreFiles(s.files); } } }, "×")
+      ]));
+    })));
+  }
+  // #564: supplier downloads that belong to an item already
+  var additions = nf.plan.additions || [];
+  if (additions.length) {
+    nav.appendChild(h("p.small.dim", { text: "Belong to an item already (" + additions.length + ") – a supplier download next to the part saved from it:" }));
+    nav.appendChild(h("ul.tree", null, additions.map(function (a) {
+      var p = additionPrompt(a);
+      return h("li", null, h("div.node.new-file", { title: p.lines[0] }, [
+        h("span.twisty"), h("span.ico.dim", { text: "↳", "aria-hidden": "true" }),
+        h("span.label", null, [h("span.fname", { text: a.file.name }), h("span.dim", { text: " → " + a.owner.item + "/" + a.owner.revision })]),
+        h("button.small", { type: "button", title: p.lines[0], on: { click: function (ev) { ev.stopPropagation(); addToItem(a); } } }, "Add to item"),
+        h("button.icon.small", { type: "button", title: "Ignore " + a.file.name + " – not suggested again", "aria-label": "Ignore " + a.file.name,
+          on: { click: function (ev) { ev.stopPropagation(); ignoreFiles([a.file]); } } }, "×")
       ]));
     })));
   }
@@ -783,6 +799,53 @@ function newFilesSection(nav) {
 /** *New* prefilled with one suggestion: its files, name and type. */
 function createOne(s) {
   newItemDialog({ paths: s.files.map(function (f) { return f.path; }), name: s.name, type: s.type });
+}
+
+/** *Add to item* (#564): a supplier download into the item of the part saved
+ *  from it – check out if needed, upload it in its own folder (tracked, so it
+ *  is no longer "new"), check in again if the check-out was taken for this. */
+function addToItem(a) {
+  var p = additionPrompt(a), o = a.owner, f = a.file;
+  var path = "/items/" + enc(o.item) + "/revisions/" + enc(o.revision);
+  dialog(p.title, h("div.stack", null, p.lines.map(function (t) { return h("p", { text: t }); })), [
+    { label: "Cancel", onClick: function (d) { d.close(); } },
+    { label: p.button, primary: true, submit: true, onClick: function (d) {
+      d.close();
+      var rev = null, tookLock = false;
+      setStatus("Adding " + f.name + " to " + o.item + "/" + o.revision + " …");
+      api("GET", path).then(function (r) {
+        rev = r;
+        if (rev.checked_out_by && rev.checked_out_by !== state.me.id) {
+          throw new Error(o.item + "/" + o.revision + " is checked out by " + (rev.checked_out_by_name || "someone else") + " – ask them to check it in first");
+        }
+        if (rev.checked_out_by) return null;
+        tookLock = true;
+        return api("POST", path + "/checkout");
+      }).then(function () {
+        var folders = {};
+        folders[f.name] = f.folder || "";
+        return transfer(function () {
+          return call("upload_files", { item: o.item, code: o.revision, paths: [f.path], comment: "Supplier download added from New on this computer",
+            folders: folders, project: f.project, track: true, refuseClash: true });
+        });
+      }).then(function () {
+        return tookLock ? api("POST", "/worklist/checkin-all", { revisions: [rev.id] }) : null;
+      }).then(function () {
+        // the file is read-only again like the rest of the revision
+        return call("workspace_status", { project: o.project || f.project, item: o.item, code: o.revision }).catch(function () {});
+      }).then(function () {
+        setStatus("");
+        toast("Added " + f.name + " to " + o.item + "/" + o.revision + (tookLock ? " – checked in again" : " – your check-out stays"));
+        rescanNewFiles();
+        refreshWorklistCount();
+      }, function (err) {
+        setStatus("");
+        // a check-out taken for this is given back
+        var undo = tookLock && rev ? api("POST", path + "/cancel-checkout").catch(function () {}) : Promise.resolve();
+        undo.then(function () { toast("Could not add " + f.name + ": " + errorText(err), "error"); });
+      });
+    } }
+  ]);
 }
 
 function ignoreFiles(files) {

@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 const source = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../desktop/ui/js/new-files.js");
 const {
-  ageText, batchSummary, folderText, isNewModelOfItsOwn, kindOf, nameParts, newItemFindings, newItemKeyText,
+  additionPrompt, ageText, batchSummary, companionNote, companionReasonText, folderText, isNewModelOfItsOwn, kindOf, nameParts, newItemFindings, newItemKeyText,
   newItemPlacement, newItemSummary, planNewFiles, workspacePath
 } = await import("data:text/javascript;base64," + fs.readFileSync(source).toString("base64"));
 
@@ -184,6 +184,41 @@ test("working-folder paths use the folder's separator", () => {
   assert.equal(workspacePath("C:\\TeamCraft\\", "GRAKSLER/Design/a.ipt"), "C:\\TeamCraft\\GRAKSLER\\Design\\a.ipt");
   assert.equal(workspacePath("/home/u/TeamCraft", "GRAKSLER/a.ipt"), "/home/u/TeamCraft/GRAKSLER/a.ipt");
   assert.equal(workspacePath("/ws/", "/G//a.ipt"), "/ws/G/a.ipt");
+});
+
+test("#564: a supplier download joins the new part saved from it, in another folder", () => {
+  const plan = planNewFiles([
+    { rel: "G/Buy/ISWB25-64.step", project: "G", folder: "Buy", name: "ISWB25-64.step", modified_ms: 2,
+      companion_of: "G/Buy/ISWB25-64/ISWB25-64.ipt", reason: "saved_from" },
+    { rel: "G/Buy/ISWB25-64/ISWB25-64.ipt", project: "G", folder: "Buy/ISWB25-64", name: "ISWB25-64.ipt", modified_ms: 1 },
+    { rel: "G/Buy/orphan.step", project: "G", folder: "Buy", name: "orphan.step", companion_of: "G/gone.ipt", reason: "same_name" }
+  ], kinds);
+  assert.equal(plan.suggestions.length, 1);
+  const s = plan.suggestions[0];
+  assert.deepEqual(s.files.map((f) => f.name), ["ISWB25-64.ipt", "ISWB25-64.step"], "the model first, the download along");
+  assert.equal(s.folder, "Buy/ISWB25-64");
+  assert.equal(companionNote(s), "ISWB25-64.step goes along – the part was saved from the download (the part names it)");
+  assert.deepEqual(plan.other.map((f) => f.name), ["orphan.step"], "a companion of a part that is not new stays an other file");
+  assert.deepEqual(plan.additions, []);
+});
+
+test("#564: a supplier download of a tracked part is offered as Add to item, explained", () => {
+  const owner = { project: "G", item: "PRT-387", revision: "A", file: "G/Buy/ISWB25-64/ISWB25-64.ipt" };
+  const plan = planNewFiles([
+    { rel: "G/Buy/ISWB25-64.step", project: "G", folder: "Buy", name: "ISWB25-64.step", belongs_to: owner, reason: "same_name_below" }
+  ], kinds);
+  assert.equal(plan.suggestions.length, 0);
+  assert.equal(plan.other.length, 0);
+  assert.equal(plan.additions.length, 1);
+  const p = additionPrompt(plan.additions[0]);
+  assert.equal(p.title, "Add ISWB25-64.step to PRT-387/A?");
+  assert.equal(p.button, "Add to PRT-387");
+  assert.match(p.lines[0], /belongs to ISWB25-64\.ipt of PRT-387\/A: same name – the part is in a folder below/);
+  assert.match(p.lines.join(" "), /in its folder \(G \/ Buy\)/);
+  assert.match(p.lines.join(" "), /checks it out for this and checks it in again/);
+  // groups the user may not edit are left out, as for suggestions
+  assert.equal(planNewFiles([{ rel: "X/a.step", project: "X", folder: "", name: "a.step", belongs_to: owner }], kinds, () => false).additions.length, 0);
+  assert.equal(companionReasonText("unknown"), "it belongs to the part");
 });
 
 console.log(passed + " tests passed");

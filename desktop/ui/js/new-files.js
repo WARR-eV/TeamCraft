@@ -154,20 +154,33 @@ export function newItemSummary(project, folder, files, copies) {
  * Returns {suggestions: [{key, project, folder, name, type, files, modified_ms}], other: [file]}.
  */
 export function planNewFiles(files, kinds, editable) {
-  var groups = {}, order = [], loose = [];
+  var groups = {}, order = [], loose = [], additions = [], joining = [], keyOfRel = {};
   (files || []).forEach(function (f) {
     if (editable && !editable(f.project)) return;
+    // #564: a supplier download that belongs to an item already – *Add to item*
+    if (f.belongs_to) { additions.push({ file: f, owner: f.belongs_to, reason: f.reason || null }); return; }
+    // #564: a supplier download of a new native part elsewhere – joins its group below
+    if (f.companion_of) { joining.push(f); return; }
     var kind = kindOf(f.name, kinds);
     var stem = nameParts(f.name).stem;
     var key = [f.project, f.folder || "", stem].join("\u0000").toLowerCase();
     if (MODEL_KINDS.indexOf(kind) >= 0 || COMPANION_KINDS.indexOf(kind) >= 0) {
-      if (!groups[key]) { groups[key] = { key: key, project: f.project, folder: f.folder || "", name: stem, files: [], kinds: [], modified_ms: 0 }; order.push(key); }
+      if (!groups[key]) { groups[key] = { key: key, project: f.project, folder: f.folder || "", name: stem, files: [], kinds: [], modified_ms: 0, reasons: [] }; order.push(key); }
+      keyOfRel[(f.rel || "").toLowerCase()] = key;
       groups[key].files.push(f);
       groups[key].kinds.push(kind);
       groups[key].modified_ms = Math.max(groups[key].modified_ms, f.modified_ms || 0);
     } else {
       loose.push(f);
     }
+  });
+  joining.forEach(function (f) {
+    var g = groups[keyOfRel[(f.companion_of || "").toLowerCase()]];
+    if (!g) { loose.push(f); return; }
+    g.files.push(f);
+    g.kinds.push(kindOf(f.name, kinds) || "exchange");
+    g.reasons.push({ name: f.name, reason: f.reason || null });
+    g.modified_ms = Math.max(g.modified_ms, f.modified_ms || 0);
   });
   var suggestions = [], other = loose.slice();
   order.forEach(function (key) {
@@ -183,12 +196,49 @@ export function planNewFiles(files, kinds, editable) {
     suggestions.push({
       key: g.key, project: g.project, folder: g.folder, name: g.name,
       type: models.indexOf("assembly") >= 0 ? "assembly" : "part",
-      files: g.files, modified_ms: g.modified_ms
+      files: g.files, modified_ms: g.modified_ms, reasons: g.reasons
     });
   });
   suggestions.sort(function (a, b) { return (b.modified_ms - a.modified_ms) || a.key.localeCompare(b.key); });
   other.sort(function (a, b) { return (a.rel || "").localeCompare(b.rel || ""); });
-  return { suggestions: suggestions, other: other };
+  additions.sort(function (a, b) { return (a.file.rel || "").localeCompare(b.file.rel || ""); });
+  return { suggestions: suggestions, other: other, additions: additions };
+}
+
+/** Why a supplier download was matched to a native part (#564), in words for
+ *  the user: `saved_from`, `same_name`, `same_name_above`, `same_name_below`. */
+export function companionReasonText(reason) {
+  if (reason === "saved_from") return "the part was saved from the download (the part names it)";
+  if (reason === "same_name_above") return "same name – the part is in the folder above";
+  if (reason === "same_name_below") return "same name – the part is in a folder below";
+  if (reason === "same_name") return "same name, same folder";
+  return "it belongs to the part";
+}
+
+/** The tooltip of a suggestion that took supplier downloads along (#564):
+ *  "ISWB25-64.step goes along – the part was saved from this file". */
+export function companionNote(suggestion) {
+  return ((suggestion && suggestion.reasons) || []).map(function (r) {
+    return r.name + " goes along – " + companionReasonText(r.reason);
+  }).join("; ");
+}
+
+/** *Add to item* (#564): the row text and the confirmation, for someone who
+ *  has never seen it. `a` is an entry of `planNewFiles(...).additions`. */
+export function additionPrompt(a) {
+  var target = a.owner.item + "/" + a.owner.revision;
+  var part = (a.owner.file || "").split("/").pop();
+  var folder = a.file.project + (a.file.folder ? " / " + a.file.folder : "");
+  return {
+    row: a.file.name + " → " + target,
+    title: "Add " + a.file.name + " to " + target + "?",
+    lines: [
+      a.file.name + " belongs to " + part + " of " + target + ": " + companionReasonText(a.reason) + ".",
+      "It is added to that item as a file of its own, in its folder (" + folder + ") – a supplier download is kept as the original next to the part.",
+      "If you have not checked out " + target + ", TeamCraft checks it out for this and checks it in again right after; nothing else of the item changes."
+    ],
+    button: "Add to " + a.owner.item
+  };
 }
 
 /** The summary of a batch *Create items…* before anything is created:
