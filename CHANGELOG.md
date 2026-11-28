@@ -152,6 +152,19 @@ Other changes:
   Without group* on *Project groups*, other users do not, and such an item is
   readable by every user until it is moved into a group.
 
+### Fixed
+
+- Desktop: *Check in all*, *Check in selected* and *Check in and sign out*
+  never sent *Update the BOM from the CAD file* (#407) – an assembly checked
+  in that way kept its old BOM. Their dialogs now show the box (ticked by
+  default every time, naming the assembly files) when a check-in includes an
+  assembly file; *Check in and sign out* uses the default. The result lists
+  the BOM changes per assembly. Park never updates the BOM.
+- Desktop Home, *Files*: the favourite-folder banner is one line (★, the
+  path with its last folder always visible, *Whole group*, *Remove
+  favourite*) instead of three; what it means is in its tooltip and for
+  screen readers.
+
 ## [0.2.14] - 2026-11-24
 
 ### Security

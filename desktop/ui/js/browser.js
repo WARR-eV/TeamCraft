@@ -93,20 +93,26 @@ function drawBar(p, opts, level) {
   bar.className = "home-root";
   if (!act) return;
   if (opts.favourite && !opts.atTop) {
+    // one line: ★ path … [Whole group] [Remove favourite]; what the star means
+    // is in the tooltip and for screen readers
+    var where = favouritePath(p.code, opts.favourite);
     bar.className = "home-root on";
     bar.setAttribute("role", "note");
-    bar.appendChild(h("p.home-root-title", null, [
-      h("span.home-root-star", { "aria-hidden": "true", text: "★" }),
-      h("strong", { text: "Favourite folder" }), " – not the top of the group"
+    bar.setAttribute("title", "Favourite folder – not the top of the group: " + where);
+    bar.appendChild(h("span.home-root-star", { "aria-hidden": "true", text: "★" }));
+    bar.appendChild(h("span.visually-hidden", { text: "Favourite folder – not the top of the group: " }));
+    // the last folder always shows; the way there gives way with "…"
+    var cut = where.lastIndexOf(" / ");
+    bar.appendChild(h("span.home-root-path", null, cut < 0 ? h("span.home-root-leaf", { text: where }) : [
+      h("span.home-root-via", { text: where.slice(0, cut + 3) }),
+      h("span.home-root-leaf", { text: where.slice(cut + 3) })
     ]));
-    bar.appendChild(h("p.home-root-path", { title: favouritePath(p.code, opts.favourite), text: favouritePath(p.code, opts.favourite) }));
-    bar.appendChild(h("div.row", null, [
-      h("button.small", { type: "button", title: "Show the top of " + p.code + " – the favourite stays", on: { click: function () { act.showTop(true); } } }, "Whole group"),
-      h("button.small.ghost", { type: "button", title: "Home starts at the top of the group again", on: { click: function () { act.favour(""); } } }, "Remove favourite")
-    ]));
+    bar.appendChild(h("button.small", { type: "button", title: "Show the top of " + p.code + " – the favourite stays", on: { click: function () { act.showTop(true); } } }, "Whole group"));
+    bar.appendChild(h("button.small.ghost", { type: "button", title: "Home starts at the top of the group again", on: { click: function () { act.favour(""); } } }, "Remove favourite"));
     return;
   }
   bar.removeAttribute("role");
+  bar.removeAttribute("title");
   if (opts.favourite) {
     bar.appendChild(h("button.link.small.home-root-back", {
       type: "button", title: "Back to the favourite folder " + favouritePath(p.code, opts.favourite),

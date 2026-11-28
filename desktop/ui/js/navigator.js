@@ -5,7 +5,7 @@
 import { $, ICONS, api, append, badge, call, clear, dialog, enc, errorNotice, errorText, field, h, lockIcon, setStatus, state, svgIcon, toast } from "./core.js";
 import { fmtDate, label } from "/static/shared/js/format.js";
 import { canSeeLocks, openLockOverview } from "./lock-overview.js";
-import { CHECK_IN_ALL_TITLE, canEdit, canEditProject, checkInAll, fetchWorklist, refreshWorklistCount, reloadProjects, renderNotifications, rescanLocalChanges, rescanNewFiles, scanLocalChanges, scanNewFiles, sendLocalChanges, showWorklistCount } from "./shell.js";
+import { CHECK_IN_ALL_TITLE, bomChoiceBox, canEdit, canEditProject, checkInAll, fetchWorklist, refreshWorklistCount, reloadProjects, renderNotifications, rescanLocalChanges, rescanNewFiles, scanLocalChanges, scanNewFiles, sendLocalChanges, showWorklistCount } from "./shell.js";
 import { assistantContextChanged } from "./assistant.js";
 import { agent, renderAgentView } from "./agent.js";
 import { openRevision } from "./revision.js";
@@ -670,7 +670,13 @@ function localGet(refs) {
  *  the chosen files (revisions with a conflict stay checked out). */
 function localCheckin(report) {
   if (!report.changed.length) return;
+  formatKinds().catch(function () { return {}; }).then(function (kinds) { askLocalCheckin(report, kinds); });
+}
+
+function askLocalCheckin(report, kinds) {
   var comment = h("input", { type: "text", maxlength: "500", placeholder: "What changed?" });
+  // #407: ticked by default; not used by Park (the revision stays checked out)
+  var bom = bomChoiceBox(report.changed, kinds);
   var names = report.changed.map(function (c) { return c.item + "/" + c.code + " (" + c.upload.join(", ") + ")"; });
   var added = [];
   report.changed.forEach(function (c) {
@@ -681,6 +687,7 @@ function localCheckin(report) {
     h("ul.small", null, names.map(function (t) { return h("li", { text: t }); })),
     added.length ? h("p.notice", { text: "Also checked in, though not ticked – the check-in releases the check-out, so no changed file of " +
       "these revisions is left behind (Park uploads them and keeps the check-out): " + added.join("; ") }) : null,
+    bom ? bom.node : null,
     field("Comment", comment)
   ]), [
     { label: "Cancel", onClick: function (d) { d.close(); } },
@@ -688,7 +695,8 @@ function localCheckin(report) {
     { label: "Check in", primary: true, submit: true, onClick: function (d) { d.close(); send(false); } }
   ]);
   function send(park) {
-    sendLocalChanges(report, park, comment.value.trim() || (park ? "Parked from Local changes" : "Checked in from Local changes")).then(function (sent) {
+    sendLocalChanges(report, park, comment.value.trim() || (park ? "Parked from Local changes" : "Checked in from Local changes"),
+      { bom: bom ? bom.input.checked : true }).then(function (sent) {
       var problems = sent.kept.concat(sent.failed);
       toast((sent.done.length ? (park ? "Parked " : "Checked in ") + sent.done.join(", ") : park ? "Nothing parked" : "Nothing checked in") +
         (problems.length ? ". " + problems.join("; ") : "."), sent.failed.length ? "error" : null);

@@ -4,6 +4,7 @@
 
 import { $, ICONS, api, append, badge, call, clear, confirmDialog, dialog, enc, errorText, h, invoke, rememberError, reportLink, run, setStatus, state, svgIcon, toast, tool, transfer } from "./core.js";
 import { checkInAllFailure } from "./report-inputs.js";
+import { bomBoxLabel, bomCheckins, checkinBomText } from "./checkin-bom.js";
 import { installText, misfitQuestion, releasePageArgs, releasePageLabel, serverNote, transferBusy, updateAction } from "./update-rules.js";
 import { fmtDate, fmtSize, label } from "/static/shared/js/format.js";
 import { t } from "/static/shared/js/i18n.js";
@@ -719,22 +720,42 @@ export function localChangesList(report) {
  * stays) the modified and new files of every check-out with local changes,
  * one after the other. A check-out with a conflict is left alone (the server
  * would refuse it). Resolves with `{done, kept, failed}` (lines of text). */
-export function sendLocalChanges(report, park, comment) {
+export function sendLocalChanges(report, park, comment, opts) {
   var out = { done: [], kept: [], failed: [] };
+  // *Update the BOM from the CAD file* (#407): on unless the user unticked it,
+  // never when parking; only for check-ins with an assembly file (bomCheckins)
+  var withBom = !park && !(opts && opts.bom === false);
   report.unreadable.forEach(function (u) { out.kept.push(u[0].item + "/" + u[0].code + ": could not be compared – " + u[1]); });
   // a counted transfer: the update window does not replace the app meanwhile (#466)
   return transfer(function () {
-    return report.changed.reduce(function (chain, c) {
-      return chain.then(function () {
-        var name = c.item + "/" + c.code;
-        if (c.conflicts.length) { out.kept.push(name + ": conflict in " + c.conflicts.join(", ") + " – merge in its Workspace tab"); return; }
-        setStatus((park ? "Parking " : "Checking in ") + name + " …");
-        return call(park ? "workspace_park" : "workspace_checkin", { project: c.project, item: c.item, code: c.code, files: c.upload, comment: comment })
-          .then(function () { out.done.push(name + " (" + c.upload.join(", ") + ")"); },
-            function (err) { out.failed.push(name + ": " + errorText(err)); });
-      });
-    }, Promise.resolve());
+    return (withBom ? formatKinds().catch(function () { return {}; }) : Promise.resolve({})).then(function (kinds) {
+      var bomFor = withBom ? bomCheckins(report.changed, kinds) : [];
+      return report.changed.reduce(function (chain, c) {
+        return chain.then(function () {
+          var name = c.item + "/" + c.code;
+          if (c.conflicts.length) { out.kept.push(name + ": conflict in " + c.conflicts.join(", ") + " – merge in its Workspace tab"); return; }
+          setStatus((park ? "Parking " : "Checking in ") + name + " …");
+          var args = { project: c.project, item: c.item, code: c.code, files: c.upload, comment: comment };
+          if (!park) args.bomFromReferences = bomFor.indexOf(c) >= 0;
+          return call(park ? "workspace_park" : "workspace_checkin", args)
+            .then(function (r) {
+              var bomLine = args.bomFromReferences ? checkinBomText(r && r.bom) : "";
+              out.done.push(name + " (" + c.upload.join(", ") + ")" + (bomLine ? " – " + bomLine : ""));
+            }, function (err) { out.failed.push(name + ": " + errorText(err)); });
+        });
+      }, Promise.resolve());
+    });
   }).then(function () { setStatus(""); return out; }, function (err) { setStatus(""); throw err; });
+}
+
+/** The *Update the BOM from the CAD file* box of *Check in all* and *Check in
+ *  selected*: ticked by default every time (#407), or null when no check-in
+ *  has an assembly file. `box.input.checked` is the choice. */
+export function bomChoiceBox(changed, kinds) {
+  var list = bomCheckins(changed, kinds);
+  if (!list.length) return null;
+  var input = h("input", { type: "checkbox", checked: true });
+  return { input: input, node: h("label.check", null, [input, bomBoxLabel(list, kinds)]) };
 }
 
 function lines(title, list, cls) {
@@ -769,25 +790,34 @@ export function checkInAll() {
     return checkoutsWithChanges(checkouts);
   }).then(function (report) {
     if (!atRisk(report)) { releaseClean(checkouts.length, report, null); return; }
-    dialog("Local changes before Check in all", h("div.stack", null, [
-      h("p", { text: atRisk(report) + " of your " + checkouts.length + " check-outs have changes in the working folder that are not on the server yet:" }),
-      localChangesList(report),
-      h("p.small.muted", { text: "Check them in first: their modified and new files become new versions and their locks are released too. " +
-        "Check-outs with a conflict stay checked out. Only the others: just the check-outs without local changes are released." })
-    ]), [
-      { label: "Cancel", onClick: function (d) { d.close(); } },
-      { label: "Only the others", onClick: function (d) { d.close(); releaseClean(checkouts.length, report, null); } },
-      { label: "Check them in first", primary: true, submit: true, onClick: function (d) {
-        d.close();
-        // one transfer from the first upload to the last release (#466)
-        transfer(function () {
-          return sendLocalChanges(report, false, "Checked in with Check in all").then(function (sent) {
-            return releaseClean(checkouts.length, report, sent);
-          });
-        }).catch(function () {});
-      } }
-    ], { wide: true });
+    return formatKinds().catch(function () { return {}; }).then(function (kinds) { askCheckInAll(checkouts, report, kinds); });
   }, function () {});
+}
+
+/** The question of *Check in all* when check-outs hold local changes – with
+ *  *Update the BOM from the CAD file* (ticked by default, #407) when one of
+ *  them checks in an assembly file. */
+function askCheckInAll(checkouts, report, kinds) {
+  var bom = bomChoiceBox(report.changed, kinds);
+  dialog("Local changes before Check in all", h("div.stack", null, [
+    h("p", { text: atRisk(report) + " of your " + checkouts.length + " check-outs have changes in the working folder that are not on the server yet:" }),
+    localChangesList(report),
+    bom ? bom.node : null,
+    h("p.small.muted", { text: "Check them in first: their modified and new files become new versions and their locks are released too. " +
+      "Check-outs with a conflict stay checked out. Only the others: just the check-outs without local changes are released." })
+  ]), [
+    { label: "Cancel", onClick: function (d) { d.close(); } },
+    { label: "Only the others", onClick: function (d) { d.close(); releaseClean(checkouts.length, report, null); } },
+    { label: "Check them in first", primary: true, submit: true, onClick: function (d) {
+      d.close();
+      // one transfer from the first upload to the last release (#466)
+      transfer(function () {
+        return sendLocalChanges(report, false, "Checked in with Check in all", { bom: bom ? bom.input.checked : true }).then(function (sent) {
+          return releaseClean(checkouts.length, report, sent);
+        });
+      }).catch(function () {});
+    } }
+  ], { wide: true });
 }
 
 /** Releases the check-outs without local changes and reports everything. */

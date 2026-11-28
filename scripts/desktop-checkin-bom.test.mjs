@@ -13,7 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const source = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../desktop/ui/js/checkin-bom.js");
-const { bomStructureFile, offerBomUpdate, checkinBomText } =
+const { bomBoxLabel, bomCheckins, bomStructureFile, offerBomUpdate, checkinBomText } =
   await import("data:text/javascript;base64," + fs.readFileSync(source).toString("base64"));
 
 let passed = 0;
@@ -68,6 +68,27 @@ test("nothing changed: no line, even with something to report", () => {
   assert.equal(checkinBomText({ added: [], updated: [], refused: [{ child: "ASM-1", reason: "circular" }] }),
     "BOM unchanged · refused (circular): ASM-1");
   assert.equal(checkinBomText({ added: ["PRT-1"], updated: ["PRT-2", "PRT-3"] }), "BOM: 1 line added, 2 quantities changed");
+});
+
+test("Check in all / Check in selected: the box covers the check-ins with an assembly file, never a conflict", () => {
+  const changed = [
+    { item: "ASM-46", code: "A", upload: ["Main 4.3.iam"], conflicts: [] },
+    { item: "PRT-3", code: "A", upload: ["Lever.ipt"], conflicts: [] },
+    { item: "ASM-90", code: "A", upload: ["Brake.iam", "Brake.stp"], conflicts: [] },
+    { item: "ASM-12", code: "A", upload: ["Frame.iam"], conflicts: ["Frame.iam"] }
+  ];
+  const list = bomCheckins(changed, kinds);
+  assert.deepEqual(list.map((c) => c.item), ["ASM-46", "ASM-90"]);
+  const label = bomBoxLabel(list, kinds);
+  assert.match(label, /^Update the BOM from the CAD file \(Main 4\.3\.iam, Brake\.iam\)/);
+  assert.match(label, /never removes a line/);
+  assert.deepEqual(bomCheckins([changed[1]], kinds), [], "parts only: no box");
+  assert.deepEqual(bomCheckins([], kinds), []);
+});
+
+test("the box label names at most four assembly files", () => {
+  const many = ["A", "B", "C", "D", "E", "F"].map((n) => ({ item: n, code: "A", upload: [n + ".iam"], conflicts: [] }));
+  assert.match(bomBoxLabel(bomCheckins(many, kinds), kinds), /\(A\.iam, B\.iam, C\.iam, D\.iam and 2 more\)/);
 });
 
 console.log(passed + " tests passed");
