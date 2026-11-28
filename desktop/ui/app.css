@@ -198,9 +198,11 @@ ul.connections > li { justify-content: space-between; align-items: center; paddi
   border: 1.5px solid currentColor; border-radius: 50%;
 }
 .badge-in_work::before, .badge-draft::before, .badge-new::before { box-shadow: inset 3px 0 0 currentColor; }
-.badge-in_review, .badge-in_triage, .badge-modified, .badge-outdated, .badge-deferred {
+.badge-in_review, .badge-in_triage, .badge-outdated, .badge-deferred {
   color: var(--st-review-fg); background: var(--st-review-bg); border-color: var(--st-review-bd);
 }
+/* changed on this computer: violet, never the amber of a check-out */
+.badge-modified { color: var(--st-local-fg); background: var(--st-local-bg); border-color: var(--st-local-bd); }
 /* a reviewer who has not decided yet: waiting, not a warning */
 .badge-pending { color: var(--text-muted); background: transparent; border-color: var(--border-strong); }
 /* priorities: plain text like the web titleblock; ▲ high, ▲▲ critical */
@@ -1237,6 +1239,14 @@ ul.file-picks li .mono { overflow: hidden; text-overflow: ellipsis; white-space:
 .new-item-info .notice { margin: 0; }
 /* worklist: New on this computer – the tick box before the row's icon */
 .node.new-file input[type="checkbox"], .node.local-change input[type="checkbox"] { flex: none; margin: 0 4px 0 2px; }
+/* worklist: Local changes – only the file name is cut with "…"; the state
+   (a wrench for Modified, else the badge) and "not checked out" never shrink */
+.local-state { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.local-modified { display: inline-flex; color: var(--st-local-fg); }
+.local-modified svg {
+  width: 14px; height: 14px;
+  fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;
+}
 
 /* Preview images stored in CAD files (Inventor, Solid Edge, SolidWorks):
    drawings on paper, white in both schemes */

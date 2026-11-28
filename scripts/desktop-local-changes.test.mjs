@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 const source = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../desktop/ui/js/local-changes.js");
 const {
-  LOCAL_STATES, localRevKey, localRowActions, localRowKey, localSummaryText, localVersionText, planLocalChanges, revisionCheckin, selectionActions
+  LOCAL_STATES, localRevKey, localRowActions, localRowKey, localStateMark, localSummaryText, localVersionText, planLocalChanges, revisionCheckin, selectionActions
 } = await import("data:text/javascript;base64," + fs.readFileSync(source).toString("base64"));
 
 let passed = 0;
@@ -148,6 +148,32 @@ test("keys ignore case and an empty scan plans nothing", () => {
   assert.deepEqual(plan.items, []);
   assert.equal(localSummaryText(plan), "");
   assert.deepEqual(LOCAL_STATES, ["conflict", "modified", "new", "outdated", "missing"]);
+});
+
+test("a modified file shows a wrench, never hidden behind a long name; without a check-out it says so", () => {
+  const mine = localStateMark(file({ without_checkout: false }));
+  assert.equal(mine.kind, "wrench");
+  assert.equal(mine.label, "Modified");
+  assert.equal(mine.notCheckedOut, false);
+  assert.match(mine.title, /check it in/);
+  const loose = localStateMark(file({ name: "Synchrone Riemenscheibe12 Planetengetriebe.ipt", without_checkout: true }));
+  assert.equal(loose.kind, "wrench");
+  assert.equal(loose.notCheckedOut, true);
+  assert.match(loose.title, /not checked it out/);
+  assert.match(loose.title, /Check out keeps your file/);
+});
+
+test("the other states keep their badge and label", () => {
+  for (const state of ["conflict", "new", "outdated", "missing"]) {
+    const m = localStateMark(file({ state }));
+    assert.equal(m.kind, "badge", state);
+    assert.equal(m.notCheckedOut, false, state);
+  }
+  assert.equal(localStateMark(file({ state: "missing" })).label, "Not in working folder");
+  const unknown = localStateMark(file({ state: "renamed" }));
+  assert.equal(unknown.kind, "badge");
+  assert.equal(unknown.label, "renamed");
+  assert.match(localStateMark(file({ state: "new", without_checkout: true })).title, /not checked it out/);
 });
 
 console.log(passed + " tests passed");

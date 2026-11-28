@@ -77,6 +77,11 @@
   --st-impact-bg: #fff1e7;
   --st-impact-edge: #d97a1e;
   --st-lock-other: #8a5300;
+  /* changed on this computer (Local changes, the Modified badge): violet, so it
+     is never mistaken for the amber of a check-out */
+  --st-local-fg: #6941c6;
+  --st-local-bg: #f3effc;
+  --st-local-bd: #d4c6f4;
 
   /* avatar tints: identity, not data */
   --avatar-1: #dbe7f5;
@@ -171,6 +176,9 @@
     --st-impact-bg: #3a2414;
     --st-impact-edge: #f3a15f;
     --st-lock-other: #e9b949;
+    --st-local-fg: #b9a3f5;
+    --st-local-bg: #251d3a;
+    --st-local-bd: #44356b;
     --avatar-1: #1f3550;
     --avatar-2: #1e3a2b;
     --avatar-3: #3d2f1a;
@@ -241,6 +249,9 @@
   --st-impact-bg: #3a2414;
   --st-impact-edge: #f3a15f;
   --st-lock-other: #e9b949;
+  --st-local-fg: #b9a3f5;
+  --st-local-bg: #251d3a;
+  --st-local-bd: #44356b;
   --avatar-1: #1f3550;
   --avatar-2: #1e3a2b;
   --avatar-3: #3d2f1a;
@@ -386,6 +397,10 @@
   --primary-hover: #8a4ccb;
   --primary-active: #9255d2;
   --on-primary: #ffffff;
+  /* violet is this skin's brand: local changes in cyan instead */
+  --st-local-fg: #6fd3e0;
+  --st-local-bg: #0f2a30;
+  --st-local-bd: #1f4d55;
   --glow:
     radial-gradient(65% 55% at 20% -10%, rgb(127 63 191 / 22%), transparent 70%),
     radial-gradient(60% 50% at 50% 115%, rgb(127 127 255 / 14%), transparent 70%);

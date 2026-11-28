@@ -49,6 +49,14 @@ see the notices in the README.
 
 ### Changed
 
+- Desktop worklist, *Local changes*: the state of a row no longer hides behind
+  a long file name – only the name is cut with "…", the state and *not checked
+  out* always show. A modified file is marked with a small wrench instead of
+  the *Modified* badge. Locally changed files have their own colour (violet;
+  cyan in the EndeavourOS skin) in the row and in the *Modified* badge, so they
+  are no longer the amber of a check-out on the Home tab (`--st-local-*` in
+  `shared/css/skins.css`).
+
 UI review #513 – the decided themes:
 
 - Web: one *Vault* entry in the main nav for the folder explorer and the
