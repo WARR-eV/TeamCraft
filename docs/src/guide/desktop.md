@@ -217,9 +217,17 @@ check-outs and reviews, and a **local working folder**:
   that is not the same as on the server, across all project groups and
   grouped by item: **modified**, **outdated** (somebody checked in a newer
   version), **conflict** (changed here and on the server), **new** (a file
-  next to a tracked one, such as a STEP export) and **missing**. A file you
-  changed after clearing its read-only flag shows up too, marked *not checked
-  out* – you do not have to open its item first. Each row has its actions,
+  next to a tracked one, such as a STEP export) and **missing**. A
+  modified file is marked with a small violet wrench (hover it for what it
+  means) – violet so it is never mistaken for the amber of a check-out; the
+  other states keep their badge, and the state always shows, also beside a
+  long file name. A file changed without a check-out shows up too, with a small warning
+  triangle beside the wrench (hover it: *Changed although you have not checked
+  it out*) – you do not have to open its item first. This happens
+  when a CAD program saves a file you have not checked out: Inventor's *Save
+  All*, for example, saves every file it considers changed, and it replaces
+  read-only files instead of writing into them, so the read-only flag does
+  not stop it. Each row has its actions,
   and the ticked rows take the ones above the list: **Check out** (keep my
   file) for a file changed without a check-out – your file stays as it is and
   the revision becomes yours to check in; **Get latest** for outdated and

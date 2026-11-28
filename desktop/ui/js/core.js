@@ -133,6 +133,10 @@ export var ICONS = {
   refresh: "M20 11a8 8 0 1 0-2.3 5.7|M20 4v7h-7",
   plus: "M12 5v14|M5 12h14",
   edit: "M4 20h4L19 9l-4-4L4 16z",
+  // changed on this computer (Local changes): an open-end wrench
+  wrench: "M15.5 3.5V7.5L16.5 8.5H20.5A5 5 0 0 1 12.2 12.3L5.5 19A1.6 1.6 0 0 1 3.2 16.7L10.6 9.6A5 5 0 0 1 15.5 3.5Z",
+  // a warning that needs the user (changed without a check-out): a triangle with "!"
+  warning: "M12 3.5L21.5 20H2.5Z|M12 9.5v5|M12 17.2v.1",
   obsolete: "M5 5l14 14|M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18",
   release: "M5 21V4|M5 4h12l-2.5 4 2.5 4H5",
   eye: "M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z|M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6",

@@ -11,7 +11,7 @@ import { agent, renderAgentView } from "./agent.js";
 import { openRevision } from "./revision.js";
 import { impactGroups, relationShort, relationText } from "./references.js";
 import { getting, lockAge, reportDownload } from "./workspace.js";
-import { LOCAL_LABEL, localSummaryText, localVersionText, revisionCheckin, selectionActions } from "./local-changes.js";
+import { localStateMark, localSummaryText, localVersionText, revisionCheckin, selectionActions } from "./local-changes.js";
 import { openChange } from "./change.js";
 import { openRequest } from "./requests.js";
 import { checkNewItemFiles, createItemFromFiles, editableGroupOfFolder, newItemDialog } from "./dialogs.js";
@@ -542,8 +542,6 @@ function localRevisionNode(rev, ticked, updateBar, editor) {
   return h("li", null, [head, h("ul.tree", null, rev.rows.map(function (r) {
     var box = h("input", { type: "checkbox", "aria-label": "Tick " + r.name, checked: !!ticked[r.key],
       on: { click: function (ev) { ev.stopPropagation(); }, change: function () { ticked[r.key] = box.checked; updateBar(); } } });
-    var stateBadge = badge(r.state, LOCAL_LABEL[r.state] || r.state);
-    if (r.without_checkout) stateBadge.title = "Changed without a check-out – check out to keep your file";
     var buttons = r.actions.filter(function (a) { return editor || (a !== "checkout" && a !== "checkin"); }).map(function (a) {
       return h("button.small", { type: "button", title: LOCAL_ACTION_TITLE[a], on: { click: function (ev) {
         ev.stopPropagation();
@@ -552,12 +550,28 @@ function localRevisionNode(rev, ticked, updateBar, editor) {
     });
     return h("li", null, h("div.node.local-change", { title: r.path }, [
       box,
-      h("span.label", null, [h("span.fname", { text: r.name }), " ", stateBadge,
-        r.without_checkout ? h("span.small.dim", { text: " not checked out" }) : null]),
+      // only the name is cut with "…": the state beside it never shrinks
+      h("span.label", null, h("span.fname", { text: r.name })),
+      localStateNode(r),
       h("span.meta.small.dim", { text: localVersionText(r) }),
       h("span.row", null, buttons)
     ]));
   }))]);
+}
+
+/** The state of a *Local changes* row (`localStateMark`): a wrench for a
+ *  modified file, else the state's badge, then a warning triangle when it
+ *  was changed without a check-out. */
+function localStateNode(r) {
+  var m = localStateMark(r);
+  var mark = m.kind === "wrench"
+    ? h("span.local-modified", { role: "img", "aria-label": m.label, title: m.title }, svgIcon(ICONS.wrench))
+    : badge(r.state, m.label);
+  if (m.kind !== "wrench") mark.title = m.title;
+  var warn = m.warning
+    ? h("span.local-warning", { role: "img", "aria-label": m.warning, title: m.warning }, svgIcon(ICONS.warning))
+    : null;
+  return h("span.local-state", null, [mark, warn]);
 }
 
 function localRef(rev) { return { project: rev.project || null, item: rev.item, code: rev.code }; }
